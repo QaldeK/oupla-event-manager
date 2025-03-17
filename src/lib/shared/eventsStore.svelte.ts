@@ -1,0 +1,491 @@
+import { SyncStore } from '$lib/shared/syncState.svelte';
+import type { EventsRecord, EventsResponse } from '$lib/types/pocketbase.ts';
+import type { DateProposedType, OrganizerType, RecurrenceType } from '$lib/schemas/event.schema';
+import { Collections } from '$lib/types/pocketbase';
+import { format, parse } from 'date-fns';
+
+// Ajouter ces types au début du fichier
+export interface EventConflict {
+	id: string;
+	event_title: string;
+	time_start: string;
+	time_end: string;
+	rooms: string[];
+	conflictType: 'confirmed' | 'unconfirmed' | 'sondage' | 'close-confirmed' | 'close-unconfirmed';
+	hasSameRoom: boolean;
+	date_event: string;
+	isConfirmed: boolean;
+	organizers: OrganizerType[];
+	sourceEventId?: string; // Propriété temporaire pour la déduplication
+}
+
+type ConflictType = 'confirmed' | 'unconfirmed' | 'sondage';
+
+interface EventConflictInfo {
+	id: string;
+	event_title: string;
+	organizers: OrganizerType[];
+	rooms: string[];
+	conflictType: ConflictType;
+	date_event?: string;
+	dateStart?: string;
+	dateEnd?: string;
+	time_start: string;
+	time_end: string;
+}
+
+export interface ConflictMap {
+	confirmed: EventConflict[];
+	unconfirmed: EventConflict[];
+	sondage: EventConflict[];
+	'close-confirmed': EventConflict[];
+	'close-unconfirmed': EventConflict[];
+}
+
+// Type helper qui combine EventsRecord et StoreRecord
+export type SyncEventRecord = EventsRecord & {
+	id: string;
+	created: string;
+	updated: string;
+	collectionId: string;
+	collectionName: Collections;
+	expand?: {
+		created_by?: UsersResponse;
+	};
+};
+
+class EventsStore {
+	#store = $state({
+		syncStore: null as SyncStore<SyncEventRecord> | null,
+		isInitialized: false,
+		error: null as Error | null,
+		initPromise: null as Promise<void> | null,
+		mode: null as 'internal' | 'external' | null
+	});
+
+	async init({ spaceId, mode }: StoreConfig) {
+		if (this.#store.initPromise) return this.#store.initPromise;
+
+		this.#store.initPromise = (async () => {
+			const dbName = 'eventsStore'; //= mode === 'external' ? 'events-public' : 'events-dashboard';
+
+			const filter = `space = '${spaceId}' && (date_event = "" || date_event >= '${new Date().toISOString().split('T')[0]}')`;
+
+			const syncStore = new SyncStore<SyncEventRecord>({
+				name: 'eventsStore',
+				version: 1,
+				dbName,
+				sync: {
+					mode: 'realtime',
+					filter,
+					sort: 'date_event',
+					expand: 'created_by'
+				},
+				cache: {
+					maxRecords: mode === 'external' ? 200 : 500,
+					strategy: 'lru'
+				}
+			});
+
+			await syncStore.init(Collections.Events);
+			this.#store.syncStore = syncStore;
+			this.#store.mode = mode;
+			this.#store.isInitialized = true;
+		})();
+
+		return this.#store.initPromise;
+	}
+
+	async forceRefresh(): Promise<void> {
+		if (!this.#store.syncStore) {
+			throw new Error('Store not initialized');
+		}
+		try {
+			await this.#store.syncStore.forceRefresh();
+		} catch (error) {
+			console.error('Erreur lors du refresh forcé:', error);
+			throw error;
+		}
+	}
+
+	async clearAndDestroy(): Promise<void> {
+		if (this.#store.syncStore) {
+			await this.#store.syncStore.clearAll();
+			this.#store.syncStore = null;
+		}
+		this.#store.isInitialized = false;
+		this.#store.error = null;
+		this.#store.initPromise = null;
+	}
+
+	// :::  getters
+
+	allEvents = $derived.by<SyncEventRecord[]>(() => {
+		if (!this.#store.syncStore) return [];
+
+		return this.#store.syncStore
+			.getAll()
+			.filter((e) => !e.isMasterRecurrent)
+			.sort((a: SyncEventRecord, b: SyncEventRecord) => {
+				if (!a.date_event && !b.date_event) return 0;
+				if (!a.date_event) return 1;
+				if (!b.date_event) return -1;
+				return a.date_event.localeCompare(b.date_event);
+			});
+	});
+
+	allMasterEvents = $derived.by<SyncEventRecord[]>(() => {
+		if (!this.#store.syncStore) return [];
+
+		return this.#store.syncStore.getAll().filter((e) => e.isMasterRecurrent);
+	});
+
+	eventsWithDate = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => e.date_event));
+
+	eventsWithoutDate = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => !e.date_event));
+
+	confirmedEvents = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => e.isConfirmed));
+
+	unconfirmedEvents = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => !e.isConfirmed));
+
+	confirmableEvents = $derived<SyncEventRecord[]>(
+		this.eventsWithDate.filter((e) => !e.isConfirmed)
+	);
+
+	eventsWithSondage = $derived<SyncEventRecord[]>(
+		this.eventsWithoutDate.filter(
+			(e) => Array.isArray(e.dates_proposed) && (e.dates_proposed?.length ?? 0) > 0
+		)
+	);
+
+	eventsWithoutDateProposition = $derived<SyncEventRecord[]>(
+		this.eventsWithoutDate.filter(
+			(e) => Array.isArray(e.dates_proposed) && e.dates_proposed?.length === 0
+		)
+	);
+
+	eventsWithoutOrganizers = $derived<SyncEventRecord[]>(
+		this.allEvents.filter((e) => {
+			return Array.isArray(e.organizers) && e.organizers.length === 0;
+		})
+	);
+
+	getEventsOccurences = $derived<SyncEventRecord[]>(
+		this.eventsWithDate.filter((e) => e.isRecurrent)
+	);
+
+	getEventById = $derived.by(() => (id: string): SyncEventRecord | undefined => {
+		if (!this.#store.syncStore) return undefined;
+		return this.#store.syncStore.get(id);
+	});
+
+	// USELESS
+	getEventsByDate = $derived.by<Map<string, SyncEventRecord[]>>(() => {
+		const eventsByDateMap = new Map<string, SyncEventRecord[]>();
+		for (const event of this.allEvents) {
+			if (event.date_event) {
+				if (!eventsByDateMap.has(event.date_event)) {
+					eventsByDateMap.set(event.date_event, []); // Initialiser un tableau vide si la date n'existe pas
+				}
+				eventsByDateMap.get(event.date_event)!.push(event); // Ajouter l'événement au tableau de la date correspondante
+			}
+		}
+		return eventsByDateMap;
+	});
+
+	getEventsByDateTime = $derived.by<Map<string, EventConflictInfo[]>>(() => {
+		const eventsByDateMap = new Map<string, EventConflictInfo[]>();
+
+		for (const event of this.allEvents) {
+			// Fonction utilitaire pour créer l'objet d'information
+			const createEventInfo = (
+				event: SyncEventRecord,
+				dateStart?: string,
+				dateEnd?: string
+			): EventConflictInfo => ({
+				id: event.id,
+				event_title: event.event_title,
+				organizers: event.organizers,
+				rooms: event.rooms,
+				conflictType: event.isConfirmed ? 'confirmed' : 'unconfirmed',
+				date_event: event.date_event,
+				dateStart: dateStart || event.dateStart,
+				dateEnd: dateEnd || event.dateEnd,
+				time_start: dateStart ? format(new Date(dateStart), 'HH:mm') : event.time_start,
+				time_end: dateEnd ? format(new Date(dateEnd), 'HH:mm') : event.time_end
+			});
+
+			// Fonction utilitaire pour extraire la date YYYY-MM-DD
+			const extractDateOnly = (dateString: string | null | undefined): string | null => {
+				if (!dateString) return null;
+
+				try {
+					// Si c'est déjà au format YYYY-MM-DD
+					if (event.date_event) return event.date_event;
+
+					// Pour les dates ISO ou standard
+					return dateString.split('T')[0].split(' ')[0];
+				} catch (error) {
+					console.error('Error processing date:', dateString, error);
+					return null;
+				}
+			};
+
+			// Fonction utilitaire pour ajouter un événement à la map
+			const addEventToDate = (
+				dateString: string | null | undefined,
+				eventInfo: EventConflictInfo
+			) => {
+				const dateOnly = extractDateOnly(dateString);
+				if (!dateOnly) return;
+
+				if (!eventsByDateMap.has(dateOnly)) {
+					eventsByDateMap.set(dateOnly, []);
+				}
+
+				// Éviter les doublons pour le même événement
+				if (!eventsByDateMap.get(dateOnly)!.some((e) => e.id === eventInfo.id)) {
+					eventsByDateMap.get(dateOnly)!.push(eventInfo);
+				}
+			};
+
+			// Traiter la date principale si elle existe
+			if (event.dateStart) {
+				const eventInfo = createEventInfo(event, event.dateStart, event.dateEnd);
+				addEventToDate(event.dateStart, eventInfo);
+			} else if (event.date_event) {
+				// Fallback sur date_event + time_start/end si dateStart n'existe pas
+				const dateStart = `${event.date_event}T${event.time_start}`;
+				const dateEnd = `${event.date_event}T${event.time_end}`;
+				const eventInfo = createEventInfo(event, dateStart, dateEnd);
+				addEventToDate(event.date_event, eventInfo);
+			}
+
+			// Traiter les dates proposées si elles existent
+			if (event.dates_proposed?.length) {
+				for (const proposedDate of event.dates_proposed) {
+					if (proposedDate?.dateStart && proposedDate?.dateEnd) {
+						const sondageEventInfo = createEventInfo(
+							event,
+							proposedDate.dateStart,
+							proposedDate.dateEnd
+						);
+						sondageEventInfo.conflictType = 'sondage';
+						addEventToDate(proposedDate.dateStart, sondageEventInfo);
+					}
+				}
+			}
+		}
+
+		return eventsByDateMap;
+	});
+
+	// ::: Utilitaires partagés
+	private timeUtils = {
+		parseTimeToMinutes: (time: string): number => {
+			const [hours, minutes] = time.split(':').map(Number);
+			return hours * 60 + minutes;
+		},
+
+		parseDateTime: (dateTimeStr: string, format: string) =>
+			parse(dateTimeStr, format, new Date()).getTime(),
+
+		checkTimeOverlap: (start1: number, end1: number, start2: number, end2: number): boolean =>
+			start1 < end2 && end1 > start2,
+
+		isTimeClose: (time1: number, time2: number, threshold = 2 * 60 * 60 * 1000): boolean =>
+			Math.abs(time1 - time2) < threshold
+	};
+
+	// Méthode centrale de détection des chevauchements
+	private findOverlappingEvents(
+		targetStart: number,
+		targetEnd: number,
+		events: EventConflictInfo[],
+		options: {
+			excludeEventId?: string;
+			checkCloseEvents?: boolean;
+			rooms?: string[];
+		} = {}
+	) {
+		const overlappingEvents = events.filter((event) => {
+			if (options.excludeEventId && event.id === options.excludeEventId) return false;
+
+			const eventStartTime = event.dateStart
+				? new Date(event.dateStart).getTime()
+				: this.parseTimeToDate(event.time_start, new Date()).getTime();
+			const eventEndTime = event.dateEnd
+				? new Date(event.dateEnd).getTime()
+				: this.parseTimeToDate(event.time_end, new Date()).getTime();
+
+			const hasTimeOverlap = this.timeUtils.checkTimeOverlap(
+				targetStart,
+				targetEnd,
+				eventStartTime,
+				eventEndTime
+			);
+
+			const isClose =
+				options.checkCloseEvents &&
+				(this.timeUtils.isTimeClose(targetEnd, eventStartTime) ||
+					this.timeUtils.isTimeClose(targetStart, eventEndTime));
+
+			return hasTimeOverlap || isClose;
+		});
+
+		if (options.rooms) {
+			return overlappingEvents.map((event) =>
+				this.formatConflict(event, options.rooms, targetStart, targetEnd)
+			);
+		}
+
+		return overlappingEvents;
+	}
+
+	/**
+	 * Trouve tous les groupes d'événements qui se chevauchent pour chaque date
+	 * @returns Une Map avec des clés au format "date_groupe" et des tableaux d'événements en conflit
+	 */
+	getOverlappingEventGroups = $derived.by<Map<string, EventConflictInfo[][]>>(() => {
+		const overlappingByDate = new Map<string, EventConflictInfo[][]>();
+
+		for (const [date, events] of this.getEventsByDateTime.entries()) {
+			if (events.length < 2) continue;
+
+			const groups: EventConflictInfo[][] = [];
+			const processed = new Set<string>();
+
+			for (const event of events) {
+				if (processed.has(event.id)) continue;
+
+				const eventStart = event.dateStart
+					? new Date(event.dateStart).getTime()
+					: this.parseTimeToDate(event.time_start, new Date(date)).getTime();
+				const eventEnd = event.dateEnd
+					? new Date(event.dateEnd).getTime()
+					: this.parseTimeToDate(event.time_end, new Date(date)).getTime();
+
+				const overlapping = this.findOverlappingEvents(eventStart, eventEnd, events);
+
+				if (overlapping.length > 1) {
+					groups.push(overlapping);
+					overlapping.forEach((e) => processed.add(e.id));
+				}
+			}
+
+			if (groups.length > 0) {
+				overlappingByDate.set(date, groups);
+			}
+		}
+
+		return overlappingByDate;
+	});
+
+	findConflicts(
+		eventId: string | undefined,
+		dateTimeStart: string,
+		dateTimeEnd: string,
+		rooms: string[]
+	) {
+		if (!dateTimeStart || !dateTimeEnd) return [];
+
+		const dateStr = dateTimeStart.substring(0, 8);
+		const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+		const eventsOnDate = this.getEventsByDateTime.get(formattedDate) || [];
+
+		const startTime = this.timeUtils.parseDateTime(dateTimeStart, 'yyyyMMddHHmm');
+		const endTime = this.timeUtils.parseDateTime(dateTimeEnd, 'yyyyMMddHHmm');
+
+		return this.findOverlappingEvents(startTime, endTime, eventsOnDate, {
+			excludeEventId: eventId,
+			checkCloseEvents: true,
+			rooms
+		});
+	}
+
+	private formatConflict(
+		event: EventConflictInfo,
+		rooms: string[],
+		startTime: number,
+		endTime: number
+	): Conflict {
+		const hasSameRoom = this.hasSameRoomCheck(rooms, event.rooms);
+
+		// Déterminer le type de conflit
+		let conflictType: Conflict['conflictType'] = event.conflictType;
+
+		// Si ce n'est pas un sondage, vérifier si c'est un conflit direct ou proche
+		if (event.conflictType !== 'sondage') {
+			const eventStartTime = event.dateStart
+				? new Date(event.dateStart).getTime()
+				: this.parseTimeToDate(event.time_start, new Date()).getTime();
+			const eventEndTime = event.dateEnd
+				? new Date(event.dateEnd).getTime()
+				: this.parseTimeToDate(event.time_end, new Date()).getTime();
+
+			const isDirectConflict = this.timeUtils.checkTimeOverlap(
+				startTime,
+				endTime,
+				eventStartTime,
+				eventEndTime
+			);
+
+			if (!isDirectConflict) {
+				// Ajouter le préfixe 'close-' pour les événements proches
+				conflictType = event.conflictType === 'confirmed' ? 'close-confirmed' : 'close-unconfirmed';
+			}
+		}
+
+		return {
+			id: event.id,
+			event_title: event.event_title,
+			time_start: event.dateStart ? format(new Date(event.dateStart), 'HH:mm') : event.time_start,
+			time_end: event.dateEnd ? format(new Date(event.dateEnd), 'HH:mm') : event.time_end,
+			rooms: event.rooms,
+			conflictType,
+			hasSameRoom
+		};
+	}
+
+	private checkDateOverlap(start1: number, end1: number, start2: number, end2: number): boolean {
+		return start1 < end2 && end1 > start2;
+	}
+
+	private hasSameRoomCheck(rooms1: string[], rooms2: string[]): boolean {
+		const event1Rooms = new Set(rooms1 || []);
+		const event2Rooms = new Set(rooms2 || []);
+		if (event1Rooms.size === 0 || event2Rooms.size === 0) return false;
+		return [...event1Rooms].some((room) => event2Rooms.has(room));
+	}
+
+	private parseTimeToDate(timeString: string, baseDate: Date): Date {
+		{
+			const [hours, minutes] = timeString.split(':').map(Number);
+			const date = new Date(baseDate);
+			date.setHours(hours, minutes, 0, 0);
+			return date;
+		}
+	}
+
+	get isInitialized(): boolean {
+		return this.#store.isInitialized;
+	}
+
+	get error(): Error | null {
+		return this.#store.error;
+	}
+
+	/**
+	 * Méthode de nettoyage pour détruire l'instance de SyncStore et réinitialiser l'état.
+	 */
+	destroy(): void {
+		if (this.#store.syncStore) {
+			this.#store.syncStore.destroy();
+			this.#store.syncStore = null;
+		}
+		this.#store.isInitialized = false;
+		this.#store.error = null;
+	}
+}
+
+export const eventsStore = new EventsStore();

@@ -1,0 +1,372 @@
+// eventsDb.ts
+import { getDb } from '$lib/initData.svelte';
+import type { EventType } from '$lib/types/event';
+import { pb } from '$lib/pocketbase.svelte';
+
+let eventsList = $state<EventType[]>([]);
+let masterEventList = $state<EventType[]>([]);
+
+let lastEventsUpdate = $state<string>(localStorage.getItem('lastEventsUpdate') || '');
+interface EventByDate {
+	id: string;
+	event_title: string;
+	date_event: string;
+	rooms: string[];
+	date_type: 'confirmed' | 'unconfirmed' | 'sondage';
+	dateTimeStart: string;
+	dateTimeEnd: string;
+	dates_proposed?: Array<{ dateTimeStart: string; dateTimeEnd: string }>;
+}
+
+let eventsByDateStore = $state<Map<string, EventByDate[]>>(new Map());
+
+// Getters pour exporter les états
+export const getEventsList = () => eventsList;
+export const getLastEventsUpdate = () => lastEventsUpdate;
+export const getEventsByDateStore = () => eventsByDateStore;
+
+// Getters pour les états dérivés
+export const getConfirmedEvents = () => confirmedEvents;
+export const getUnpublishedEvents = () => unpublishedEvents;
+export const getPublishedEvents = () => publishedEvents;
+export const getCancelledEvents = () => cancelledEvents;
+export const getPendingEvents = () => pendingEvents;
+export const getEventsWithoutDates = () => eventsWithoutDates;
+export const getEventsWithProposedDates = () => eventsWithProposedDates;
+export const getEventsWithoutOrganizers = () => eventsWithoutOrganizers;
+export const getEventsListSum = () => eventsListSum;
+export const getMasterEvents = () => masterEventList;
+export const getEventsOccurences = () => eventsRecurrent;
+
+export const getEventById = (id: string): EventType | undefined => {
+	const event = eventsList.find((event) => event.id === id);
+	return event;
+};
+export const getMasterEventById = (id: string) => {
+	const event = masterEventList.find((event) => event.id === id);
+	return event;
+};
+
+// ::: stores dérivés / filtré
+const confirmedEvents = $derived(eventsList.filter((event) => event.isConfirmed === true));
+const unpublishedEvents = $derived(
+	eventsList.filter(
+		(event) => event.isPublished === false && event.isConfirmed === true && !event.canceled
+	)
+);
+const publishedEvents = $derived(eventsList.filter((event) => event.isPublished === true));
+const cancelledEvents = $derived(eventsList.filter((event) => event.canceled === true));
+const pendingEvents = $derived(eventsList.filter((event) => event.isConfirmed !== true));
+const eventsWithoutDates = $derived(
+	eventsList.filter((event) => event.date_event === '' && event.dates_proposed?.length === 0)
+);
+const eventsWithProposedDates = $derived(
+	eventsList.filter((event) => event.date_event && event.isConfirmed === false)
+);
+const eventsWithoutOrganizers = $derived(
+	eventsList.filter((event) => !event.organizers || event.organizers.length === 0)
+);
+
+const eventsListSum = $derived(
+	eventsList
+		.filter((event) => !event.canceled)
+		.map(({ id, event_title, date_event, time_start, time_end, isConfirmed, rooms }) => ({
+			event_title,
+			id,
+			date_event,
+			time_start,
+			time_end,
+			isConfirmed,
+			rooms,
+			dateTimeStart: `${date_event.replace(/-/g, '')}${time_start.replace(/:/g, '')}`,
+			dateTimeEnd: `${date_event.replace(/-/g, '')}${time_end.replace(/:/g, '')}`
+		}))
+);
+
+const eventsRecurrent = $derived(
+	eventsList.filter((event) => event.isRecurrent && !event.isMasterRecurrent)
+);
+
+export const nbEventsByCategory = () => {
+	const nbConfirmedEvents = $derived(confirmedEvents.length);
+	const nbEventsWithoutDates = $derived(eventsWithoutDates.length);
+	const nbEventsWithProposedDates = $derived(eventsWithProposedDates.length);
+	const nbPendingEvents = $derived(pendingEvents.length);
+	const nbPublishedEvents = $derived(publishedEvents.length);
+	const nbUnpublishedEvents = $derived(unpublishedEvents.length);
+	const nbWithoutOrganizers = $derived(eventsWithoutOrganizers.length);
+	return {
+		nbConfirmedEvents,
+		nbEventsWithoutDates,
+		nbEventsWithProposedDates,
+		nbPendingEvents,
+		nbPublishedEvents,
+		nbUnpublishedEvents,
+		nbWithoutOrganizers
+	};
+};
+
+let isInitialized = false;
+
+class EventsDB {
+	private currentDate: string;
+	private spaceId: string | null = null;
+	private subscription: any = null; // Stocke la référence de la souscription active
+
+	constructor() {
+		this.currentDate = new Date().toISOString().slice(0, 10);
+	}
+
+	private updateEventInMap(
+		map: Map<string, EventType[]>,
+		date: string,
+		event: EventType,
+		timeInfo: any
+	) {
+		if (!map.has(date)) {
+			map.set(date, []);
+		}
+		const eventsForDate = map.get(date);
+		const existingEventIndex = eventsForDate.findIndex((e) => e.id === event.id);
+
+		const eventWithTime = {
+			id: event.id,
+			event_title: event.event_title,
+			date_event: event.date_event,
+			rooms: event.rooms,
+			date_type: timeInfo.date_type,
+			...timeInfo
+		};
+
+		if (existingEventIndex !== -1) {
+			eventsForDate[existingEventIndex] = eventWithTime;
+		} else {
+			eventsForDate.push(eventWithTime);
+		}
+	}
+
+	private updateEventsByDate(events: EventType[]): void {
+		const eventsByDate = new Map<string, EventByDate[]>();
+		for (const event of events) {
+			if (event.canceled) continue;
+
+			if (event.date_event) {
+				this.updateEventInMap(eventsByDate, event.date_event, event, {
+					time_start: event.time_start,
+					time_end: event.time_end,
+					dateTimeStart: `${event.date_event.replace(/-/g, '')}${event.time_start.replace(/:/g, '')}`,
+					dateTimeEnd: `${event.date_event.replace(/-/g, '')}${event.time_end.replace(/:/g, '')}`,
+					date_type: event.isConfirmed ? 'confirmed' : 'unconfirmed'
+				});
+			} else if (event.dates_proposed?.length) {
+				for (const proposedDate of event.dates_proposed) {
+					if (proposedDate.dateStart && proposedDate.dateEnd) {
+						const [startDate, startTime] = proposedDate.dateStart.split('T');
+						const [, endTime] = proposedDate.dateEnd.split('T');
+						const formattedStart = proposedDate.dateStart.replace(/[-:T.Z]/g, '').slice(0, 12);
+						const formattedEnd = proposedDate.dateEnd.replace(/[-:T.Z]/g, '').slice(0, 12);
+
+						this.updateEventInMap(eventsByDate, startDate, event, {
+							time_start: startTime.slice(0, 5),
+							time_end: endTime.slice(0, 5),
+							dateTimeStart: formattedStart,
+							dateTimeEnd: formattedEnd,
+							date_type: 'sondage'
+						});
+					}
+				}
+			}
+		}
+
+		eventsByDateStore = eventsByDate;
+	}
+	private sortEvents(events: EventType[]): EventType[] {
+		return events.sort((a, b) => {
+			if (!a.date_event && !b.date_event) return 0;
+			if (!a.date_event) return 1;
+			if (!b.date_event) return -1;
+			return a.date_event.localeCompare(b.date_event);
+		});
+	}
+
+	// Nettoyer la souscription (usage : onDestroy et handleLogout in layout)
+	public cleanup(): void {
+		if (this.subscription) {
+			this.subscription.unsubscribe();
+			this.subscription = null;
+			console.log('Cleaned up PocketBase subscription');
+		}
+	}
+
+	async init(spaceId: string): Promise<void> {
+		if (isInitialized && this.spaceId === spaceId) {
+			console.log('eventsDb already initialized for this space');
+			return;
+		}
+
+		try {
+			console.log('Initializing eventsDb...');
+			this.spaceId = spaceId;
+
+			await this.loadFutureFromPocketBase();
+
+			this.subscribeToPocketBase(spaceId);
+
+			isInitialized = true;
+		} catch (error) {
+			console.error('Failed to initialize eventsDb:', error);
+			throw error;
+		}
+	}
+
+	private async synchronizeWithPocketBase(lastUpdate: string): Promise<void> {
+		if (!this.spaceId) {
+			throw new Error('spaceId not set');
+		}
+		try {
+			const formattedLastUpdate = this.formatDateForPocketBase(lastUpdate);
+			const pocketbaseEvents = await pb.collection('events').getFullList<EventType>({
+				filter: `space = "${this.spaceId} && (date_event = '' || date_event >= '${this.currentDate})'`,
+				sort: 'date_event'
+			});
+
+			eventsList = pocketbaseEvents.filter((event) => !event.isMasterRecurrent);
+			masterEventList = pocketbaseEvents.filter((event) => event.isMasterRecurrent);
+
+			const db = await getDb();
+			const storedEvents = await db.getAll('events');
+
+			// Créer des maps pour un accès rapide par ID
+			const pbEventsMap = new Map(pocketbaseEvents.map((event) => [event.id, event]));
+			const storedEventsMap = new Map(storedEvents.map((event) => [event.id, event]));
+
+			const tx = db.transaction('events', 'readwrite');
+
+			// Mise à jour et ajout des événements de PocketBase dans IndexedDB
+			for (const pbEvent of pocketbaseEvents) {
+				await tx.store.put(pbEvent);
+			}
+
+			// Suppression des événements qui ne sont plus dans PocketBase
+			for (const storedEvent of storedEvents) {
+				if (!pbEventsMap.has(storedEvent.id)) {
+					await tx.store.delete(storedEvent.id);
+				}
+			}
+
+			await tx.done;
+
+			// Recharger les événements depuis IndexedDB et mettre à jour les listes Svelte
+			const updatedStoredEvents = await db.getAll('events');
+			this.updateEventsByDate(updatedStoredEvents);
+
+			this.updateLastEventsUpdate();
+			console.log('Synchronized with PocketBase (granular update)');
+		} catch (error) {
+			console.error('Failed to synchronize with PocketBase:', error);
+			throw error;
+		}
+	}
+	private async loadFutureFromPocketBase(): Promise<void> {
+		if (!this.spaceId) {
+			throw new Error("l'espace de l'utilisateur n'est pas défini");
+			return;
+		}
+		try {
+			// Récupérer tous les événements futurs ou sans date
+			const allEvents = await pb.collection('events').getFullList<EventType>({
+				filter: `space = "${this.spaceId}" && (date_event = '' || date_event >= '${this.currentDate}')`,
+				sort: 'date_event'
+			});
+
+			masterEventList = allEvents.filter((event) => event.isMasterRecurrent);
+			eventsList = allEvents.filter((event) => !event.isMasterRecurrent);
+
+			this.updateEventsByDate(eventsList);
+
+			console.log(
+				`Loaded ${eventsList.length} events, ${masterEventList.length} master events from PocketBase`
+			);
+		} catch (error) {
+			console.error('Failed to load events from PocketBase:', error);
+			throw error;
+		}
+	}
+
+	private formatDateForPocketBase(date: string): string {
+		return date.replace('T', ' ');
+	}
+
+	private updateLastEventsUpdate(): void {
+		const now = new Date().toISOString();
+		lastEventsUpdate = now;
+		localStorage.setItem('lastEventsUpdate', now);
+	}
+
+	private subscribeToPocketBase(spaceId): void {
+		if (this.subscription) {
+			console.log('PocketBase subscription already exists');
+			return;
+		}
+		pb.collection('events').subscribe(
+			'*',
+			async (e) => {
+				try {
+					const { action, record } = e;
+					console.log(`Received ${action} event for record ${record.id}`);
+
+					switch (action) {
+						case 'create':
+							if (!record.isMasterRecurrent) {
+								eventsList = this.sortEvents([...eventsList, record]);
+								this.updateEventsByDate(eventsList);
+							} else {
+								masterEventList = this.sortEvents([...masterEventList, record]);
+							}
+							break;
+						case 'update':
+							if (!record.date_event || record.date_event >= this.currentDate) {
+								if (!record.isMasterRecurrent) {
+									// Mettre à jour eventsList
+									const indexToUpdate = eventsList.findIndex((e) => e.id === record.id);
+									if (indexToUpdate !== -1) {
+										if (eventsList[indexToUpdate].date_event !== record.date_event) {
+											eventsList[indexToUpdate] = record;
+											eventsList = this.sortEvents(eventsList);
+											this.updateEventsByDate(eventsList);
+										} else {
+											// La date de l'événement n'a pas changé, mise à jour simple
+											eventsList[indexToUpdate] = record;
+										}
+									}
+								} else {
+									// Mettre à jour masterEventList
+									const indexToUpdate = masterEventList.findIndex((e) => e.id === record.id);
+									masterEventList[indexToUpdate] = record;
+								}
+							}
+							break;
+						case 'delete':
+							if (!record.isMasterRecurrent) {
+								// Supprimer de eventsList
+								eventsList = this.sortEvents(eventsList.filter((event) => event.id !== record.id));
+							} else {
+								// Supprimer de masterEventList
+								masterEventList = this.sortEvents(
+									masterEventList.filter((event) => event.id !== record.id)
+								);
+							}
+							break;
+					}
+				} catch (error) {
+					console.error('Failed to process PocketBase event:', error);
+				}
+			},
+			{ filter: `space = "${spaceId}"` }
+		);
+		console.log('Subscribed to PocketBase events');
+	}
+}
+
+export const eventsDb = new EventsDB();
+export const initEventDb = (spaceId: string) => eventsDb.init(spaceId);

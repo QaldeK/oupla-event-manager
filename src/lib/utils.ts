@@ -1,0 +1,338 @@
+import { type ClassValue, clsx } from 'clsx';
+// ::: Date-fns :::
+import { addMinutes, format, parse } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { twMerge } from 'tailwind-merge';
+// ::: Tippy :::
+import tippy from 'tippy.js';
+import 'tippy.js/dist/tippy.css';
+
+import { cubicOut } from 'svelte/easing';
+import type { TransitionConfig } from 'svelte/transition';
+
+import { updateEvent } from './pocketbase.svelte';
+import type { OrganizerType } from './schemas/event.schema';
+import type { UserType } from './types/types';
+
+export function cn(...inputs: ClassValue[]) {
+	return twMerge(clsx(inputs));
+}
+
+type FlyAndScaleParams = {
+	y?: number;
+	x?: number;
+	start?: number;
+	duration?: number;
+};
+
+export const flyAndScale = (
+	node: Element,
+	params: FlyAndScaleParams = { y: -8, x: 0, start: 0.95, duration: 150 }
+): TransitionConfig => {
+	const style = getComputedStyle(node);
+	const transform = style.transform === 'none' ? '' : style.transform;
+
+	const scaleConversion = (valueA: number, scaleA: [number, number], scaleB: [number, number]) => {
+		const [minA, maxA] = scaleA;
+		const [minB, maxB] = scaleB;
+
+		const percentage = (valueA - minA) / (maxA - minA);
+		const valueB = percentage * (maxB - minB) + minB;
+
+		return valueB;
+	};
+
+	const styleToString = (style: Record<string, number | string | undefined>): string => {
+		return Object.keys(style).reduce((str, key) => {
+			if (style[key] === undefined) return str;
+			return str + `${key}:${style[key]};`;
+		}, '');
+	};
+
+	return {
+		duration: params.duration ?? 200,
+		delay: 0,
+		css: (t) => {
+			const y = scaleConversion(t, [0, 1], [params.y ?? 5, 0]);
+			const x = scaleConversion(t, [0, 1], [params.x ?? 0, 0]);
+			const scale = scaleConversion(t, [0, 1], [params.start ?? 0.95, 1]);
+
+			return styleToString({
+				transform: `${transform} translate3d(${x}px, ${y}px, 0) scale(${scale})`,
+				opacity: t
+			});
+		},
+		easing: cubicOut
+	};
+};
+
+// ::: dates
+
+export const createDateFromString = (dateStr: string, timeStr: string): Date => {
+	const [year, month, day] = dateStr.split('-');
+	const [hours, minutes] = timeStr.split(':');
+	return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes));
+};
+
+export const addTime = (initial, durationToAdd = 10) => {
+	if (initial) {
+		const calculated = format(
+			addMinutes(parse(initial, 'kk:mm', new Date()), durationToAdd),
+			'kk:mm'
+		);
+		return calculated;
+	} else {
+		return;
+	}
+};
+
+export const lisibleDate = (date) => {
+	return format(date, 'EEEE d MMMM', { locale: fr });
+};
+export const lisibleTime = (date) => {
+	return format(date, 'kk:mm', { locale: fr });
+};
+
+export const formatDatePb = (date) => {
+	return format(date, 'yyyy-MM-dd');
+};
+
+export const formatTimePb = (date) => {
+	return format(date, 'HH:mm');
+};
+
+// ::: Other
+
+export const tooltip = (node, options) => {
+	const instance = tippy(node, options);
+
+	return {
+		update(newOptions) {
+			instance.setProps(newOptions);
+		},
+		destroy() {
+			instance.destroy();
+		}
+	};
+};
+
+// :::___ Click-outside :::
+// Usage :
+// <div use:clickOutside={() => {console.log('Clicked outside')}}> ... </div>
+// Warn : insert class 'click-inside' on the child element if you want to exclude it (exemple: for multi-select component)
+export function clickOutside(node: HTMLElement, callback: () => void) {
+	function handleClick(event: MouseEvent) {
+		if (
+			node &&
+			!node.contains(event.target as Node) &&
+			!event.target.closest('.click-inside') &&
+			callback
+		) {
+			callback();
+		}
+	}
+
+	document.addEventListener('click', handleClick);
+
+	return {
+		destroy() {
+			document.removeEventListener('click', handleClick);
+		}
+	};
+}
+
+// debounce // USELESS :plutot avec effect dans /utils/debounce.svelte.ts
+
+export function createDebounce<T extends (...args: any[]) => any>(
+	func: T,
+	wait: number = 250,
+	options: {
+		leading?: boolean;
+		maxWait?: number;
+	} = {}
+) {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	let lastArgs: Parameters<T> | undefined;
+	let lastTime: number = 0;
+
+	return {
+		call: (...args: Parameters<T>) => {
+			const now = Date.now();
+			lastArgs = args;
+
+			// Exécution immédiate si leading est true et qu'aucun timeout n'est en cours
+			if (options.leading && !timeoutId) {
+				func(...args);
+				lastTime = now;
+				return;
+			}
+
+			// Clear le timeout existant
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+
+			// Création du nouveau timeout
+			timeoutId = setTimeout(() => {
+				if (lastArgs) {
+					func(...lastArgs);
+					lastTime = Date.now();
+					timeoutId = undefined;
+					lastArgs = undefined;
+				}
+			}, wait);
+		},
+		cancel: () => {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				timeoutId = undefined;
+			}
+			lastArgs = undefined;
+		}
+	};
+}
+
+export const userToOrganizerFmt = (user: User, tasks?: string[] | string) => ({
+	id: user.id,
+	username: user.username,
+	email: user.email,
+	tasks: tasks || []
+});
+
+// ::: pb event functions
+
+export const handleTaskSubscription = async (params: {
+	task: string;
+	currentUser: { id: string; username: string; email: string };
+	event: {
+		id: string;
+		tasks: string[];
+		organizers: Array<{ id: string; tasks: string[] }>;
+		isConfirmed: boolean;
+	};
+	onShowConfirmModal?: (options: { title: string; message: string; onConfirm: () => void }) => void;
+}) => {
+	const { task, currentUser, event, onShowConfirmModal } = params;
+
+	const isSubscribed = event.organizers.some(
+		(org) => org.id === currentUser.id && org.tasks.includes(task)
+	);
+
+	const proceedWithTaskUpdate = async () => {
+		let updatedOrganizers = [...event.organizers];
+		const currentOrganizerIndex = updatedOrganizers.findIndex((org) => org.id === currentUser.id);
+
+		if (isSubscribed) {
+			if (currentOrganizerIndex !== -1) {
+				const organizer = updatedOrganizers[currentOrganizerIndex];
+				const updatedTasks = organizer.tasks.filter((t) => t !== task);
+
+				if (updatedTasks.length === 0) {
+					updatedOrganizers = updatedOrganizers.filter((org) => org.id !== currentUser.id);
+				} else {
+					updatedOrganizers[currentOrganizerIndex] = {
+						...organizer,
+						tasks: updatedTasks
+					};
+				}
+			}
+		} else {
+			if (currentOrganizerIndex !== -1) {
+				updatedOrganizers[currentOrganizerIndex] = {
+					...updatedOrganizers[currentOrganizerIndex],
+					tasks: [...updatedOrganizers[currentOrganizerIndex].tasks, task]
+				};
+			} else {
+				updatedOrganizers.push({
+					id: currentUser.id,
+					username: currentUser.username,
+					email: currentUser.email,
+					tasks: [task],
+					role: '',
+					maybehere: ''
+				});
+			}
+		}
+
+		await updateEvent(event.id, { organizers: updatedOrganizers });
+	};
+
+	if (isSubscribed && event.isConfirmed) {
+		if (event.tasks.length > 1 && onShowConfirmModal) {
+			onShowConfirmModal({
+				title: 'Confirmation de désistement',
+				message:
+					"L'événement étant déjà confirmé, les autres participants seront notifiés de votre désistement par email. Souhaitez-vous continuer ?",
+				onConfirm: proceedWithTaskUpdate
+			});
+			return;
+		}
+
+		const isOnlyOrganizer = event.organizers.length === 1;
+		if (isOnlyOrganizer && onShowConfirmModal) {
+			onShowConfirmModal({
+				title: 'Désistement et annulation',
+				message:
+					"Vous êtes le seul participant. Voulez-vous annuler l'événement ? Il sera marqué comme annulé sur le site. Nous vous suggérons d'informer les membres via la newsletter.",
+				onConfirm: async () => {
+					await proceedWithTaskUpdate();
+					await updateEvent(event.id, { canceled: true });
+				}
+			});
+			return;
+		}
+	}
+
+	await proceedWithTaskUpdate();
+};
+
+export const handleOrganizerMaybehere = (params: {
+	organizers: OrganizerType[];
+	currentUser: UserType;
+	maybehere: 'oui' | '';
+	isDateAccepted?: boolean;
+}) => {
+	const { organizers, currentUser, maybehere, isDateAccepted } = params;
+
+	const currentOrganizerIndex = organizers.findIndex((org) => org.id === currentUser.id);
+
+	// Si la date est acceptée et maybehere est 'oui', on assigne la tâche par défaut
+	const tasks = isDateAccepted && maybehere === 'oui' ? [getSpace.tasks.defaultTask] : [];
+
+	if (currentOrganizerIndex !== -1) {
+		// Mettre à jour maybehere pour l'organisateur existant
+		const updatedOrganizer = {
+			...organizers[currentOrganizerIndex],
+			maybehere,
+			...(isDateAccepted && { tasks })
+		};
+		const updatedOrganizers = [...organizers];
+		updatedOrganizers[currentOrganizerIndex] = updatedOrganizer;
+		return updatedOrganizers;
+	} else {
+		// Ajouter un nouvel organisateur avec maybehere
+		return [
+			...organizers,
+			{
+				id: currentUser.id,
+				username: currentUser.username,
+				email: currentUser.email,
+				tasks,
+				role: currentUser.role,
+				maybehere
+			}
+		];
+	}
+};
+
+export const convertMaybehereToOrganizer = (org: OrganizerSchemaDatesProposed) => ({
+	id: org.id,
+	username: org.username,
+	email: org.email,
+	tasks: [getSpace.tasks.defaultTask],
+	role: org.role
+});
+
+export const filterAndConvertOrganizers = (organizers: OrganizerSchemaDatesProposed[]) => {
+	return organizers.filter((org) => org.maybehere === 'oui').map(convertMaybehereToOrganizer);
+};
