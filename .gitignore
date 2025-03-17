@@ -21,3 +21,23 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+
+pb
+.prompts
+_pb_bak
+.directory
+*_bak
+
+# windsurf rules
+.windsurfrules
+.clinerules
+.continuerules
+.aider*
+!.aiderules
+
+.vscode/*
+aider.conf.yml
+.zed/*
+.augment-guidelines
+svelte5Doc

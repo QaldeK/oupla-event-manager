@@ -1,6 +1,15 @@
-<script lang="ts">
+<script>
 	import '../app.css';
-	let { children } = $props();
 </script>
 
-{@render children()}
+<header>
+	<!-- Your header content here -->
+</header>
+
+<main>
+	<slot />
+</main>
+
+<footer>
+	<!-- Your footer content here -->
+</footer>
