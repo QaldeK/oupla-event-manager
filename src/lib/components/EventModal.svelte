@@ -1,0 +1,759 @@
+<script lang="ts">
+	import { debounce } from '$lib/actions/debounce';
+	import Checkbox from '$lib/components/Checkbox.svelte';
+	import Frame from '$lib/components/Frame.svelte';
+	import GroupCheckBox from '$lib/components/GroupCheckBox.svelte';
+	import Info from '$lib/components/Info.svelte';
+	import Modal from '$lib/components/Modal.svelte';
+	import Quill from '$lib/components/Quill.svelte';
+	import RecurrentTab from '$lib/components/forModal/RecurrentTab.svelte';
+	import Textarea from '$lib/components/ui-custom/textarea/textarea.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { newEvent } from '$lib/constants/events.constants';
+	import { ValidationSchemaType, validateEvent } from '$lib/schemas/event.schema';
+	import { getSpace } from '$lib/shared/spaceOptions.svelte';
+	import type { EventType } from '$lib/types/event';
+	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
+	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
+	import DateUniq from '$lib/components/forModal/DateUniq.svelte';
+	import OrganizersAndTasksSelect from '$lib/components/forModal/OrganizersAndTasksSelect.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import {
+		createEvent,
+		createRecurrentEvent,
+		updateAllOccurrences,
+		updateEvent
+	} from '$lib/pocketbase.svelte';
+	import {
+		eventState,
+		getOrganizersPossibles,
+		modalState,
+		showAlert
+	} from '$lib/shared/states.svelte';
+	import { createDateFromString, lisibleDate } from '$lib/utils';
+
+	import { slide } from 'svelte/transition';
+
+	import { CalendarCheck, Save, X } from 'lucide-svelte';
+
+	const closeModal = () => {
+		modalState.event = false;
+		eventState.is = { ...newEvent };
+	};
+
+	// ::: Data et Etat réactif
+	let eventData = $state<EventType>({ ...(eventState.is as EventType) });
+	let rooms: string[] = getSpace.rooms;
+	let categories: string[] = getSpace.categories;
+	let isAlertDialogOpen = $state<boolean>(false);
+	let organizersPossibles = $state(getOrganizersPossibles());
+
+	// Nouveau type pour mieux gérer les états
+	type EventMode =
+		| 'NEW_SINGLE' // Création événement unique
+		| 'NEW_RECURRENT' // Création événement récurrent
+		| 'EDIT_SINGLE' // Modification événement unique
+		| 'EDIT_RECURRENT_ONE' // Modification occurrence unique
+		| 'EDIT_RECURRENT_ALL'; // Modification toutes occurrences
+
+	// Nouvelle logique de détermination du mode
+	let eventMode: EventMode = $derived.by(() => {
+		if (!eventData.id) {
+			return eventData.isRecurrent ? 'NEW_RECURRENT' : 'NEW_SINGLE';
+		}
+
+		if (eventData.id && eventData.isRecurrent) {
+			return eventData.isMasterRecurrent ? 'EDIT_RECURRENT_ALL' : 'EDIT_RECURRENT_ONE';
+		}
+
+		return 'EDIT_SINGLE';
+	});
+
+	// ::: Event Mode & dynamics props
+	type DisplayMode = 'DATE' | 'SONDAGE' | 'RECURRENT';
+
+	let displayMode = $derived.by((): DisplayMode => {
+		if (eventMode === 'NEW_RECURRENT' || eventMode === 'EDIT_RECURRENT_ALL') {
+			return 'RECURRENT';
+		}
+		if (eventData.isSondage) {
+			return 'SONDAGE';
+		}
+		return 'DATE';
+	});
+
+	// Fonction de transition vers le mode sondage
+	function switchToSondage() {
+		eventData.isSondage = true;
+		eventData.date_event = '';
+		if (eventData.dates_proposed?.length === 0) {
+			// Initialiser avec la date actuelle si disponible
+			const currentDate = eventData.date_event;
+			if (currentDate && eventData.time_start && eventData.time_end) {
+				addDateProposal(currentDate, eventData.time_start, eventData.time_end);
+			}
+		}
+	}
+
+	// Fonction de transition vers le mode date unique
+	function switchToDate() {
+		eventData.isSondage = false;
+		eventData.dates_proposed = [];
+	}
+
+	const modalTitle = $derived.by(() => {
+		switch (eventMode) {
+			case 'NEW_SINGLE':
+				return 'Créer un nouvel événement';
+			case 'NEW_RECURRENT':
+				return 'Créer un événement récurrent';
+			case 'EDIT_SINGLE':
+				return "Modifier l'événement";
+			case 'EDIT_RECURRENT_ONE':
+				return "Modifier l'occurrence de l'événement";
+			case 'EDIT_RECURRENT_ALL':
+				return "Modifier l'ensemble des occurences";
+		}
+	});
+
+	let dateAndHoursTitle = $derived.by(() => {
+		if (displayMode === 'RECURRENT') {
+			return 'Dates et horaires - Configuration de la récurrence';
+		} else if (displayMode === 'DATE') {
+			return "Date et horaire de l'événement";
+		} else if (displayMode === 'SONDAGE') return 'Dates proposées - Sondage';
+	});
+
+	let hasExternalPreference = $derived.by(() => !!eventData.external_proposal?.period_preference);
+
+	const cancelSondage = () => {
+		eventData.isSondage = false;
+		eventData.dates_proposed = [];
+	};
+
+	// ::: validation & submit
+
+	const hasRecurrentLocalErrors = () => {
+		let errors = {};
+
+		if (!eventData.recurrence?.firstDate) {
+			errors = { ...errors, firstDate: ['champ requis'] };
+		}
+		if (!eventData.recurrence?.lastDate) {
+			errors = { ...errors, lastDate: ['champ requis'] };
+		}
+		if (!eventData.recurrence?.recurrenceType) {
+			errors = { ...errors, recurrenceType: ['champ requis'] };
+		}
+		if (
+			eventData.recurrence?.recurrenceType === 'MONTHLY_BY_DAY' &&
+			!eventData.recurrence?.monthlyByDayOccurrences.length
+		) {
+			errors = { ...errors, monthlyByDayOccurrences: ['champ requis'] };
+		}
+		console.log('errors', errors);
+		return errors;
+	};
+
+	let recurrentErrors = $state<Record<string, string[]>>({});
+	// let dateOrgLocalErrors = $state<Record<string, string[]>>({});
+
+	const confirmSubmit = async () => {
+		isAlertDialogOpen = false;
+		await submitForm();
+	};
+
+	let errors = $state<Record<string, string[] | undefined>>({});
+
+	const handleConfirm = async () => {
+		try {
+			// Vérifier que le task par défaut est présent
+			if (!eventData.tasks.includes(getSpace.tasks.defaultTask)) {
+				eventData.tasks.push(getSpace.tasks.defaultTask);
+			}
+			const validationResult = validateEvent(eventData, ValidationSchemaType.PUBLISH);
+
+			if (!validationResult.success && validationResult.errors) {
+				errors = validationResult.errors.flatten().fieldErrors;
+				showAlert(
+					"L'événement ne peut être confirmé : vérifiez les champs mal renseignés.",
+					'error'
+				);
+				return;
+			}
+
+			eventData.isConfirmed = true;
+
+			await submitForm();
+		} catch (err) {
+			console.error('Erreur de validation :', err);
+			showAlert("Erreur lors de la confirmation de l'événement.", 'error');
+		}
+	};
+
+	const handleSave = async () => {
+		try {
+			const schema = () => {
+				switch (eventMode) {
+					case 'NEW_SINGLE':
+					case 'EDIT_SINGLE':
+					case 'EDIT_RECURRENT_ONE':
+						return ValidationSchemaType.SAVE;
+					case 'EDIT_RECURRENT_ALL':
+					case 'NEW_RECURRENT':
+						recurrentErrors = hasRecurrentLocalErrors();
+						return ValidationSchemaType.SAVE_RECURRENT_MASTER;
+				}
+			};
+			console.log('schema', schema());
+			const validationResult = validateEvent(eventData, schema());
+
+			if (!validationResult.success && validationResult.errors) {
+				errors = validationResult.errors.flatten().fieldErrors;
+				showAlert("Erreur dans les données de l'événement.", 'error');
+				return;
+			}
+			if (eventMode === 'EDIT_RECURRENT_ALL') {
+				isAlertDialogOpen = true;
+			}
+
+			await submitForm();
+		} catch (err) {
+			console.error('Erreur lors de la sauvegarde :', err);
+			showAlert("Erreur lors de la sauvegarde de l'événement.", 'error');
+		}
+	};
+
+	const submitForm = async () => {
+		try {
+			if (eventData.date_event && eventData.time_start && eventData.time_end) {
+				const startDate = createDateFromString(eventData.date_event, eventData.time_start);
+				const endDate = createDateFromString(eventData.date_event, eventData.time_end);
+
+				eventData.dateStart = startDate.toISOString();
+				eventData.dateEnd = endDate.toISOString();
+			}
+
+			switch (eventMode) {
+				case 'NEW_SINGLE':
+					await createEvent(eventData);
+					break;
+
+				case 'NEW_RECURRENT': {
+					await createRecurrentEvent(eventData);
+					break;
+				}
+				case 'EDIT_SINGLE':
+				case 'EDIT_RECURRENT_ONE':
+					await updateEvent(eventData.id, eventData);
+					break;
+
+				case 'EDIT_RECURRENT_ALL':
+					await updateAllOccurrences(eventData);
+					break;
+			}
+			closeModal();
+		} catch (error) {
+			console.error(error);
+			showAlert("Erreur lors de l'enregistrement de l'événement.", 'error');
+		}
+	};
+
+	// ::: tasks & organizers
+
+	let tasksPossibles = $derived.by<string[]>(() => {
+		const baseTasks = (() => {
+			switch (eventMode) {
+				case 'NEW_SINGLE':
+				case 'NEW_RECURRENT':
+					return getSpace.tasks.list || [];
+				case 'EDIT_SINGLE':
+				case 'EDIT_RECURRENT_ALL':
+					return Array.from(new Set([...(getSpace.tasks.list || []), ...eventData.tasks]));
+				case 'EDIT_RECURRENT_ONE':
+					return Array.from(new Set([...(eventData.recurrence?.tasks || []), ...eventData.tasks]));
+				default:
+					return [];
+			}
+		})();
+
+		// S'assurer que toutes les tâches personnalisées sont incluses
+		return Array.from(new Set([...baseTasks, ...eventData.tasks]));
+	});
+
+	let tasksLabel = $derived.by(() => {
+		switch (eventMode) {
+			case 'NEW_SINGLE':
+			case 'EDIT_SINGLE':
+				return 'Définisser les mandats à réaliser pour cet événement';
+			case 'NEW_RECURRENT':
+			case 'EDIT_RECURRENT_ALL':
+				return 'Définir les mandats à réaliser pour chaque occurrence de cet événement';
+			case 'EDIT_RECURRENT_ONE':
+				return 'Modifier les mandats à realiser pour cette occurrence spécifique';
+		}
+	});
+
+	$effect(() => {
+		if (eventMode === 'EDIT_RECURRENT_ONE') {
+			organizersPossibles = Array.from(
+				new Set([...(eventData.recurrence?.recurrenceTeam || []), ...(eventData.organizers || [])])
+			);
+		} else if (eventMode === 'EDIT_RECURRENT_ALL') {
+			// Créer un Map pour éliminer les doublons basé sur l'ID
+
+			// Ajouter/écraser avec les organisateurs existants
+			(eventData.organizers || []).forEach((user) => {
+				organizersPossibles = (user.id, user);
+			});
+		}
+	});
+
+	function addCustomTask(newTask: string) {
+		if (newTask === '' || eventData.tasks.includes(newTask)) return;
+		eventData.tasks.push(newTask);
+	}
+
+	let hasMultipleTasks = $derived.by(() => eventData.tasks && eventData.tasks.length > 1);
+
+	// ::: fonction utilitaires
+
+	// Fonction pour appliquer une proposition unique
+	function applyProposal(proposal: {
+		date_event: string;
+		time_start: string;
+		time_end: string;
+		start_event?: string;
+	}) {
+		eventData = {
+			...eventData,
+			date_event: proposal.date_event,
+			time_start: proposal.time_start,
+			time_end: proposal.time_end,
+			start_event: proposal.start_event || proposal.time_start // fallback sur time_start si start_event n'est pas défini
+		};
+	}
+
+	// Fonction pour convertir les propositions sélectionnées en dates de sondage
+	function convertSelectedToProposed() {
+		const selectedProposals =
+			eventData.external_proposal?.proposals?.filter((p) => p.selected) || [];
+
+		// Conversion des propositions en format DateProposed
+		const newDatesProposed = selectedProposals.map((proposal) => {
+			const [year, month, day] = proposal.date_event.split('-');
+			const [hourStart, minuteStart] = proposal.time_start.split(':');
+			const [hourEnd, minuteEnd] = proposal.time_end.split(':');
+
+			const dateStart = new Date(`${year}-${month}-${day}T${hourStart}:${minuteStart}`);
+			const dateEnd = new Date(`${year}-${month}-${day}T${hourEnd}:${minuteEnd}`);
+
+			return {
+				dateStart: dateStart.toISOString(),
+				dateEnd: dateEnd.toISOString(),
+				organizers: []
+			};
+		});
+
+		// Ajout des nouvelles dates proposées
+		eventData.dates_proposed = [...(eventData.dates_proposed || []), ...newDatesProposed].sort(
+			(a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime()
+		);
+
+		// Activation de l'onglet sondage
+		eventData.isSondage = true;
+	}
+
+	// Fonction utilitaire pour formater les dates
+	function formatDate(dateString: string): string {
+		const date = new Date(dateString);
+		return new Intl.DateTimeFormat('fr-FR', {
+			weekday: 'long',
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		}).format(date);
+	}
+</script>
+
+<!-- {$inspect('eventData', eventData)} -->
+{$inspect('eventMode', eventMode)}
+{$inspect('eventData', eventData)}
+<!-- {$inspect('organizersPossibles', organizersPossibles)} -->
+<!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
+<!-- {$inspect('eOrg', eventData.organizers)} -->
+<!-- {$inspect('activeTabDate', activeTabDate)} -->
+<!-- {$inspect('activeSondageTab', activeSondageTab)} -->
+
+<Modal>
+	<!-- {$inspect('recurrenceDates', recurrenceDates)} -->
+
+	<h1 class="mb-4 text-2xl">{modalTitle}</h1>
+	<div class="fixed top-6 right-4 z-50 flex flex-col gap-4">
+		<button onclick={closeModal} class=" rounded-full"
+			><X
+				strokeWidth={2.75}
+				class="rounded-full border-4 border-gray-700 bg-gray-100 text-gray-700 hover:border-red-900 hover:text-red-900 md:h-8 md:w-8"
+			/></button
+		>
+
+		<Button onclick={handleSave} size="icon_sm">
+			<Save />
+		</Button>
+	</div>
+	<form class="space-y-10">
+		<div class="flex flex-wrap items-center">
+			<div class="w-full items-center space-y-2 md:w-1/2">
+				<label for="event_title" class="text-fluid-sm block font-medium text-gray-700"
+					>Nom de l'événement</label
+				>
+				<input
+					use:debounce={{
+						onChange: (v) => (eventData.event_title = v)
+					}}
+					value={eventData.event_title}
+					type="text"
+					id="event_title"
+					name="event_title"
+					class="block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-xs focus:border-indigo-300 focus:ring-3 focus:ring-indigo-200 focus:outline-hidden"
+				/>
+				{#if errors.event_title}
+					<p class="text-fluid-sm text-red-500 italic">{errors.event_title[0]}</p>
+				{/if}
+			</div>
+			<div class="w-min-fit flex flex-wrap items-center pt-2 md:ms-2">
+				<div class="">
+					<Checkbox
+						label="Evénement public"
+						id="public_event"
+						bind:checked={eventData.isPublic}
+						help="Les événements non-public ne seront pas visible sur le site ni ajouté à la newsletter"
+					/>
+				</div>
+				<div class="">
+					{#if eventMode === 'NEW_SINGLE' || eventMode === 'NEW_RECURRENT'}
+						<Checkbox
+							bind:checked={eventData.isRecurrent}
+							id="recurrent"
+							label="événement récurrent"
+						/>
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<!-- ::: date event -->
+
+		<!-- FIXIT condition chelou -->
+		{#snippet ExternalProposalPref()}
+			{#if hasExternalPreference}
+				<Info variant="outline" class="border-amber-600 shadow-md">
+					<p class="italic">
+						Cet événement à été proposé par: {eventData.expand?.created_by.username}
+						({eventData.expand?.created_by?.email}), depuis le site publique
+					</p>
+					<div class=" text-fluid-sm p-2">
+						Période indiquée comme possible pour l'intervenant·e:
+						<p class="border-l-4 ps-2 italic">
+							"{eventData.external_proposal?.period_preference}"
+						</p>
+					</div>
+				</Info>
+			{/if}
+		{/snippet}
+
+		<div id="dateOrg" transition:slide>
+			<Frame
+				title={dateAndHoursTitle}
+				class_title={'bg-gray-100 text-md md:text-lg'}
+				class_frame={'md:p-8'}
+			>
+				<div class="space-y-4">
+					{#if displayMode === 'RECURRENT'}
+						<div>
+							<RecurrentTab bind:eventData localErrors={errors} {recurrentErrors} />
+						</div>
+					{:else if displayMode === 'SONDAGE'}
+						<div>
+							<Info>
+								<p>
+									Si il n'y a plus qu'une date envisagée, vous pouvez valider la date choisie (<CalendarCheck
+										class="inline"
+										size={16}
+									/>), ou <Button
+										variant="outline"
+										size="xxs"
+										class="m-1 border-red-300"
+										onclick={cancelSondage}>annuler ce sondage</Button
+									>
+								</p>
+							</Info>
+							{@render ExternalProposalPref()}
+							<DatePickerProposed bind:eventData localErrors={errors} />
+						</div>
+					{:else}
+						<div>
+							{@render ExternalProposalPref()}
+
+							{#if eventData.external_proposal?.proposals}
+								<Info>
+									<div class="mb-2">
+										<p class="mb-2">Dates proposées :</p>
+										<div class="flex flex-wrap gap-2">
+											{#each eventData.external_proposal?.proposals as proposal, index}
+												<div class="flex items-center gap-2">
+													<Checkbox
+														bind:checked={proposal.selected}
+														label={`${lisibleDate(proposal.date_event)} - ${proposal.time_start}`}
+														id={index}
+													/>
+												</div>
+											{/each}
+										</div>
+										<div class="flex justify-end">
+											<Button size="xs" onclick={convertSelectedToProposed}>
+												Convertir les dates sélectionnées en sondage
+											</Button>
+										</div>
+									</div>
+								</Info>
+							{/if}
+
+							<Info>
+								{#if !eventData.dates_proposed?.length}
+									<p>
+										Si plusieurs dates sont envisagées, vous pouvez
+										<Button variant="outline" size="xxs" onclick={switchToSondage}>
+											créer un sondage
+										</Button>
+									</p>
+								{:else}
+									<p class="text-fluid-sm">
+										Un sondage pour determiner la date de cet événement à lieu. Si la date choisie
+										ne convient plus, vous pouvez le
+										<Button variant="link" size="xxs" onclick={switchToSondage}>rétablir</Button>
+									</p>
+								{/if}
+							</Info>
+
+							<DateUniq bind:eventData localErrors={errors} />
+						</div>
+					{/if}
+				</div>
+			</Frame>
+		</div>
+
+		<!-- ::: ROle & Oragnizers -->
+		<!-- FIXIT : checker ce qui doit apparaitre, et utiliser des props $derived en fonction d'eventMode plutot que des #if -->
+
+		<Frame title={'Rôles'} class_title={'bg-gray-100'}>
+			<div class="mb-2 block font-medium text-gray-700">
+				{tasksLabel}
+			</div>
+			<ButtonGroupSelect
+				options={tasksPossibles}
+				bind:selectedItems={eventData.tasks}
+				hasAddInput={true}
+				onadd={addCustomTask}
+				defaultOption={getSpace.tasks.defaultTask}
+			/>
+			<button
+				class="text-fluid-sm p-2 text-blue-700 hover:text-blue-600 hover:underline"
+				onclick={() => (eventData.tasks = tasksPossibles)}>> ajoutez tous les rôles</button
+			>
+		</Frame>
+
+		{#if eventMode !== 'NEW_RECURRENT' && eventMode !== 'EDIT_RECURRENT_ALL'}
+			<Frame title={'Organisateur·ices'} class_title={'bg-gray-100'}>
+				<OrganizersAndTasksSelect
+					{organizersPossibles}
+					tasks={eventData.tasks || []}
+					bind:organizers={eventData.organizers}
+					hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
+				/>
+
+				{#if errors.organizers}
+					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
+				{/if}
+			</Frame>
+		{:else}
+			<Frame title={'Organisateur·ices'} class_title={'bg-gray-100'}>
+				<div class="mb-2 text-gray-700">
+					Ajoutez les personnes qui participent à organiser ces événements récurrents (celles et
+					ceux qui pourront s'inscrire sur l'organisation des occurrences de chaque événement)
+				</div>
+				<ButtonGroupSelect
+					options={organizersPossibles}
+					bind:selectedItems={eventData.recurrence.recurrenceTeam}
+					optionsLabel="username"
+				/>
+				<button
+					class="text-fluid-sm p-2 text-blue-700 hover:text-blue-600 hover:underline"
+					onclick={() => (eventData.recurrence.recurrenceTeam = organizersPossibles)}
+					>> ajoutez tout le monde</button
+				>
+				{#if errors.organizers}
+					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
+				{/if}
+			</Frame>
+		{/if}
+
+		<Frame>
+			<div class="flex flex-col gap-4 md:flex-row">
+				<div class="flex flex-1 flex-col gap-1">
+					<Checkbox label="Prix libre" id="prix_libre" bind:checked={eventData.is_prix_libre} />
+					{#if !eventData.is_prix_libre}
+						<label for="prix" class="flex" transition:slide>
+							<input
+								type="text"
+								class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+								id="prix"
+								placeholder="Prix ?"
+								bind:value={eventData.prix}
+							/>
+						</label>
+					{/if}
+				</div>
+				<div class="flex flex-1 flex-col gap-1">
+					<Checkbox label="Mixité" id="ismixite" bind:checked={eventData.isMixiteChoisie} />
+					{#if eventData.isMixiteChoisie}
+						<label for="mixite" class="flex" transition:slide>
+							<input
+								type="text"
+								class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+								id="mixite"
+								bind:value={eventData.mixite}
+								placeholder="Décrivez le type de mixité"
+							/>
+						</label>
+					{/if}
+				</div>
+				<div class="flex flex-1 flex-col gap-1">
+					<Checkbox
+						label="Tout public"
+						id="all_public"
+						bind:checked={eventData.is_age_no_restriction}
+					/>
+					{#if !eventData.is_age_no_restriction}
+						<label for="age" class="flex" transition:slide>
+							<input
+								type="number"
+								class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+								id="age"
+								placeholder="Age minimum ?"
+								bind:value={eventData.age_advice}
+							/>
+						</label>
+					{/if}
+				</div>
+			</div>
+		</Frame>
+		<div class="mb-0 flex flex-wrap justify-between">
+			<!-- ::: rooms -->
+			<Frame title={'Salles réservées'} class_frame={'sm:me-6'} class_title={'bg-gray-100'}>
+				<div id="rooms" class="flex flex-wrap items-center gap-2">
+					<GroupCheckBox
+						groupItems={rooms}
+						bind:eventDataGroup={eventData.rooms}
+						classLabel="w-full"
+					/>
+				</div>
+				{#if errors.rooms}
+					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.rooms[0]}</p>
+				{/if}
+			</Frame>
+
+			<!-- ::: catégories -->
+
+			<Frame
+				title={"Type d'événement"}
+				class_frame={'flex-1 items-center content-center'}
+				class_title={'bg-gray-100'}
+			>
+				<div id="categories" class="align-">
+					<GroupCheckBox groupItems={categories} bind:eventDataGroup={eventData.categories} />
+				</div>
+				{#if errors.categories}
+					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.categories[0]}</p>
+				{/if}
+			</Frame>
+		</div>
+
+		<!-- ::: description -->
+		<div class="space-y-1">
+			<label for="description" class="ms-2 block font-semibold text-gray-700"
+				>Description de l'événement</label
+			>
+			<Textarea
+				id="description"
+				name="description"
+				rows={8}
+				placeholder="Description de l'événement destiné aux bénévoles/organisateur·ices"
+				value={eventData.description}
+				debounce={{
+					enabled: true,
+					wait: 500,
+					onChange: (v) => (eventData.description = v)
+				}}
+			/>
+		</div>
+
+		<!-- ::: Description publique -->
+		<Frame title={'Description publique'} class_title={'bg-gray-100'}>
+			<Info>
+				<p>
+					Description destinée au public (Newsletter, site). Inutile de renseigner le titre, la
+					date, les horaires, prix, mixité, etc. <span class="text-fluid-sm">
+						(ils seront automatiquement ajoutés et mis en forme lors de la génération de la
+						newsletter et du site)
+					</span>
+				</p>
+			</Info>
+			<div>
+				<Quill bind:dataContent={eventData.desc_public} />
+			</div>
+			{#if errors.desc_public}<p class="text-fluid-sm p-2 text-red-500 italic">
+					{errors.desc_public[0]}
+				</p>{/if}
+		</Frame>
+
+		<div class="mb-4 flex flex-wrap justify-end gap-x-4 gap-y-2">
+			<button
+				type="button"
+				class="block w-full rounded bg-red-500 px-4 py-2 font-bold text-white hover:bg-red-700 md:w-fit"
+				onclick={closeModal}>Fermer sans enregistrer</button
+			>
+			<button
+				type="button"
+				class="block w-full rounded bg-teal-500 px-4 py-2 font-bold text-white hover:bg-teal-700 md:w-fit"
+				onclick={handleConfirm}>Enregistrer et Confirmer l'événement</button
+			>
+			<button
+				class="block w-full rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 md:w-fit"
+				type="button"
+				onclick={handleSave}>Enregistrer</button
+			>
+		</div>
+	</form>
+
+	<!-- AlertDialog pour la confirmation de modification de toutes les occurrences -->
+	<AlertDialog.Root bind:open={isAlertDialogOpen}>
+		<AlertDialog.Content>
+			<AlertDialog.Header>
+				<AlertDialog.Title>Modifier toutes les occurrences ?</AlertDialog.Title>
+				<AlertDialog.Description>
+					Êtes-vous sûr de vouloir modifier toutes les occurrences de cet événement récurrent ?
+				</AlertDialog.Description>
+			</AlertDialog.Header>
+			<AlertDialog.Footer>
+				<AlertDialog.Cancel onclick={() => (isAlertDialogOpen = false)}>Annuler</AlertDialog.Cancel>
+				<AlertDialog.Action onclick={confirmSubmit}
+					>Confirmer la modification globale</AlertDialog.Action
+				>
+			</AlertDialog.Footer>
+		</AlertDialog.Content>
+	</AlertDialog.Root>
+</Modal>
+
+<style>
+</style>

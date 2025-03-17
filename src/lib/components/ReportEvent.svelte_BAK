@@ -1,0 +1,97 @@
+<script lang="ts">
+	import { eventState, modalState } from '$lib/shared/states.svelte';
+	import { type EventTS, eventToModify, loadEvent } from '$lib/types/event';
+	import { createEvent, updateEvent } from '$lib/pocketbase.svelte';
+
+	import DateOrg from './forModal/DateOrg.svelte';
+
+	// FIXIT Replace DateOrg !
+
+	const canceledEvent = eventState.is as EventTS;
+
+	// ::: Réinitialise eventToModify à reportedEvent
+	let reportedEvent: EventTS = {
+		...canceledEvent,
+		id: '',
+		created: '',
+		updated: '',
+		reportedFrom: canceledEvent.date_event,
+		canceled: false,
+		date_event: '',
+		time_start: '',
+		time_end: '',
+		start_public: '',
+		start_event: '',
+		isConfirmed: false
+	};
+
+	loadEvent(reportedEvent);
+
+	function closeModal() {
+		modalState.report = false;
+	}
+
+	function handleSubmit() {
+		updateEvent(canceledEvent.id, {
+			...canceledEvent,
+			canceled: true,
+			reportedTo: eventState.is.date_event
+		});
+		createEvent({ ...eventToModify });
+		closeModal();
+	}
+
+	function handleConfirm() {
+		updateEvent(canceledEvent);
+		createEvent({ ...eventToModify, confirmed: true });
+		closeModal();
+	}
+</script>
+
+<!-- TEST -->
+<!-- {$inspect('eventToModify', eventToModify)} -->
+<!-- {$inspect('canceledEvent', canceledEvent)} -->
+<!-- {$inspect('reportedEvent', reportedEvent)} -->
+
+<h1 class="mb-4 text-2xl">
+	Reporter l'événement <span class="font-bold">{canceledEvent.event_title}</span>
+</h1>
+<p class="mb-4 text-lg text-gray-800">
+	Initialement prévue le <span
+		class="mr-2 rounded border border-gray-300 bg-gray-100 px-2 py-0.5 font-bold"
+		>{lisibleDate(canceledEvent?.date_event)}
+		{#if canceledEvent.time_start && canceledEvent.time_end}
+			de {canceledEvent.time_start} à {canceledEvent.time_end}
+		{/if}
+	</span>{#if canceledEvent.organizers.length > 1}
+		et géré par {#each canceledEvent.organizers as organizer}
+			<span class="mr-2 rounded border border-gray-300 bg-gray-100 px-2 py-0.5 font-bold"
+				>{organizer.name}</span
+			>
+		{/each}
+	{/if}
+</p>
+
+<div class="mb-4">
+	<DateOrg />
+</div>
+
+<div class="mb-4 mt-8 flex flex-wrap justify-end gap-x-4 gap-y-2">
+	<!-- ::: Button End -->
+
+	<button
+		type="button"
+		class="block w-full rounded bg-red-500 px-4 py-2 font-bold text-white hover:bg-red-700 md:w-fit"
+		onclick={closeModal}>Annuler</button
+	>
+	<button
+		type="button"
+		class="block w-full rounded bg-teal-500 px-4 py-2 font-bold text-white hover:bg-teal-700 md:w-fit"
+		onclick={handleConfirm}>Reporter et Confirmer l'événement</button
+	>
+	<button
+		class="block w-full rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 md:w-fit"
+		type="button"
+		onclick={handleSubmit}>Reporter</button
+	>
+</div>
