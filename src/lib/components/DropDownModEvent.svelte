@@ -6,7 +6,7 @@
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 
-	let { currentEvent } = $props();
+	let { currentEvent, hasAuth } = $props();
 
 	const modifyMasterEvent = () => {
 		const masterEvent = eventsStore.getEventById(currentEvent.masterRecurrentId);
@@ -31,8 +31,12 @@
 			<PencilIcon /> Modifier <ChevronDown />
 		</button>
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content class="bg-base-200">
-		<DropdownMenu.Item onclick={modifyThisOccurrence}>Cette occurrence</DropdownMenu.Item>
-		<DropdownMenu.Item onclick={modifyMasterEvent}>Toutes les occurrences</DropdownMenu.Item>
+	<DropdownMenu.Content class="bg-base-200 ">
+		{#if hasAuth}
+			<DropdownMenu.Item onclick={modifyThisOccurrence}>Cette occurrence</DropdownMenu.Item>
+			<DropdownMenu.Item onclick={modifyMasterEvent}>Toutes les occurrences</DropdownMenu.Item>
+		{:else}
+			Vous n'êtes pas autorisé à modifier cet événement.
+		{/if}
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

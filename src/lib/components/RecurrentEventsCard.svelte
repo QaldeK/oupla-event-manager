@@ -69,17 +69,17 @@
 </script>
 
 <div
-	class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800"
+	class="overflow-hidden rounded-lg border bg-base-100 shadow-md"
 >
 	<div class="space-y-4 p-4">
 		<!-- En-tête -->
 		<div class="border-b pb-2">
-			<h2 class=" text-xl font-bold text-gray-800 dark:text-gray-100">
+			<h2 class=" text-fluid-xl font-bold ">
 				{master.event_title}
 			</h2>
-			<div class="text-fluid-sm mt-1 text-gray-600 dark:text-gray-400">
+			<div class="text-fluid-sm mt-1  ">
 				{formatRecurrence(master.recurrence)}
-				<span class="text-fluid-sm block text-gray-500">
+				<span class="text-fluid-sm block ">
 					Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
 				</span>
 			</div>
@@ -87,7 +87,7 @@
 
 		<!-- Prochaines occurrences -->
 		<div>
-			<h3 class="mb-2 font-medium text-gray-700 dark:text-gray-300">
+			<h3 class="mb-2 font-medium  ">
 				Prochaines dates ({occurrences.length || 0})
 			</h3>
 			{#each (occurrences || []).slice(0, 5) as occurrence}
@@ -97,22 +97,20 @@
 					);
 				}}
 				<div
-					class="hover:bg-accent flex flex-col border-b border-gray-300 p-2 dark:border-gray-700"
+					class="flex flex-col border-b p-2 "
 				>
 					<div class="flex items-baseline justify-between">
-						<span class="text-gray-600 dark:text-gray-400">
+						<span class="font-medium">
 							{lisibleDate(new Date(occurrence.date_event))}
 						</span>
 						<div class="flex items-center gap-4">
 							{#if !occurrence.isConfirmed}
 								<div use:tooltip={{ content: "Confirmer que l'évenément à lieu" }}>
 									<button
-										variant="outline"
-										size="badge"
 										onclick={() => onConfirm(occurrence.id)}
-										class={occurrence.organizers.length > 0
-											? 'border border-green-200 text-green-600 hover:bg-green-200 hover:text-green-900 dark:border-green-600 dark:bg-green-600 dark:text-green-400 dark:hover:bg-green-600 dark:hover:text-white'
-											: 'border border-gray-200 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white'}
+										class="  btn btn-compact {occurrence.organizers.length > 0 
+											? 'btn-success btn-outline' 
+											: 'btn-ghost'}"
 									>
 										+ Confirmez
 									</button>
@@ -124,22 +122,21 @@
 							{/if}
 							<div use:tooltip={{ content: 'modifier cette occurrence' }} class="">
 								<button
-									variant="outline"
-									size="icon_md"
 									onclick={() => {
 										eventState.is = occurrence;
 										modalState.event = true;
 									}}
+									class="btn btn-soft btn-square btn-sm"
 								>
-									<PencilLine class="w-full text-gray-700" />
+									<PencilLine class="h-4 w-4" />
 								</button>
 							</div>
 						</div>
 					</div>
-					<div class="flex flex-wrap items-center">
+					<div class="flex flex-wrap items-center gap-x-2">
 						{#each occurrence.organizers as organizer}
 							<div
-								class="text-fluid-sm rounded-full bg-gray-100 px-3 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+								class="font-semibold badge badge-accent badge-soft "
 							>
 								{organizer.username}
 							</div>
@@ -147,22 +144,23 @@
 
 						<button
 							onclick={() => subscribeUserToOccurence(occurrence)}
-							class="text-fluid-sm ms-2 px-2 py-1 text-blue-600 hover:underline"
-							>{isUserSubscribedToTask(occurrence.tasks[0])
-								? 'Se désinscrire'
-								: "S'inscrire"}</button
+							class="btn btn-link "
 						>
+							{isUserSubscribedToTask(occurrence.tasks[0])
+								? 'Se désinscrire'
+								: "S'inscrire"}
+						</button>
 					</div>
 				</div>
 			{:else}
-				<div class="text-fluid-sm text-gray-500">Aucune date programmée</div>
+				<div class="text-fluid-sm ">Aucune date programmée</div>
 			{/each}
 		</div>
 
 		<!-- Équipe récurrente -->
-		<div class="border-t border-gray-100 pt-4 dark:border-gray-700">
+		<div class="border-t border-gray-100 pt-4 border-gray-700">
 			<div class="mb-2 flex items-center justify-between">
-				<h3 class="text-fluid-sm font-medium text-gray-700 dark:text-gray-300">
+				<h3 class="text-fluid-sm font-medium  ">
 					Équipe organisatrice
 				</h3>
 				<button
@@ -172,7 +170,7 @@
 							isOrganizersModal.open = true;
 						}
 					}}
-					class="text-fluid-sm text-blue-600 hover:underline dark:text-blue-400"
+					class="btn btn-soft btn-compact"
 				>
 					+ Gérer
 				</button>
@@ -183,7 +181,7 @@
 					{#each master.recurrenceTeam as member}
 						{#if member && typeof member === 'object' && 'username' in member}
 							<div
-								class="text-fluid-sm rounded-full bg-gray-100 px-3 py-1 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+								class="text-fluid-sm rounded-full bg-gray-100 px-3 py-1  bg-gray-700 "
 							>
 								{member.username}
 							</div>
@@ -191,13 +189,13 @@
 					{/each}
 				</div>
 			{:else}
-				<div class="text-fluid-sm text-red-500 dark:text-red-400">Aucun organisateur assigné</div>
+				<div class="text-fluid-sm text-error">Aucun organisateur assigné</div>
 			{/if}
 		</div>
 	</div>
 	<div
 		id="footer-card"
-		class="flex flex-wrap justify-end gap-x-4 border-t border-gray-200 bg-gray-100 px-2 py-1 text-right dark:border-gray-700"
+		class="flex flex-wrap justify-end gap-x-4 border-t  px-2 py-1 text-right "
 	>
 		<button
 			onclick={() => {
@@ -206,9 +204,7 @@
 					modalState.event = true;
 				}
 			}}
-			class=""
-			variant="slate"
-			size="xs"
+			class="btn btn-secondary btn-compact"
 		>
 			Modifier toutes les occurences
 		</button>

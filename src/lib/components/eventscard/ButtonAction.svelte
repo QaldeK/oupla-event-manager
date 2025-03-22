@@ -48,8 +48,7 @@
 
 	function handleModifyClick(event: EventType) {
 		if (!hasAuth) {
-			console.warn('no auth');
-			showAlert("Vous n'avez pas les droits nécessaires pour modifier cet événement.", 'error');
+			showAlert("Vous n'êtes pas autorisé à modifier cet événement.", 'error');
 			return;
 		}
 		modifyEvent(event);
@@ -124,7 +123,9 @@
 			<button class="btn" onclick={() => confirmEvent()}> confirmer </button>
 		{/if}
 		{#if currentEvent.isRecurrent}
-			<DropDownModEvent {currentEvent} />
+			<div class={!hasAuth ? 'cursor-default opacity-50' : ''}>
+				<DropDownModEvent {currentEvent} {hasAuth} />
+			</div>
 		{:else}
 			<button
 				onclick={() => handleModifyClick(currentEvent)}

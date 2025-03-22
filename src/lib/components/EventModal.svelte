@@ -4,11 +4,13 @@
 	import Frame from '$lib/components/Frame.svelte';
 	import GroupCheckBox from '$lib/components/GroupCheckBox.svelte';
 	import Info from '$lib/components/Info.svelte';
+	import AutoConfirmSettings from '$lib/components/forModal/AutoConfirmSettings.svelte';
+
 	import Modal from '$lib/components/Modal.svelte';
 	import Quill from '$lib/components/Quill.svelte';
 	import RecurrentTab from '$lib/components/forModal/RecurrentTab.svelte';
 	import Textarea from '$lib/components/ui-custom/textarea/textarea.svelte';
-	import { newEvent } from '$lib/constants/events.constants';
+	import { getNewEvent } from '$lib/constants/events.constants';
 	import { ValidationSchemaType, validateEvent } from '$lib/schemas/event.schema';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import type { EventType } from '$lib/types/event';
@@ -36,7 +38,7 @@
 
 	const closeModal = () => {
 		modalState.event = false;
-		eventState.is = { ...newEvent };
+		eventState.is = { ...getNewEvent() };
 	};
 
 	// ::: Data et Etat réactif
@@ -551,6 +553,7 @@
 				{/if}
 			</Frame>
 		{/if}
+		<AutoConfirmSettings bind:eventData />
 
 		<Frame>
 			<div class="flex flex-col gap-4 md:flex-row">
