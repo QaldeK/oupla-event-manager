@@ -56,7 +56,14 @@ export const updateEvent = async (eventID: string, data: Partial<EventsRecord>) 
 
 export const createEvent = async (data: Partial<EventsRecord>) => {
 	try {
-		const record = await pb.collection('events').create({ ...data, space: getSpace.id });
+		// S'assurer que created_by est toujours défini avec l'utilisateur actuel
+		const eventData = {
+				...data,
+				created_by: pb.authStore.record.id,
+				space: getSpace.id
+		};
+		
+		const record = await pb.collection('events').create(eventData);
 		return record;
 	} catch (error) {
 		console.error(error);
@@ -156,6 +163,7 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 			isMasterRecurrent: true,
 			date_event: '', // on ne met pas de date à l'event master
 			space: getSpace.id,
+			created_by: pb.authStore.record.id,
 			recurrence: {
 				...eventData.recurrence,
 				tasks: eventData.tasks
@@ -176,6 +184,7 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 			const occurrenceData = {
 				...eventData,
 				space: getSpace.id,
+				created_by: pb.authStore.record.id,
 				date_event: date,
 				masterRecurrentId: masterRecord.id,
 				isMasterRecurrent: false,

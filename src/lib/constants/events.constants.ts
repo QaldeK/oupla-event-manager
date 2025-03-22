@@ -5,11 +5,10 @@ import type { EventFormType } from '$lib/types/event';
 
 // Fonction pour obtenir les valeurs par défaut dynamiques
 export function getNewEvent(): EventFormType {
-
 	return {
 		// Valeurs dynamiques
-		space: getSpace.id,
-		created_by: userDb.current?.id ?? pb.authStore.model?.id ?? '', 
+		space: '',
+		created_by: '',
 		tasks: [],
 		// Valeurs statiques
 		event_title: '',
@@ -34,7 +33,13 @@ export function getNewEvent(): EventFormType {
 			recurrenceType: '',
 			monthlyByDayOccurrences: [],
 			recurrenceTeam: [],
-			tasks: []
+			tasks: [],
+			autoConfirm: false,
+			autoConfirmMin: 1,
+			notifyNoOrganizer: true,
+			notifyNoOrganizerDays: 7,
+			notifyNotConfirmed: true,
+			notifyNotConfirmedDays: 3
 		},
 		dates_proposed: [],
 		description: '',
@@ -57,6 +62,3 @@ export function getNewEvent(): EventFormType {
 		external_proposal: {}
 	};
 }
-
-// Pour la compatibilité avec le code existant
-export const newEvent = getNewEvent();

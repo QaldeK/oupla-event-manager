@@ -3,7 +3,8 @@
 		- basculer a réccurant lorsque qu'explicitement demander (pas par les tabs mais boutons)
 	*/
 	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
-	import { newEvent } from '$lib/constants/events.constants';
+
+	import { getNewEvent } from '$lib/constants/events.constants';
 	import { type EventFormType } from '$lib/types/event';
 	import {
 		addDays,
@@ -23,9 +24,9 @@
 	import MultiSelect from './MultiSelect.svelte';
 	import TimeReservation from './TimeReservation.svelte';
 
-	// FIXIT : possibly undefined resolve by newEvent fallback ?
+	// FIXIT : possibly undefined resolve by getNewEvent fallback ?
 	let {
-		eventData = $bindable<EventFormType>({ ...newEvent } as EventFormType),
+		eventData = $bindable<EventFormType>({ ...getNewEvent() } as EventFormType),
 		localErrors,
 		recurrentErrors
 	} = $props();
@@ -332,11 +333,8 @@
 	<!-- Date de début -->
 	<div class="flex flex-wrap gap-x-6 gap-y-4">
 		<div class="min-w-fit">
-			<label for="date_event" class="text-fluid-sm block font-medium text-gray-700">
-				Première date
-			</label>
 			<div class="min-w-54">
-				<DatePicker bind:value={eventData.recurrence.firstDate} id="date_event" />
+				<DatePicker bind:value={eventData.recurrence.firstDate} label="	Première date" />
 			</div>
 			<!-- {#if recurrentErrors.firstDate}
 				<p class="error">{recurrentErrors.firstDate}</p>
@@ -344,11 +342,8 @@
 		</div>
 		<!-- Date de fin -->
 		<div class="min-w-fit">
-			<label for="end_date" class="text-fluid-sm block font-medium text-gray-700">
-				Jusqu'au...
-			</label>
 			<div class="min-w-54">
-				<DatePicker bind:value={eventData.recurrence.lastDate} id="end_date" />
+				<DatePicker bind:value={eventData.recurrence.lastDate} label="Jusqu'au..." />
 			</div>
 			{#if recurrentErrors.lastDate}
 				<p class="text-fluid-sm text-red-500 italic">{recurrentErrors.lastDate}</p>
