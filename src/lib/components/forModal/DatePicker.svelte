@@ -10,7 +10,6 @@
 
 	let {
 		value = $bindable(''),
-		eventId,
 		onResetDate = () => {},
 		mode = 'single', // 'single' or 'multiple'
 		resetButton = false,
@@ -18,13 +17,13 @@
 		label = 'Ajoutez des dates'
 	} = $props();
 
-	let fp = null;
+	let fp: any = null;
+	let dpId = crypto.randomUUID().substring(0, 8);
 	let dateInput: HTMLInputElement;
 	const eventsByDateTime = $derived(eventsStore.getEventsByDateTime);
 	$inspect('eventsByDateTime', eventsByDateTime);
 
 	$effect(() => {
-
 		fp = flatpickr(dateInput, {
 			dateFormat: 'l j F Y',
 			locale: French,
@@ -119,12 +118,12 @@
 
 <div class="flex items-end gap-x-4">
 	<div class="flex flex-col gap-y-1">
-		<label for={eventId} class="text-fluid-sm block">
+		<label for={dpId} class="text-fluid-sm block">
 			{label}
 		</label>
 		<input
 			bind:this={dateInput}
-			id={eventId}
+			id={dpId}
 			type="text"
 			class="border-base-300 w-full rounded-lg border bg-white py-2 pr-10 pl-3 shadow-xs focus:outline-hidden"
 			{placeholder}
