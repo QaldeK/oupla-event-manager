@@ -25,7 +25,7 @@
 	const spaceId = $derived(getSpace.id);
 	const categories = $derived(getSpace.categories);
 
-	// État du formulaire basé sur newEvent
+	// État du formulaire basé sur getNewEvent()
 	let formData = $state({
 		...getNewEvent(), // Utilise la fonction pour obtenir les valeurs dynamiques
 		// Surcharge des valeurs spécifiques au formulaire de proposition

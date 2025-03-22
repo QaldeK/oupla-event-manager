@@ -38,7 +38,8 @@
 		RefreshCw,
 		Settings,
 		UserPlus,
-		Users
+		Users,
+		CircleUserRound
 	} from 'lucide-svelte';
 
 	let { children } = $props();
@@ -252,10 +253,10 @@
 				</div>
 			{:else}
 				<!-- Top nav -->
-				<header class="navbar bg-neutral text-base-300 fixed top-0 right-0 left-0 z-50 shadow-sm">
+				<header class="navbar min-h-0 bg-neutral text-base-300 fixed top-0 right-0 left-0 z-50 shadow-sm">
 					<div class="flex-none">
 						<button class="btn btn-square btn-ghost" onclick={sidebarActions.toggle}>
-							{#if sidebarState.isOpen}
+							{#if sidebarState.isOpen && !sidebarState.isCompact}
 								<PanelLeftClose size={24} />
 							{:else}
 								<Menu size={24} />
@@ -263,16 +264,17 @@
 						</button>
 					</div>
 
-					<div class="flex-1">
-						<a href="/dashboard" class="text-xl"
-							>Oupla - {currentSpace.name} - {currentUser.username} {currentUser.id} {userDb.current?.id}</a
+					<div class="flex-1 flex justify-center">
+						<a href="/dashboard" class="text-lg"
+							>Oupla - {currentSpace.name} - {currentUser.username}</a
 						>
 					</div>
 
 					<div class="flex-none gap-2">
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
-								<button class="btn btn-ghost">{currentUser.username}</button>
+								<button class="btn btn-outline"><CircleUserRound />
+ 									{currentUser.username} </button>
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content class="menu bg-base-200 rounded-box w-56">
 								<DropdownMenu.Label class="menu-title">Mon compte</DropdownMenu.Label>
