@@ -5,6 +5,8 @@ export interface UserType {
 	id: string;
 	username: string;
 	email: string;
+	currentRole: string;
+	verified: boolean;
 	memberOf: Array<{
 		id: string;
 		name: string;

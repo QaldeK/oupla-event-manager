@@ -201,42 +201,46 @@ export const userToOrganizerFmt = (user: User, tasks?: string[] | string) => ({
 
 // ::: pb event functions
 
-export const handleTaskSubscription = async (params: {
+interface TaskSubscriptionParams {
 	task: string;
-	currentUser: { id: string; username: string; email: string };
-	event: {
-		id: string;
-		tasks: string[];
-		organizers: Array<{ id: string; tasks: string[] }>;
-		isConfirmed: boolean;
-	};
-	onShowConfirmModal?: (options: { title: string; message: string; onConfirm: () => void }) => void;
-}) => {
-	const { task, currentUser, event, onShowConfirmModal } = params;
+	currentUser: UserType;
+	event: EventType;
+	onShowConfirmModal: (options: {
+		title: string;
+		message: string;
+		onConfirm: () => void;
+	}) => void;
+}
 
-	// Trouver l'organisateur actuel
-	const currentOrganizer = event.organizers.find(org => org.id === currentUser.id);
-	const isSubscribed = currentOrganizer?.tasks.includes(task);
+// Vérifie si toutes les tâches d'un événement sont assignées à au moins un organisateur
+export const areAllTasksAssigned = (tasks: string[], organizers: OrganizerType[]): boolean => {
+	return tasks.every(task => organizers.some(org => org.tasks.includes(task)));
+};
 
-	// Si l'utilisateur est déjà inscrit à cette tâche
-	if (isSubscribed) {
-		// Mettre à jour uniquement les tâches de l'organisateur actuel
-		const updatedOrganizers = event.organizers.map(org => {
+export const handleTaskSubscription = async ({ task, currentUser, event, onShowConfirmModal }: TaskSubscriptionParams) => {
+	// Copie des organisateurs actuels
+	const currentOrganizers = Array.isArray(event.organizers) ? [...event.organizers] : [];
+	const isUserSubscribed = currentOrganizers.some(
+		(org) => org.id === currentUser.id && org.tasks.includes(task)
+	);
+
+	let updatedOrganizers;
+	if (isUserSubscribed) {
+		// Désinscrire l'utilisateur de la tâche
+		updatedOrganizers = currentOrganizers.map((org) => {
 			if (org.id === currentUser.id) {
 				return {
 					...org,
-					tasks: org.tasks.filter(t => t !== task)
+					tasks: org.tasks.filter((t) => t !== task)
 				};
 			}
 			return org;
 		});
-		
-		await updateEvent(event.id, { organizers: updatedOrganizers });
 	} else {
-		// Si l'utilisateur n'est pas encore inscrit
-		if (currentOrganizer) {
-			// Ajouter la nouvelle tâche aux tâches existantes
-			const updatedOrganizers = event.organizers.map(org => {
+		// Inscrire l'utilisateur à la tâche
+		const existingUser = currentOrganizers.find((org) => org.id === currentUser.id);
+		if (existingUser) {
+			updatedOrganizers = currentOrganizers.map((org) => {
 				if (org.id === currentUser.id) {
 					return {
 						...org,
@@ -245,22 +249,29 @@ export const handleTaskSubscription = async (params: {
 				}
 				return org;
 			});
-			
-			await updateEvent(event.id, { organizers: updatedOrganizers });
 		} else {
-			// Créer un nouvel organisateur avec la tâche
-			const newOrganizer = {
+			updatedOrganizers = [...currentOrganizers, {
 				id: currentUser.id,
 				username: currentUser.username,
 				email: currentUser.email,
-				tasks: [task]
-			};
-			
-			await updateEvent(event.id, { 
-				organizers: [...event.organizers, newOrganizer]
-			});
+				tasks: [task],
+				role: currentUser.role
+			}];
 		}
 	}
+
+	// Vérification pour l'auto-confirmation
+	let shouldAutoConfirm = false;
+	if (event.recurrence?.autoConfirm) {
+		shouldAutoConfirm = areAllTasksAssigned(event.tasks, updatedOrganizers) && 
+			updatedOrganizers.length >= event.recurrence.autoConfirmMin;
+	}
+
+	// Mise à jour avec la confirmation automatique si nécessaire
+	await updateEvent(event.id, {
+		organizers: updatedOrganizers,
+		...(shouldAutoConfirm && { isConfirmed: true })
+	});
 };
 
 export const handleOrganizerMaybehere = (params: {

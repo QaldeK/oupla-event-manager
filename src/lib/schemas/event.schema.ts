@@ -15,7 +15,13 @@ export const RecurrenceSchema = z.object({
 	recurrenceType: z.string().default(''),
 	monthlyByDayOccurrences: z.array(z.number().optional()).default([]),
 	recurrenceTeam: z.array(RecurrenceTeamSchema).default([]),
-	tasks: z.array(z.string()).default([])
+	tasks: z.array(z.string()).default([]),
+	autoConfirm: z.boolean().default(false),
+	autoConfirmMin: z.number().optional(),
+	notifyNoOrganizer: z.boolean().optional().default(false),
+	notifyNoOrganizerDays: z.number().optional().default(5),
+	notifyNotConfirmed: z.boolean().optional().default(false),
+	notifyNotConfirmedDays: z.number().optional().default(3)
 });
 
 export const OrganizerSchema = z.object({
