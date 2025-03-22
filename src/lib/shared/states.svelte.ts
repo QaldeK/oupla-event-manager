@@ -2,7 +2,7 @@
 
 // export const eventsList = $state();
 
-import { newEvent } from '$lib/constants/events.constants';
+import { getNewEvent } from '$lib/constants/events.constants';
 import { getSpace } from '$lib/shared/spaceOptions.svelte';
 
 export const modalState = $state({
@@ -48,7 +48,7 @@ export const openTaskModal = (params: {
 
 // Evenement en cours de modification (pour EventModal...)
 export const eventState = $state({
-	is: newEvent
+	is: getNewEvent()
 });
 
 /* ::: Organisateurs possibles (membres de l'espace)
@@ -112,7 +112,7 @@ export const hasAuthorizations = (params: {
 	const currentRole = userDb.currentRole;
 
 	if (!currentUser) return false;
-	
+
 	// Admin a toujours les droits
 	if (currentRole === 'admin') return true;
 

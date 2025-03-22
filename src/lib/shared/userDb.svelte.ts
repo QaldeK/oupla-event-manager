@@ -63,6 +63,12 @@ class UserDB {
 		return this.userData?.memberOf || [];
 	}
 
+	get id() {
+		return this.userData?.id || '';
+	}
+
+	// Méthodes privées
+
 	private async buildFullUserInfo(baseUserRecord: any): Promise<UserType> {
 		const memberOfResponse = await pb.collection('spaceMembers').getFullList({
 			filter: `user = "${baseUserRecord.id}"`,
