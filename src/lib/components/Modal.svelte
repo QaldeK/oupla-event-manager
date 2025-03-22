@@ -22,16 +22,15 @@
 </script>
 
 <div
-	class="bg-opacity-50 fixed inset-0 z-50 flex h-full w-full items-center justify-center bg-gray-900"
+	class="bg-neutral/50 fixed inset-0 z-50 flex h-full w-full items-center justify-center backdrop-blur-xs"
 	transition:fade={{ duration: 150 }}
 >
 	<div
-		class="relative mx-auto max-h-dvh w-full max-w-6xl overflow-y-auto rounded-xl bg-gray-100 p-2 shadow-lg md:max-h-[calc(100dvh-2rem)] md:p-6"
+		class="bg-base-100 relative mx-auto max-h-dvh w-full max-w-6xl overflow-y-auto rounded-xl p-2 shadow-lg md:max-h-[calc(100dvh-2rem)] md:p-6"
 	>
 		{@render children?.()}
 	</div>
 </div>
-<div></div>
 
 <style>
 </style>

@@ -330,7 +330,7 @@
 
 <div class="mt-4 space-y-10">
 	<!-- Date de début -->
-	<div class="flex flex-wrap gap-x-6 gap-y-6">
+	<div class="flex flex-wrap gap-x-6 gap-y-4">
 		<div class="min-w-fit">
 			<label for="date_event" class="text-fluid-sm block font-medium text-gray-700">
 				Première date
@@ -357,14 +357,14 @@
 	</div>
 
 	<!-- Type de récurrence -->
-	<div class="items-top flex flex-wrap gap-x-10 gap-y-6">
+	<div class="items-top flex flex-wrap gap-x-10 gap-y-4">
 		<div class="">
 			<select
 				id="recurrence-type"
 				name="recurrence-type"
 				bind:value={eventData.recurrence.recurrenceType}
 				aria-describedby="recurrence-type-description"
-				class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-xs transition-all duration-300 ease-in-out focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+				class="select"
 			>
 				<option value="" disabled selected> Choisissez un type de récurrence </option>
 				<option value={recurrenceChoice.WEEKLY}>Hebdomadaire</option>

@@ -6,7 +6,6 @@
 	import Quill from '$lib/components/Quill.svelte';
 	import TimePickRange from '$lib/components/TimePickRange.svelte';
 	import DatePickerProposal from '$lib/components/forModal/DatePickerProposal.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { getNewEvent } from '$lib/constants/events.constants';
@@ -15,8 +14,9 @@
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import { userDb } from '$lib/shared/userDb.svelte';
 	import { z } from 'zod';
-
 	import { slide } from 'svelte/transition';
+	import { UserPlus, LogIn } from 'lucide-svelte';
+	import { showAlert } from '$lib/shared/states.svelte';
 
 	const formSchema = PropositionFormSchema;
 
@@ -52,9 +52,10 @@
 
 	// État d'authentification
 	let isAuthenticated = $state(pb.authStore.isValid);
-	let email = $state('');
-	let password = $state('');
-	let passwordConfirm = $state('');
+	let username = $state('');
+	let email = $state('***REMOVED***');
+	let password = $state('***REMOVED***');
+	let passwordConfirm = $state('***REMOVED***');
 	let authError = $state('');
 
 	// Validation du mot de passe uniquement pour la correspondance
@@ -70,68 +71,44 @@
 		formData.space = spaceId;
 	});
 
-	// Vérifie si l'email existe déjà
-	async function checkEmail() {
-		try {
-			const result = await pb.collection('users').getFirstListItem(`email="${email}"`);
-			return true;
-		} catch {
-			return false;
-		}
-	}
+	let activeTab = $state('register'); // 'register' ou 'login'
 
-	// Gestion de l'authentification
-	async function handleAuth(e: SubmitEvent) {
+	// Séparation des handlers pour plus de clarté
+	async function handleRegister(e: SubmitEvent) {
 		e.preventDefault();
 		authError = '';
 
 		try {
-			const emailExists = await checkEmail();
+			// Création du compte et connexion automatique
+			const user = await userDb.register(username, email, password);
 
-			if (emailExists) {
-				// Connexion pour utilisateur existant
-				await userDb.login(email, password);
-			} else {
-				// Vérification du mot de passe pour les nouveaux utilisateurs
-				if (!passwordConfirm) {
-					authError = 'Veuillez confirmer votre mot de passe pour créer un compte';
-					return;
-				}
-
-				if (password.length < 8) {
-					authError = 'Le mot de passe doit contenir au moins 8 caractères';
-					return;
-				}
-
-				if (password !== passwordConfirm) {
-					authError = 'Les mots de passe ne correspondent pas';
-					return;
-				}
-
-				// Inscription
-				try {
-					// Création du compte et connexion automatique
-					const user = await userDb.register(email, password);
-
-					// Création du membre externe
-					await pb.collection('spaceMembers').create({
-						user: user.id,
-						space: spaceId,
-						role: 'external'
-					});
-				} catch (registerError) {
-					console.error('Register error:', registerError);
-					throw new Error(
-						"Erreur lors de l'inscription : " +
-							(registerError instanceof Error ? registerError.message : 'Erreur inconnue')
-					);
-				}
-			}
+			// Création du membre externe
+			await pb.collection('spaceMembers').create({
+				user: user.id,
+				space: spaceId,
+				role: 'external'
+			});
 
 			isAuthenticated = true;
 			authError = '';
+			showAlert('Connexion réussie', 'success');
 		} catch (error) {
-			console.error('Auth error:', error);
+			console.error('Register error:', error);
+			authError = error instanceof Error ? error.message : "Erreur d'inscription";
+		}
+	}
+
+	async function handleLogin(e: SubmitEvent) {
+		e.preventDefault();
+		authError = '';
+
+		try {
+			await userDb.login(email, password);
+			isAuthenticated = true;
+			authError = '';
+			showAlert('Connexion réussie', 'success');
+		} catch (error) {
+			console.error('Login error:', error);
 			authError = error instanceof Error ? error.message : "Erreur d'authentification";
 		}
 	}
@@ -221,37 +198,166 @@
 	});
 </script>
 
-<div class="container mx-auto max-w-2xl p-4">
+<div class="container mx-auto mb-10 max-w-2xl p-4">
 	<h1 class="mb-6 text-2xl font-bold">
 		Proposer un événement pour {spaceName}
 	</h1>
 
 	{#if !isAuthenticated}
-		<div class="mb-6 rounded-lg border bg-gray-50 p-6">
-			<h2 class="mb-4 text-xl font-semibold">Identification requise</h2>
-			<form onsubmit={handleAuth} class="space-y-4">
-				<div>
-					<label for="email" class="text-fluid-sm mb-2 block font-medium">Email</label>
-					<Input type="email" id="email" bind:value={email} required />
-				</div>
-				<div>
-					<label for="password" class="text-fluid-sm mb-2 block font-medium">Mot de passe</label>
-					<Input type="password" id="password" bind:value={password} required />
-				</div>
-				<div>
-					<label for="passwordConfirm" class="text-fluid-sm mb-2 block font-medium">
-						Confirmation du mot de passe
-						<span class="text-fluid-sm text-gray-500"
-							>(si vous n'êtes pas déjà inscrit sur oupla)</span
-						>
+		<div class="card bg-base-200 mb-4 shadow-xl">
+			<div class="card-body">
+				<h2 class="card-title mb-4">Identification requise</h2>
+
+				<div class="tabs tabs-lift">
+					<label class="tab">
+						<input
+							type="radio"
+							name="auth_tabs"
+							checked={activeTab === 'register'}
+							onchange={() => (activeTab = 'register')}
+						/>
+						<UserPlus class="me-2 size-4" />
+						Créer un compte
 					</label>
-					<Input type="password" id="passwordConfirm" bind:value={passwordConfirm} />
+					<div class="tab-content bg-base-100 border-base-300 p-6">
+						<form onsubmit={handleRegister} class="space-y-4">
+							<div class="w-full">
+								<label for="username" class="floating-label text-lg">
+									<span>Nom</span>
+									<input
+										type="text"
+										id="username"
+										bind:value={username}
+										class="input input-bordered validator w-full"
+										placeholder="Votre nom"
+										pattern="[A-Za-z][A-Za-z0-9\-]*"
+										minlength="3"
+										maxlength="30"
+										title="Lettres, chiffres ou tirets uniquement"
+										required
+									/>
+									<p class="validator-hint">
+										Doit contenir entre 3 et 30 caractères. Uniquement des lettres, chiffres ou
+										tirets
+									</p>
+								</label>
+							</div>
+
+							<div class="w-full">
+								<label for="register-email" class="floating-label text-lg">
+									<span>Email</span>
+									<input
+										type="email"
+										id="register-email"
+										bind:value={email}
+										class="input input-bordered validator w-full"
+										placeholder="votre@email.com"
+										required
+									/>
+									<p class="validator-hint">Format email valide requis</p>
+								</label>
+							</div>
+
+							<div class="w-full">
+								<label for="register-password" class="floating-label text-lg">
+									<span>Mot de passe</span>
+									<input
+										type="password"
+										id="register-password"
+										bind:value={password}
+										class="input input-bordered validator w-full"
+										placeholder="Mot de passe"
+										required
+										minlength="8"
+									/>
+									<p class="validator-hint">Minimum 8 caractères</p>
+								</label>
+							</div>
+
+							<div class="w-full">
+								<label for="password-confirm" class="floating-label text-lg">
+									<span>Confirmer le mot de passe</span>
+									<input
+										type="password"
+										id="password-confirm"
+										bind:value={passwordConfirm}
+										class="input input-bordered validator w-full"
+										pattern={password}
+										placeholder="Confirmer votre mot de passe"
+										required
+									/>
+									<p class="validator-hint">Doit être identique au mot de passe</p>
+								</label>
+							</div>
+
+							<button type="submit" class="btn btn-primary w-full">Créer mon compte</button>
+						</form>
+					</div>
+
+					<label class="tab">
+						<input
+							type="radio"
+							name="auth_tabs"
+							checked={activeTab === 'login'}
+							onchange={() => (activeTab = 'login')}
+						/>
+						<LogIn class="me-2 size-4" />
+						S'identifier
+					</label>
+					<div class="tab-content bg-base-100 border-base-300 p-6">
+						<form onsubmit={handleLogin} class="space-y-4">
+							<div class="w-full">
+								<label for="login-email" class="floating-label text-lg">
+									<span>Email</span>
+									<input
+										type="email"
+										id="login-email"
+										bind:value={email}
+										class="input input-bordered validator w-full"
+										placeholder="votre@email.com"
+										required
+									/>
+									<p class="validator-hint">Format email valide requis</p>
+								</label>
+							</div>
+
+							<div class="w-full">
+								<label for="login-password" class="floating-label text-lg">
+									<span>Mot de passe</span>
+									<input
+										type="password"
+										id="login-password"
+										bind:value={password}
+										class="input input-bordered validator w-full"
+										placeholder="Votre mot de passe"
+										required
+									/>
+								</label>
+							</div>
+
+							<button type="submit" class="btn btn-primary w-full">Se connecter</button>
+						</form>
+					</div>
 				</div>
+
 				{#if authError}
-					<div class="text-fluid-sm text-red-600">{authError}</div>
+					<div class="alert alert-error mt-4">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-6 w-6 shrink-0 stroke-current"
+							fill="none"
+							viewBox="0 0 24 24"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+							/></svg
+						>
+						<span>{authError}</span>
+					</div>
 				{/if}
-				<Button type="submit" class="w-full">S'identifier</Button>
-			</form>
+			</div>
 		</div>
 	{/if}
 
@@ -273,17 +379,18 @@
 			class:pointer-events-none={!isAuthenticated}
 		>
 			<div class="space-y-8">
-				<div>
-					<label for="event_title" class="text-fluid-sm mb-2 block font-medium">
-						Titre de l'événement *
-					</label>
-					<Input
+				<div class="flex flex-col gap-y-1">
+					<label for="event_title" class=""> Titre de l'événement * </label>
+					<input
 						type="text"
 						id="event_title"
 						bind:value={formData.event_title}
 						placeholder="Nom de votre événement"
 						required
+						minlength="3"
+						class="input input-lg validator w-full"
 					/>
+					<p class="validator-hint">Titre requis, minimum 3 caractères</p>
 				</div>
 				<div>
 					<label for="periodPreference" class="text-fluid-sm mb-2 block font-medium">
@@ -296,7 +403,7 @@
 					/>
 				</div>
 				<!-- Section des propositions de dates -->
-				<Frame title="Proposer une ou plusieurs dates" class_title="bg-gray-50" class_frame="mb-8">
+				<Frame title="Proposer une ou plusieurs dates" class_frame="mb-8">
 					<Info>
 						<p>
 							Si vous avez des dates précises à proposer pour lesquelles vous êtes disponibles,
@@ -315,9 +422,12 @@
 											placeholder="Selectionnez une date"
 										/>
 										{#if formData.external_proposal.proposals.length > 1}
-											<Button variant="outline" size="sm" onclick={() => removeProposal(i)}>
+											<button
+												class="btn btn-outline btn-error btn-sm"
+												onclick={() => removeProposal(i)}
+											>
 												Supprimer
-											</Button>
+											</button>
 										{/if}
 									</div>
 									<div class="grid grid-cols-1 items-start gap-x-4 sm:grid-cols-2">
@@ -329,7 +439,7 @@
 												minTime="06:00"
 												classAdd="w-full"
 											/>
-											<p class="text-fluid-sm text-gray-500 italic">
+											<p class="text-fluid-xs text-base-content/70 italic">
 												heure à laquelle vous souhaiteriez arriver dans le lieu pour mettre en place
 												l'événement
 											</p>
@@ -342,7 +452,7 @@
 												minTime={proposal.time_start}
 												classAdd="w-full"
 											/>
-											<p class="text-fluid-sm text-gray-500 italic">
+											<p class="text-fluid-xs text-base-content/70 italic">
 												heure à laquelle vous souhaitez commencer le spectacle/l'intervention
 											</p>
 										</div>
@@ -350,13 +460,13 @@
 								</div>
 							</div>
 						{/each}
-						<Button variant="outline" onclick={addProposal} class="w-full">
+						<button type="button" onclick={addProposal} class="btn btn-outline btn-block">
 							Ajouter une autre proposition
-						</Button>
+						</button>
 					</div>
 				</Frame>
 				<!-- Catégories -->
-				<Frame title="Type d'événement" class_title="bg-gray-50" class_frame="mb-8">
+				<Frame title="Type d'événement" class_frame="mb-8">
 					<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
 						<GroupCheckBox groupItems={categories} bind:eventDataGroup={formData.categories} />
 					</div>
@@ -370,7 +480,7 @@
 								<label for="prix" class="flex" transition:slide>
 									<input
 										type="text"
-										class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+										class="text-md input"
 										id="prix"
 										placeholder="Prix ?"
 										bind:value={formData.prix}
@@ -384,7 +494,7 @@
 								<label for="mixite" class="flex" transition:slide>
 									<input
 										type="text"
-										class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+										class="text-md input"
 										id="mixite"
 										bind:value={formData.mixite}
 										placeholder="Décrivez le type de mixité"
@@ -402,7 +512,7 @@
 								<label for="age" class="flex" transition:slide>
 									<input
 										type="number"
-										class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+										class="text-md input"
 										id="age"
 										placeholder="Age minimum ?"
 										bind:value={formData.age_advice}
@@ -420,21 +530,6 @@
 						/>
 					</div>
 				</Frame>
-				<!-- Description publique -->
-				<div class="space-y-2">
-					<h3 class="text-lg font-medium">Description publique *</h3>
-					<Info>
-						<p>
-							Présentation de l'événement, déstiné au public (pour diffusion sur la Newsletter, le
-							site, etc.). Inutile de renseigner le titre, la date, les horaires, prix, mixité, etc.
-							<span class="text-fluid-sm">
-								(ce sera automatiquement ajoutés et mis en forme lors de la génération de la
-								newsletter et du site)
-							</span>
-						</p>
-					</Info>
-					<Quill bind:dataContent={formData.desc_public} />
-				</div>
 				<!-- Durée globale -->
 				<div class="mb-6 flex flex-col gap-2">
 					<label for="duree" class="text-fluid-sm font-medium text-gray-700">
@@ -450,7 +545,23 @@
 						{/each}
 					</select>
 				</div>
-				<Button type="submit" class="w-full">Envoyer la proposition</Button>
+
+				<!-- Description publique -->
+				<div class="space-y-2">
+					<h3 class="text-lg font-medium">Description publique *</h3>
+					<Info>
+						<p>
+							Présentation de l'événement, déstiné au public (pour diffusion sur la Newsletter, le
+							site, etc.). Inutile de renseigner le titre, la date, les horaires, prix, mixité, etc.
+							<span class="text-fluid-sm">
+								(ce sera automatiquement ajoutés et mis en forme lors de la génération de la
+								newsletter et du site)
+							</span>
+						</p>
+					</Info>
+					<Quill bind:dataContent={formData.desc_public} />
+				</div>
+				<button type="submit" class="btn btn-primary btn-block">Envoyer la proposition</button>
 			</div>
 		</form>
 	{/if}

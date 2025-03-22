@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { pb } from '$lib/pocketbase.svelte';
 	import { getSpace, loadSpaceOptions } from '$lib/shared/spaceOptions.svelte';
+	import Alert from '$lib/components/Alert.svelte';
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -59,3 +60,5 @@
 {:else}
 	{@render children?.()}
 {/if}
+
+<Alert />

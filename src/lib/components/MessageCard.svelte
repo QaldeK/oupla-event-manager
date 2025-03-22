@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { pb } from '$lib/pocketbase.svelte';
 	import { deleteMessage, updateMessage } from '$lib/pocketbase.svelte';
@@ -59,10 +58,12 @@
 				<div class="space-y-2">
 					<Textarea bind:value={editContent} class="min-h-[80px]" />
 					<div class="flex gap-2">
-						<Button size="sm" onclick={handleUpdateMessage} disabled={!editContent.trim()}>
+						<button class="btn btn-sm" onclick={handleUpdateMessage} disabled={!editContent.trim()}>
 							Enregistrer
-						</Button>
-						<Button size="sm" variant="outline" onclick={() => (isEditing = false)}>Annuler</Button>
+						</button>
+						<button class="btn btn-sm btn-sort btn-error" onclick={() => (isEditing = false)}
+							>Annuler</button
+						>
 					</div>
 				</div>
 			{:else}
@@ -74,20 +75,20 @@
 
 		<!-- Actions -->
 		<div class="mt-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-			<Button variant="ghost" size="sm" onclick={() => onReply(message.id)}>
+			<button variant="ghost" size="sm" onclick={() => onReply(message.id)}>
 				<Reply class="mr-1 h-4 w-4" />
 				Répondre
-			</Button>
+			</button>
 
 			{#if message.user === pb.authStore.record.id}
-				<Button variant="ghost" size="sm" onclick={() => (isEditing = true)}>
+				<button variant="ghost" size="sm" onclick={() => (isEditing = true)}>
 					<Edit2 class="mr-1 h-4 w-4" />
 					Modifier
-				</Button>
-				<Button variant="ghost" size="sm" onclick={handleDeleteMessage}>
+				</button>
+				<button class="btn btn-ghost btn-sm" onclick={handleDeleteMessage}>
 					<Trash2 class="mr-1 h-4 w-4" />
 					Supprimer
-				</Button>
+				</button>
 			{/if}
 		</div>
 	</div>

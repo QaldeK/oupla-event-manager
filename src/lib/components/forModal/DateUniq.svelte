@@ -23,6 +23,19 @@
 		return eventData.date_event.replace(/-/g, '') + eventData.time_end.replace(/:/g, '');
 	});
 
+	// Fonction de transition vers le mode sondage
+	function switchToSondage() {
+		eventData.isSondage = true;
+		eventData.date_event = '';
+		if (eventData.dates_proposed?.length === 0) {
+			// Initialiser avec la date actuelle si disponible
+			const currentDate = eventData.date_event;
+			if (currentDate && eventData.time_start && eventData.time_end) {
+				addDateProposal(currentDate, eventData.time_start, eventData.time_end);
+			}
+		}
+	}
+
 	const resetDate = (): void => {
 		eventData.date_event = '';
 		eventData.time_start = '';
@@ -36,6 +49,7 @@
 		modalState.confirm = {
 			isOpen: true,
 			data: {
+				variant: 'danger',
 				title: "Annuler l'événement",
 				message:
 					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
@@ -49,21 +63,32 @@
 	// $inspect('localErrors', localErrors);
 </script>
 
-<div class="space-y-10">
+<div class="space-y-6">
 	{#if !eventData.isConfirmed}
+		<Info>
+			{#if !eventData.dates_proposed?.length}
+				<p>
+					Si plusieurs dates sont envisagées, vous pouvez
+					<button class="link link-primary" onclick={switchToSondage}> créer un sondage </button>
+				</p>
+			{:else}
+				<p class="text-fluid-sm">
+					Un sondage pour determiner la date de cet événement à lieu. Si la date choisie ne convient
+					plus, vous pouvez le
+					<button class="link link-primary" onclick={switchToSondage}>rétablir</button>
+				</p>
+			{/if}
+		</Info>
 		<div class="lg:w-1/2">
-			<label for="date_event" class="text-fluid-sm block font-medium text-gray-700"
-				>Date de l'événement</label
-			>
+	
 
-			<div class="flex gap-x-2">
 				<DatePicker
 					bind:value={eventData.date_event}
 					eventId={eventData.id}
 					onResetDate={resetDate}
 					resetButton={true}
+					label="Date de l'événement"
 				/>
-			</div>
 
 			{#if localErrors.date_event}
 				<p class="text-fluid-sm p-2 text-red-500 italic">{localErrors.date_event}</p>

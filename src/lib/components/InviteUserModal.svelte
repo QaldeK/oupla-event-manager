@@ -90,7 +90,7 @@
 					id="email"
 					value={email}
 					oninput={(e) => (email = e.currentTarget.value)}
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+					class="input mt-1 block w-full"
 					required
 				/>
 			</div>
@@ -113,12 +113,7 @@
 				<div class="mt-4 space-y-2">
 					<p class="font-medium text-gray-700">Lien d'invitation :</p>
 					<div class="flex items-center gap-2">
-						<input
-							type="text"
-							value={invitationLink}
-							readonly
-							class="text-fluid-sm w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2"
-						/>
+						<input type="text" value={invitationLink} readonly class="text-fluid-sm input w-full" />
 						<button
 							type="button"
 							onclick={copyLink}

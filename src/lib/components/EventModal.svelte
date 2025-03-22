@@ -8,7 +8,6 @@
 	import Quill from '$lib/components/Quill.svelte';
 	import RecurrentTab from '$lib/components/forModal/RecurrentTab.svelte';
 	import Textarea from '$lib/components/ui-custom/textarea/textarea.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { newEvent } from '$lib/constants/events.constants';
 	import { ValidationSchemaType, validateEvent } from '$lib/schemas/event.schema';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
@@ -17,7 +16,6 @@
 	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
 	import DateUniq from '$lib/components/forModal/DateUniq.svelte';
 	import OrganizersAndTasksSelect from '$lib/components/forModal/OrganizersAndTasksSelect.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import {
 		createEvent,
 		createRecurrentEvent,
@@ -81,19 +79,6 @@
 		}
 		return 'DATE';
 	});
-
-	// Fonction de transition vers le mode sondage
-	function switchToSondage() {
-		eventData.isSondage = true;
-		eventData.date_event = '';
-		if (eventData.dates_proposed?.length === 0) {
-			// Initialiser avec la date actuelle si disponible
-			const currentDate = eventData.date_event;
-			if (currentDate && eventData.time_start && eventData.time_end) {
-				addDateProposal(currentDate, eventData.time_start, eventData.time_end);
-			}
-		}
-	}
 
 	// Fonction de transition vers le mode date unique
 	function switchToDate() {
@@ -389,6 +374,7 @@
 	<!-- {$inspect('recurrenceDates', recurrenceDates)} -->
 
 	<h1 class="mb-4 text-2xl">{modalTitle}</h1>
+
 	<div class="fixed top-6 right-4 z-50 flex flex-col gap-4">
 		<button onclick={closeModal} class=" rounded-full"
 			><X
@@ -397,16 +383,14 @@
 			/></button
 		>
 
-		<Button onclick={handleSave} size="icon_sm">
+		<button onclick={handleSave} class="btn btn-sm">
 			<Save />
-		</Button>
+		</button>
 	</div>
 	<form class="space-y-10">
 		<div class="flex flex-wrap items-center">
 			<div class="w-full items-center space-y-2 md:w-1/2">
-				<label for="event_title" class="text-fluid-sm block font-medium text-gray-700"
-					>Nom de l'événement</label
-				>
+				<label for="event_title" class="text-fluid-sm">Nom de l'événement</label>
 				<input
 					use:debounce={{
 						onChange: (v) => (eventData.event_title = v)
@@ -415,7 +399,7 @@
 					type="text"
 					id="event_title"
 					name="event_title"
-					class="block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-xs focus:border-indigo-300 focus:ring-3 focus:ring-indigo-200 focus:outline-hidden"
+					class="input block w-full"
 				/>
 				{#if errors.event_title}
 					<p class="text-fluid-sm text-red-500 italic">{errors.event_title[0]}</p>
@@ -447,7 +431,7 @@
 		<!-- FIXIT condition chelou -->
 		{#snippet ExternalProposalPref()}
 			{#if hasExternalPreference}
-				<Info variant="outline" class="border-amber-600 shadow-md">
+				<Info variant="warning">
 					<p class="italic">
 						Cet événement à été proposé par: {eventData.expand?.created_by.username}
 						({eventData.expand?.created_by?.email}), depuis le site publique
@@ -465,8 +449,8 @@
 		<div id="dateOrg" transition:slide>
 			<Frame
 				title={dateAndHoursTitle}
-				class_title={'bg-gray-100 text-md md:text-lg'}
-				class_frame={'md:p-8'}
+				class_title="text-fluid-md md:text-fluid-lg "
+				class_frame="md:p-8"
 			>
 				<div class="space-y-4">
 					{#if displayMode === 'RECURRENT'}
@@ -475,20 +459,8 @@
 						</div>
 					{:else if displayMode === 'SONDAGE'}
 						<div>
-							<Info>
-								<p>
-									Si il n'y a plus qu'une date envisagée, vous pouvez valider la date choisie (<CalendarCheck
-										class="inline"
-										size={16}
-									/>), ou <Button
-										variant="outline"
-										size="xxs"
-										class="m-1 border-red-300"
-										onclick={cancelSondage}>annuler ce sondage</Button
-									>
-								</p>
-							</Info>
 							{@render ExternalProposalPref()}
+
 							<DatePickerProposed bind:eventData localErrors={errors} />
 						</div>
 					{:else}
@@ -500,7 +472,7 @@
 									<div class="mb-2">
 										<p class="mb-2">Dates proposées :</p>
 										<div class="flex flex-wrap gap-2">
-											{#each eventData.external_proposal?.proposals as proposal, index}
+											{#each eventData.external_proposal?.proposals as proposal, index (index)}
 												<div class="flex items-center gap-2">
 													<Checkbox
 														bind:checked={proposal.selected}
@@ -511,30 +483,13 @@
 											{/each}
 										</div>
 										<div class="flex justify-end">
-											<Button size="xs" onclick={convertSelectedToProposed}>
+											<button class="btn btn-xs" onclick={convertSelectedToProposed}>
 												Convertir les dates sélectionnées en sondage
-											</Button>
+											</button>
 										</div>
 									</div>
 								</Info>
 							{/if}
-
-							<Info>
-								{#if !eventData.dates_proposed?.length}
-									<p>
-										Si plusieurs dates sont envisagées, vous pouvez
-										<Button variant="outline" size="xxs" onclick={switchToSondage}>
-											créer un sondage
-										</Button>
-									</p>
-								{:else}
-									<p class="text-fluid-sm">
-										Un sondage pour determiner la date de cet événement à lieu. Si la date choisie
-										ne convient plus, vous pouvez le
-										<Button variant="link" size="xxs" onclick={switchToSondage}>rétablir</Button>
-									</p>
-								{/if}
-							</Info>
 
 							<DateUniq bind:eventData localErrors={errors} />
 						</div>
@@ -546,8 +501,8 @@
 		<!-- ::: ROle & Oragnizers -->
 		<!-- FIXIT : checker ce qui doit apparaitre, et utiliser des props $derived en fonction d'eventMode plutot que des #if -->
 
-		<Frame title={'Rôles'} class_title={'bg-gray-100'}>
-			<div class="mb-2 block font-medium text-gray-700">
+		<Frame title="Rôles">
+			<div class="mb-2 block font-medium">
 				{tasksLabel}
 			</div>
 			<ButtonGroupSelect
@@ -557,14 +512,13 @@
 				onadd={addCustomTask}
 				defaultOption={getSpace.tasks.defaultTask}
 			/>
-			<button
-				class="text-fluid-sm p-2 text-blue-700 hover:text-blue-600 hover:underline"
-				onclick={() => (eventData.tasks = tasksPossibles)}>> ajoutez tous les rôles</button
+			<button class="link link-primary ms-4" onclick={() => (eventData.tasks = tasksPossibles)}
+				>> ajoutez tous les rôles</button
 			>
 		</Frame>
 
 		{#if eventMode !== 'NEW_RECURRENT' && eventMode !== 'EDIT_RECURRENT_ALL'}
-			<Frame title={'Organisateur·ices'} class_title={'bg-gray-100'}>
+			<Frame title="Organisateur·ices">
 				<OrganizersAndTasksSelect
 					{organizersPossibles}
 					tasks={eventData.tasks || []}
@@ -577,11 +531,11 @@
 				{/if}
 			</Frame>
 		{:else}
-			<Frame title={'Organisateur·ices'} class_title={'bg-gray-100'}>
-				<div class="mb-2 text-gray-700">
+			<Frame title="Organisateur·ices">
+				<p class="mb-2">
 					Ajoutez les personnes qui participent à organiser ces événements récurrents (celles et
 					ceux qui pourront s'inscrire sur l'organisation des occurrences de chaque événement)
-				</div>
+				</p>
 				<ButtonGroupSelect
 					options={organizersPossibles}
 					bind:selectedItems={eventData.recurrence.recurrenceTeam}
@@ -606,7 +560,7 @@
 						<label for="prix" class="flex" transition:slide>
 							<input
 								type="text"
-								class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+								class="input flex flex-1"
 								id="prix"
 								placeholder="Prix ?"
 								bind:value={eventData.prix}
@@ -620,7 +574,7 @@
 						<label for="mixite" class="flex" transition:slide>
 							<input
 								type="text"
-								class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+								class="input flex flex-1"
 								id="mixite"
 								bind:value={eventData.mixite}
 								placeholder="Décrivez le type de mixité"
@@ -638,7 +592,7 @@
 						<label for="age" class="flex" transition:slide>
 							<input
 								type="number"
-								class="text-md flex flex-1 rounded border border-gray-300 p-2 focus:ring-indigo-500"
+								class="input flex flex-1"
 								id="age"
 								placeholder="Age minimum ?"
 								bind:value={eventData.age_advice}
@@ -650,7 +604,7 @@
 		</Frame>
 		<div class="mb-0 flex flex-wrap justify-between">
 			<!-- ::: rooms -->
-			<Frame title={'Salles réservées'} class_frame={'sm:me-6'} class_title={'bg-gray-100'}>
+			<Frame title="Salles réservées" class_frame="sm:me-6">
 				<div id="rooms" class="flex flex-wrap items-center gap-2">
 					<GroupCheckBox
 						groupItems={rooms}
@@ -665,11 +619,7 @@
 
 			<!-- ::: catégories -->
 
-			<Frame
-				title={"Type d'événement"}
-				class_frame={'flex-1 items-center content-center'}
-				class_title={'bg-gray-100'}
-			>
+			<Frame title="Type d'événement" class_frame="flex-1 items-center content-center">
 				<div id="categories" class="align-">
 					<GroupCheckBox groupItems={categories} bind:eventDataGroup={eventData.categories} />
 				</div>
@@ -699,7 +649,7 @@
 		</div>
 
 		<!-- ::: Description publique -->
-		<Frame title={'Description publique'} class_title={'bg-gray-100'}>
+		<Frame title="Description publique">
 			<Info>
 				<p>
 					Description destinée au public (Newsletter, site). Inutile de renseigner le titre, la
@@ -720,16 +670,16 @@
 		<div class="mb-4 flex flex-wrap justify-end gap-x-4 gap-y-2">
 			<button
 				type="button"
-				class="block w-full rounded bg-red-500 px-4 py-2 font-bold text-white hover:bg-red-700 md:w-fit"
+				class="btn btn-error block w-full font-bold sm:w-fit"
 				onclick={closeModal}>Fermer sans enregistrer</button
 			>
 			<button
 				type="button"
-				class="block w-full rounded bg-teal-500 px-4 py-2 font-bold text-white hover:bg-teal-700 md:w-fit"
+				class="btn btn-accent block w-full font-bold sm:w-fit"
 				onclick={handleConfirm}>Enregistrer et Confirmer l'événement</button
 			>
 			<button
-				class="block w-full rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 md:w-fit"
+				class="btn btn-primary block w-full font-bold sm:w-fit"
 				type="button"
 				onclick={handleSave}>Enregistrer</button
 			>
@@ -737,22 +687,22 @@
 	</form>
 
 	<!-- AlertDialog pour la confirmation de modification de toutes les occurrences -->
-	<AlertDialog.Root bind:open={isAlertDialogOpen}>
-		<AlertDialog.Content>
-			<AlertDialog.Header>
-				<AlertDialog.Title>Modifier toutes les occurrences ?</AlertDialog.Title>
-				<AlertDialog.Description>
-					Êtes-vous sûr de vouloir modifier toutes les occurrences de cet événement récurrent ?
-				</AlertDialog.Description>
-			</AlertDialog.Header>
-			<AlertDialog.Footer>
-				<AlertDialog.Cancel onclick={() => (isAlertDialogOpen = false)}>Annuler</AlertDialog.Cancel>
-				<AlertDialog.Action onclick={confirmSubmit}
-					>Confirmer la modification globale</AlertDialog.Action
-				>
-			</AlertDialog.Footer>
-		</AlertDialog.Content>
-	</AlertDialog.Root>
+	<dialog id="confirm_recurrence_modal" class="modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold">Modifier toutes les occurrences ?</h3>
+			<p class="py-4">
+				Êtes-vous sûr de vouloir modifier toutes les occurrences de cet événement récurrent ?
+			</p>
+			<div class="modal-action">
+				<form method="dialog">
+					<button class="btn btn-ghost" onclick={() => (isAlertDialogOpen = false)}>Annuler</button>
+					<button class="btn btn-primary" onclick={confirmSubmit}
+						>Confirmer la modification globale</button
+					>
+				</form>
+			</div>
+		</div>
+	</dialog>
 </Modal>
 
 <style>

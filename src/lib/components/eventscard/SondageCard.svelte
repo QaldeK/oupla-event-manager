@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { lisibleDate, lisibleTime } from '$lib/utils';
 	import { eventState, modalState } from '$lib/shared/states.svelte';
@@ -103,10 +102,10 @@
 			class="text-md flex w-full items-center justify-between border-gray-300 bg-gray-100 p-1 font-bold"
 		>
 			<div class="px-2 text-gray-700">Sondage: disponibilité</div>
-			<Button onclick={() => openSondageModal(thisEvent)} size="xs" variant="outline" class="">
+			<button onclick={() => openSondageModal(thisEvent)} class="btn btn-xs">
 				<CalendarPlus />
 				Participez au sondage
-			</Button>
+			</button>
 		</div>
 		<div class="text-md text-gray-700">
 			<div class="flex flex-col divide-y">
@@ -135,15 +134,10 @@
 		<div class="flex w-full justify-between font-semibold">
 			<div>Organisateur•ices</div>
 			<div class="">
-				<Button
-					onclick={() => openSondageModal(thisEvent)}
-					size="xs"
-					variant="slate"
-					class="text-slate-900"
-				>
+				<button onclick={() => openSondageModal(thisEvent)} class="btn btn-xs">
 					<CalendarPlus />
 					Participez
-				</Button>
+				</button>
 			</div>
 		</div>
 		{@render org(thisEvent)}

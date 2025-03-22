@@ -10,11 +10,11 @@
 		base: 'relative mb-4 flex items-center gap-4 rounded-md border p-2 md:px-4 align-baseline',
 		variants: {
 			variant: {
-				info: 'bg-blue-100 border-blue-300 text-gray-700',
-				warning: 'bg-amber-100 border-amber-300 text-gray-700',
-				danger: 'bg-red-100 border-red-300 text-gray-700',
-				success: 'bg-green-100 border-green-300 text-gray-700',
-				outline: 'border-gray-300 text-gray-700'
+				info: 'bg-info/20 border-info/70',
+				warning: 'bg-warning/20 border-warning/70',
+				danger: 'bg-error/20 border-error/70',
+				success: 'bg-success/20 border-success/70',
+				outline: 'border-neutral'
 			}
 		},
 		defaultVariants: {
@@ -53,15 +53,15 @@
 	const getIconColor = () => {
 		switch (variant) {
 			case 'warning':
-				return 'text-amber-800';
+				return 'text-warning';
 			case 'danger':
-				return 'text-red-800';
+				return 'text-error';
 			case 'success':
-				return 'text-green-800';
+				return 'text-succes';
 			case 'outline':
-				return 'text-gray-800';
+				return 'text-neutral';
 			default:
-				return 'text-blue-800';
+				return 'text-info';
 		}
 	};
 
@@ -70,7 +70,7 @@
 
 <div class={cn(infoVariants({ variant }), className)}>
 	{#if Icon}
-		<div class={cn('absolute top-0 left-0 ms-3 mt-4', getIconColor())}>
+		<div class={cn('absolute top-0 left-0 p-3', getIconColor())}>
 			{#if variant === 'warning'}
 				<AlertTriangle size={24} />
 			{:else if variant === 'danger'}

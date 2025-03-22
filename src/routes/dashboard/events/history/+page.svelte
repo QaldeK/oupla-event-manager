@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { pastEventsStore } from '$lib/shared/eventsStore.svelte';
+	// import { pastEventsStore } from '$lib/shared/eventsStore.svelte'; // TODO
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import type { EventsRecord } from '$lib/types/pocketbase';
 	import { format } from 'date-fns';
@@ -8,22 +8,22 @@
 	let isLoading = $state(true);
 
 	// Initialiser le store
-	$effect(() => {
-		async function initStore() {
-			try {
-				isLoading = true;
-				await pastEventsStore.init({
-					spaceId: getSpace.id,
-					mode: 'dashboard'
-				});
-			} catch (error) {
-				console.error('Erreur lors du chargement des événements passés:', error);
-			} finally {
-				isLoading = false;
-			}
-		}
-		initStore();
-	});
+	// $effect(() => {
+	// 	async function initStore() {
+	// 		try {
+	// 			isLoading = true;
+	// 			await pastEventsStore.init({
+	// 				spaceId: getSpace.id,
+	// 				mode: 'dashboard'
+	// 			});
+	// 		} catch (error) {
+	// 			console.error('Erreur lors du chargement des événements passés:', error);
+	// 		} finally {
+	// 			isLoading = false;
+	// 		}
+	// 	}
+	// 	initStore();
+	// });
 
 	// Grouper les événements par mois
 	const months = $derived(() => {

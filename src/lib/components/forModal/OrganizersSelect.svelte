@@ -7,7 +7,7 @@
 	import { getContext } from 'svelte';
 
 	let currentUser = getContext<CurrentUser>('currentUser');
-	let isAdmin: boolean = () => currentUser.role === 'admin';
+	let isAdmin = () =>  currentUser.role === 'admin';
 
 	let {
 		organizers = $bindable(),
@@ -48,7 +48,7 @@
 
 <div class="p-4">
 	<div class="flex flex-wrap gap-3">
-		{#each benevolesList as benevole}
+		{#each benevolesList as benevole (benevole)}
 			<div
 				class="flex items-center justify-between rounded-lg border border-gray-200 bg-white shadow-sm"
 			>

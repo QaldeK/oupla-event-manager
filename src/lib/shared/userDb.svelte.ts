@@ -165,16 +165,15 @@ class UserDB {
 	}
 
 	logout() {
-		pb.authStore.clear();
 		this.userData = null;
 		this.initialized = false;
-		// this.setToStorage(null); // Redondant avec .clear ?
 	}
 
-	async register(email: string, password: string): Promise<UserType> {
+	async register(username: string, email: string, password: string): Promise<UserType> {
 		try {
 			// Création du compte
 			const data = {
+				username,
 				email,
 				password,
 				passwordConfirm: password,

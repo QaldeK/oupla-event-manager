@@ -12,7 +12,7 @@
 		minTime = '06:00'
 	} = $props();
 
-	let fpid = `time-picker-${Math.random().toString(36).slice(2, 9)}`;
+	let fpid = `time-picker-${crypto.randomUUID()}`;
 	let fpInstance;
 
 	$effect(() => {
@@ -59,20 +59,17 @@
 	});
 </script>
 
-<div class="flex items-center gap-x-2">
-	<label for={fpid} class="text-fluid-sm font-medium text-gray-700"
-		>{label}
-		<div class="flex items-center rounded-md border border-gray-300 bg-gray-200 shadow-xs">
-			<Clock class="pointer-events-none mx-2 hidden items-center text-gray-700 md:block" />
-			<input
-				id={fpid}
-				{value}
-				type="text"
-				class="px-2 py-2 {classAdd
-					? classAdd
-					: ''} rounded-md rounded-l-none bg-white text-base text-gray-700 focus:outline-hidden"
-				{placeholder}
-			/>
-		</div>
+<div class="grid">
+	<label for={fpid} class="text-fluid-sm">
+		{label}
 	</label>
+	<input
+		id={fpid}
+		{value}
+		type="text"
+		class="{classAdd
+			? classAdd
+			: ''} border-base-300 flex w-full rounded-lg border bg-white py-2 pr-10 pl-3 shadow-xs focus:outline-hidden"
+		{placeholder}
+	/>
 </div>

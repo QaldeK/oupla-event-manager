@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Modal from '$lib/components/Modal.svelte';
 	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import type { EventType } from '$lib/types/event';
 	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from '$lib/utils';
 	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
@@ -95,7 +94,7 @@
 	</h1>
 
 	<div class="py-4">
-		<DatePickerProposed {eventData} />
+		<DatePickerProposed bind:eventData />
 	</div>
 
 	<div class="mt-4 flex flex-wrap justify-end gap-x-4 gap-y-2">

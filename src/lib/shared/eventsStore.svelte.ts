@@ -108,14 +108,28 @@ class EventsStore {
 		}
 	}
 
-	async clearAndDestroy(): Promise<void> {
-		if (this.#store.syncStore) {
-			await this.#store.syncStore.clearAll();
+	async clearAndDestroy() {
+		try {
+			// Arrêter toutes les souscriptions en cours
+			if (this.#store.syncStore) {
+				await this.#store.syncStore.destroy();
+			}
+
+			// Réinitialiser complètement le store
+			this.#store = {
+				syncStore: null,
+				isInitialized: false,
+				error: null,
+				initPromise: null,
+				mode: null
+			};
+
+		} catch (error) {
+			console.error('Erreur lors de la destruction du store:', error);
+			// Forcer la réinitialisation même en cas d'erreur
+			this.#store.isInitialized = false;
 			this.#store.syncStore = null;
 		}
-		this.#store.isInitialized = false;
-		this.#store.error = null;
-		this.#store.initPromise = null;
 	}
 
 	// :::  getters
@@ -196,24 +210,41 @@ class EventsStore {
 	getEventsByDateTime = $derived.by<Map<string, EventConflictInfo[]>>(() => {
 		const eventsByDateMap = new Map<string, EventConflictInfo[]>();
 
+		// horaire par defaut inséré ensuite si non renseigné 
+		const getDefaultTimes = (isStart: boolean) => {
+			return isStart ? '00:00' : '23:59';
+		};
+
 		for (const event of this.allEvents) {
 			// Fonction utilitaire pour créer l'objet d'information
 			const createEventInfo = (
 				event: SyncEventRecord,
 				dateStart?: string,
 				dateEnd?: string
-			): EventConflictInfo => ({
-				id: event.id,
-				event_title: event.event_title,
-				organizers: event.organizers,
-				rooms: event.rooms,
-				conflictType: event.isConfirmed ? 'confirmed' : 'unconfirmed',
-				date_event: event.date_event,
-				dateStart: dateStart || event.dateStart,
-				dateEnd: dateEnd || event.dateEnd,
-				time_start: dateStart ? format(new Date(dateStart), 'HH:mm') : event.time_start,
-				time_end: dateEnd ? format(new Date(dateEnd), 'HH:mm') : event.time_end
-			});
+			): EventConflictInfo => {
+				// Si on a une date mais pas d'horaire, on utilise les horaires par défaut
+				const hasDate = event.date_event || dateStart;
+				const hasTime = event.time_start && event.time_end;
+				
+				const timeStart = hasDate && !hasTime ? getDefaultTimes(true) : 
+					(dateStart ? format(new Date(dateStart), 'HH:mm') : event.time_start);
+				
+				const timeEnd = hasDate && !hasTime ? getDefaultTimes(false) : 
+					(dateEnd ? format(new Date(dateEnd), 'HH:mm') : event.time_end);
+
+				return {
+					id: event.id,
+					event_title: event.event_title,
+					organizers: event.organizers,
+					rooms: event.rooms,
+					conflictType: event.isConfirmed ? 'confirmed' : 'unconfirmed',
+					date_event: event.date_event,
+					dateStart: dateStart || event.dateStart,
+					dateEnd: dateEnd || event.dateEnd,
+					time_start: timeStart,
+					time_end: timeEnd
+				};
+			};
 
 			// Fonction utilitaire pour extraire la date YYYY-MM-DD
 			const extractDateOnly = (dateString: string | null | undefined): string | null => {
@@ -308,15 +339,36 @@ class EventsStore {
 			rooms?: string[];
 		} = {}
 	) {
+		const getDefaultTime = (date: string, isStart: boolean) => {
+			const baseDate = new Date(date);
+			if (isStart) {
+				baseDate.setHours(0, 0, 0, 0);
+			} else {
+				baseDate.setHours(23, 59, 59, 999);
+			}
+			return baseDate.getTime();
+		};
+
 		const overlappingEvents = events.filter((event) => {
 			if (options.excludeEventId && event.id === options.excludeEventId) return false;
 
-			const eventStartTime = event.dateStart
-				? new Date(event.dateStart).getTime()
-				: this.parseTimeToDate(event.time_start, new Date()).getTime();
-			const eventEndTime = event.dateEnd
-				? new Date(event.dateEnd).getTime()
-				: this.parseTimeToDate(event.time_end, new Date()).getTime();
+			let eventStartTime: number;
+			let eventEndTime: number;
+
+			if (event.date_event && (!event.time_start || !event.time_end)) {
+				// Événement avec date mais sans horaire : occupe toute la journée
+				eventStartTime = getDefaultTime(event.date_event, true);
+				eventEndTime = getDefaultTime(event.date_event, false);
+			} else {
+				eventStartTime = event.dateStart
+					? new Date(event.dateStart).getTime()
+					: this.parseTimeToDate(event.time_start, new Date()).getTime();
+				eventEndTime = event.dateEnd
+					? new Date(event.dateEnd).getTime()
+					: this.parseTimeToDate(event.time_end, new Date()).getTime();
+			}
+
+			if (isNaN(eventStartTime) || isNaN(eventEndTime)) return false;
 
 			const hasTimeOverlap = this.timeUtils.checkTimeOverlap(
 				targetStart,

@@ -5,19 +5,11 @@
 	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
 	import OrganizersSelect from '$lib/components/forModal/OrganizersSelect.svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
 	import type { EventFormType, OrganizerType } from '$lib/types/event';
-	import {
-		addTime,
-		formatDatePb,
-		formatTimePb,
-		lisibleDate,
-		lisibleTime,
-		tooltip
-	} from '$lib/utils';
+	import { addTime, formatDatePb, formatTimePb, lisibleDate, lisibleTime } from '$lib/utils';
 	import { eventState } from '$lib/shared/states.svelte';
 
-	import { fade, slide } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 
 	import { CalendarCheck, PlusCircle, Trash2 } from 'lucide-svelte';
 
@@ -87,6 +79,10 @@
 
 	// ::: functions
 
+	const cancelSondage = () => {
+		eventData.isSondage = false;
+	};
+
 	const addDateProposal = () => {
 		if (selectedDate && startTime && endTime && selectedDate) {
 			const newProposals = selectedDate.map((date: string) => {
@@ -150,59 +146,65 @@
 
 	// $inspect('dateAccepted', dateAccepted);
 	// $inspect('eventsListSum', eventsListSum);
-	$inspect('datesFutureProposed', datesFutureProposed);
+	// $inspect('datesFutureProposed', datesFutureProposed);
 	// $inspect('oldDatesProposed', oldDatesProposed);
 </script>
 
 <div id="datesProposedTab" class="space-y-2">
+	<Info>
+		<p>
+			Si il n'y a plus qu'une date envisagée, vous pouvez valider la date choisie <CalendarCheck
+				class="badge badge-outline"
+				size={16}
+			/>, ou
+			<button class="link link-error" onclick={cancelSondage}>annuler ce sondage</button>
+		</p>
+	</Info>
 	{#if eventData?.external_proposal?.proposals?.length > 0 && hasUnproposedDates()}
 		<div transition:slide>
 			<Info variant="warning">
 				<p class="text-fluid-sm">
 					Certaines dates du sondage n'ont pas été soumise à l'intervenant·e ayant proposé·e
 					l'événement.
-					<Button
-						variant="outline"
-						size="xxs"
-						class="mt-2 ml-auto flex border-orange-500 text-orange-700 hover:bg-orange-100"
+					<button
+						class="btn btn-outline btn-xs btn-warning mt-2 ml-auto flex"
 						onclick={() => {
 							/* TODO: Implement proposeAllDates */
 						}}
 					>
 						Proposer toutes les nouvelles dates
-					</Button>
+					</button>
 				</p>
 			</Info>
 		</div>
 	{/if}
 
-	<div class="text-fluid-sm block font-medium text-gray-700">Ajouter une proposition de date :</div>
-	<div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+	<div class="mb-6 flex flex-wrap items-center gap-x-10 gap-y-2">
 		<DatePicker
 			bind:value={selectedDate}
 			{eventId}
 			mode="multiple"
 			placeholder="Selectionnez des dates"
 		/>
-
-		<div class="flex gap-x-4 gap-y-2 not-md:flex-wrap">
-			<div>
-				<TimePickRange bind:value={startTime} placeholder="début" classAdd="md:w-24 w-full" />
-			</div>
-			<div>
-				<TimePickRange
-					bind:value={endTime}
-					initial={addTime(startTime, 180)}
-					placeholder="fin"
-					classAdd="md:w-24 w-full"
-				/>
-			</div>
-			<div>
+		<div class="flex flex-col gap-y-1">
+			<span class="text-fluid-sm"> heure de réservation du lieu </span>
+			<div class="flex items-center gap-x-4 gap-y-2 not-md:flex-wrap">
+				<div>
+					<TimePickRange bind:value={startTime} placeholder="début" classAdd="md:w-32 w-full" />
+				</div>
+				<div>
+					<TimePickRange
+						bind:value={endTime}
+						initial={addTime(startTime, 180)}
+						placeholder="fin"
+						classAdd="md:w-32 w-full"
+					/>
+				</div>
 				<button
 					type="button"
 					onclick={addDateProposal}
 					disabled={!selectedDate || selectedDate.length === 0 || !startTime || !endTime}
-					class="cursor-pointer rounded bg-gray-200 p-2 text-green-700 shadow-sm hover:bg-gray-300 disabled:pointer-events-none disabled:text-gray-400"
+					class="btn btn-primary disabled:pointer-events-none disabled:text-gray-400"
 				>
 					<PlusCircle />
 				</button>
@@ -210,16 +212,16 @@
 		</div>
 	</div>
 
-	<div transition:fade>
-		{#each datesFutureProposed as date, index}
-			<div out:slide>
+	<div out:fade>
+		{#each datesFutureProposed as date, index (index)}
+			<div>
 				<div
-					class="mt-4 rounded-xl border border-gray-300 shadow {bestDate === date.dateStart
+					class="mt-4 rounded-xl shadow {bestDate === date.dateStart
 						? 'border-l-4 border-l-green-300'
 						: ''}  {dateAccepted?.dateStart === date.dateStart ? 'bg-green-50' : 'bg-white'}"
 				>
 					<div
-						class="py-.5 -top-0 left-2.5 items-center justify-between rounded-t-xl bg-gray-200 px-4 font-semibold text-gray-700 sm:flex"
+						class="py-.5 bg-base-300 -top-0 left-2.5 items-center justify-between rounded-t-xl px-4 font-semibold text-gray-700 sm:flex"
 					>
 						<div class="flex flex-wrap items-center gap-x-2">
 							<div>
@@ -250,41 +252,50 @@
 						</div>
 
 						<div class="gap-x-4 p-1 sm:flex">
-							<div use:tooltip={{ content: 'Supprimer cette proposition de date' }} class="">
-								<Button
-									variant="icon"
-									class="text-destructive hover:bg-destructive/10 border-destructive border shadow-sm"
-									size="icon_md"
+							<div data-tip="Supprimer cette proposition de date" class="tooltip">
+								<button
+									class="btn btn-square btn-soft btn-error"
 									onclick={() => removeDateProposal(index)}
 								>
 									<Trash2 />
-								</Button>
+								</button>
 							</div>
 							<div
-								use:tooltip={{
-									content:
-										date.organizers.length === 0
-											? 'Au moins un·e organisateur·ice est requis pour accepter la date'
-											: 'Accepter la date'
-								}}
-								class="top-1"
+								data-tip={date.organizers.length === 0
+									? 'Au moins un·e organisateur·ice est requis pour accepter la date'
+									: 'Accepter la date'}
+								class="tootip"
 							>
-								<Button
-									variant="icon"
-									class="border border-green-500 p-1 text-green-700 shadow-sm hover:bg-green-500/20 disabled:text-gray-400 {dateAccepted?.dateStart ===
+								<button
+									class="btn btn-success btn-square btn-soft {dateAccepted?.dateStart ===
 									date.dateStart
 										? 'bg-green-500 text-white'
 										: ''}"
-									size="icon_md"
 									onclick={() => validateDate(date)}
 									disabled={date.organizers.length === 0}
 								>
 									<CalendarCheck />
-								</Button>
+								</button>
 							</div>
 						</div>
 					</div>
-					<OrganizersSelect bind:organizers={date.organizers} />
+					<button class="btn btn-soft btn-sm btn-primary" onclick={organizer_select.showModal()}
+						>Inscrire</button
+					>
+					<dialog id="organizer_select" class="modal">
+						<div class="modal-box w-11/12 max-w-5xl">
+							<h3 class="text-lg font-bold">Hello!</h3>
+							<OrganizersSelect bind:organizers={date.organizers} />
+
+							<div class="modal-action">
+								<form method="dialog">
+									<!-- if there is a button in form, it will close the modal -->
+									<button class="btn">Close</button>
+								</form>
+							</div>
+						</div>
+					</dialog>
+
 					<div class="px-5 py-2">
 						<ConflictAlert
 							{eventId}
@@ -299,7 +310,7 @@
 		{#if oldDatesProposed.length > 0}
 			<div class="text-fluid-sm p-2 text-gray-500 italic">
 				Des dates déjà passées ont été proposées précédemment, et ont été automatiquement supprimées
-				( {#each oldDatesProposed as date}
+				( {#each oldDatesProposed as date (date)}
 					{lisibleDate(date.dateStart)},
 				{/each} )
 			</div>

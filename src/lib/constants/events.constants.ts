@@ -1,15 +1,16 @@
 import { pb } from '$lib/pocketbase.svelte';
 import { getSpace } from '$lib/shared/spaceOptions.svelte';
+import { userDb } from '$lib/shared/userDb.svelte';
 import type { EventFormType } from '$lib/types/event';
 
 // Fonction pour obtenir les valeurs par défaut dynamiques
 export function getNewEvent(): EventFormType {
+
 	return {
 		// Valeurs dynamiques
 		space: getSpace.id,
-		created_by: pb.authStore.model?.id || '',
-		tasks: [getSpace.tasks.defaultTask],
-
+		created_by: userDb.current?.id ?? pb.authStore.model?.id ?? '', 
+		tasks: [],
 		// Valeurs statiques
 		event_title: '',
 		date_event: '',
@@ -24,6 +25,7 @@ export function getNewEvent(): EventFormType {
 		canceled: false,
 		isMasterRecurrent: false,
 		isRecurrent: false,
+		isSondage: false,
 		masterRecurrentId: '',
 		recurrence: {
 			firstDate: '',
@@ -45,7 +47,7 @@ export function getNewEvent(): EventFormType {
 		age_advice: '',
 		is_prix_libre: true,
 		prix: '',
-		duree: '01:30',
+		duree: '',
 		organizers: [],
 		rooms: [''],
 		categories: [''],

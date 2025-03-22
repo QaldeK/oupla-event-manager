@@ -3,7 +3,6 @@
 	import type { EventType } from '$lib/types/event';
 	import { handleTaskSubscription, lisibleDate } from '$lib/utils';
 	import { tooltip } from '$lib/utils';
-	import { Button } from '$lib/components/ui/button';
 	import type { UserType } from '$lib/types/types';
 
 	import { getContext } from 'svelte';
@@ -107,7 +106,7 @@
 						<div class="flex items-center gap-4">
 							{#if !occurrence.isConfirmed}
 								<div use:tooltip={{ content: "Confirmer que l'évenément à lieu" }}>
-									<Button
+									<button
 										variant="outline"
 										size="badge"
 										onclick={() => onConfirm(occurrence.id)}
@@ -116,7 +115,7 @@
 											: 'border border-gray-200 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-600 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white'}
 									>
 										+ Confirmez
-									</Button>
+									</button>
 								</div>
 							{:else if occurrence.isConfirmed && !occurrence.canceled}
 								<span class="text-fluid-sm text-nowrap text-green-600">✓ Confirmé</span>
@@ -124,7 +123,7 @@
 								<span class="text-fluid-sm text-nowrap text-red-600">✗ Annulé</span>
 							{/if}
 							<div use:tooltip={{ content: 'modifier cette occurrence' }} class="">
-								<Button
+								<button
 									variant="outline"
 									size="icon_md"
 									onclick={() => {
@@ -133,7 +132,7 @@
 									}}
 								>
 									<PencilLine class="w-full text-gray-700" />
-								</Button>
+								</button>
 							</div>
 						</div>
 					</div>
@@ -200,7 +199,7 @@
 		id="footer-card"
 		class="flex flex-wrap justify-end gap-x-4 border-t border-gray-200 bg-gray-100 px-2 py-1 text-right dark:border-gray-700"
 	>
-		<Button
+		<button
 			onclick={() => {
 				if (modalState.event) {
 					eventState.is = master;
@@ -212,6 +211,6 @@
 			size="xs"
 		>
 			Modifier toutes les occurences
-		</Button>
+		</button>
 	</div>
 </div>

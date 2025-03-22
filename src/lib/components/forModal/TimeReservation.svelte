@@ -1,11 +1,10 @@
 <script lang="ts">
 	import TimePickRange from '$lib/components/TimePickRange.svelte';
 	import { addTime } from '$lib/utils';
-	import Alert from '$lib/components/Alert.svelte';
+	import {showAlert} from '$lib/shared/states.svelte';
 	import 'flatpickr/dist/flatpickr.min.css';
 	import 'tippy.js/dist/tippy.css';
 
-	import { onMount } from 'svelte';
 
 	let {
 		localErrors,
@@ -18,11 +17,13 @@
 	} = $props();
 
 	let isLoading: boolean = true;
-	let alertMsg = $state('');
+	let alertMsg = $state('')
 
-	onMount(() => {
-		isLoading = false;
-	});
+	$effect(() => {
+		if (alertMsg !== '' ){
+			showAlert(alertMsg, "error")
+		}
+	})
 
 	$effect(() => {
 		if (!eventData.time_start || !eventData.time_end) return;
@@ -58,7 +59,7 @@
 			}
 		}
 
-		if (startEvent && !isStartEventValid) {
+		if (startEvent && !isStartEventValid && !isTimeEndAfter00) {
 			if (startEvent < (startPublic || timeStart)) {
 				alertMsg =
 					"Le début de l'événement ne peut pas être avant l'heure de début de réservation.";
@@ -71,21 +72,21 @@
 	});
 </script>
 
-{#if alertMsg}
-	<Alert bind:message={alertMsg} type="error" />
-{/if}
+<!-- {#if alertMsg}
+	<Alert message={alertMsg} type="error" />
+{/if} -->
 <div class="flex flex-wrap gap-x-10 gap-y-4">
 	<div class="flex flex-col">
-		<div class="flex items-center gap-x-4 gap-y-2">
+		<div class="flex items-end gap-x-6 gap-y-2">
 			<TimePickRange
 				bind:value={eventData.time_start}
-				classAdd="md:w-32 w-full"
+				classAdd="md:w-48 w-full"
 				initial="17:00"
 				label="Réservation de :"
 			/>
 			<TimePickRange
 				bind:value={eventData.time_end}
-				classAdd="md:w-32 w-full"
+				classAdd="md:w-48 w-full"
 				initial={addTime(eventData.time_start, 180)}
 				label="à :"
 			/>
@@ -98,16 +99,16 @@
 	</div>
 
 	<div class="flex flex-col">
-		<div class="flex items-center gap-x-4 gap-y-2">
+		<div class="flex items-center gap-x-6 gap-y-2">
 			<TimePickRange
 				bind:value={eventData.start_public}
-				classAdd="md:w-32 w-full"
+				classAdd="md:w-48 w-full"
 				initial={addTime(eventData.time_start, 10)}
 				label="ouverture au public :"
 			/>
 			<TimePickRange
 				bind:value={eventData.start_event}
-				classAdd="md:w-32 w-full"
+				classAdd="md:w-48 w-full"
 				initial={addTime(eventData.start_public || eventData.time_start, 20)}
 				label="début de l'événement :"
 			/>

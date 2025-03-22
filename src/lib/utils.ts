@@ -214,76 +214,53 @@ export const handleTaskSubscription = async (params: {
 }) => {
 	const { task, currentUser, event, onShowConfirmModal } = params;
 
-	const isSubscribed = event.organizers.some(
-		(org) => org.id === currentUser.id && org.tasks.includes(task)
-	);
+	// Trouver l'organisateur actuel
+	const currentOrganizer = event.organizers.find(org => org.id === currentUser.id);
+	const isSubscribed = currentOrganizer?.tasks.includes(task);
 
-	const proceedWithTaskUpdate = async () => {
-		let updatedOrganizers = [...event.organizers];
-		const currentOrganizerIndex = updatedOrganizers.findIndex((org) => org.id === currentUser.id);
-
-		if (isSubscribed) {
-			if (currentOrganizerIndex !== -1) {
-				const organizer = updatedOrganizers[currentOrganizerIndex];
-				const updatedTasks = organizer.tasks.filter((t) => t !== task);
-
-				if (updatedTasks.length === 0) {
-					updatedOrganizers = updatedOrganizers.filter((org) => org.id !== currentUser.id);
-				} else {
-					updatedOrganizers[currentOrganizerIndex] = {
-						...organizer,
-						tasks: updatedTasks
+	// Si l'utilisateur est déjà inscrit à cette tâche
+	if (isSubscribed) {
+		// Mettre à jour uniquement les tâches de l'organisateur actuel
+		const updatedOrganizers = event.organizers.map(org => {
+			if (org.id === currentUser.id) {
+				return {
+					...org,
+					tasks: org.tasks.filter(t => t !== task)
+				};
+			}
+			return org;
+		});
+		
+		await updateEvent(event.id, { organizers: updatedOrganizers });
+	} else {
+		// Si l'utilisateur n'est pas encore inscrit
+		if (currentOrganizer) {
+			// Ajouter la nouvelle tâche aux tâches existantes
+			const updatedOrganizers = event.organizers.map(org => {
+				if (org.id === currentUser.id) {
+					return {
+						...org,
+						tasks: [...org.tasks, task]
 					};
 				}
-			}
+				return org;
+			});
+			
+			await updateEvent(event.id, { organizers: updatedOrganizers });
 		} else {
-			if (currentOrganizerIndex !== -1) {
-				updatedOrganizers[currentOrganizerIndex] = {
-					...updatedOrganizers[currentOrganizerIndex],
-					tasks: [...updatedOrganizers[currentOrganizerIndex].tasks, task]
-				};
-			} else {
-				updatedOrganizers.push({
-					id: currentUser.id,
-					username: currentUser.username,
-					email: currentUser.email,
-					tasks: [task],
-					role: '',
-					maybehere: ''
-				});
-			}
-		}
-
-		await updateEvent(event.id, { organizers: updatedOrganizers });
-	};
-
-	if (isSubscribed && event.isConfirmed) {
-		if (event.tasks.length > 1 && onShowConfirmModal) {
-			onShowConfirmModal({
-				title: 'Confirmation de désistement',
-				message:
-					"L'événement étant déjà confirmé, les autres participants seront notifiés de votre désistement par email. Souhaitez-vous continuer ?",
-				onConfirm: proceedWithTaskUpdate
+			// Créer un nouvel organisateur avec la tâche
+			const newOrganizer = {
+				id: currentUser.id,
+				username: currentUser.username,
+				email: currentUser.email,
+				tasks: [task]
+			};
+			
+			await updateEvent(event.id, { 
+				organizers: [...event.organizers, newOrganizer]
 			});
-			return;
-		}
-
-		const isOnlyOrganizer = event.organizers.length === 1;
-		if (isOnlyOrganizer && onShowConfirmModal) {
-			onShowConfirmModal({
-				title: 'Désistement et annulation',
-				message:
-					"Vous êtes le seul participant. Voulez-vous annuler l'événement ? Il sera marqué comme annulé sur le site. Nous vous suggérons d'informer les membres via la newsletter.",
-				onConfirm: async () => {
-					await proceedWithTaskUpdate();
-					await updateEvent(event.id, { canceled: true });
-				}
-			});
-			return;
 		}
 	}
-
-	await proceedWithTaskUpdate();
 };
 
 export const handleOrganizerMaybehere = (params: {

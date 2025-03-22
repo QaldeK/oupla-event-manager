@@ -57,15 +57,15 @@
 	<!-- XXX : onchange → ontoggle -->
 	<input
 		type="checkbox"
-		class="peer h-5 w-5 cursor-pointer rounded shadow-sm transition-all"
+		class="peer checkbox checkbox-primary"
 		{id}
 		bind:checked
 		ontoggle={() => onToggle}
 	/>
 	<span class="ml-2 cursor-pointer text-gray-600 {classLabel}">{label}</span>
 	{#if helpContent !== ''}
-		<span use:tooltip={{ content: helpContent }}>
+		<div class="tooltip" data-tip={helpContent}>
 			<CircleHelp size="14" class="ms-2 mb-2 text-gray-700" />
-		</span>
+		</div>
 	{/if}
 </label>

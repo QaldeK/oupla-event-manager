@@ -1,6 +1,5 @@
 <script lang="ts">
 	import MessageCard from '$lib/components/MessageCard.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { sendMessage } from '$lib/pocketbase.svelte';
 	import { messageStore } from '$lib/shared/messageStore.svelte';
@@ -68,9 +67,9 @@
 			<div class="text-fluid-sm mb-2 flex items-center gap-2 text-gray-500">
 				<Reply class="h-4 w-4" />
 				<span>Réponse à un message</span>
-				<Button variant="ghost" size="sm" onclick={() => (replyingTo = null)} class="ml-auto">
+				<button class="btn btn-ghost btn-sm ml-auto" onclick={() => (replyingTo = null)}>
 					Annuler
-				</Button>
+				</button>
 			</div>
 		{/if}
 
@@ -80,7 +79,11 @@
 				bind:value={newMessage}
 				class="mb-2 min-h-[80px]"
 			/>
-			<Button class="float-end " onclick={handleSend} disabled={!newMessage.trim()}>Envoyer</Button>
+			<button
+				class="btn btn-primary btn-sm float-end"
+				onclick={handleSend}
+				disabled={!newMessage.trim()}>Envoyer</button
+			>
 		</div>
 	</div>
 </div>

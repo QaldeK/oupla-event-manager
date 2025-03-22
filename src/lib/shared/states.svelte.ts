@@ -84,40 +84,6 @@ export function showAlert(message: string, type: 'info' | 'error' | 'success' = 
 }
 
 // ::: État pour détecter si l'utilisateur est sur mobile
-// FIXME  : pas besoin d'un state ? Prend bcp de temps a charger
-export function createMobileState() {
-	let isMobile = $state(false);
-
-	function initMobileDetection() {
-		const mobileQuery = ['(hover: none)', '(pointer: coarse)'].join(' and ');
-
-		const checkMobile = () => {
-			isMobile = window.matchMedia(mobileQuery).matches;
-		};
-
-		// Vérification initiale
-		checkMobile();
-
-		// Écouter les changements
-		const mediaQuery = window.matchMedia(mobileQuery);
-		mediaQuery.addEventListener('change', checkMobile);
-
-		// Retourne une fonction de nettoyage
-		return () => {
-			mediaQuery.removeEventListener('change', checkMobile);
-		};
-	}
-
-	return {
-		get value() {
-			return isMobile;
-		},
-		initMobileDetection
-	};
-}
-
-export const mobileState = createMobileState();
-// export const mobileState = Device.isMobile();
 
 // État pour la taille d'écran
 export const displayState = $state({
@@ -136,8 +102,29 @@ export const messageSheet = $state({
 });
 
 import { userDb } from '$lib/shared/userDb.svelte';
-export const isAdmin = (): boolean => {
-	if (!userDb) return false;
-	const role = userDb.currentRole;
-	return role === 'admin';
+
+export const hasAuthorizations = (params: {
+	isRecurrent?: boolean;
+	recurrenceTeam?: string[];
+	createdBy?: string;
+}): boolean => {
+	const currentUser = userDb.current;
+	const currentRole = userDb.currentRole;
+
+	if (!currentUser) return false;
+	
+	// Admin a toujours les droits
+	if (currentRole === 'admin') return true;
+
+	// Vérifie si l'utilisateur fait partie de l'équipe récurrente
+	if (params.isRecurrent && params.recurrenceTeam?.includes(currentUser.id)) {
+		return true;
+	}
+
+	// Vérifie si l'utilisateur est le créateur et a le rôle "helpers"
+	if (currentRole === 'helpers' && params.createdBy === currentUser.id) {
+		return true;
+	}
+
+	return false;
 };

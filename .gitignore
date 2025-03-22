@@ -29,10 +29,7 @@ _pb_bak
 .directory
 *_bak
 
-# windsurf rules
-.windsurfrules
-.clinerules
-.continuerules
+# llm
 .aider*
 !.aiderules
 
@@ -40,4 +37,4 @@ _pb_bak
 aider.conf.yml
 .zed/*
 .augment-guidelines
-svelte5Doc
+llm/*

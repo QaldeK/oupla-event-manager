@@ -1,8 +1,7 @@
 <script lang="ts">
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { Button } from '$lib/components/ui/button';
 	import { modalState } from '$lib/shared/states.svelte';
-	import { cn } from '$lib/utils';
+
+	let modalId = "task_dialog";
 
 	// pseudo props
 	let username: string = $state(modalState.tasks.data.username);
@@ -11,7 +10,6 @@
 
 	const isSelected = (option: any) => {
 		if (!selectedTasks) return false;
-
 		return selectedTasks.some((item) => item === option);
 	};
 
@@ -27,35 +25,39 @@
 		if (modalState.tasks.data.onSubmit) {
 			modalState.tasks.data.onSubmit(selectedTasks);
 		}
+		const modal = document.getElementById(modalId) as HTMLDialogElement;
+		modal?.close();
 		modalState.tasks.isOpen = false;
 	};
+
+	$effect(() => { if (modalState.tasks.isOpen) {
+		const modal = document.getElementById(modalId) as HTMLDialogElement;
+		modal?.showModal(); 
+		
+	} });
 </script>
 
-<AlertDialog.Root bind:open={modalState.tasks.isOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>Définir les roles pour {username}</AlertDialog.Title>
-		</AlertDialog.Header>
+<dialog id={modalId} class="modal">
+	<div class="modal-box">
+		<h3 class="text-lg font-bold">Définir les roles pour {username}</h3>
 		<div class="my-4">
 			<div class="flex w-full flex-wrap items-center gap-2">
-				{#each tasks as task}
-					<Button
-						variant="outline"
-						size="xs"
-						class={cn(
-							'flex items-center gap-2 hover:border-green-500',
-							isSelected(task) && 'border-4 border-green-500 font-bold'
-						)}
+				{#each tasks as task (task)}
+					<button
+						class="btn btn-outline btn-xs {isSelected(task) &&
+							'border-4 border-green-500 font-bold'}"
 						onclick={() => toggleItem(task)}
 					>
 						<span>{task}</span>
-					</Button>
+					</button>
 				{/each}
 			</div>
 		</div>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Annuler</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={handleSubmit}>Enregistrer</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+		<div class="modal-action">
+			<form method="dialog">
+				<button class="btn btn-ghost">Annuler</button>
+				<button class="btn btn-primary" onclick={handleSubmit}>Enregistrer</button>
+			</form>
+		</div>
+	</div>
+</dialog>

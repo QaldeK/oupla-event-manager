@@ -35,7 +35,7 @@
 				<div class="space-y-2">
 					<label class="block text-lg font-bold text-gray-700" for="name">Nom </label>
 					<input
-						class="w-full rounded border border-gray-300 p-2"
+						class="input w-full rounded border border-gray-300 p-2"
 						type="text"
 						name="name"
 						id="name"
@@ -45,7 +45,7 @@
 				<div class="space-y-2">
 					<label class="block text-lg font-bold text-gray-700" for="mail">Email</label>
 					<input
-						class="w-full rounded border border-gray-300 p-2"
+						class="input w-full rounded border border-gray-300 p-2"
 						type="email"
 						name="email"
 						id="email"

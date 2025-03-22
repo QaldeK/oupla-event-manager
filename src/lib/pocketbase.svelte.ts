@@ -233,14 +233,6 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 				.map((occ) => [occ.date_event, occ])
 		);
 
-		// Vérification que occurrencesMap n'est pas vide
-		if (!occurrencesMap.size) {
-			$inspect('Aucune occurrence existante trouvée');
-			return;
-		} else {
-			$inspect('occurrencesMap', occurrencesMap);
-		}
-
 		// Identification des actions nécessaires
 		const toDelete = existingOccurrences
 			.filter((occ) => !recurrenceDates.includes(occ.date_event))
@@ -279,10 +271,10 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 				};
 			});
 
-		$inspect('reccurenceDates', $state.snapshot(recurrenceDates));
-		$inspect('toCreate', toCreate);
-		$inspect('toDelete', toDelete);
-		$inspect('toUpdate', toUpdate);
+		// $inspect('reccurenceDates', $state.snapshot(recurrenceDates));
+		// $inspect('toCreate', toCreate);
+		// $inspect('toDelete', toDelete);
+		// $inspect('toUpdate', toUpdate);
 
 		// 4. Exécuter les batches séparément
 		// Batch de suppression
@@ -318,7 +310,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 					createBatch.collection('events').create(record);
 				});
 				await createBatch.send();
-				$inspect(`${toCreate.length} nouvelles occurrences créées`);
+				console.log(`${toCreate.length} nouvelles occurrences créées`);
 			} catch (error) {
 				console.warn(`Erreur lors de la création des occurrences:`, error);
 			}
@@ -334,7 +326,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 					updateBatch.collection('events').update(recordId, record);
 				});
 				await updateBatch.send();
-				$inspect(`${toUpdate.length} occurrences mises à jour`);
+				console.log(`${toUpdate.length} occurrences mises à jour`);
 			} catch (error) {
 				console.warn(`Erreur lors de la mise à jour des occurrences:`, error);
 			}
@@ -360,7 +352,7 @@ export async function sendEmail(html: string, text: string, recipient: string) {
 
 		// Gérer la réponse
 		if (response.success) {
-			$inspect('Email envoyé avec succès !');
+			console.log('Email envoyé avec succès !');
 		}
 	} catch (error) {
 		console.error("Erreur lors de l'envoi de l'email:", error);
@@ -394,7 +386,7 @@ export const loadMessages = async (eventId: string) => {
 			sort: 'created',
 			expand: 'user'
 		})) as ListResult<MessagesResponse>;
-		$inspect('Messages chargés:', messages);
+		console.log('Messages chargés:', messages);
 		return messages;
 	} catch (error) {
 		console.error('Error fetching messages:', error);

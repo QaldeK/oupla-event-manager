@@ -9,24 +9,27 @@
 	import { CalendarX2 } from 'lucide-svelte';
 
 	let {
-		value = $bindable(),
+		value = $bindable(''),
 		eventId,
 		onResetDate = () => {},
 		mode = 'single', // 'single' or 'multiple'
 		resetButton = false,
-		placeholder = 'Selectionnez une date'
+		placeholder = 'Selectionnez une date',
+		label = 'Ajoutez des dates'
 	} = $props();
 
-	let fp: any;
+	let fp = null;
 	let dateInput: HTMLInputElement;
 	const eventsByDateTime = $derived(eventsStore.getEventsByDateTime);
 	$inspect('eventsByDateTime', eventsByDateTime);
 
 	$effect(() => {
+
 		fp = flatpickr(dateInput, {
 			dateFormat: 'l j F Y',
 			locale: French,
 			minDate: 'today',
+			static: true,
 			mode,
 			onDayCreate: (dObj, dStr, fp, dayElem) => {
 				const dateStr = fp.formatDate(dayElem.dateObj, 'Y-m-d');
@@ -114,21 +117,21 @@
 	}
 </script>
 
-<div class="flex items-center gap-x-4">
-	<input
-		bind:this={dateInput}
-		id={eventId}
-		type="text"
-		class="w-full rounded-md border border-gray-300 bg-white py-2 pr-10 pl-3 text-gray-700 shadow-xs focus:outline-hidden"
-		{placeholder}
-	/>
-
+<div class="flex items-end gap-x-4">
+	<div class="flex flex-col gap-y-1">
+		<label for={eventId} class="text-fluid-sm block">
+			{label}
+		</label>
+		<input
+			bind:this={dateInput}
+			id={eventId}
+			type="text"
+			class="border-base-300 w-full rounded-lg border bg-white py-2 pr-10 pl-3 shadow-xs focus:outline-hidden"
+			{placeholder}
+		/>
+	</div>
 	{#if mode === 'single' && value !== '' && resetButton}
-		<button
-			type="button"
-			class="pointer-events-auto rounded bg-red-100 px-3 py-1.5 text-red-700 shadow-sm hover:text-red-500 hover:shadow-lg"
-			onclick={resetDate}
-		>
+		<button type="button" class="btn btn-error btn-outline" onclick={resetDate}>
 			<CalendarX2 />
 		</button>
 	{/if}

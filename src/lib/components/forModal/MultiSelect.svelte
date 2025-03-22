@@ -89,7 +89,7 @@
 		aria-expanded={isOpen}
 		aria-haspopup="listbox"
 		tabindex="0"
-		class="flex cursor-pointer flex-wrap gap-2 rounded-md border border-gray-300 bg-white px-3 py-2"
+		class="input flex h-full w-full flex-wrap gap-2 rounded-md sm:w-96"
 		onclick={toggleDropdown}
 		onkeydown={(e) => {
 			if (e.key === 'Enter' || e.key === ' ') {
@@ -97,12 +97,12 @@
 			}
 		}}
 	>
-		{#each selectedValues as value}
-			<div class="relative flex items-center rounded bg-blue-100 px-3 py-1 text-blue-700">
+		{#each selectedValues as value (value)}
+			<div class="bg-primary/20 text-primary relative flex items-center rounded px-3 py-1">
 				<span class="mr-8">{getLabelForValue(value)}</span>
 				<button
 					onclick={() => removeOption(value)}
-					class="center absolute right-1 flex h-6 w-6 items-center justify-center rounded bg-red-50 font-bold text-gray-700 hover:text-red-700"
+					class="center absolute right-1 flex h-6 w-6 items-center justify-center rounded bg-red-50 font-bold text-red-900 hover:cursor-pointer hover:text-red-700"
 					aria-label="Supprimer {getLabelForValue(value)}"
 				>
 					×
@@ -120,7 +120,7 @@
 			class="absolute z-10 mt-1 w-full rounded-md border bg-white shadow-lg"
 			transition:slide
 		>
-			{#each options as option, index}
+			{#each options as option, index (index)}
 				<div
 					role="option"
 					tabindex="0"

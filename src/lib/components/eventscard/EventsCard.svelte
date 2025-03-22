@@ -1,7 +1,6 @@
 <script lang="ts">
 	import ExpandableCard from '$lib/components/ExpandableCard.svelte';
 	import GroupRadioButton from '$lib/components/GroupRadioButton.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { updateEvent } from '$lib/pocketbase.svelte';
 	import {
 		filterAndConvertOrganizers,
@@ -10,7 +9,7 @@
 		lisibleTime,
 		tooltip
 	} from '$lib/utils';
-	import { eventState, isAdmin, modalState, openTaskModal } from '$lib/shared/states.svelte';
+	import { eventState, hasAuthorizations, modalState, openTaskModal } from '$lib/shared/states.svelte';
 	import type { EventType, OrganizerType, SyncEventRecord } from '$lib/types/event';
 	import type { EventsRecord } from '$lib/types/pocketbase';
 	import type { UserType } from '$lib/types/types';
@@ -77,7 +76,13 @@
 		if (!hasTime) return 'Horaires à définir';
 		return '';
 	});
-	const hasAuthorizations = $derived(isAdmin);
+
+
+	const hasAuth = $derived.by(() => hasAuthorizations({
+  isRecurrent: currentEvent.isRecurrent,
+  recurrenceTeam: currentEvent.recurrenceTeam,
+  createdBy: currentEvent.created_by
+}));
 
 	let organizersLabel = $derived.by(() => {
 		if (hasSondage) return 'Organisateur•ices - Sondage disponibilité';
@@ -177,7 +182,8 @@
 					data: {
 						title: options.title,
 						message: options.message,
-						onConfirm: options.onConfirm
+						onConfirm: options.onConfirm,
+						variant: 'warning'
 					}
 				};
 			}
@@ -235,25 +241,25 @@
 					const timeStart = new Date(selectedDate.dateStart).toTimeString().slice(0, 5);
 					const timeEnd = new Date(selectedDate.dateEnd).toTimeString().slice(0, 5);
 					// USELESS ?
-					const confirmedOrganizers = selectedDate.organizers
-						.filter((org) => org.maybehere === 'oui')
-						.map((org) => {
-							const existingOrganizer = currentEvent.organizers.find(
-								(existing) => existing.id === org.id
-							);
+					// const confirmedOrganizers = selectedDate.organizers
+					// 	.filter((org) => org.maybehere === 'oui')
+					// 	.map((org) => {
+					// 		const existingOrganizer = currentEvent.organizers.find(
+					// 			(existing) => existing.id === org.id
+					// 		);
 
-							const tasks = existingOrganizer
-								? [...new Set([...existingOrganizer.tasks, getTasks.defaultTask])]
-								: [getTasks.defaultTask];
+					// 		const tasks = existingOrganizer
+					// 			? [...new Set([...existingOrganizer.tasks, getTasks.defaultTask])]
+					// 			: [getTasks.defaultTask];
 
-							return {
-								id: org.id,
-								username: org.username,
-								email: org.email,
-								tasks: tasks,
-								role: org.role
-							};
-						});
+					// 		return {
+					// 			id: org.id,
+					// 			username: org.username,
+					// 			email: org.email,
+					// 			tasks: tasks,
+					// 			role: org.role
+					// 		};
+					// 	});
 
 					updateEvent(currentEvent.id, {
 						date_event: dateEvent,
@@ -341,19 +347,19 @@
 	<div
 		id={currentEvent.id}
 		class="transition:fade mb-8 rounded-lg border bg-white shadow-lg md:mb-4 {currentEvent.isConfirmed
-			? 'border border-gray-200'
+			? 'border-gray-200'
 			: 'border-l-4 border-l-amber-500'}"
 	>
 		<TopAlert thisEvent={currentEvent} />
-
+		<!-- <span>auth : {hasAuth}</span> -->
 		<div class="pb-4">
 			<div class="justify-between gap-2 md:flex">
 				<!-- ::: date -->
 				<div
 					id="Top_event_date"
 					class="px-6 py-2 shadow md:mt-2 md:rounded-l-xl {currentEvent.isConfirmed
-						? 'bg-green-100'
-						: 'bg-amber-100'} {currentEvent.canceled ? 'bg-red-100' : ''}"
+						? 'bg-success/20'
+						: 'bg-warning/20'} {currentEvent.canceled ? 'bg-error/20' : ''}"
 				>
 					<!-- Container principal -->
 					<div
@@ -361,30 +367,30 @@
 					>
 						<!-- Ligne 1 : Date + Time en mobile -->
 						{#if currentEvent.date_event}
-							<p class="text-fluid-lg font-bold {currentEvent.canceled ? 'line-through' : ''}">
+							<span class="text-fluid-base font-bold {currentEvent.canceled ? 'line-through' : ''}">
 								{lisibleDate(currentEvent.date_event)}
-							</p>
+							</span>
 						{/if}
 						{#if timeDisplay}
-							<p class="text-end font-medium {currentEvent.canceled ? 'line-through' : ''}">
+							<span class=" font-medium {currentEvent.canceled ? 'line-through' : ''}">
 								{timeDisplay}
-							</p>
+							</span>
 						{/if}
 
 						<!-- Ligne 2 : Message de statut -->
 						{#if statusMessage}
-							<p class="text-center text-gray-600 italic">
+							<span class="text-base-content/70 text-center italic">
 								{statusMessage}
-							</p>
+							</span>
 						{/if}
 
 						<!-- Ligne 3 : Salles -->
 						{#if hasRooms}
-							<div class="text-end font-medium text-gray-600">
+							<div class="text-base-content/70 font-medium">
 								<span class="text-fluid-sm">salle·s :</span>
-								{#each currentEvent.rooms as room, index}
+								{#each currentEvent.rooms as room, index (index)}
 									{#if room && room.trim() !== ''}
-										<span class="text-md text-gray-700">
+										<span class="text-md text-base-content">
 											{room}{index <
 											currentEvent.rooms.filter((r) => r && r.trim() !== '').length - 1
 												? ', '
@@ -400,13 +406,13 @@
 
 				<div class="w-full px-4 py-2 md:order-first md:w-3/5">
 					<h2 class="mb-1">{currentEvent.event_title}</h2>
-					{#each currentEvent.categories as category, index}
-						<span class="text-fluid-sm font-bold text-gray-800 uppercase">
+					{#each currentEvent.categories as category, index (category)}
+						<span class="text-fluid-sm text-base-content font-bold uppercase">
 							{category}{index < currentEvent.categories.length - 1 ? ', ' : ''}
 						</span>
 					{/each}
 					{#if currentEvent.reportedFrom}
-						<div class="text-fluid-sm p-1 text-gray-600">
+						<div class="text-fluid-sm text-base-content/70 p-1">
 							Initialement prévu le {lisibleDate(currentEvent.reportedFrom)}
 						</div>
 					{/if}
@@ -438,34 +444,30 @@
 						<div
 							class="text-fluid-sm flex w-full items-center justify-between rounded-t-lg border-gray-300 bg-slate-100 p-1 font-semibold"
 						>
-							<div class="px-2 text-gray-700">
+							<div class="text-base-content px-2">
 								{organizersLabel}
 							</div>
 							<!--::: Top - Cas 1: aucune date de proposé, ni sondage -->
 							<div class="me-1">
 								{#if hasNoPropositions}
-									<Button onclick={handleOrganizersBtn} variant="outline" class="">
+									<button onclick={handleOrganizersBtn} class="btn">
 										<CalendarPlus />
 										<span class="not-md:hidden">Créer un sondage</span>
-									</Button>
+									</button>
 								{:else if hasSondage}
-									{#if hasAuthorizations}
-										<Button
-											onclick={() => openModal('sondage', currentEvent)}
-											variant="outline"
-											class=""
-										>
+									{#if hasAuth}
+										<button onclick={() => openModal('sondage', currentEvent)} class="btn">
 											<CalendarPlus />
 											<span class="not-md:hidden">Modifier le sondage</span>
-										</Button>
+										</button>
 									{/if}
 									<!-- ::: top: Cas 3 : une date proposé et Une seule tache -->
 								{:else if hasDate && currentEvent.tasks.length === 1}
-									<Button variant="outline" onclick={() => handleTask(currentEvent.tasks[0])}>
+									<button class="btn" onclick={() => handleTask(currentEvent.tasks[0])}>
 										{isUserSubscribedToTask(currentEvent.tasks[0])
 											? 'Se désinscrire'
 											: "S'inscrire"}
-									</Button>
+									</button>
 								{/if}
 							</div>
 						</div>
@@ -473,7 +475,7 @@
 							<div class="flex flex-col rounded-b-lg bg-white {hasSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
 								{#if hasSondage}
-									<div class=" items-baseline gap-2 p-2 text-gray-800">
+									<div class=" text-base-content items-baseline gap-2 p-2">
 										<!-- <p class="ml-auto text-fluid-sm">Serez vous disponibles à ces dates ?</p> -->
 
 										<!-- __ Bouton afficher/masquer tous les détails -->
@@ -490,7 +492,7 @@
 										</button>
 									</div>
 									<div class="flex flex-col divide-y">
-										{#each datesFutureProposed as data}
+										{#each datesFutureProposed as data (data.dateStart)}
 											{@const oui = data.organizers.filter((org) => org.maybehere === 'oui').length}
 											{@const peutetre = data.organizers.filter(
 												(org) => org.maybehere === 'peut-être'
@@ -502,45 +504,46 @@
 												data.dateStart
 													? 'border-l-4 border-l-green-300'
 													: ''}
-													{showSondageDetails ? 'mb-4' : ''}
+													{showSondageDetails ? 'mb-4 ' : 'border'}
+
 													"
 											>
-												<div class="flex items-center justify-between gap-y-2 not-sm:flex-wrap">
+												<div class=" flex items-center justify-between gap-y-2 not-sm:flex-wrap">
 													<div
 														id="sondage-date-top"
-														class="flex w-full flex-grow items-center justify-between md:max-w-2/3"
+														class="flex flex-grow items-center justify-between not-sm:flex-wrap not-sm:gap-y-2 sm:max-w-2/3"
 													>
-														{#if hasAuthorizations}
-															<div use:tooltip={{ content: 'Valider cette date' }} class=" px-1">
-																<Button
-																	onclick={() => validateDate(data)}
-																	size="icon_md"
-																	variant="icon"
-																	class="border border-gray-300    {data.organizers.some(
-																		(org) => org.maybehere === 'oui'
-																	)
-																		? 'bg-green-100 hover:bg-green-200 hover:text-green-800'
-																		: 'bg-gray-100'}"
-																>
-																	<CalendarCheck />
-																</Button>
+														<div class="flex items-center">
+															{#if hasAuth}
+																<div class="tooltip px-1" data-tip="Valider cette date">
+																	<button
+																		onclick={() => validateDate(data)}
+																		class="btn btn-success btn-outline btn-square {data.organizers.some(
+																			(org) => org.maybehere === 'oui'
+																		)
+																			? ''
+																			: 'text-gray-300'}"
+																	>
+																		<CalendarCheck />
+																	</button>
+																</div>
+															{/if}
+															<div
+																class="text-fluid-base flex flex-wrap gap-x-4 px-3 font-semibold not-sm:order-2"
+															>
+																<div>{lisibleDate(data.dateStart)}</div>
+
+																<div>
+																	{lisibleTime(data.dateStart)} - {lisibleTime(data.dateEnd)}
+																</div>
 															</div>
-														{/if}
-
-														<div
-															class="text-fluid-sm align-self-start flex gap-x-4 px-3 font-semibold not-md:flex-wrap"
-														>
-															<div>{lisibleDate(data.dateStart)}</div>
-
-															<div>{lisibleTime(data.dateStart)} - {lisibleTime(data.dateEnd)}</div>
 														</div>
-
 														<!--:::___ Résumé des votes -->
-														<div class="ml-2 flex items-center space-x-1">
+														<div class="ml-2 flex items-center space-x-1 not-sm:order-3">
 															<span
 																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {oui >
 																0
-																	? 'bg-green-100 text-green-800'
+																	? 'bg-success/20'
 																	: ''}"
 															>
 																<ThumbsUp class="mr-0.5 h-4 w-4" />
@@ -550,7 +553,7 @@
 															<span
 																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {peutetre >
 																0
-																	? 'bg-amber-100 text-amber-800'
+																	? 'text-warning-content bg-warning/20'
 																	: ''}"
 															>
 																<BadgeHelp class="mr-0.5 h-4 w-4" />
@@ -560,7 +563,7 @@
 															<span
 																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {non >
 																0
-																	? 'bg-red-100 text-red-800'
+																	? 'bg-error/20 text-error-content'
 																	: ''}"
 															>
 																<ThumbsDown class="mr-0.5 h-4 w-4" />
@@ -583,32 +586,32 @@
 													<div transition:fade={{ duration: 150 }} class="mt-2 px-3 pb-2">
 														<div class="rounded-md bg-gray-50 p-2">
 															{#if data.organizers.length === 0}
-																<p class="text-fluid-sm text-gray-500">
+																<p class="text-fluid-sm text-base-content/70">
 																	Aucune réponse pour le moment
 																</p>
 															{:else}
 																<div class="text-fluid-sm grid gap-1">
 																	<div
-																		class="text-fluid-sm grid grid-cols-3 gap-1 font-medium text-gray-600"
+																		class=" text-base-content/70 grid grid-cols-3 gap-1 font-medium"
 																	>
 																		<div class="flex items-center">
-																			<ThumbsUp class="mr-1 h-3 w-3 text-green-600" /> Disponible
+																			<ThumbsUp class="text-success-content mr-1 h-4" /> Disponible
 																		</div>
 																		<div class="flex items-center">
-																			<BadgeHelp class="mr-1 h-3 w-3 text-amber-600" /> Peut-être
+																			<BadgeHelp class="text-warning-content mr-1 h-4" /> Peut-être
 																		</div>
 																		<div class="flex items-center">
-																			<ThumbsDown class="mr-1 h-3 w-3 text-red-600" /> Indisponible
+																			<ThumbsDown class="text-error-content mr-1 h-4" /> Indisponible
 																		</div>
 																	</div>
 
 																	<hr class="my-1" />
 
 																	<div class="grid grid-cols-3 gap-1">
-																		<div class="flex flex-wrap gap-x-2 text-green-700">
-																			{#each data.organizers.filter((org) => org.maybehere === 'oui') as org}
+																		<div class="flex flex-wrap gap-2">
+																			{#each data.organizers.filter((org) => org.maybehere === 'oui') as org (org.id)}
 																				<div
-																					class="py-.5 text-fluid-smrounded-xl px-2 shadow-xs ring ring-gray-200 {org.id ===
+																					class="py-.5 bg-success/20 text-fluid-sm ring-success/30 w-max-fit h-fit rounded-xl px-2 shadow-xs ring {org.id ===
 																					currentUser.id
 																						? 'font-bold'
 																						: ''}"
@@ -617,10 +620,10 @@
 																				</div>
 																			{/each}
 																		</div>
-																		<div class="flex flex-wrap gap-x-2 text-amber-700">
-																			{#each data.organizers.filter((org) => org.maybehere === 'peut-être') as org}
+																		<div class="flex flex-wrap gap-2">
+																			{#each data.organizers.filter((org) => org.maybehere === 'peut-être') as org (org.id)}
 																				<div
-																					class="py-.5 text-fluid-sm rounded-xl px-2 shadow-xs ring ring-gray-200 {org.id ===
+																					class="py-.5 bg-warning/20 text-fluid-sm ring-warning/30 h-fit rounded-xl px-2 shadow-xs ring {org.id ===
 																					currentUser.id
 																						? 'font-bold'
 																						: ''}"
@@ -629,10 +632,10 @@
 																				</div>
 																			{/each}
 																		</div>
-																		<div class="flex flex-wrap gap-x-2 text-red-700">
-																			{#each data.organizers.filter((org) => org.maybehere === 'non') as org}
+																		<div class="flex flex-wrap gap-2">
+																			{#each data.organizers.filter((org) => org.maybehere === 'non') as org (org.id)}
 																				<div
-																					class="py-.5 text-fluid-sm rounded-xl px-2 shadow-xs ring ring-gray-200 {org.id ===
+																					class="py-.5 text-fluid-sm ring-error/30 bg-error/20 h-fit rounded-xl px-2 shadow-xs ring {org.id ===
 																					currentUser.id
 																						? 'font-bold'
 																						: ''}"
@@ -651,9 +654,9 @@
 										{/each}
 									</div>
 									{#if hasSondage && oldDatesProposed.length > 0}
-										<div class="text-fluid-sm p-2 text-gray-500 italic">
+										<div class="text-fluid-sm text-base-content/70 p-2 italic">
 											Des dates déjà passées ont été proposées précédemment, et ont été
-											automatiquement supprimées ( {#each oldDatesProposed as date}
+											automatiquement supprimées ( {#each oldDatesProposed as date (date.dateStart)}
 												{lisibleDate(date.dateStart)},
 											{/each} )
 										</div>
@@ -665,7 +668,10 @@
 									<!-- tasks card -->
 									{#if currentEvent.tasks && currentEvent.tasks.length > 1}
 										<div class="sm:grid sm:grid-cols-3 sm:justify-around sm:gap-4 sm:p-4">
-											{#each currentEvent.tasks as task}
+											{#each currentEvent.tasks as task (task)}
+												{@const organizersForTask = currentEvent.organizers.filter((org) =>
+													org.tasks.includes(task)
+												)}
 												<div
 													class="text-fluid-sm rounded-lg border font-semibold {!currentEvent.organizers.some(
 														(org) => org.tasks.includes(task)
@@ -674,28 +680,26 @@
 														: 'border-gray-300'}"
 												>
 													<div
-														class="mb-2 rounded-t-lg bg-gray-100 px-4 py-1 text-center text-gray-700"
+														class="text-base-content mb-2 rounded-t-lg bg-gray-100 px-4 py-1 text-center"
 													>
 														{task}
 													</div>
 													<div class="mb-2 flex flex-wrap gap-2 px-2">
-														{#each currentEvent.organizers.filter( (org) => org.tasks.includes(task) ) as organizer}
+														{#each organizersForTask as organizer (organizer.id)}
 															<span
-																transition:fade
-																class="text-fluid-sm inline-flex rounded-md px-2 py-1 text-gray-800
-																{organizer.id === currentUser.id ? 'border-2 border-slate-700' : 'border border-slate-400 '}"
+																transition:fade|local
+																class="badge"
+																class:border-2={organizer.id === currentUser.id}
+																class:border-slate-700={organizer.id === currentUser.id}
+																class:border={organizer.id !== currentUser.id}
+																class:border-slate-400={organizer.id !== currentUser.id}
 															>
 																{organizer.username}
 															</span>
 														{/each}
-														<Button
-															variant="outline"
-															size="xxs"
-															class="ml-auto"
-															onclick={() => handleTask(task)}
-														>
+														<button class="btn btn-sm ml-auto" onclick={() => handleTask(task)}>
 															{isUserSubscribedToTask(task) ? 'Se désinscrire' : "S'inscrire"}
-														</Button>
+														</button>
 													</div>
 												</div>
 											{/each}
@@ -703,15 +707,15 @@
 									{:else}
 										<div class="flex flex-wrap gap-2">
 											{#if !currentEvent.organizers.length}
-												<span class=" text-fluid-sm p-2 text-gray-500 italic">
+												<span class=" text-fluid-sm text-base-content/70 p-2 italic">
 													personne pour le moment...
 												</span>
 											{:else}
-												<div class="p-3">
-													{#each currentEvent.organizers.filter( (org) => org.tasks.includes(currentEvent.tasks[0]) ) as organizer}
+												<div class=" flex flex-wrap gap-2 p-3">
+													{#each currentEvent.organizers.filter( (org) => org.tasks.includes(currentEvent.tasks[0]) ) as organizer (organizer.id)}
 														<span
-															class="text-fluid-sm inline-flex rounded-md px-2 py-1 text-gray-800
-																{organizer.id === currentUser.id ? 'border-2 border-slate-700' : 'border border-slate-400 '}"
+															class="badge badge-soft badge-neutral
+																{organizer.id === currentUser.id ? 'font-semibold' : ''}"
 														>
 															{organizer.username}
 														</span>
@@ -723,11 +727,11 @@
 								{/if}
 							</div>
 							<!-- ::: __ mandats a se répartir> -->
-							{#if !hasDate && currentEvent.tasks && (currentEvent.tasks.length > 1 || currentEvent.tasks[0] !== getTasks.defaultTask)}
-								<div class=" p-2 text-gray-600">
+							{#if !hasDate && currentEvent.tasks && currentEvent.tasks.length > 1}
+								<div class=" text-base-content/70 p-2">
 									<p class="text-fluid-xs">
 										Mandats à se répartir pour la gestion de l'événement : <span class="italic">
-											{#each currentEvent.tasks as task, index}
+											{#each currentEvent.tasks as task, index (index)}
 												{task}{index < currentEvent.tasks.length - 1 ? ', ' : ''}
 											{/each}
 										</span>
@@ -739,7 +743,7 @@
 									{/if}
 								</div>
 							{:else if currentEvent.tasks && currentEvent.tasks.length === 1}
-								<div class="text-fluid-xs p-2 text-gray-600">
+								<div class="text-fluid-xs text-base-content/70 p-2">
 									L'inscription concerne le mandat "{currentEvent.tasks[0]}". Il n'y a pas d'autre
 									mandat à se répartir.
 								</div>

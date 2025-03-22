@@ -7,7 +7,6 @@
 	// import ReportEvent from '$lib/components/ReportEvent.svelte';
 	import TaskDialog from '$lib/components/TaskDialog.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import * as Select from '$lib/components/ui/select/index.js';
 	// store
 	import { eventsStore } from '$lib/shared/eventsStore.svelte';
 	import { messageStore } from '$lib/shared/messageStore.svelte';
@@ -15,7 +14,6 @@
 	import { userDb } from '$lib/shared/userDb.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 	import InviteUserModal from '$lib/components/InviteUserModal.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import { pb } from '$lib/pocketbase.svelte';
 	import { messageSheet, modalState } from '$lib/shared/states.svelte';
 	import type { CurrentUser } from '$lib/types/types';
@@ -203,111 +201,88 @@
 
 	async function handleLogout() {
 		try {
-			// Destruction des stores de manière asynchrone
-			await Promise.all([eventsStore.clearAndDestroy(), messageStore.clearAndDestroy()]);
+			// 1. Détruire tous les stores
+			await Promise.all([
+				eventsStore.clearAndDestroy(), 
+				messageStore.clearAndDestroy()
+			]);
 
-			// Effacer les données d'authentification
+			// 2. Réinitialiser les états locaux
+			isInitialized = false;
+			isInitializing = false;
+			currentSpace = null;
+			currentUser = {} as CurrentUser;
+			error = null;
+
+			// 4. Nettoyer l'authentification
 			pb.authStore.clear();
+			userDb.logout();  // S'assurer que userDb est aussi nettoyé
 
-			// Rediriger vers login
+			// 5. Rediriger
 			goto('/login');
 		} catch (error) {
 			console.error('Erreur lors de la déconnexion:', error);
+			// Forcer un nettoyage même en cas d'erreur
+			pb.authStore.clear();
+			userDb.logout();
 			goto('/login');
 		}
 	}
-
-	// $inspect(messageSheet);
 </script>
 
 {#await initPromise}
 	<div class="flex min-h-screen items-center justify-center">
 		<div class="text-center">
 			<div class="mb-4 text-2xl font-semibold">Chargement...</div>
-			<div class="text-gray-600">Initialisation de votre espace</div>
+			<div class="text-base-content">Initialisation de votre espace</div>
 		</div>
 	</div>
 {:then}
 	{#if isInitialized}
-		<div class="flex h-full w-full bg-gray-100">
+		<div class="bg-base-100 flex min-h-screen flex-col">
 			{#if error}
 				<div class="fixed inset-0 z-50 flex items-center justify-center">
 					<div class="rounded-lg bg-white p-6 shadow-lg">
 						<h2 class="mb-4 text-xl font-bold text-red-600">Erreur d'initialisation</h2>
-						<p class="text-gray-700">{error.message}</p>
-						<button
-							class="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-							onclick={() => goto('/login')}
-						>
+						<p class="text-base-content">{error.message}</p>
+						<button class="btn btn-primary" onclick={() => goto('/login')}>
 							Retour à la connexion
 						</button>
 					</div>
 				</div>
 			{:else}
 				<!-- Top nav -->
-				<header
-					class="fixed top-0 right-0 left-0 z-50 flex w-full items-center justify-between bg-gray-800 p-2 text-white"
-				>
-					<!-- Bouton pour les écrans < md -->
-					<button
-						data-drawer-target="logo-sidebar"
-						data-drawer-toggle="logo-sidebar"
-						aria-controls="logo-sidebar"
-						type="button"
-						class="inline-flex items-center rounded-lg bg-slate-600 p-2 text-gray-200 hover:bg-slate-500 focus:ring-2 focus:ring-gray-200 focus:outline-hidden"
-						onclick={sidebarActions.toggle}
-					>
-						<span class="sr-only">Gérer la sidebar</span>
-						{#if sidebarState.isOpen}
-							<PanelLeftClose size={24} />
-						{:else}
-							<Menu size={24} />
-						{/if}
-					</button>
-					<a href="/dashboard"> <p>Oupla - mofo - {currentUser.username}</p></a>
+				<header class="navbar bg-neutral text-base-300 fixed top-0 right-0 left-0 z-50 shadow-sm">
+					<div class="flex-none">
+						<button class="btn btn-square btn-ghost" onclick={sidebarActions.toggle}>
+							{#if sidebarState.isOpen}
+								<PanelLeftClose size={24} />
+							{:else}
+								<Menu size={24} />
+							{/if}
+						</button>
+					</div>
 
-					<div class="flex items-center space-x-4">
-						{#if userDb.current?.memberOf && userDb.current.memberOf.length > 1}
-							<Select.Root
-								type="single"
-								value={space}
-								onSelectedChange={(value: string) => {
-									const new_space = userDb.current?.memberOf.find(
-										(s: { id: string }) => s.id === value
-									);
-									if (new_space) space = new_space;
-								}}
-							>
-								<Select.Trigger class="w-[180px] border-gray-600 bg-gray-700 text-white">
-									<Select.Value placeholder="Sélectionner un espace" />
-								</Select.Trigger>
-								<Select.Content>
-									{#each userDb.memberOf as space}
-										<Select.Item value={space.id}>{space.name}</Select.Item>
-									{/each}
-								</Select.Content>
-							</Select.Root>
-						{:else if userDb.currentSpace}
-							<div class="text-fluid-sm font-medium text-white">{userDb.currentSpace.name}</div>
-						{/if}
+					<div class="flex-1">
+						<a href="/dashboard" class="text-xl"
+							>Oupla - {currentSpace.name} - {currentUser.username} {currentUser.id} {userDb.current?.id}</a
+						>
+					</div>
+
+					<div class="flex-none gap-2">
 						<DropdownMenu.Root>
-							<DropdownMenu.Trigger asChild>
-								<Button
-									variant="outline"
-									class="border-gray-600 bg-gray-700 text-white hover:bg-gray-600"
-								>
-									{currentUser.username}
-								</Button>
+							<DropdownMenu.Trigger>
+								<button class="btn btn-ghost">{currentUser.username}</button>
 							</DropdownMenu.Trigger>
-							<DropdownMenu.Content class="w-56">
-								<DropdownMenu.Label>Mon compte</DropdownMenu.Label>
+							<DropdownMenu.Content class="menu bg-base-200 rounded-box w-56">
+								<DropdownMenu.Label class="menu-title">Mon compte</DropdownMenu.Label>
 								<DropdownMenu.Separator />
 								<DropdownMenu.Group>
-									<DropdownMenu.Item onclick={() => goto('/dashboard/config')}>
+									<DropdownMenu.Item onclick={() => goto('/dashboard/config')} class="menu-item">
 										<Settings class="mr-2 h-4 w-4" />
 										<span>Paramètres</span>
 									</DropdownMenu.Item>
-									<DropdownMenu.Item onclick={handleRefresh}>
+									<DropdownMenu.Item onclick={handleRefresh} class="menu-item">
 										<RefreshCw class="mr-2 h-4 w-4" />
 										<span>Forcer le rafraîchissement</span>
 									</DropdownMenu.Item>
@@ -320,7 +295,7 @@
 											<span>Changer d'espace</span>
 										</DropdownMenu.SubTrigger>
 										<DropdownMenu.SubContent>
-											{#each userDb.memberOf as space}
+											{#each userDb.memberOf as space (space.id)}
 												<DropdownMenu.Item>
 													{space.name}
 												</DropdownMenu.Item>
@@ -338,271 +313,186 @@
 					</div>
 				</header>
 
-				<!-- Responsive sidebar -->
-				<aside
-					id="logo-sidebar"
-					class=" fixed top-0 left-0 z-40 h-screen
-					overflow-y-auto border-r border-gray-200 bg-white pt-15 transition-all duration-300 lg:shrink-0 dark:border-gray-700 dark:bg-gray-800
+				<div class="flex min-h-screen pt-16">
+					<!-- Responsive sidebar -->
+
+					<aside
+						id="logo-sidebar"
+						class="bg-base-200 fixed top-0 left-0 z-40 h-[calc(100vh-4rem)] overflow-hidden overflow-x-hidden transition-all duration-300
 					{sidebarState.isOpen ? 'translate-x-0' : '-translate-x-full'}
-					{!displayState.isMobile && sidebarState.isCompact ? 'w-15' : 'w-70 p-2'}"
-					aria-label="Sidebar"
-				>
-					<div class="mt-10 flex flex-col">
-						<button
-							onclick={() => (modalState.event = true)}
-							class=" mb-4 flex w-full items-center justify-center rounded-lg bg-blue-500 p-2 font-bold text-white hover:bg-blue-700 {sidebarState.isCompact
-								? 'm-auto h-10'
-								: ''}"
-						>
-							{#if sidebarState.isCompact}
-								<CalendarPlus size={30} class="" />
-							{:else}
-								Ajouter un événement
-							{/if}
-						</button>
-						<div
-							class="my-4 items-center justify-center space-y-2 rounded-xl bg-gray-100 font-medium text-nowrap {sidebarState.isCompact
-								? ' flex w-15 flex-col px-0'
-								: ' px-4 '}"
-						>
-							<a
-								href="/dashboard/events"
-								class:active={!page.url.searchParams.has('status')}
-								class="sidebar-link"
-								title="Événements"
+					{!displayState.isMobile && sidebarState.isCompact ? 'w-20' : 'w-64 '}
+					"
+						aria-label="Sidebar"
+					>
+						<div class="mt-24 flex h-full flex-col overflow-y-auto p-1">
+							<button
+								onclick={() => (modalState.event = true)}
+								class="btn btn-primary mb-4 w-full {sidebarState.isCompact ? 'btn-square' : ''}"
 							>
-								<span class="flex items-center justify-center">
-									<Calendar
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=""
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}>Événements</span>
-							</a>
-							<hr class="my-2" />
+								{#if sidebarState.isCompact}
+									<CalendarPlus size={24} />
+								{:else}
+									Ajouter un événement
+								{/if}
+							</button>
 
-							<!-- Événements confirmés -->
-							<a
-								href={getFilterUrl({ status: 'confirmed' })}
-								class:active={page.url.searchParams.get('status') === 'confirmed'}
-								class="sidebar-link"
-								title="Programmés"
-							>
-								<span class="flex items-center justify-center">
-									<Clock
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=""
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}>Programmés</span>
-							</a>
-
-							<!-- Événements en attente -->
-							<div
-								class="rounded-lg {sidebarState.isCompact
-									? 'bg-slate-200'
-									: 'p-2 shadow-lg ring-2 shadow-slate-500/50 ring-slate-200'}"
-							>
-								<a
-									href={getFilterUrl({ status: 'pending' })}
-									class:active={page.url.searchParams.get('status') === 'pending'}
-									class="sidebar-link"
-									title="En attentes"
-								>
-									<span class="flex items-center justify-center">
-										<Clock
-											size={sidebarState.isCompact ? 32 : 24}
-											strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-											class=" text-yellow-500"
-										/>
-									</span>
-									<span class:hidden={sidebarState.isCompact}>En attentes</span>
-								</a>
-								<a
-									href={getFilterUrl({ status: 'eventsWithoutDate' })}
-									class:active={page.url.searchParams.get('status') === 'eventsWithoutDate'}
-									class:ml-3={!sidebarState.isCompact}
-									class="sidebar-link"
-									title="Sans date"
-								>
-									<span class="flex items-center justify-center">
-										<Calendar
-											size={sidebarState.isCompact ? 32 : 24}
-											strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-											class=" text-red-500"
-										/>
-									</span>
-									<span class:hidden={sidebarState.isCompact} class="text-fluid-sm">Sans date</span>
-								</a>
-
-								<a
-									href={getFilterUrl({ status: 'eventsWithoutOrganizers' })}
-									class:active={page.url.searchParams.get('status') === 'eventsWithoutOrganizers'}
-									class:ml-3={!sidebarState.isCompact}
-									class="sidebar-link"
-									title="Sans organisateur·ices"
-								>
-									<span class="flex items-center justify-center">
-										<Users
-											size={sidebarState.isCompact ? 32 : 24}
-											strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-											class=" text-red-500"
-										/>
-									</span>
-									<span class:hidden={sidebarState.isCompact} class="text-fluid-sm"
-										>Sans organisateur·ices</span
+							<ul class="menu menu-lg rounded-box bg-base-100 gap-3">
+								<li>
+									<a
+										href="/dashboard/events"
+										class:bg-primary-content={!page.url.searchParams.has('status')}
+										class="flex items-center gap-2"
 									>
-								</a>
+										<Calendar size={24} />
+										<span class:hidden={sidebarState.isCompact}>Événements</span>
+									</a>
+								</li>
 
-								<a
-									href={getFilterUrl({ status: 'eventsWithSondage' })}
-									class:active={page.url.searchParams.get('status') === 'eventsWithSondage'}
-									class:ml-3={!sidebarState.isCompact}
-									class="sidebar-link"
-									title="Sondages en cours"
-								>
-									<span class="flex items-center justify-center">
-										<CalendarSearch
-											size={sidebarState.isCompact ? 32 : 24}
-											strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-											class=" text-fuchsia-700"
-										/>
-									</span>
-									<span class:hidden={sidebarState.isCompact} class="text-fluid-sm"
-										>Sondages en cours</span
+								<li>
+									<a
+										href={getFilterUrl({ status: 'confirmed' })}
+										class:bg-primary-content={page.url.searchParams.get('status') === 'confirmed'}
 									>
-								</a>
-							</div>
-							<!-- Autres items du menu -->
-							<a
-								href={getFilterUrl({ status: 'conflicts' })}
-								class:active={page.url.searchParams.get('status') === 'conflicts'}
-								class="sidebar-link"
-								title="En conflits"
-							>
-								<span class="flex items-center justify-center">
-									<AlertTriangle
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=" text-red-500"
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}> En conflits</span>
-							</a>
+										<Clock size={24} />
+										<span class:hidden={sidebarState.isCompact}>Programmés</span>
+									</a>
+								</li>
 
-							<a
-								href="/dashboard/events/recurrent"
-								class:active={page.url.pathname === '/dashboard/events/recurrent'}
-								class="sidebar-link"
-								title="Récurrents"
-							>
-								<span class="flex items-center justify-center">
-									<RefreshCw
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=""
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}>Récurrents</span>
-							</a>
-							<a
-								href="/dashboard/newsletter"
-								class:active={page.url.pathname === '/dashboard/newsletter'}
-								class="sidebar-link"
-								title="Newsletter"
-							>
-								<span class="flex items-center justify-center">
-									<Mail
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=""
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}>Newsletter</span>
-							</a>
+								<!-- Section en attente avec style spécial -->
+								<li>
+									<a
+										href={getFilterUrl({ status: 'pending' })}
+										class:bg-primary-content={page.url.searchParams.get('status') === 'pending'}
+									>
+										<Clock size={24} class="text-warning" />
+										<span class:hidden={sidebarState.isCompact}>En attentes</span>
+									</a>
+									<ul class:hidden={sidebarState.isCompact}>
+										<li>
+											<a
+												href={getFilterUrl({ status: 'eventsWithoutDate' })}
+												class:bg-primary-content={page.url.searchParams.get('status') ===
+													'eventsWithoutDate'}
+											>
+												<Calendar size={24} class="text-error" />
+												<span class:hidden={sidebarState.isCompact}>Sans date</span>
+											</a>
+										</li>
+										<li>
+											<a
+												href={getFilterUrl({ status: 'eventsWithoutOrganizers' })}
+												class:bg-primary-content={page.url.searchParams.get('status') ===
+													'eventsWithoutOrganizers'}
+											>
+												<Users size={24} class="text-error" />
+												<span class:hidden={sidebarState.isCompact}>Sans organisateur·ices</span>
+											</a>
+										</li>
+										<li>
+											<a
+												href={getFilterUrl({ status: 'eventsWithSondage' })}
+												class:bg-primary-content={page.url.searchParams.get('status') ===
+													'eventsWithSondage'}
+											>
+												<CalendarSearch size={24} class="text-primary" />
+												<span class:hidden={sidebarState.isCompact}>Sondages en cours</span>
+											</a>
+										</li>
+									</ul>
+								</li>
+
+								<li>
+									<a
+										href={getFilterUrl({ status: 'conflicts' })}
+										class:bg-primary-content={page.url.searchParams.get('status') === 'conflicts'}
+									>
+										<AlertTriangle size={24} class="text-error" />
+										<span class:hidden={sidebarState.isCompact}>En conflits</span>
+									</a>
+								</li>
+
+								<li>
+									<a
+										href="/dashboard/events/recurrent"
+										class:bg-primary-content={page.url.pathname === '/dashboard/events/recurrent'}
+									>
+										<RefreshCw size={24} />
+										<span class:hidden={sidebarState.isCompact}>Récurrents</span>
+									</a>
+								</li>
+
+								<li>
+									<a
+										href="/dashboard/newsletter"
+										class:bg-primary-content={page.url.pathname === '/dashboard/newsletter'}
+									>
+										<Mail size={24} />
+										<span class:hidden={sidebarState.isCompact}>Newsletter</span>
+									</a>
+								</li>
+							</ul>
+
+							<!-- Section du bas -->
+							<ul class="menu menu-lg rounded-box bg-base-100 mt-4">
+								<li>
+									<a href="/" onclick={() => (modalState.inviteUser = true)}>
+										<UserPlus size={24} />
+										<span class:hidden={sidebarState.isCompact}>Inviter</span>
+									</a>
+								</li>
+								<li>
+									<a
+										href="/dashboard/config"
+										class:bg-primary-content={page.url.pathname === '/dashboard/config'}
+									>
+										<Settings size={24} />
+										<span class:hidden={sidebarState.isCompact}>Paramètres</span>
+									</a>
+								</li>
+							</ul>
 						</div>
-						<div
-							class="my-4 items-center justify-center space-y-2 rounded-xl bg-gray-100 py-4 font-medium text-nowrap {sidebarState.isCompact
-								? ' flex w-15 flex-col px-0'
-								: ' px-4 '}"
-						>
-							<a
-								href="/"
-								onclick={() => (modalState.inviteUser = true)}
-								class="sidebar-link"
-								title="Inviter un utilisateur"
-							>
-								<span class="flex items-center justify-center">
-									<UserPlus
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=""
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}>Inviter</span>
-							</a>
+					</aside>
 
-							<a
-								href="/dashboard/config"
-								class:active={page.url.pathname === '/dashboard/config'}
-								class="sidebar-link"
-								title="Paramètres"
-							>
-								<span class="flex items-center justify-center">
-									<Settings
-										size={sidebarState.isCompact ? 32 : 24}
-										strokeWidth={sidebarState.isCompact ? 2.5 : 2}
-										class=""
-									/>
-								</span>
-								<span class:hidden={sidebarState.isCompact}>Paramètres</span>
-							</a>
-						</div>
-					</div>
-				</aside>
-
-				<!-- Content -->
-				<main
-					class="mt-16 w-full p-1 transition-all duration-300
-				{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-70' : ''}
-				{sidebarState.isOpen && sidebarState.isCompact ? 'ml-18' : ''}
-				md:p-4"
-				>
-					{@render children()}
-					<!--
+					<!-- Content -->
+					<main
+						class="mt-16 flex-1 overflow-y-auto p-4 transition-all duration-300
+					{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-72' : ''}
+					{sidebarState.isOpen && sidebarState.isCompact ? 'ml-20' : ''}"
+					>
+						{@render children()}
+						<!--
 		{#if $benevoleModal}
 		<CreateBenevole />
 		{/if} -->
-					{#if modalState.event}
-						<EventModal />
-					{/if}
-					{#if modalState.report}
-						<!-- <Modal>
+						{#if modalState.event}
+							<EventModal />
+						{/if}
+						{#if modalState.report}
+							<!-- <Modal>
 						<ReportEvent />
 					</Modal> -->
-					{/if}
+						{/if}
 
-					{#if modalState.dateSondage}
-						<DateSondageModal />
-					{/if}
+						{#if modalState.dateSondage}
+							<DateSondageModal />
+						{/if}
 
-					{#if modalState.tasks.isOpen}
-						<TaskDialog />
-					{/if}
-					{#if modalState.inviteUser}
-						<InviteUserModal />
-					{/if}
-					{#if modalState.confirm.isOpen}
-						<ConfirmDialog />
-					{/if}
-					{#if messageSheet.isOpen}
-						<MessageSheet />
-					{/if}
+						{#if modalState.tasks.isOpen}
+							<TaskDialog />
+						{/if}
+						{#if modalState.inviteUser}
+							<InviteUserModal />
+						{/if}
+						{#if modalState.confirm.isOpen}
+							<ConfirmDialog />
+						{/if}
+						{#if messageSheet.isOpen}
+							<MessageSheet />
+						{/if}
 
-					<Alert />
-				</main>
+						<Alert />
+					</main>
+				</div>
 			{/if}
 		</div>
 	{/if}
@@ -610,51 +500,17 @@
 	<div class="fixed inset-0 z-50 flex items-center justify-center">
 		<div class="rounded-lg bg-white p-6 shadow-lg">
 			<h2 class="mb-4 text-xl font-bold text-red-600">Session expirée</h2>
-			<p class="text-gray-700">{error.message}</p>
-			<button
-				class="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-				onclick={() => goto('/login')}
-			>
+			<p class="text-base-content">{error.message}</p>
+			<button class="btn btn-primary" onclick={() => goto('/login')}>
 				Retour à la connexion
 			</button>
 		</div>
 	</div>
 {/await}
 
-<style>
+<!-- <style lang="postcss">
+  @reference "tailwindcss";
 	.active {
-		background-color: white;
-		color: #2563eb;
-		box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+		 "bg-base-300";
 	}
-
-	/* Ajustements pour le mode compact */
-	:global(.w-70) {
-		width: 17.5rem;
-	}
-
-	.hidden {
-		display: none;
-	}
-
-	a.sidebar-link {
-		display: flex;
-		justify-items: center;
-		align-items: center;
-		gap: 0.5rem; /* gap-2 */
-		border-radius: 0.75rem; /* rounded-xl */
-		padding-left: 0.75rem; /* px-3 */
-		padding-right: 0.75rem; /* px-3 */
-		padding-top: 0.5rem; /* py-2 */
-		padding-bottom: 0.5rem; /* py-2 */
-		font-size: 1.125rem; /* text-lg */
-		line-height: 1.75rem; /* text-lg */
-		font-weight: 500; /* font-medium */
-		text-decoration: none; /* pour enlever le soulignement par défaut des liens */
-		color: inherit; /* pour hériter la couleur du parent */
-	}
-
-	a.sidebar-link:hover {
-		background-color: white; /* hover:bg-white */
-	}
-</style>
+</style> -->
