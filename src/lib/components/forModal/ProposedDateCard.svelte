@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import { CalendarCheck, Trash2 } from 'lucide-svelte';
+	import { CalendarCheck, Trash2, UserPlus } from 'lucide-svelte';
 	import OrganizersSelect from './OrganizersSelect.svelte';
 	import ConflictAlert from '$lib/components/ConflictAlert.svelte';
 	import { lisibleDate, lisibleTime } from '$lib/utils';
@@ -49,9 +49,9 @@
 >
 	<!-- Header avec la date et les actions -->
 	<div
-		class="py-.5 bg-base-300 -top-0 left-2.5 items-center justify-between rounded-t-xl px-4 font-semibold text-gray-700 sm:flex"
+		class="py-.5 bg-base-300 -top-0 left-2.5 grid items-center justify-center rounded-t-xl px-4 font-semibold sm:flex sm:justify-between"
 	>
-		<div>
+		<div class="text-fluid-base">
 			<span class="text-nowrap">{lisibleDate(date.dateStart)}, </span>
 			<span class="ms-1 text-nowrap">
 				de {lisibleTime(date.dateStart)} à {lisibleTime(date.dateEnd)}
@@ -59,38 +59,41 @@
 		</div>
 
 		<!-- Action buttons -->
-		<div class="gap-x-4 p-1 sm:flex">
-			<div data-tip="Supprimer cette proposition de date" class="tooltip">
-				<button class="btn btn-square btn-soft btn-error" onclick={() => onRemove(index)}>
-					<Trash2 />
-				</button>
-			</div>
-			<div
-				data-tip={date.organizers.length === 0
-					? 'Au moins un·e organisateur·ice est requis pour accepter la date'
-					: 'Accepter la date'}
-				class="tooltip"
+		<div class="flex justify-center gap-x-6 p-1">
+			<button
+				class="btn btn-soft btn-sm btn-primary not-sm:w-1/3"
+				onclick={() => organizer_select.showModal()}
 			>
-				<button
-					class="btn btn-success btn-square btn-soft {dateAccepted?.dateStart === date.dateStart
-						? 'bg-green-500 text-white'
-						: ''}"
-					onclick={() => onValidate(date)}
-					disabled={date.organizers.length === 0}
-				>
-					<CalendarCheck />
-				</button>
-			</div>
+				<UserPlus />
+				<span class="not-sm:hidden">Modifier</span>
+			</button>
+
+			<button class="btn btn-soft btn-error btn-sm not-sm:w-1/3" onclick={() => onRemove(index)}>
+				<Trash2 />
+				<span class="not-sm:hidden">Supprimer</span>
+			</button>
+
+			<button
+				class="btn btn-sm btn-success btn-soft not-sm:w-1/3 {dateAccepted?.dateStart ===
+				date.dateStart
+					? 'bg-green-500 text-white'
+					: ''}"
+				onclick={() => onValidate(date)}
+				disabled={date.organizers.length === 0}
+			>
+				<CalendarCheck />
+				<span class="not-sm:hidden">Valider</span>
+			</button>
 		</div>
 	</div>
 
 	<!-- Organisateurs section -->
 	<div class="p-4">
-		<div class="mb-4 flex flex-wrap gap-2">
-			{#each activeOrganizers as organizer}
+		<div class=" flex flex-wrap gap-2">
+			{#each activeOrganizers as organizer (organizer)}
 				<div
-					class="badge {organizer.maybehere === 'oui'
-						? 'badge-success'
+					class="badge badge-soft font-semibold {organizer.maybehere === 'oui'
+						? 'badge-success '
 						: organizer.maybehere === 'peut-être'
 							? 'badge-warning'
 							: 'badge-error'}"
@@ -99,10 +102,6 @@
 				</div>
 			{/each}
 		</div>
-
-		<button class="btn btn-soft btn-sm btn-primary" onclick={() => organizer_select.showModal()}>
-			Inscrire
-		</button>
 	</div>
 
 	<!-- Modal -->
