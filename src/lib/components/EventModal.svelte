@@ -5,25 +5,30 @@
 	import GroupCheckBox from '$lib/components/GroupCheckBox.svelte';
 	import Info from '$lib/components/Info.svelte';
 	import AutoConfirmSettings from '$lib/components/forModal/AutoConfirmSettings.svelte';
+	import TaskSelect from '$lib/components/forModal/TaskSelect.svelte';
 
 	import Modal from '$lib/components/Modal.svelte';
 	import Quill from '$lib/components/Quill.svelte';
-	import RecurrentTab from '$lib/components/forModal/RecurrentTab.svelte';
-	import Textarea from '$lib/components/ui-custom/textarea/textarea.svelte';
-	import { getNewEvent } from '$lib/constants/events.constants';
-	import { ValidationSchemaType, validateEvent } from '$lib/schemas/event.schema';
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
-	import type { EventType } from '$lib/types/event';
 	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
 	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
 	import DateUniq from '$lib/components/forModal/DateUniq.svelte';
 	import OrganizersAndTasksSelect from '$lib/components/forModal/OrganizersAndTasksSelect.svelte';
+	import RecurrentTab from '$lib/components/forModal/RecurrentTab.svelte';
+	import Textarea from '$lib/components/ui-custom/textarea/textarea.svelte';
 	import {
 		createEvent,
 		createRecurrentEvent,
 		updateAllOccurrences,
 		updateEvent
 	} from '$lib/pocketbase.svelte';
+	import {
+		ValidationSchemaType,
+		getNewEvent,
+		validateEvent,
+		type EventType,
+		type TaskType
+	} from '$lib/schemas/event.schema';
+	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import {
 		eventState,
 		getOrganizersPossibles,
@@ -34,7 +39,7 @@
 
 	import { slide } from 'svelte/transition';
 
-	import { CalendarCheck, Save, X } from 'lucide-svelte';
+	import { Save, X } from 'lucide-svelte';
 
 	const closeModal = () => {
 		modalState.event = false;
@@ -85,7 +90,6 @@
 	// Fonction de transition vers le mode date unique
 	function switchToDate() {
 		eventData.isSondage = false;
-		eventData.dates_proposed = [];
 	}
 
 	const modalTitle = $derived.by(() => {
@@ -115,7 +119,6 @@
 
 	const cancelSondage = () => {
 		eventData.isSondage = false;
-		eventData.dates_proposed = [];
 	};
 
 	// ::: validation & submit
@@ -123,21 +126,26 @@
 	const hasRecurrentLocalErrors = () => {
 		let errors = {};
 
-		if (!eventData.recurrence?.firstDate) {
-			errors = { ...errors, firstDate: ['champ requis'] };
+		if (eventData.recurrence) {
+			if (!eventData.recurrence.firstDate) {
+				errors = { ...errors, firstDate: ['champ requis'] };
+			}
+			if (!eventData.recurrence.lastDate) {
+				errors = { ...errors, lastDate: ['champ requis'] };
+			}
+			if (!eventData.recurrence.recurrenceType) {
+				errors = { ...errors, recurrenceType: ['champ requis'] };
+			}
+			if (
+				eventData.recurrence.recurrenceType === 'MONTHLY_BY_DAY' &&
+				!eventData.recurrence.monthlyByDayOccurrences.length
+			) {
+				errors = { ...errors, monthlyByDayOccurrences: ['champ requis'] };
+			}
+		} else {
+			errors = { ...errors, recurrence: ['Les données de récurrence sont requises'] };
 		}
-		if (!eventData.recurrence?.lastDate) {
-			errors = { ...errors, lastDate: ['champ requis'] };
-		}
-		if (!eventData.recurrence?.recurrenceType) {
-			errors = { ...errors, recurrenceType: ['champ requis'] };
-		}
-		if (
-			eventData.recurrence?.recurrenceType === 'MONTHLY_BY_DAY' &&
-			!eventData.recurrence?.monthlyByDayOccurrences.length
-		) {
-			errors = { ...errors, monthlyByDayOccurrences: ['champ requis'] };
-		}
+
 		console.log('errors', errors);
 		return errors;
 	};
@@ -154,10 +162,6 @@
 
 	const handleConfirm = async () => {
 		try {
-			// Vérifier que le task par défaut est présent
-			if (!eventData.tasks.includes(getSpace.tasks.defaultTask)) {
-				eventData.tasks.push(getSpace.tasks.defaultTask);
-			}
 			const validationResult = validateEvent(eventData, ValidationSchemaType.PUBLISH);
 
 			if (!validationResult.success && validationResult.errors) {
@@ -248,24 +252,30 @@
 
 	// ::: tasks & organizers
 
-	let tasksPossibles = $derived.by<string[]>(() => {
-		const baseTasks = (() => {
+	let tasksPossibles = $derived.by<TaskType[]>(() => {
+		// Récupérer les tâches de base selon le mode
+		const baseTasks = () => {
 			switch (eventMode) {
 				case 'NEW_SINGLE':
 				case 'NEW_RECURRENT':
-					return getSpace.tasks.list || [];
+					return getSpace.tasks || [];
 				case 'EDIT_SINGLE':
 				case 'EDIT_RECURRENT_ALL':
-					return Array.from(new Set([...(getSpace.tasks.list || []), ...eventData.tasks]));
+					return [...(getSpace.tasks || []), ...eventData.tasks];
 				case 'EDIT_RECURRENT_ONE':
-					return Array.from(new Set([...(eventData.recurrence?.tasks || []), ...eventData.tasks]));
+					return [...(eventData.recurrence?.tasks || []), ...eventData.tasks];
 				default:
-					return [];
+					return getSpace.tasks;
 			}
-		})();
+		};
 
-		// S'assurer que toutes les tâches personnalisées sont incluses
-		return Array.from(new Set([...baseTasks, ...eventData.tasks]));
+		// Fusionner toutes les tâches
+		const allTasks = baseTasks();
+
+		// Éliminer les doublons en se basant sur le nom
+		return allTasks.filter(
+			(task, index, self) => index === self.findIndex((t) => t.name === task.name)
+		) as TaskType[];
 	});
 
 	let tasksLabel = $derived.by(() => {
@@ -278,6 +288,16 @@
 				return 'Définir les mandats à réaliser pour chaque occurrence de cet événement';
 			case 'EDIT_RECURRENT_ONE':
 				return 'Modifier les mandats à realiser pour cette occurrence spécifique';
+		}
+	});
+
+	// defaultTask est ajouté dès qu'il n'y a plus de tache
+	$effect(() => {
+		const defaultTask = getSpace.defaultTask as TaskType;
+
+		// Si defaultTask existe et tasks est vide ou undefined, initialiser avec defaultTask
+		if (defaultTask && (!eventData.tasks || eventData.tasks.length === 0)) {
+			eventData.tasks = [defaultTask];
 		}
 	});
 
@@ -296,30 +316,44 @@
 		}
 	});
 
-	function addCustomTask(newTask: string) {
-		if (newTask === '' || eventData.tasks.includes(newTask)) return;
-		eventData.tasks.push(newTask);
+	function addCustomTask(newTaskName: string) {
+		if (newTaskName === '' || !eventData.tasks) return;
+
+		// Vérifier si la tâche existe déjà dans le tableau
+		const taskExists = eventData.tasks.some((task) => task.name === newTaskName);
+
+		if (!taskExists) {
+			// Créer un nouvel objet TaskType
+			const newTask: TaskType = {
+				name: newTaskName,
+				description: 'Tâche personnalisée',
+				type: 'none'
+			};
+
+			// Ajouter l'objet TaskType
+			eventData.tasks = [...(eventData.tasks || []), newTask];
+		}
 	}
 
-	let hasMultipleTasks = $derived.by(() => eventData.tasks && eventData.tasks.length > 1);
+	// let hasMultipleTasks = $derived(eventData.tasks && eventData.tasks.length > 1);
 
 	// ::: fonction utilitaires
 
 	// Fonction pour appliquer une proposition unique
-	function applyProposal(proposal: {
-		date_event: string;
-		time_start: string;
-		time_end: string;
-		start_event?: string;
-	}) {
-		eventData = {
-			...eventData,
-			date_event: proposal.date_event,
-			time_start: proposal.time_start,
-			time_end: proposal.time_end,
-			start_event: proposal.start_event || proposal.time_start // fallback sur time_start si start_event n'est pas défini
-		};
-	}
+	// function applyProposal(proposal: {
+	// 	date_event: string;
+	// 	time_start: string;
+	// 	time_end: string;
+	// 	start_event?: string;
+	// }) {
+	// 	eventData = {
+	// 		...eventData,
+	// 		date_event: proposal.date_event,
+	// 		time_start: proposal.time_start,
+	// 		time_end: proposal.time_end,
+	// 		start_event: proposal.start_event || proposal.time_start // fallback sur time_start si start_event n'est pas défini
+	// 	};
+	// }
 
 	// Fonction pour convertir les propositions sélectionnées en dates de sondage
 	function convertSelectedToProposed() {
@@ -352,15 +386,15 @@
 	}
 
 	// Fonction utilitaire pour formater les dates
-	function formatDate(dateString: string): string {
-		const date = new Date(dateString);
-		return new Intl.DateTimeFormat('fr-FR', {
-			weekday: 'long',
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric'
-		}).format(date);
-	}
+	// function formatDate(dateString: string): string {
+	// 	const date = new Date(dateString);
+	// 	return new Intl.DateTimeFormat('fr-FR', {
+	// 		weekday: 'long',
+	// 		year: 'numeric',
+	// 		month: 'long',
+	// 		day: 'numeric'
+	// 	}).format(date);
+	// }
 </script>
 
 <!-- {$inspect('eventData', eventData)} -->
@@ -435,8 +469,9 @@
 			{#if hasExternalPreference}
 				<Info variant="warning">
 					<p class="italic">
-						Cet événement à été proposé par: {eventData.expand?.created_by.username}
-						({eventData.expand?.created_by?.email}), depuis le site publique
+						Cet événement à été proposé par: {eventData.expand?.created_by.username ||
+							'utilisateur inconnu'}
+						({eventData.expand?.created_by?.email || 'email inconnu'}), depuis le site publique
 					</p>
 					<div class=" text-fluid-sm p-2">
 						Période indiquée comme possible pour l'intervenant·e:
@@ -507,23 +542,33 @@
 			<div class="mb-2 block font-medium">
 				{tasksLabel}
 			</div>
-			<ButtonGroupSelect
-				options={tasksPossibles}
-				bind:selectedItems={eventData.tasks}
+			<TaskSelect
+				taskOptions={tasksPossibles}
+				bind:selectedTasks={eventData.tasks}
 				hasAddInput={true}
 				onadd={addCustomTask}
-				defaultOption={getSpace.tasks.defaultTask}
 			/>
-			<button class="link link-primary ms-4" onclick={() => (eventData.tasks = tasksPossibles)}
-				>> ajoutez tous les rôles</button
+			<button
+				class="link link-primary ms-4"
+				onclick={() => {
+					// Ajouter toutes les tâches de l'espace
+					const allTasks = [...(eventData.tasks || []), ...getSpace.tasks];
+
+					// Éliminer les doublons par nom
+					eventData.tasks = allTasks.filter(
+						(task, index, self) => index === self.findIndex((t) => t.name === task.name)
+					);
+				}}
 			>
+				> ajoutez tous les rôles
+			</button>
 		</Frame>
 
 		{#if eventMode !== 'NEW_RECURRENT' && eventMode !== 'EDIT_RECURRENT_ALL'}
 			<Frame title="Organisateur·ices">
 				<OrganizersAndTasksSelect
 					{organizersPossibles}
-					tasks={eventData.tasks || []}
+					tasks={tasksPossibles}
 					bind:organizers={eventData.organizers}
 					hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
 				/>
@@ -545,9 +590,31 @@
 				/>
 				<button
 					class="text-fluid-sm p-2 text-blue-700 hover:text-blue-600 hover:underline"
-					onclick={() => (eventData.recurrence.recurrenceTeam = organizersPossibles)}
-					>> ajoutez tout le monde</button
+					onclick={() => {
+						if (eventData.recurrence) {
+							eventData.recurrence.recurrenceTeam = organizersPossibles;
+						} else {
+							// Si recurrence n'existe pas encore, l'initialiser
+							eventData.recurrence = {
+								firstDate: '',
+								lastDate: '',
+								recurrenceDates: [],
+								recurrenceType: '',
+								monthlyByDayOccurrences: [],
+								recurrenceTeam: organizersPossibles,
+								tasks: [],
+								autoConfirm: false,
+								autoConfirmMin: 1,
+								notifyNoOrganizer: false,
+								notifyNoOrganizerDays: 1,
+								notifyNotConfirmed: false,
+								notifyNotConfirmedDays: 1
+							};
+						}
+					}}
 				>
+					> ajoutez tout le monde
+				</button>
 				{#if errors.organizers}
 					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
 				{/if}

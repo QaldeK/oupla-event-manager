@@ -1,10 +1,7 @@
 <script lang="ts">
 	import Modal from '$lib/components/Modal.svelte';
-	import { getSpace, spaceOptionsDB } from '$lib/shared/spaceOptions.svelte';
+	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import { showAlert } from '$lib/shared/states.svelte';
-	import { pb } from '$lib/pocketbase.svelte';
-	import type { SpaceConfig } from '$lib/types/spaceOptions';
-
 	import { slide } from 'svelte/transition';
 
 	let initialConfig = JSON.parse(JSON.stringify(getSpace.config));
@@ -19,6 +16,9 @@
 	// });
 
 	let showModalConfirm = $state(false);
+	let defaultTaskIndex = $state(
+		spaceConfig.tasks.findIndex((task) => task.type === 'default') || 0
+	);
 
 	const handleModalResponse = (response) => {
 		// Fermer la modal
@@ -51,8 +51,48 @@
 		array.splice(index, 1);
 	}
 
+	function addNewTask() {
+		spaceConfig.tasks = [
+			...spaceConfig.tasks,
+			{
+				name: '',
+				description: '',
+				type: 'default'
+			}
+		];
+	}
+
+	function removeTask(index: number) {
+		// Si on supprime la tâche par défaut, il faut en définir une autre
+		const isRemovingDefault = index === defaultTaskIndex;
+
+		spaceConfig.tasks = spaceConfig.tasks.filter((_, i) => i !== index);
+
+		// Ajuster l'index par défaut après suppression
+		if (isRemovingDefault && spaceConfig.tasks.length > 0) {
+			setDefaultTask(0);
+		} else if (index < defaultTaskIndex) {
+			defaultTaskIndex = defaultTaskIndex - 1;
+		}
+	}
+
+	function setDefaultTask(index: number) {
+		// Définir la tâche comme "default" et réinitialiser l'ancienne
+		if (
+			defaultTaskIndex !== undefined &&
+			defaultTaskIndex >= 0 &&
+			defaultTaskIndex < spaceConfig.tasks.length
+		) {
+			spaceConfig.tasks[defaultTaskIndex].type = 'none';
+		}
+
+		spaceConfig.tasks[index].type = 'default';
+		defaultTaskIndex = index;
+	}
+
 	async function handleSubmit() {
 		try {
+			console.log('Submitting config:', $state.snapshot(spaceConfig));
 			await getSpace.updateConfig($state.snapshot(spaceConfig));
 
 			// Mettre à jour la référence initiale après succès
@@ -67,6 +107,7 @@
 
 	function resetChanges() {
 		spaceConfig = JSON.parse(JSON.stringify(initialConfig));
+		defaultTaskIndex = spaceConfig.tasks.findIndex((task) => task.type === 'default') || 0;
 	}
 </script>
 
@@ -91,7 +132,7 @@
 		<section class="rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold">Salles</h2>
 			<div class="space-y-3">
-				{#each spaceConfig.rooms as room, i}
+				{#each spaceConfig.rooms as room, i (room)}
 					<div class="flex items-center gap-2">
 						<input
 							type="text"
@@ -121,7 +162,7 @@
 				<button
 					type="button"
 					onclick={() => addOption(spaceConfig.rooms)}
-					class="w-full rounded-lg border-2 border-dashed border-gray-300 py-2 text-gray-600 hover:border-gray-400 hover:text-gray-700"
+					class="btn btn-dash w-full"
 				>
 					Ajouter une salle
 				</button>
@@ -132,7 +173,7 @@
 		<section class="rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold">Catégories</h2>
 			<div class="space-y-3">
-				{#each spaceConfig.categories as category, i}
+				{#each spaceConfig.categories as category, i (i)}
 					<div class="flex items-center gap-2">
 						<input
 							type="text"
@@ -160,7 +201,7 @@
 				<button
 					type="button"
 					onclick={() => addOption(spaceConfig.categories)}
-					class="w-full rounded-lg border-2 border-dashed border-gray-300 py-2 text-gray-600 hover:border-gray-400 hover:text-gray-700"
+					class="btn btn-dash w-full"
 				>
 					Ajouter une catégorie
 				</button>
@@ -170,52 +211,78 @@
 		<!-- Rôles -->
 		<section class="rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold">Rôles organisationnels (mandats)</h2>
-			<div class="mb-4">
-				<label for="defaultRole" class="text-fluid-sm mb-2 block font-medium text-gray-700"
-					>Rôle séléctionné par défaut
-				</label>
-				<select
-					id="defaultRole"
-					bind:value={spaceConfig.tasks.defaultTask}
-					class="w-fit rounded-md border border-gray-300 bg-gray-100 px-3 py-2 shadow-xs hover:cursor-pointer hover:border-gray-400"
-				>
-					{#each spaceConfig.tasks.list as task}
-						<option value={task} class="">{task}</option>
-					{/each}
-				</select>
-			</div>
-			<div class="space-y-3">
-				{#each spaceConfig.tasks.list, i}
-					<div class="flex items-center gap-2">
-						<input
-							type="text"
-							bind:value={spaceConfig.tasks.list[i]}
-							class="w-full rounded border px-3 py-2"
-							placeholder="Nom du rôle"
-						/>
-						<button
-							type="button"
-							onclick={() => removeOption(spaceConfig.tasks.list, i)}
-							class="rounded p-2 text-red-600 hover:bg-red-50"
-							aria-label="Supprimer le rôle"
-						>
-							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width={2}
-									d="M6 18L18 6M6 6l12 12"
-								/>
-							</svg>
-						</button>
+
+			<div class="space-y-4 divide-y-3">
+				{#each spaceConfig.tasks as task, i (i)}
+					<div class="rounded-lg p-4">
+						<div class="flex flex-wrap items-center gap-3">
+							<!-- Nom de la tâche -->
+							<div class="flex-grow">
+								<label class="floating-label">
+									<input
+										type="text"
+										bind:value={spaceConfig.tasks[i].name}
+										class="input input-lg w-full"
+										placeholder="Nom de la tache"
+									/> <span>Nom de la tache</span>
+								</label>
+							</div>
+
+							<!-- Type de tâche (doable/none) -->
+							<div class="min-w-[120px]">
+								<select
+									bind:value={spaceConfig.tasks[i].type}
+									disabled={i === defaultTaskIndex}
+									class="select select-sm w-full {i === defaultTaskIndex ? 'hidden' : ''}"
+								>
+									<option value="doable">Réalisable</option>
+									<option value="none">Aucun</option>
+								</select>
+							</div>
+							<!-- Bouton "Par défaut" (radio) -->
+							<button
+								type="button"
+								onclick={() => setDefaultTask(i)}
+								class="btn btn-sm {i === defaultTaskIndex ? 'btn-success' : 'btn'}"
+							>
+								{i === defaultTaskIndex ? 'Par défaut ✓' : 'Définir par défaut'}
+							</button>
+
+							<!-- Bouton de suppression -->
+							<button
+								type="button"
+								onclick={() => removeTask(i)}
+								class="btn btn-sm btn-error btn-outline"
+								aria-label="Supprimer le rôle"
+							>
+								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width={2}
+										d="M6 18L18 6M6 6l12 12"
+									/>
+								</svg>
+							</button>
+						</div>
+
+						<!-- Description (en dessous) -->
+						<div class="mt-4">
+							<label class="floating-label">
+								<textarea
+									bind:value={spaceConfig.tasks[i].description}
+									class="textarea w-full p-4"
+									placeholder="Description de la tâche"
+									rows="2"
+								></textarea>
+								<span>Description de la tâche</span>
+							</label>
+						</div>
 					</div>
 				{/each}
-				<button
-					type="button"
-					onclick={() => addOption(spaceConfig.tasks.list)}
-					class="w-full rounded-lg border-2 border-dashed border-gray-300 py-2 text-gray-600 hover:border-gray-400 hover:text-gray-700"
-				>
-					Ajouter un rôle
+
+				<button type="button" onclick={addNewTask} class="btn btn-dash w-full">
+					Ajouter une tâche
 				</button>
 			</div>
 		</section>

@@ -1,5 +1,6 @@
 export * from './message';
 export * from './pocketbase';
+export * from './spaceOptions';
 
 export interface UserType {
 	id: string;

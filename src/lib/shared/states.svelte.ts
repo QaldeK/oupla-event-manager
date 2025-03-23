@@ -2,7 +2,7 @@
 
 // export const eventsList = $state();
 
-import { getNewEvent } from '$lib/constants/events.constants';
+import { getNewEvent } from '$lib/schemas/event.schema';
 import { getSpace } from '$lib/shared/spaceOptions.svelte';
 
 export const modalState = $state({

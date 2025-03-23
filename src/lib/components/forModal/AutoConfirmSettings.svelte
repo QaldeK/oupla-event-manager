@@ -6,30 +6,16 @@
 	let { eventData = $bindable() } = $props();
 
 	// Assurer que les propriétés nécessaires existent
-	$effect(() => {
-		if (!eventData.recurrence.autoConfirm) {
-			eventData.recurrence.autoConfirm = false;
-		}
-
-		if (!eventData.recurrence.autoConfirmMin) {
-			eventData.recurrence.autoConfirmMin = 2;
-		}
-
-		// Initialiser les nouvelles propriétés si elles n'existent pas
-		if (eventData.recurrence.notifyNoOrganizer === undefined) {
-			eventData.recurrence.notifyNoOrganizer = false;
-		}
-
-		if (eventData.recurrence.notifyNoOrganizerDays === undefined) {
-			eventData.recurrence.notifyNoOrganizerDays = 5;
-		}
-
-		if (eventData.recurrence.notifyNotConfirmed === undefined) {
-			eventData.recurrence.notifyNotConfirmed = false;
-		}
-
-		if (eventData.recurrence.notifyNotConfirmedDays === undefined) {
-			eventData.recurrence.notifyNotConfirmedDays = 3;
+	$effect.pre(() => {
+		if (!eventData.recurrence) {
+			eventData.recurrence = {
+				autoConfirm: false,
+				autoConfirmMin: 2,
+				notifyNoOrganizer: false,
+				notifyNoOrganizerDays: 5,
+				notifyNotConfirmed: false,
+				notifyNotConfirmedDays: 3,
+			};
 		}
 	});
 </script>

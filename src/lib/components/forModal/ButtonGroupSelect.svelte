@@ -1,6 +1,6 @@
 <script lang="ts">
 	let {
-		selectedItems = $bindable([q]),
+		selectedItems = $bindable([]),
 		options = $bindable([]),
 		optionsLabel = '',
 		hasAddInput = false,

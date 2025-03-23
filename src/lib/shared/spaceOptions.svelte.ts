@@ -49,8 +49,9 @@ import type {
 	SpaceConfig,
 	SpaceDetails,
 	SpaceOptionsType,
-	SpaceUser
-} from '$lib/types/spaceOptions';
+	SpaceUser,
+	TaskType
+} from '$lib/types/types';
 
 // Structure pour stocker les IDs des enregistrements supprimés
 interface DeletedRecords {
@@ -119,10 +120,10 @@ class SpaceOptionsDB {
 				configId: record.id,
 				name: record.expand?.space?.name || '',
 				description: record.expand?.space?.description || '',
-				rooms: options.rooms || [],
-				categories: options.categories || [],
+				rooms: [],
+				categories: [],
 				members: [], // Vide en mode public
-				tasks: options.tasks || {
+				tasks: {
 					list: [],
 					defaultTask: ''
 				}
@@ -182,10 +183,11 @@ class SpaceOptionsDB {
 			const members = await this.membersManager.loadMembers(spaceID);
 
 			const newConfigId = record.id;
-			const options = record.options || ({} as SpaceOptionsType);
-			const id = record.space;
 
-			const tasks = options.tasks || {
+			// Utiliser directement les champs dédiés
+			const rooms = record.rooms || [];
+			const categories = record.categories || [];
+			const tasks = record.tasks || {
 				list: [],
 				defaultTask: ''
 			};
@@ -199,11 +201,15 @@ class SpaceOptionsDB {
 			};
 
 			const newConfig: SpaceConfig = {
-				...options,
-				id,
-				...this.optionOf,
+				id: record.space,
+				configId: newConfigId,
+				name: this.optionOf.space.name,
+				description: this.optionOf.space.description,
+				rooms,
+				categories,
 				tasks,
-				members
+				members,
+				space: this.optionOf.space
 			};
 
 			// Mise à jour du state et du localStorage uniquement si les données ont changé
@@ -236,10 +242,7 @@ let _spaceConfig = $state<SpaceConfig>({
 	rooms: [],
 	categories: [],
 	members: [],
-	tasks: {
-		list: [],
-		defaultTask: ''
-	}
+	tasks: []
 });
 
 export const getSpace = {
@@ -249,13 +252,20 @@ export const getSpace = {
 	async updateConfig(newConfig: SpaceConfig) {
 		if (newConfig.space) {
 			try {
-				// 3. Effectuer la mise à jour
-				await pb.collection('spaces_options').update(configId, { options: newConfig });
+				// Mise à jour uniquement des champs dédiés
+				const updateData = {
+					rooms: newConfig.rooms,
+					categories: newConfig.categories,
+					tasks: newConfig.tasks
+				};
 
-				// 2. Mise à jour du state local
+				// Effectuer la mise à jour
+				await pb.collection('spaces_options').update(configId, updateData);
+
+				// Mise à jour du state local
 				_spaceConfig = newConfig;
 
-				// 3. Mise à jour localStorage
+				// Mise à jour localStorage
 				await spaceOptionsDB.set(newConfig);
 
 				return true;
@@ -280,8 +290,21 @@ export const getSpace = {
 		return _spaceConfig.categories;
 	},
 
-	get tasks() {
+	get tasks(): TaskType[] {
 		return _spaceConfig.tasks;
+	},
+
+	get defaultTask(): TaskType {
+		const defaultTask = _spaceConfig.tasks.find((task) => task.type === 'default');
+		// Si aucune tâche par défaut n'est trouvée, créez une tâche par défaut
+		if (!defaultTask && _spaceConfig.tasks.length === 0) {
+			return {
+				name: 'Here',
+				description: 'Tâche par défaut automatiquement créée',
+				type: 'default'
+			};
+		}
+		return defaultTask || _spaceConfig.tasks[0];
 	},
 
 	get name() {

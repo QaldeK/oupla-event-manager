@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { eventState, modalState } from '$lib/shared/states.svelte';
 	import type { EventType } from '$lib/types/event';
-	import { handleTaskSubscription, lisibleDate } from '$lib/utils';
-	import { tooltip } from '$lib/utils';
 	import type { UserType } from '$lib/types/types';
+	import { handleTaskSubscription, lisibleDate, tooltip } from '$lib/utils';
 
 	import { getContext } from 'svelte';
 
-	import { Pen, PencilLine, SquarePen } from 'lucide-svelte';
+	import { PencilLine } from 'lucide-svelte';
 
-	import Modal from './Modal.svelte';
-
+	
 	type RecurrenceType = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY_BY_DATE' | 'MONTHLY_BY_DAY';
 
 	interface ValidMaster extends EventType {

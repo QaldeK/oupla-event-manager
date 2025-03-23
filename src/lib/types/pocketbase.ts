@@ -96,7 +96,7 @@ export type EventsRecord<Tcategories = unknown, Tdates_proposed = unknown, Texte
 	canceled?: boolean
 	categories?: null | Tcategories
 	created?: IsoDateString
-	created_by?: RecordIdString
+	created_by: RecordIdString
 	dateEnd?: IsoDateString
 	dateStart?: IsoDateString
 	date_event?: string
@@ -116,11 +116,14 @@ export type EventsRecord<Tcategories = unknown, Tdates_proposed = unknown, Texte
 	isPublished?: boolean
 	isRecurrent?: boolean
 	isSendToNewsletter?: boolean
+	isSondage?: boolean
 	is_age_no_restriction?: boolean
 	is_prix_libre?: boolean
 	link?: string
 	masterRecurrentId?: RecordIdString
 	mixite?: string
+	noOrganizerNotificationSent?: boolean
+	notConfirmedNotificationSent?: boolean
 	organizers?: null | Torganizers
 	other_date_query?: null | Tother_date_query
 	prix?: string
@@ -128,7 +131,7 @@ export type EventsRecord<Tcategories = unknown, Tdates_proposed = unknown, Texte
 	reportedFrom?: string
 	reportedTo?: string
 	rooms?: null | Trooms
-	space?: RecordIdString
+	space: RecordIdString
 	start_event?: string
 	start_public?: string
 	tasks?: null | Ttasks

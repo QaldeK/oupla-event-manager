@@ -1,3 +1,7 @@
+import type { TasksListType, TaskType } from '$lib/schemas/event.schema';
+
+export type { TaskType } from '$lib/schemas/event.schema';
+
 export interface SpaceConfig {
 	id: string;
 	configId: string;
@@ -5,11 +9,9 @@ export interface SpaceConfig {
 	description: string;
 	rooms: string[];
 	categories: string[];
-	members: string[];
-	tasks: {
-		list: string[];
-		defaultTask: string;
-	};
+	members: SpaceUser[];
+	tasks: TaskType[];
+
 	space?: {
 		id: string;
 		name: string;
@@ -33,10 +35,7 @@ export interface SpaceDetails {
 }
 
 export interface SpaceOptionsType {
-	tasks?: {
-		list: string[];
-		defaultTask: string;
-	};
+	tasks?: TaskType[];
 	rooms?: string[];
 	categories?: string[];
 }

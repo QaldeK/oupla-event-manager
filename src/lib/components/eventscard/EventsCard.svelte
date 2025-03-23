@@ -101,7 +101,7 @@
 	// effect
 
 	$effect(() => {
-		if (currentEvent.dates_proposed.length) {
+		if (currentEvent.dates_proposed?.length) {
 			const today = new Date();
 			oldDatesProposed = (currentEvent.dates_proposed || []).filter(
 				(date) => new Date(date.dateStart) < today
@@ -208,7 +208,7 @@
 						id: currentUser.id,
 						username: currentUser.username,
 						email: currentUser.email,
-						tasks: [getTasks.defaultTask], // Les tâches sont vides pendant le sondage
+						tasks: [{ name: getTasks.defaultTask, description: '' }], // Les tâches n'ont que la tache par defaut pendant le sondage
 						role: currentUser.role,
 						maybehere: maybehereValue
 					});
@@ -266,7 +266,7 @@
 						time_start: timeStart,
 						time_end: timeEnd,
 						organizers: filterAndConvertOrganizers(selectedDate.organizers),
-						dates_proposed: []
+						// dates_proposed: []
 					});
 				}
 			}

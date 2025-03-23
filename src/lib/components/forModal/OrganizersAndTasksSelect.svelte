@@ -1,10 +1,12 @@
 <script lang="ts">
 	import PopoverMultiSelect from '$lib/components/PopoverMultiSelect.svelte';
-	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
+	import TaskSelect from '$lib/components/forModal/TaskSelect.svelte';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
+	import type { TaskConfig } from '$lib/types/spaceOptions';
 	import { cn } from '$lib/utils';
-	import { fade, slide } from 'svelte/transition';
 	import { UserMinus, UserPlus } from 'lucide-svelte';
+	import { fade, slide } from 'svelte/transition';
+	import ButtonGroupSelect from './ButtonGroupSelect.svelte';
 
 	interface Organizer {
 		email: string;
@@ -27,20 +29,25 @@
 	} = $props<{
 		organizersPossibles: User[];
 		hasMultipleTasks: boolean;
-		tasks: string[];
+		tasks: TaskConfig[];
 		organizers: Organizer[];
 	}>();
 
 	let selectedOrganizer = $state<User | null>(null);
-	let selectedTasks = $state<string[]>([]);
+	let selectedTasks = $state<TaskConfig[]>([]);
 	let modalId = 'tasks_select_modal';
+
+	let defaultTask = $derived.by(() => {
+		const defaultTaskConfig = tasks.find((task) => task.type === 'default');
+		return defaultTaskConfig?.name || (tasks.length > 0 ? tasks[0].name : '');
+	});
 
 	// TODO $derived instead of $effect + $state ?
 	let uniqTask = $state('');
 
 	$effect(() => {
-		if (!hasMultipleTasks) {
-			uniqTask = tasks[0];
+		if (!hasMultipleTasks && tasks.length > 0) {
+			uniqTask = defaultTask;
 		}
 	});
 
@@ -99,15 +106,15 @@
 		organizers = organizers.filter((org) => org.id !== organizer.id);
 	}
 
-	function toggleTasks(organizer: Organizer, task: string) {
+	function toggleTasks(organizer: Organizer, taskName: string) {
 		const index = organizers.findIndex((org) => org.id === organizer.id);
 		if (index === -1) return;
 
 		const updatedOrganizer = { ...organizers[index] };
-		if (updatedOrganizer.tasks.includes(task)) {
-			updatedOrganizer.tasks = updatedOrganizer.tasks.filter((r) => r !== task);
+		if (updatedOrganizer.tasks.includes(taskName)) {
+			updatedOrganizer.tasks = updatedOrganizer.tasks.filter((r) => r !== taskName);
 		} else {
-			updatedOrganizer.tasks = [...updatedOrganizer.tasks, task];
+			updatedOrganizer.tasks = [...updatedOrganizer.tasks, taskName];
 		}
 		organizers[index] = updatedOrganizer;
 		organizers = [...organizers];
@@ -133,9 +140,9 @@
 			<div transition:slide class="flex items-center gap-4 rounded-lg bg-gray-200 py-0.5 pl-3">
 				<span class="font-medium">{organizer.username}</span>
 				<PopoverMultiSelect
-					items={tasks}
+					items={tasks.map((t) => t.name)}
 					bind:selectedItems={organizer.tasks}
-					toggleItem={(task) => toggleTasks(organizer, task)}
+					toggleItem={(taskName) => toggleTasks(organizer, taskName)}
 					size="sm"
 					label=""
 					labelEmpty="mandats ?"
@@ -175,9 +182,7 @@
 <dialog id={modalId} class="modal">
 	<div class="modal-box">
 		<h3 class="text-lg font-bold">Définir les roles pour {selectedOrganizer?.username}</h3>
-		<div class="my-4">
-			<ButtonGroupSelect options={tasks} bind:selectedItems={selectedTasks} />
-		</div>
+		<TaskSelect taskOptions={tasks} bind:selectedTasks />
 		<div class="modal-action">
 			<form method="dialog">
 				<button class="btn btn-ghost">Annuler</button>

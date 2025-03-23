@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ConflictAlert from '$lib/components/ConflictAlert.svelte';
 	import Info from '$lib/components/Info.svelte';
-	import { type EventFormType } from '$lib/types/event';
+	import { type EventType } from '$lib/types/event';
 	import { lisibleDate } from '$lib/utils';
 	import { modifyRecord } from '$lib/pocketbase.svelte';
 	import { modalState } from '$lib/shared/states.svelte';
@@ -11,7 +11,7 @@
 	import DatePicker from './DatePicker.svelte';
 	import TimeReservation from './TimeReservation.svelte';
 
-	let { localErrors, eventData = $bindable<EventFormType>({} as EventFormType) } = $props();
+	let { localErrors, eventData = $bindable<EventType>({} as EventType) } = $props();
 
 	let dateTimeStart = $derived.by(() => {
 		if (!eventData.date_event || !eventData.time_start) return null;
@@ -80,15 +80,13 @@
 			{/if}
 		</Info>
 		<div class="lg:w-1/2">
-	
-
-				<DatePicker
-					bind:value={eventData.date_event}
-					eventId={eventData.id}
-					onResetDate={resetDate}
-					resetButton={true}
-					label="Date de l'événement"
-				/>
+			<DatePicker
+				bind:value={eventData.date_event}
+				eventId={eventData.id}
+				onResetDate={resetDate}
+				resetButton={true}
+				label="Date de l'événement"
+			/>
 
 			{#if localErrors.date_event}
 				<p class="text-fluid-sm p-2 text-red-500 italic">{localErrors.date_event}</p>

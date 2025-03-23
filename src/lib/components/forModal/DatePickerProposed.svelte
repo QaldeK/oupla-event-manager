@@ -5,7 +5,7 @@
 	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
 	import OrganizersSelect from '$lib/components/forModal/OrganizersSelect.svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import type { EventFormType, OrganizerType } from '$lib/types/event';
+	import type { EventType, OrganizerType } from '$lib/types/event';
 	import { addTime, formatDatePb, formatTimePb, lisibleDate, lisibleTime } from '$lib/utils';
 	import { eventState } from '$lib/shared/states.svelte';
 
@@ -20,9 +20,9 @@
 	};
 
 	// ::: props
-	let { localErrors = {}, eventData = $bindable<EventFormType | null>(null) } = $props<{
+	let { localErrors = {}, eventData = $bindable<EventType | null>(null) } = $props<{
 		localErrors: Record<string, string[] | undefined>;
-		eventData: EventFormType | null;
+		eventData: EventType | null;
 	}>();
 
 	// ::: states & derived

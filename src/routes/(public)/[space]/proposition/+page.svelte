@@ -8,7 +8,7 @@
 	import DatePickerProposal from '$lib/components/forModal/DatePickerProposal.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { getNewEvent } from '$lib/constants/events.constants';
+	import { getNewEvent } from '$lib/schemas/event.schema';
 	import { pb } from '$lib/pocketbase.svelte';
 	import { PropositionFormSchema } from '$lib/schemas/event.schema';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';

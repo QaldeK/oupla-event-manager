@@ -4,8 +4,8 @@
 	*/
 	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
 
-	import { getNewEvent } from '$lib/constants/events.constants';
-	import { type EventFormType } from '$lib/types/event';
+	import { getNewEvent } from '$lib/schemas/event.schema';
+	import { type EventType } from '$lib/types/event';
 	import {
 		addDays,
 		addMonths,
@@ -26,7 +26,7 @@
 
 	// FIXIT : possibly undefined resolve by getNewEvent fallback ?
 	let {
-		eventData = $bindable<EventFormType>({ ...getNewEvent() } as EventFormType),
+		eventData = $bindable<EventType>({ ...getNewEvent() } as EventType),
 		localErrors,
 		recurrentErrors
 	} = $props();
