@@ -90,7 +90,7 @@
 
 {#if conflicts.length > 0}
 	<div
-		class="cursor-pointer items-center gap-1 text-fluid-sm text-gray-500 hover:text-gray-700"
+		class="bg-warning/20 text-fluid-sm cursor-pointer items-center gap-1 rounded-xl p-2 text-gray-500 hover:text-gray-700"
 		onclick={() => (isExpanded = !isExpanded)}
 		onkeydown={(e) => e.key === 'Enter' && (isExpanded = !isExpanded)}
 		role="button"
@@ -130,7 +130,7 @@
 				<ul class="ms-2">
 					{#each realConflicts as conflict}
 						<li
-							class={`flex flex-wrap items-baseline gap-1 text-fluid-sm ${getConflictColor(
+							class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(
 								conflict.conflictType
 							)}`}
 						>
@@ -152,7 +152,7 @@
 			<ul class="ms-2">
 				{#each conflicts as conflict}
 					<li
-						class={`flex flex-wrap items-baseline gap-1 text-fluid-sm ${getConflictColor(conflict.conflictType)}`}
+						class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(conflict.conflictType)}`}
 					>
 						<div class="font-bold">{conflict.event_title} :</div>
 						<div class="italic">{getConflictTypeMsg(conflict.conflictType)}</div>
