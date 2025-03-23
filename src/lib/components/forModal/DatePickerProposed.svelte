@@ -4,20 +4,17 @@
 	import TimePickRange from '$lib/components/TimePickRange.svelte';
 	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
 	import OrganizersSelect from '$lib/components/forModal/OrganizersSelect.svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	import ProposedDateCard from './ProposedDateCard.svelte';
 	import type { EventType, OrganizerType } from '$lib/types/event';
 	import { addTime, formatDatePb, formatTimePb, lisibleDate, lisibleTime } from '$lib/utils';
 	import { eventState } from '$lib/shared/states.svelte';
+	import type { DateProposedType } from '$lib/schemas/event.schema';
 
 	import { fade } from 'svelte/transition';
 
 	import { CalendarCheck, PlusCircle, Trash2 } from 'lucide-svelte';
 
-	type DateProposal = {
-		dateStart: string;
-		dateEnd: string;
-		organizers: OrganizerType[];
-	};
+
 
 	// ::: props
 	let { localErrors = {}, eventData = $bindable<EventType | null>(null) } = $props<{
@@ -30,12 +27,12 @@
 	let startTime = $state('');
 	let endTime = $state('');
 
-	let oldDatesProposed = $state<DateProposal[]>([]);
-	let datesFutureProposed = $state<DateProposal[]>([]);
+	let oldDatesProposed = $state<DateProposedType[]>([]);
+	let datesFutureProposed = $state<DateProposedType[]>([]);
 
 	let eventId = $derived(eventState.is?.id);
 	let rooms = $derived(eventState.is?.rooms);
-	let dateAccepted = $state<DateProposal | null>(null);
+	let dateAccepted = $state<DateProposedType | null>(null);
 
 	const bestDate = $derived(
 		eventData.dates_proposed?.reduce(
@@ -73,7 +70,7 @@
 		};
 	});
 
-	function validateDate(date: DateProposal) {
+	function validateDate(date: DateProposedType) {
 		dateAccepted = date;
 	}
 
@@ -83,7 +80,7 @@
 		eventData.isSondage = false;
 	};
 
-	const addDateProposal = () => {
+	const addDateProposedType = () => {
 		if (selectedDate && startTime && endTime && selectedDate) {
 			const newProposals = selectedDate.map((date: string) => {
 				const dateStart = new Date(`${date}T${startTime}`);
@@ -106,22 +103,13 @@
 		}
 	};
 
-	const removeDateProposal = (index: number) => {
+	const removeDateProposedType = (index: number) => {
 		eventData.dates_proposed = eventData.dates_proposed.filter((_, i) => i !== index);
 	};
 
-	// Fonction de conversion pour obtenir le format YYYYMMDDHHmm
-	const formatDateTimeString = (date: Date): string => {
-		const year = date.getFullYear();
-		const month = String(date.getMonth() + 1).padStart(2, '0');
-		const day = String(date.getDate()).padStart(2, '0');
-		const hours = String(date.getHours()).padStart(2, '0');
-		const minutes = String(date.getMinutes()).padStart(2, '0');
 
-		return `${year}${month}${day}${hours}${minutes}`;
-	};
 
-	function isExternalProposal(date: DateProposal): boolean {
+	function isExternalProposal(date: DateProposedType): boolean {
 		if (!eventData?.external_proposal?.proposals) return false;
 
 		return eventData.external_proposal.proposals.some((proposal) => {
@@ -202,7 +190,7 @@
 				</div>
 				<button
 					type="button"
-					onclick={addDateProposal}
+					onclick={addDateProposedType}
 					disabled={!selectedDate || selectedDate.length === 0 || !startTime || !endTime}
 					class="btn btn-primary disabled:pointer-events-none disabled:text-gray-400"
 				>
@@ -214,99 +202,19 @@
 
 	<div out:fade>
 		{#each datesFutureProposed as date, index (index)}
-			<div>
-				<div
-					class="mt-4 rounded-xl shadow {bestDate === date.dateStart
-						? 'border-l-4 border-l-green-300'
-						: ''}  {dateAccepted?.dateStart === date.dateStart ? 'bg-green-50' : 'bg-white'}"
-				>
-					<div
-						class="py-.5 bg-base-300 -top-0 left-2.5 items-center justify-between rounded-t-xl px-4 font-semibold text-gray-700 sm:flex"
-					>
-						<div class="flex flex-wrap items-center gap-x-2">
-							<div>
-								<span class="text-nowrap">{lisibleDate(date.dateStart)}, </span>
-								<span class="ms-1 text-nowrap">
-									de {lisibleTime(date.dateStart)} à {lisibleTime(date.dateEnd)}
-								</span>
-							</div>
-							<div>
-								{#if isExternalProposal(date)}
-									<Badge variant="outline" class="border-info font-normal text-gray-700 md:ms-2">
-										<span class="">
-											Proposé par l'intervenant•e - {eventData.expand?.created_by?.email}</span
-										>
-									</Badge>
-								{:else if eventData?.external_proposal?.proposals?.length > 0}
-									<Badge
-										variant="outline"
-										class="ms-2 cursor-pointer border-orange-500 text-orange-700 hover:bg-orange-100"
-										onclick={() => {
-											/* TODO: Implement proposeDate */
-										}}
-									>
-										Soumettre cette proposition de date à {eventData.expand?.created_by?.email}'
-									</Badge>
-								{/if}
-							</div>
-						</div>
-
-						<div class="gap-x-4 p-1 sm:flex">
-							<div data-tip="Supprimer cette proposition de date" class="tooltip">
-								<button
-									class="btn btn-square btn-soft btn-error"
-									onclick={() => removeDateProposal(index)}
-								>
-									<Trash2 />
-								</button>
-							</div>
-							<div
-								data-tip={date.organizers.length === 0
-									? 'Au moins un·e organisateur·ice est requis pour accepter la date'
-									: 'Accepter la date'}
-								class="tootip"
-							>
-								<button
-									class="btn btn-success btn-square btn-soft {dateAccepted?.dateStart ===
-									date.dateStart
-										? 'bg-green-500 text-white'
-										: ''}"
-									onclick={() => validateDate(date)}
-									disabled={date.organizers.length === 0}
-								>
-									<CalendarCheck />
-								</button>
-							</div>
-						</div>
-					</div>
-					<button class="btn btn-soft btn-sm btn-primary" onclick={organizer_select.showModal()}
-						>Inscrire</button
-					>
-					<dialog id="organizer_select" class="modal">
-						<div class="modal-box w-11/12 max-w-5xl">
-							<h3 class="text-lg font-bold">Hello!</h3>
-							<OrganizersSelect bind:organizers={date.organizers} />
-
-							<div class="modal-action">
-								<form method="dialog">
-									<!-- if there is a button in form, it will close the modal -->
-									<button class="btn">Close</button>
-								</form>
-							</div>
-						</div>
-					</dialog>
-
-					<div class="px-5 py-2">
-						<ConflictAlert
-							{eventId}
-							dateTimeStart={formatDateTimeString(new Date(date.dateStart))}
-							dateTimeEnd={formatDateTimeString(new Date(date.dateEnd))}
-							{rooms}
-						/>
-					</div>
-				</div>
-			</div>
+			<ProposedDateCard
+				{date}
+				{index}
+				{bestDate}
+				{dateAccepted}
+				{eventId}
+				{rooms}
+				{eventData}
+				onRemove={removeDateProposedType}
+				onValidate={validateDate}
+			/>
 		{/each}
+		
 		{#if oldDatesProposed.length > 0}
 			<div class="text-fluid-sm p-2 text-gray-500 italic">
 				Des dates déjà passées ont été proposées précédemment, et ont été automatiquement supprimées

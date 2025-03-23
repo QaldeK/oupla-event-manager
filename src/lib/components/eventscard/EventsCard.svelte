@@ -6,10 +6,14 @@
 		filterAndConvertOrganizers,
 		handleTaskSubscription,
 		lisibleDate,
-		lisibleTime,
-		tooltip
+		lisibleTime
 	} from '$lib/utils';
-	import { eventState, hasAuthorizations, modalState, openTaskModal } from '$lib/shared/states.svelte';
+	import {
+		eventState,
+		hasAuthorizations,
+		modalState,
+		openTaskModal
+	} from '$lib/shared/states.svelte';
 	import type { EventType, OrganizerType, SyncEventRecord } from '$lib/types/event';
 	import type { EventsRecord } from '$lib/types/pocketbase';
 	import type { UserType } from '$lib/types/types';
@@ -20,7 +24,7 @@
 	import {
 		BadgeHelp,
 		CalendarCheck,
-		CalendarX2,
+		Info,
 		ChevronDown,
 		ChevronUp,
 		ThumbsDown,
@@ -77,12 +81,13 @@
 		return '';
 	});
 
-
-	const hasAuth = $derived.by(() => hasAuthorizations({
-  isRecurrent: currentEvent.isRecurrent,
-  recurrenceTeam: currentEvent.recurrenceTeam,
-  createdBy: currentEvent.created_by
-}));
+	const hasAuth = $derived.by(() =>
+		hasAuthorizations({
+			isRecurrent: currentEvent.isRecurrent,
+			recurrenceTeam: currentEvent.recurrenceTeam,
+			createdBy: currentEvent.created_by
+		})
+	);
 
 	let organizersLabel = $derived.by(() => {
 		if (hasSondage) return 'Organisateur•ices - Sondage disponibilité';
@@ -265,7 +270,7 @@
 						date_event: dateEvent,
 						time_start: timeStart,
 						time_end: timeEnd,
-						organizers: filterAndConvertOrganizers(selectedDate.organizers),
+						organizers: filterAndConvertOrganizers(selectedDate.organizers)
 						// dates_proposed: []
 					});
 				}
@@ -450,21 +455,24 @@
 							<!--::: Top - Cas 1: aucune date de proposé, ni sondage -->
 							<div class="me-1">
 								{#if hasNoPropositions}
-									<button onclick={handleOrganizersBtn} class="btn">
+									<button onclick={handleOrganizersBtn} class="btn btn-compact">
 										<CalendarPlus />
 										<span class="not-md:hidden">Créer un sondage</span>
 									</button>
 								{:else if hasSondage}
 									{#if hasAuth}
-										<button onclick={() => openModal('sondage', currentEvent)} class="btn">
+										<button
+											onclick={() => openModal('sondage', currentEvent)}
+											class="btn btn-compact"
+										>
 											<CalendarPlus />
 											<span class="not-md:hidden">Modifier le sondage</span>
 										</button>
 									{/if}
 									<!-- ::: top: Cas 3 : une date proposé et Une seule tache -->
 								{:else if hasDate && currentEvent.tasks.length === 1}
-									<button class="btn" onclick={() => handleTask(currentEvent.tasks[0])}>
-										{isUserSubscribedToTask(currentEvent.tasks[0])
+									<button class="btn" onclick={() => handleTask(currentEvent.tasks[0].name)}>
+										{isUserSubscribedToTask(currentEvent.tasks[0].name)
 											? 'Se désinscrire'
 											: "S'inscrire"}
 									</button>
@@ -518,11 +526,11 @@
 																<div class="tooltip px-1" data-tip="Valider cette date">
 																	<button
 																		onclick={() => validateDate(data)}
-																		class="btn btn-success btn-outline btn-square {data.organizers.some(
+																		class="btn btn-outline btn-square {data.organizers.some(
 																			(org) => org.maybehere === 'oui'
 																		)
-																			? ''
-																			: 'text-gray-300'}"
+																			? 'btn-success'
+																			: 'text-gray-500'}"
 																	>
 																		<CalendarCheck />
 																	</button>
@@ -668,21 +676,29 @@
 									<!-- tasks card -->
 									{#if currentEvent.tasks && currentEvent.tasks.length > 1}
 										<div class="sm:grid sm:grid-cols-3 sm:justify-around sm:gap-4 sm:p-4">
-											{#each currentEvent.tasks as task (task)}
+											{#each currentEvent.tasks as task (task.name)}
 												{@const organizersForTask = currentEvent.organizers.filter((org) =>
-													org.tasks.includes(task)
+													org.tasks.includes(task.name)
 												)}
 												<div
 													class="text-fluid-sm rounded-lg border font-semibold {!currentEvent.organizers.some(
-														(org) => org.tasks.includes(task)
+														(org) => org.tasks.includes(task.name)
 													)
 														? 'border-red-300'
 														: 'border-gray-300'}"
 												>
 													<div
-														class="text-base-content mb-2 rounded-t-lg bg-gray-100 px-4 py-1 text-center"
+														class="text-base-content mb-2 flex justify-items-center rounded-t-lg bg-gray-100 px-4 py-1 text-center"
 													>
-														{task}
+														{task.name}
+														{#if task.description}
+															<div
+																class="tooltip text-base-content/80 ml-auto"
+																data-tip={task.description}
+															>
+																<Info size={18} />
+															</div>
+														{/if}
 													</div>
 													<div class="mb-2 flex flex-wrap gap-2 px-2">
 														{#each organizersForTask as organizer (organizer.id)}
@@ -697,8 +713,11 @@
 																{organizer.username}
 															</span>
 														{/each}
-														<button class="btn btn-sm ml-auto" onclick={() => handleTask(task)}>
-															{isUserSubscribedToTask(task) ? 'Se désinscrire' : "S'inscrire"}
+														<button
+															class="btn btn-sm btn-compact ml-auto"
+															onclick={() => handleTask(task.name)}
+														>
+															{isUserSubscribedToTask(task.name) ? 'Se désinscrire' : "S'inscrire"}
 														</button>
 													</div>
 												</div>
@@ -712,7 +731,7 @@
 												</span>
 											{:else}
 												<div class=" flex flex-wrap gap-2 p-3">
-													{#each currentEvent.organizers.filter( (org) => org.tasks.includes(currentEvent.tasks[0]) ) as organizer (organizer.id)}
+													{#each currentEvent.organizers.filter( (org) => org.tasks.includes(currentEvent.tasks[0].name) ) as organizer (organizer.id)}
 														<span
 															class="badge badge-soft badge-neutral
 																{organizer.id === currentUser.id ? 'font-semibold' : ''}"
@@ -732,7 +751,7 @@
 									<p class="text-fluid-xs">
 										Mandats à se répartir pour la gestion de l'événement : <span class="italic">
 											{#each currentEvent.tasks as task, index (index)}
-												{task}{index < currentEvent.tasks.length - 1 ? ', ' : ''}
+												{task.name}{index < currentEvent.tasks.length - 1 ? ', ' : ''}
 											{/each}
 										</span>
 									</p>
@@ -744,8 +763,11 @@
 								</div>
 							{:else if currentEvent.tasks && currentEvent.tasks.length === 1}
 								<div class="text-fluid-xs text-base-content/70 p-2">
-									L'inscription concerne le mandat "{currentEvent.tasks[0]}". Il n'y a pas d'autre
-									mandat à se répartir.
+									L'inscription concerne le mandat "{currentEvent.tasks[0].name}".
+									{#if currentEvent.tasks[0].description}
+										<br />{currentEvent.tasks[0].description}
+									{/if}
+									Il n'y a pas d'autre mandat à se répartir.
 								</div>
 							{/if}
 						</div>

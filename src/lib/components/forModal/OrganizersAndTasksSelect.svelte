@@ -1,25 +1,13 @@
 <script lang="ts">
-	import PopoverMultiSelect from '$lib/components/PopoverMultiSelect.svelte';
 	import TaskSelect from '$lib/components/forModal/TaskSelect.svelte';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
-	import type { TaskConfig } from '$lib/types/spaceOptions';
+	import type { UserType, OrganizerType, TaskType } from '$lib/types/types';
 	import { cn } from '$lib/utils';
-	import { UserMinus, UserPlus } from 'lucide-svelte';
+	import { UserMinus, UserPlus, ListTodo } from 'lucide-svelte';
 	import { fade, slide } from 'svelte/transition';
 	import ButtonGroupSelect from './ButtonGroupSelect.svelte';
 
-	interface Organizer {
-		email: string;
-		id: string;
-		username: string;
-		tasks: string[];
-	}
-	interface User {
-		id: string;
-		username: string;
-		email?: string;
-		role?: string;
-	}
+	
 
 	let {
 		organizersPossibles = [],
@@ -27,14 +15,14 @@
 		tasks = [],
 		organizers = $bindable([])
 	} = $props<{
-		organizersPossibles: User[];
+		organizersPossibles: UserType[];
 		hasMultipleTasks: boolean;
-		tasks: TaskConfig[];
-		organizers: Organizer[];
+		tasks: TaskType[];
+		organizers: OrganizerType[];
 	}>();
 
-	let selectedOrganizer = $state<User | null>(null);
-	let selectedTasks = $state<TaskConfig[]>([]);
+	let selectedOrganizer = $state<UserType | null>(null);
+	let selectedTasks = $state<TaskType[]>([]);
 	let modalId = 'tasks_select_modal';
 
 	let defaultTask = $derived.by(() => {
@@ -64,37 +52,61 @@
 		return usersToInvite;
 	});
 
-	function addOrganizer(user: User) {
+	function handleOrganizer(user: UserType) {
+		const isExistingOrganizer = organizers.some(org => org.id === user.id);
+
 		if (!hasMultipleTasks) {
-			organizers = [
-				...organizers,
-				{
-					email: user.email || '',
-					id: user.id,
-					username: user.username,
-					tasks: [uniqTask]
-				}
-			];
+			// Cas simple : une seule tâche possible
+			if (isExistingOrganizer) {
+				// Si l'utilisateur existe déjà, on le supprime
+				organizers = organizers.filter(org => org.id !== user.id);
+			} else {
+				// Sinon on l'ajoute avec la tâche unique
+				organizers = [
+					...organizers,
+					{
+						email: user.email || '',
+						id: user.id,
+						username: user.username,
+						tasks: [uniqTask]
+					}
+				];
+			}
 		} else {
-			selectedOrganizer = user;
-			selectedTasks = [];
+			// Cas avec plusieurs tâches : ouvrir le modal
+			selectedOrganizer = {
+				id: user.id,
+				username: user.username,
+				email: user.email || ''
+			};
+			// Si l'utilisateur existe déjà, charger ses tâches
+			selectedTasks = isExistingOrganizer
+				? tasks.filter(task => organizers.find(org => org.id === user.id)?.tasks.includes(task.name))
+				: [];
+			
 			const modal = document.getElementById(modalId) as HTMLDialogElement;
 			modal?.showModal();
 		}
 	}
 
-	function saveTasks() {
-		if (!selectedOrganizer || !selectedTasks) return;
+	function saveOrganizer() {
+		if (!selectedOrganizer) return;
 
-		organizers = [
-			...organizers,
-			{
-				email: selectedOrganizer.email || '',
-				id: selectedOrganizer.id,
-				username: selectedOrganizer.username,
-				tasks: selectedTasks
-			}
-		];
+		const index = organizers.findIndex(org => org.id === selectedOrganizer.id);
+		const updatedOrganizer = {
+			email: selectedOrganizer.email || '',
+			id: selectedOrganizer.id,
+			username: selectedOrganizer.username,
+			tasks: selectedTasks.map(task => task.name)
+		};
+
+		if (index !== -1) {
+			// Mise à jour d'un organisateur existant
+			organizers[index] = updatedOrganizer;
+		} else {
+			// Ajout d'un nouvel organisateur
+			organizers = [...organizers, updatedOrganizer];
+		}
 
 		const modal = document.getElementById(modalId) as HTMLDialogElement;
 		modal?.close();
@@ -102,103 +114,136 @@
 		selectedTasks = [];
 	}
 
-	function removeOrganizer(organizer: Organizer) {
+	function removeOrganizer(organizer: OrganizerType) {
 		organizers = organizers.filter((org) => org.id !== organizer.id);
 	}
 
-	function toggleTasks(organizer: Organizer, taskName: string) {
-		const index = organizers.findIndex((org) => org.id === organizer.id);
-		if (index === -1) return;
 
-		const updatedOrganizer = { ...organizers[index] };
-		if (updatedOrganizer.tasks.includes(taskName)) {
-			updatedOrganizer.tasks = updatedOrganizer.tasks.filter((r) => r !== taskName);
-		} else {
-			updatedOrganizer.tasks = [...updatedOrganizer.tasks, taskName];
-		}
-		organizers[index] = updatedOrganizer;
-		organizers = [...organizers];
-	}
 
 	// invite users
-	let selectedUsersToInvite = $state<User[]>([]);
+	let selectedUsersToInvite = $state<UserType[]>([]);
 	let showInviteModal = $state(false);
 	const inviteUsers = () => {};
+
+	// Fonction pour éditer les tâches d'un organisateur existant
+	function editOrganizerTasks(organizer: OrganizerType) {
+		selectedOrganizer = {
+			id: organizer.id,
+			username: organizer.username,
+			email: organizer.email
+		};
+		// Trouver les objets TaskType correspondant aux noms des tâches de l'organisateur
+		selectedTasks = tasks.filter(task => organizer.tasks.includes(task.name));
+		
+		const modal = document.getElementById(modalId) as HTMLDialogElement;
+		modal?.showModal();
+	}
+
+	// saveOrganizer fonctionne maintenant pour ajouter et mettre à jour des organisateurs
 </script>
 
-<div transition:fade>
+<div transition:fade class="flex flex-col space-y-3 ">
 	<!-- Section des organisateurs inscrits -->
-	<div transition:fade class="text-fluid-sm mb-2 font-medium text-gray-700">
-		{#if organizers && organizers.length}
-			Inscrit pour l'organisation de cet événement :
+	<div class="">
+		{#if organizers?.length}
+			Organisateur·ices inscrit·es :
 		{:else}
-			Aucun organisateur inscrit pour le moment...
+			<span class="italic text-base-content/60">Aucun·e organisateur·ice inscrit·e pour le moment...</span>
 		{/if}
 	</div>
-	<div class="mb-4 flex flex-wrap gap-2">
-		{#each organizers as organizer (organizer)}
-			<div transition:slide class="flex items-center gap-4 rounded-lg bg-gray-200 py-0.5 pl-3">
-				<span class="font-medium">{organizer.username}</span>
-				<PopoverMultiSelect
-					items={tasks.map((t) => t.name)}
-					bind:selectedItems={organizer.tasks}
-					toggleItem={(taskName) => toggleTasks(organizer, taskName)}
-					size="sm"
-					label=""
-					labelEmpty="mandats ?"
-				/>
-				<button class="btn btn-ghost btn-xs text-error" onclick={() => removeOrganizer(organizer)}>
-					<UserMinus />
-				</button>
+
+	<div class="flex flex-wrap gap-3">
+		{#each organizers as organizer (organizer.id)}
+			<div class={{'tooltip' : hasMultipleTasks}} data-tip={hasMultipleTasks ? organizer.tasks : "" }>
+				<button
+					type=button
+					transition:slide
+					class="btn gap-2 flex justify-between"
+					onclick={() => handleOrganizer(organizer)}
+				>
+					<span class="font-semibold">{organizer.username}</span>
+					<div class="ps-1">
+						{#if hasMultipleTasks}
+							<ListTodo class="w-5 text-success" />
+						{:else}
+								<UserMinus class="w-5 text-error"/>
+						{/if}
+					</div>
+					</button>
 			</div>
 		{/each}
 	</div>
 
+
+
 	<!-- Section des utilisateurs disponibles -->
 	{#if availableUsers.length}
-		<div class="mb-2 font-medium text-gray-700">
+		<div class="p-2">
 			Ajoutez les personnes participants à l'organisation de cet événement :
 		</div>
-	{/if}
-	<div class="flex w-full flex-wrap items-center gap-2">
-		{#each availableUsers as user (user)}
+		<div class="flex w-full flex-wrap items-center gap-2">
+			{#each availableUsers as user (user)}
 			<div transition:slide>
 				<button
 					class={cn(
-						'btn btn-outline btn-sm text-base font-medium',
+						'btn  btn-compact btn-dash',
 						organizers?.some((org) => org.id === user.id) && 'border-4 border-green-500 font-bold'
 					)}
-					onclick={() => addOrganizer(user)}
+					onclick={() => handleOrganizer(user)}
 				>
 					<UserPlus size={16} />
 					<span>{user.username}</span>
 				</button>
 			</div>
-		{/each}
-	</div>
+			{/each}
+		</div>
+	{/if}
+
+	<button
+		onclick={() => (showInviteModal = true)}
+		class="text-fluid-sm float-right text-end text-blue-500 hover:underline"
+	>
+		<span>Ajoutez/invitez un·e organisateur·ices à l'équipe</span>
+	</button>
 </div>
 
-<!-- Modal de sélection des rôles -->
-<dialog id={modalId} class="modal">
-	<div class="modal-box">
-		<h3 class="text-lg font-bold">Définir les roles pour {selectedOrganizer?.username}</h3>
-		<TaskSelect taskOptions={tasks} bind:selectedTasks />
-		<div class="modal-action">
-			<form method="dialog">
-				<button class="btn btn-ghost">Annuler</button>
-				<button class="btn btn-primary" onclick={saveTasks}>Enregistrer</button>
-			</form>
+
+
+	<!-- Modal de sélection des rôles -->
+	<dialog id={modalId} class="modal">
+		<div class="modal-box">
+			<h3 class="text-lg font-bold mb-4">
+				Gestion des mandats pour {selectedOrganizer?.username}
+			</h3>
+			
+			<TaskSelect taskOptions={tasks} bind:selectedTasks />
+			
+			<div class="modal-action">
+				<form method="dialog" class="flex gap-2">
+					<button 
+						type="button"
+						class="btn btn-error" 
+						onclick={() => {
+							removeOrganizer(selectedOrganizer);
+							const modal = document.getElementById(modalId) as HTMLDialogElement;
+							modal?.close();
+						}}
+					>
+						<UserMinus />
+						Désinscrire
+					</button>
+					<button class="btn">Annuler</button>
+					<button 
+						type="button" 
+						class="btn btn-primary" 
+						onclick={saveOrganizer}
+					>
+						Enregistrer
+					</button>
+				</form>
+			</div>
 		</div>
-	</div>
-</dialog>
-
-<button
-	onclick={() => (showInviteModal = true)}
-	class="text-fluid-sm float-right text-end text-blue-500 hover:underline"
->
-	<span>Ajoutez/invitez un·e organisateur·ices à l'équipe</span>
-</button>
-
+	</dialog>
 {#if usersOfSpace.length}
 	<dialog id="invite_modal" class="modal" class:modal-open={showInviteModal}>
 		<div class="modal-box">

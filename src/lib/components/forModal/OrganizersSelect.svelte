@@ -1,6 +1,5 @@
 <script lang="ts">
 	import GroupRadioButton from '$lib/components/GroupRadioButton.svelte';
-	import { type OrganizerSchemaDatesProposed } from '$lib/schemas/event.schema';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import type { CurrentUser } from '$lib/types/types';
 
