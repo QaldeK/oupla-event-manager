@@ -568,7 +568,7 @@
 			<Frame title="Organisateur·ices">
 				<OrganizersAndTasksSelect
 					{organizersPossibles}
-					tasks={tasksPossibles}
+					tasks={eventData.tasks}
 					bind:organizers={eventData.organizers}
 					hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
 				/>
