@@ -7,8 +7,7 @@ export const OrganizerSchema = z.object({
 	username: z.string(),
 	email: z.string().email(),
 	tasks: z.array(z.string()),
-	role: z.string(),
-	maybehere: z.string().optional()
+	maybehere: z.string().nullable().optional()
 });
 
 export const RecurrenceSchema = z.object({

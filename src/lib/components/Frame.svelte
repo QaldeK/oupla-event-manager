@@ -10,7 +10,7 @@
 	transition:fade={{ duration: 200 }}
 	id="info"
 	class={cn(
-		'bg-base-100 relative mb-8 border-b border-gray-300 p-4 py-8 transition-all duration-200 ease-in-out not-sm:w-full  md:mb-12 md:rounded-xl md:border md:shadow-sm ',
+		'bg-base-100 relative mb-8 border-b border-gray-300 p-4 md:p-8 py-8 transition-all duration-200 ease-in-out not-sm:w-full  md:mb-12 md:rounded-xl md:border md:shadow-sm ',
 		class_frame ? class_frame : ''
 	)}
 >
