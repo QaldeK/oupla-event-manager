@@ -35,8 +35,9 @@
 		const hasConfirmedActions = !currentEvent.canceled && currentEvent.isConfirmed;
 		const hasReportAction = hasConfirmedActions && !currentEvent.reportedTo;
 		const hasRedoAction = currentEvent.canceled && !currentEvent.reportedTo;
+		const hasPublishAction = hasConfirmedActions && !currentEvent.isPublished;
 
-		return hasConfirmedActions || hasReportAction || hasRedoAction;
+		return hasConfirmedActions || hasReportAction || hasRedoAction || hasPublishAction;
 	});
 
 	// ::: functions
@@ -100,6 +101,19 @@
 			console.error('Error updating event:', error);
 		}
 	}
+
+	async function publishEvent() {
+		try {
+			await pb.collection('events').update(currentEvent.id, { isPublished: true });
+			showAlert(
+				"L'événement a été publié avec succès et est maintenant visible par le public.",
+				'success'
+			);
+		} catch (error) {
+			console.error('Error publishing event:', error);
+			showAlert("Une erreur est survenue lors de la publication de l'événement", 'error');
+		}
+	}
 </script>
 
 <div
@@ -146,6 +160,12 @@
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content class="bg-base-200">
 				{#if !currentEvent.canceled && currentEvent.isConfirmed}
+					{#if !currentEvent.isPublished}
+						<DropdownMenu.Item onclick={publishEvent}>
+							<CalendarPlus class="mr-2 h-4 w-4" />
+							Publier l'événement
+						</DropdownMenu.Item>
+					{/if}
 					<DropdownMenu.Item onclick={cancelEvent} class="text-error">
 						<CalendarX class="mr-2 h-4 w-4" />
 						Annuler l'événement
