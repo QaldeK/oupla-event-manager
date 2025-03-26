@@ -1,10 +1,9 @@
 <script lang="ts">
 	import TimePickRange from '$lib/components/TimePickRange.svelte';
 	import { addTime } from '$lib/utils';
-	import {showAlert} from '$lib/shared/states.svelte';
+	import { showAlert } from '$lib/shared/states.svelte';
 	import 'flatpickr/dist/flatpickr.min.css';
 	import 'tippy.js/dist/tippy.css';
-
 
 	let {
 		localErrors,
@@ -17,13 +16,13 @@
 	} = $props();
 
 	let isLoading: boolean = true;
-	let alertMsg = $state('')
+	let alertMsg = $state('');
 
 	$effect(() => {
-		if (alertMsg !== '' ){
-			showAlert(alertMsg, "error")
+		if (alertMsg !== '') {
+			showAlert(alertMsg, 'error');
 		}
-	})
+	});
 
 	$effect(() => {
 		if (!eventData.time_start || !eventData.time_end) return;
@@ -93,8 +92,9 @@
 		</div>
 		<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires de réservation du lieu</p>
 		{#if localErrors.time_start || localErrors.time_end}
-			<p class="error">{localErrors.time_start || localErrors.time_end}</p>
-			<p class="error">L'heure de fin doit être après l'heure de debut</p>
+			<p class="text-fluid-xs text-error pt-1 italic">
+				{localErrors.time_start || localErrors.time_end}
+			</p>
 		{/if}
 	</div>
 
