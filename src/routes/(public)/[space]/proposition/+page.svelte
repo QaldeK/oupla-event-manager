@@ -6,24 +6,24 @@
 	import Quill from '$lib/components/Quill.svelte';
 	import TimePickRange from '$lib/components/TimePickRange.svelte';
 	import DatePickerProposal from '$lib/components/forModal/DatePickerProposal.svelte';
-	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { getNewEvent } from '$lib/schemas/event.schema';
 	import { pb } from '$lib/pocketbase.svelte';
 	import { PropositionFormSchema } from '$lib/schemas/event.schema';
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
-	import { userDb } from '$lib/shared/userDb.svelte';
 	import { z } from 'zod';
 	import { slide } from 'svelte/transition';
 	import { UserPlus, LogIn } from 'lucide-svelte';
 	import { showAlert } from '$lib/shared/states.svelte';
+	import { publicStore } from '$lib/shared/publicStore.svelte';
 
 	const formSchema = PropositionFormSchema;
 
+	const spaceInfo = $derived(publicStore.spaceInfo);
+
 	// Utilisation des données de l'espace depuis getSpace
-	const spaceName = $derived(getSpace.name);
-	const spaceId = $derived(getSpace.id);
-	const categories = $derived(getSpace.categories);
+	const spaceName = $derived(spaceInfo?.name ?? '');
+	const spaceId = $derived(spaceInfo?.id);
+	const categories = $derived(spaceInfo?.categories ?? []);
 
 	// État du formulaire basé sur getNewEvent()
 	let formData = $state({
@@ -68,7 +68,10 @@
 
 	// Initialisation de space dans un $effect
 	$effect(() => {
-		formData.space = spaceId;
+		// S'assurer que spaceId est défini avant de l'affecter
+		if (spaceId) {
+			formData.space = spaceId;
+		}
 	});
 
 	let activeTab = $state('register'); // 'register' ou 'login'
@@ -412,7 +415,7 @@
 						</p>
 					</Info>
 					<div class="divide-accent mt-4 space-y-4 divide-y-2">
-						{#each formData.external_proposal.proposals as proposal, i}
+						{#each formData.external_proposal.proposals as proposal, i (i)}
 							<div>
 								<div class="mb-4 grid grid-cols-1 gap-y-4">
 									<div class=" flex items-center justify-between">

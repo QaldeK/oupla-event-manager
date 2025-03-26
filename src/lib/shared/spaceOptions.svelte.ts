@@ -229,10 +229,42 @@ class SpaceOptionsDB {
 			throw error;
 		}
 	}
+
+	// ::: méthode pour accéder uniquement aux catégories (page semi-public proposition notamment)
+	
+
+
+	async getPublicSpaceInfo(spaceId: string): Promise<PublicSpaceInfo | null> {
+		try {
+			const record = await pb
+				.collection('spaces_options')
+				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceId}"`, {
+					expand: 'space',
+					fields: 'categories,rooms,public_site,space,expand.space.name,expand.space.description'
+				});
+
+			if (!record.public_site) {
+				throw new Error("Ce site n'est pas accessible publiquement");
+			}
+
+			return {
+				id: record.space,
+				name: record.expand?.space?.name || '',
+				description: record.expand?.space?.description || '',
+				categories: record.categories || [],
+				rooms: record.rooms || [],
+				public_site: record.public_site
+			};
+		} catch (error) {
+			console.error('Failed to load public space info:', error);
+			return null;
+		}
+	}
 }
 
 export const spaceOptionsDB = new SpaceOptionsDB();
 export const loadSpaceOptions = spaceOptionsDB.loadSpaceOptions;
+export const getPublicSpaceInfo = spaceOptionsDB.getPublicSpaceInfo.bind(spaceOptionsDB);
 
 let _spaceConfig = $state<SpaceConfig>({
 	id: '',
