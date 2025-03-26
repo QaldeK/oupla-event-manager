@@ -9,7 +9,7 @@
 	import { CalendarX2 } from 'lucide-svelte';
 
 	let {
-		value = $bindable(''),
+		value = $bindable(),
 		onResetDate = () => {},
 		mode = 'single', // 'single' or 'multiple'
 		resetButton = false,

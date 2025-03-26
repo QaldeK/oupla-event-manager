@@ -1,4 +1,4 @@
-import type { TasksListType, TaskType } from '$lib/schemas/event.schema';
+import type { TaskType } from '$lib/schemas/event.schema';
 
 export type { TaskType } from '$lib/schemas/event.schema';
 

@@ -149,7 +149,7 @@
 		</p>
 	</Info>
 	{#if eventData?.external_proposal?.proposals?.length > 0 && hasUnproposedDates()}
-		<div transition:slide>
+		<div>
 			<Info variant="warning">
 				<p class="text-fluid-sm">
 					Certaines dates du sondage n'ont pas été soumise à l'intervenant·e ayant proposé·e

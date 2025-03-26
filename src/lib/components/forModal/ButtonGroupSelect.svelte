@@ -1,7 +1,7 @@
 <script lang="ts">
 	let {
-		selectedItems = $bindable([]),
-		options = $bindable([]),
+		selectedItems = $bindable(),
+		options = $bindable(),
 		optionsLabel = '',
 		hasAddInput = false,
 		defaultOption = '',
