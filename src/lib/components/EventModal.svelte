@@ -24,9 +24,11 @@
 	import {
 		ValidationSchemaType,
 		getNewEvent,
+		getDefaultRecurrence,
 		validateEvent,
 		type EventType,
-		type TaskType
+		type TaskType,
+		type RequiredRecurrenceType
 	} from '$lib/schemas/event.schema';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import {
@@ -40,6 +42,7 @@
 	import { slide } from 'svelte/transition';
 
 	import { Save, X } from 'lucide-svelte';
+	import TimeReservation from './forModal/TimeReservation.svelte';
 
 	const closeModal = () => {
 		modalState.event = false;
@@ -53,7 +56,6 @@
 	let isAlertDialogOpen = $state<boolean>(false);
 	let organizersPossibles = $state(getOrganizersPossibles());
 
-	// Nouveau type pour mieux gérer les états
 	type EventMode =
 		| 'NEW_SINGLE' // Création événement unique
 		| 'NEW_RECURRENT' // Création événement récurrent
@@ -61,7 +63,6 @@
 		| 'EDIT_RECURRENT_ONE' // Modification occurrence unique
 		| 'EDIT_RECURRENT_ALL'; // Modification toutes occurrences
 
-	// Nouvelle logique de détermination du mode
 	let eventMode: EventMode = $derived.by(() => {
 		if (!eventData.id) {
 			return eventData.isRecurrent ? 'NEW_RECURRENT' : 'NEW_SINGLE';
@@ -74,7 +75,7 @@
 		return 'EDIT_SINGLE';
 	});
 
-	// ::: Event Mode & dynamics props
+	// :::_ Event Mode & dynamics props
 	type DisplayMode = 'DATE' | 'SONDAGE' | 'RECURRENT';
 
 	let displayMode = $derived.by((): DisplayMode => {
@@ -86,11 +87,6 @@
 		}
 		return 'DATE';
 	});
-
-	// Fonction de transition vers le mode date unique
-	function switchToDate() {
-		eventData.isSondage = false;
-	}
 
 	const modalTitle = $derived.by(() => {
 		switch (eventMode) {
@@ -117,138 +113,21 @@
 
 	let hasExternalPreference = $derived.by(() => !!eventData.external_proposal?.period_preference);
 
-	const cancelSondage = () => {
-		eventData.isSondage = false;
-	};
+	// ::: $effect
 
-	// ::: validation & submit
+	$effect(() => {
+		if (eventData.date_event && eventData.time_start && eventData.time_end) {
+			const startDate = createDateFromString(eventData.date_event, eventData.time_start);
+			const endDate = createDateFromString(eventData.date_event, eventData.time_end);
 
-	const hasRecurrentLocalErrors = () => {
-		let errors = {};
-
-		if (eventData.recurrence) {
-			if (!eventData.recurrence.firstDate) {
-				errors = { ...errors, firstDate: ['champ requis'] };
-			}
-			if (!eventData.recurrence.lastDate) {
-				errors = { ...errors, lastDate: ['champ requis'] };
-			}
-			if (!eventData.recurrence.recurrenceType) {
-				errors = { ...errors, recurrenceType: ['champ requis'] };
-			}
-			if (
-				eventData.recurrence.recurrenceType === 'MONTHLY_BY_DAY' &&
-				!eventData.recurrence.monthlyByDayOccurrences.length
-			) {
-				errors = { ...errors, monthlyByDayOccurrences: ['champ requis'] };
-			}
+			eventData.dateStart = startDate.toISOString();
+			eventData.dateEnd = endDate.toISOString();
 		} else {
-			errors = { ...errors, recurrence: ['Les données de récurrence sont requises'] };
+			// Reset les dates si une des valeurs manque
+			eventData.dateStart = '';
+			eventData.dateEnd = '';
 		}
-
-		console.log('errors', errors);
-		return errors;
-	};
-
-	let recurrentErrors = $state<Record<string, string[]>>({});
-	// let dateOrgLocalErrors = $state<Record<string, string[]>>({});
-
-	const confirmSubmit = async () => {
-		isAlertDialogOpen = false;
-		await submitForm();
-	};
-
-	let errors = $state<Record<string, string[] | undefined>>({});
-
-	const handleConfirm = async () => {
-		try {
-			const validationResult = validateEvent(eventData, ValidationSchemaType.PUBLISH);
-
-			if (!validationResult.success && validationResult.errors) {
-				errors = validationResult.errors.flatten().fieldErrors;
-				showAlert(
-					"L'événement ne peut être confirmé : vérifiez les champs mal renseignés.",
-					'error'
-				);
-				return;
-			}
-
-			eventData.isConfirmed = true;
-
-			await submitForm();
-		} catch (err) {
-			console.error('Erreur de validation :', err);
-			showAlert("Erreur lors de la confirmation de l'événement.", 'error');
-		}
-	};
-
-	const handleSave = async () => {
-		try {
-			const schema = () => {
-				switch (eventMode) {
-					case 'NEW_SINGLE':
-					case 'EDIT_SINGLE':
-					case 'EDIT_RECURRENT_ONE':
-						return ValidationSchemaType.SAVE;
-					case 'EDIT_RECURRENT_ALL':
-					case 'NEW_RECURRENT':
-						recurrentErrors = hasRecurrentLocalErrors();
-						return ValidationSchemaType.SAVE_RECURRENT_MASTER;
-				}
-			};
-			console.log('schema', schema());
-			const validationResult = validateEvent(eventData, schema());
-
-			if (!validationResult.success && validationResult.errors) {
-				errors = validationResult.errors.flatten().fieldErrors;
-				showAlert("Erreur dans les données de l'événement.", 'error');
-				return;
-			}
-			if (eventMode === 'EDIT_RECURRENT_ALL') {
-				isAlertDialogOpen = true;
-			}
-
-			await submitForm();
-		} catch (err) {
-			console.error('Erreur lors de la sauvegarde :', err);
-			showAlert("Erreur lors de la sauvegarde de l'événement.", 'error');
-		}
-	};
-
-	const submitForm = async () => {
-		try {
-			if (eventData.date_event && eventData.time_start && eventData.time_end) {
-				const startDate = createDateFromString(eventData.date_event, eventData.time_start);
-				const endDate = createDateFromString(eventData.date_event, eventData.time_end);
-
-				eventData.dateStart = startDate.toISOString();
-				eventData.dateEnd = endDate.toISOString();
-			}
-
-			switch (eventMode) {
-				case 'NEW_SINGLE':
-					await createEvent(eventData);
-					break;
-
-				case 'NEW_RECURRENT': {
-					await createRecurrentEvent(eventData);
-					break;
-				}
-				case 'EDIT_SINGLE':
-				case 'EDIT_RECURRENT_ONE':
-					await updateEvent(eventData.id, eventData);
-					break;
-
-				case 'EDIT_RECURRENT_ALL':
-					await updateAllOccurrences(eventData);
-					break;
-			}
-			closeModal();
-		} catch (error) {
-			console.error(error);
-			showAlert("Erreur lors de l'enregistrement de l'événement.", 'error');
-		}
-	};
+	});
 
 	// ::: tasks & organizers
 
@@ -291,6 +170,15 @@
 		}
 	});
 
+	$effect.pre(() => {
+		if (eventData.isRecurrent) {
+			eventData.recurrence = eventData.recurrence || getDefaultRecurrence();
+			eventData.date_event = '';
+		} else {
+			eventData.recurrence = {};
+		}
+	});
+
 	// defaultTask est ajouté dès qu'il n'y a plus de tache
 	$effect(() => {
 		const defaultTask = getSpace.defaultTask as TaskType;
@@ -316,6 +204,8 @@
 		}
 	});
 
+	// ::: functions utilities
+
 	function addCustomTask(newTaskName: string) {
 		if (newTaskName === '' || !eventData.tasks) return;
 
@@ -336,8 +226,6 @@
 	}
 
 	// let hasMultipleTasks = $derived(eventData.tasks && eventData.tasks.length > 1);
-
-	// ::: fonction utilitaires
 
 	// Fonction pour appliquer une proposition unique
 	// function applyProposal(proposal: {
@@ -385,16 +273,113 @@
 		eventData.isSondage = true;
 	}
 
-	// Fonction utilitaire pour formater les dates
-	// function formatDate(dateString: string): string {
-	// 	const date = new Date(dateString);
-	// 	return new Intl.DateTimeFormat('fr-FR', {
-	// 		weekday: 'long',
-	// 		year: 'numeric',
-	// 		month: 'long',
-	// 		day: 'numeric'
-	// 	}).format(date);
-	// }
+	// ::: Form Validation and Submission
+
+	const confirmSubmit = async () => {
+		isAlertDialogOpen = false;
+		await submitForm();
+	};
+
+	let errors = $state<Record<string, string[] | undefined>>({});
+	let formattedErrors = $state<Record<string, any>>({});
+
+	const handleConfirm = async () => {
+		try {
+			const validationResult = validateEvent(eventData, ValidationSchemaType.PUBLISH);
+			console.log(validationResult);
+			if (!validationResult.success && validationResult.errors) {
+				errors = validationResult.errors.flatten().fieldErrors;
+				formattedErrors = validationResult.errors.format();
+				showAlert(
+					"L'événement ne peut être confirmé : vérifiez les champs mal renseignés.",
+					'error'
+				);
+				return;
+			}
+
+			eventData.isConfirmed = true;
+
+			await submitForm();
+		} catch (err) {
+			console.error('Erreur de validation :', err);
+			showAlert("Erreur lors de la confirmation de l'événement.", 'error');
+		}
+	};
+
+	const handleSave = async () => {
+		try {
+			const schema = () => {
+				// Si l'événement est confirmé, on utilise toujours PublishEventSchema
+				if (eventData.isConfirmed) {
+					return ValidationSchemaType.PUBLISH;
+				}
+
+				// Sinon, on suit la logique normale
+				switch (eventMode) {
+					case 'NEW_SINGLE':
+					case 'EDIT_SINGLE':
+					case 'EDIT_RECURRENT_ONE':
+						return ValidationSchemaType.SAVE;
+					case 'EDIT_RECURRENT_ALL':
+					case 'NEW_RECURRENT':
+						return ValidationSchemaType.SAVE_RECURRENT_MASTER;
+				}
+			};
+
+			const validationResult = validateEvent(eventData, schema());
+
+			if (!validationResult.success && validationResult.errors) {
+				errors = validationResult.errors.flatten().fieldErrors;
+				formattedErrors = validationResult.errors.format();
+
+				showAlert("Erreur dans les données de l'événement. Veuillez vérifier les champs.", 'error');
+				return;
+			}
+			if (eventMode === 'EDIT_RECURRENT_ALL') {
+				isAlertDialogOpen = true;
+			}
+
+			await submitForm();
+		} catch (err) {
+			console.error('Erreur lors de la sauvegarde :', err);
+			showAlert("Erreur lors de la sauvegarde de l'événement.", 'error');
+		}
+	};
+
+	const submitForm = async () => {
+		try {
+			if (eventData.date_event && eventData.time_start && eventData.time_end) {
+				const startDate = createDateFromString(eventData.date_event, eventData.time_start);
+				const endDate = createDateFromString(eventData.date_event, eventData.time_end);
+
+				eventData.dateStart = startDate.toISOString();
+				eventData.dateEnd = endDate.toISOString();
+			}
+
+			switch (eventMode) {
+				case 'NEW_SINGLE':
+					await createEvent(eventData);
+					break;
+
+				case 'NEW_RECURRENT': {
+					await createRecurrentEvent(eventData);
+					break;
+				}
+				case 'EDIT_SINGLE':
+				case 'EDIT_RECURRENT_ONE':
+					await updateEvent(eventData.id, eventData);
+					break;
+
+				case 'EDIT_RECURRENT_ALL':
+					await updateAllOccurrences(eventData);
+					break;
+			}
+			closeModal();
+		} catch (error) {
+			console.error(error);
+			showAlert("Erreur lors de l'enregistrement de l'événement.", 'error');
+		}
+	};
 </script>
 
 <!-- {$inspect('eventData', eventData)} -->
@@ -492,7 +477,13 @@
 				<div class="space-y-4">
 					{#if displayMode === 'RECURRENT'}
 						<div>
-							<RecurrentTab bind:eventData localErrors={errors} {recurrentErrors} />
+							<RecurrentTab
+								bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
+								localErrors={formattedErrors.recurrence}
+							/>
+						</div>
+						<div>
+							<TimeReservation localErrors={errors} bind:eventData />
 						</div>
 					{:else if displayMode === 'SONDAGE'}
 						<div>
@@ -619,8 +610,9 @@
 					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
 				{/if}
 			</Frame>
+
+			<AutoConfirmSettings bind:eventData />
 		{/if}
-		<AutoConfirmSettings bind:eventData />
 
 		<Frame>
 			<div class="flex flex-col gap-4 md:flex-row">
@@ -636,6 +628,9 @@
 								bind:value={eventData.prix}
 							/>
 						</label>
+						{#if errors.prix}
+							<p class="text-fluid-sm p-2 text-red-500 italic">{errors.prix[0]}</p>
+						{/if}
 					{/if}
 				</div>
 				<div class="flex flex-1 flex-col gap-1">
@@ -650,6 +645,9 @@
 								placeholder="Décrivez le type de mixité"
 							/>
 						</label>
+						{#if errors.mixite}
+							<p class="text-fluid-sm p-2 text-red-500 italic">{errors.mixite[0]}</p>
+						{/if}
 					{/if}
 				</div>
 				<div class="flex flex-1 flex-col gap-1">
@@ -668,6 +666,9 @@
 								bind:value={eventData.age_advice}
 							/>
 						</label>
+						{#if errors.age_advice}
+							<p class="text-fluid-sm p-2 text-red-500 italic">{errors.age_advice[0]}</p>
+						{/if}
 					{/if}
 				</div>
 			</div>

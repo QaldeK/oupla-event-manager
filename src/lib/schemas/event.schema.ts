@@ -5,31 +5,8 @@ import { z } from 'zod';
 export const OrganizerSchema = z.object({
 	id: z.string(),
 	username: z.string(),
-	email: z.string().email(),
 	tasks: z.array(z.string()),
 	maybehere: z.string().nullable().optional()
-});
-
-export const RecurrenceSchema = z.object({
-	firstDate: z.string(),
-	lastDate: z.string(),
-	recurrenceDates: z.array(z.string()),
-	recurrenceType: z.string(),
-	monthlyByDayOccurrences: z.array(z.number()),
-	recurrenceTeam: z.array(
-		z.object({
-			username: z.string(),
-			id: z.string(),
-			role: z.string()
-		})
-	),
-	tasks: z.array(z.string()),
-	autoConfirm: z.boolean(),
-	autoConfirmMin: z.number(),
-	notifyNoOrganizer: z.boolean(),
-	notifyNoOrganizerDays: z.number(),
-	notifyNotConfirmed: z.boolean(),
-	notifyNotConfirmedDays: z.number()
 });
 
 export const TaskSchema = z.object({
@@ -38,7 +15,62 @@ export const TaskSchema = z.object({
 	type: z.enum(['default', 'beforeEvent', 'afterEvent', 'onEvent', 'none'])
 });
 
-export const TasksListSchema = z.array(TaskSchema);
+// Définir d'abord un RecurrenceSchema de base
+const BaseRecurrenceSchema = z
+	.object({
+		firstDate: z
+			.string({
+				required_error: 'La date de début est requise'
+			})
+			.min(1, 'La date de début est requise'),
+		lastDate: z
+			.string({
+				required_error: 'La date de fin est requise'
+			})
+			.min(1, 'La date de fin est requise'),
+		recurrenceType: z
+			.string({
+				required_error: 'Le type de récurrence est requis'
+			})
+			.min(1, 'Le type de récurrence est requis'),
+		recurrenceDates: z.array(z.string()),
+		monthlyByDayOccurrences: z.array(z.number()),
+		recurrenceTeam: z
+			.array(
+				z
+					.object({
+						username: z.string().min(1, "Le nom d'utilisateur est requis"),
+						id: z.string().min(1, "L'ID est requis"),
+						tasks: z.array(z.string().optional())
+					})
+					.optional()
+			)
+			.min(1, "L'équipe récurrente doit avoir au moins un membre"),
+		tasks: z.array(TaskSchema),
+		autoConfirm: z.boolean(),
+		autoConfirmMin: z.number(),
+		notifyNoOrganizer: z.boolean(),
+		notifyNoOrganizerDays: z.number(),
+		notifyNotConfirmed: z.boolean(),
+		notifyNotConfirmedDays: z.number()
+	})
+	.refine(
+		(data) => {
+			if (data.recurrenceType === 'MONTHLY_BY_DAY') {
+				return data.monthlyByDayOccurrences.length > 0;
+			}
+			return true;
+		},
+		{
+			message: 'Au moins une occurrence est requise pour la récurrence mensuelle par jour',
+			path: ['monthlyByDayOccurrences']
+		}
+	);
+
+// Ensuite, créer des variantes selon les besoins
+export const RecurrenceSchema = z.union([BaseRecurrenceSchema, z.null(), z.undefined()]);
+
+export const RequiredRecurrenceSchema = BaseRecurrenceSchema;
 
 export const DateProposedSchema = z.object({
 	dateStart: z.string(),
@@ -59,24 +91,63 @@ export const ExternalProposalSchema = z.object({
 	proposals: z.array(ProposalSchema).optional()
 });
 
+// Fonction utilitaire pour les validations communes : prix, mixité, age
+const validateCommonFields = (data: any, ctx: z.RefinementCtx) => {
+	// Validation du prix
+	if (!data.is_prix_libre && (!data.prix || data.prix.trim() === '')) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "Le prix est requis lorsque le prix n'est pas libre",
+			path: ['prix']
+		});
+	}
+
+	// Validation de la mixité
+	if (data.isMixiteChoisie && (!data.mixite || data.mixite.trim() === '')) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: 'La description de la mixité est requise lorsque la mixité est choisie',
+			path: ['mixite']
+		});
+	}
+
+	// Validation de l'âge
+	if (!data.is_age_no_restriction && (!data.age_advice || data.age_advice.trim() === '')) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "L'âge minimum est requis lorsque l'événement n'est pas tout public",
+			path: ['age_advice']
+		});
+	}
+
+	// Validation de start_public pour les événements publics
+	if (data.isPublic && (!data.start_public || data.start_public.trim() === '')) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "L'horaire d'ouverture du lieu est requise pour un événement public",
+			path: ['start_public']
+		});
+	}
+};
+
 // ::: TYPES DÉRIVÉS DES SOUS-STRUCTURES :::
 export type OrganizerType = z.infer<typeof OrganizerSchema>;
-export type RecurrenceType = z.infer<typeof RecurrenceSchema>;
+export type RecurrenceType = z.infer<typeof RecurrenceSchema>; // for EventModal !isRecurrent
+export type RequiredRecurrenceType = z.infer<typeof RequiredRecurrenceSchema>; // for RecurrentTab with no undefined values (isRecurrent)
 export type DateProposedType = z.infer<typeof DateProposedSchema>;
 export type ProposalType = z.infer<typeof ProposalSchema>;
 export type ExternalProposalType = z.infer<typeof ExternalProposalSchema>;
 export type TaskType = z.infer<typeof TaskSchema>;
-export type TasksListType = z.infer<typeof TasksListSchema>;
 
 // === SCHÉMA DE FORMULAIRE PRINCIPAL ===
 // Ce schéma définit les contraintes de validation pour l'interface utilisateur
-export const EventFormSchema = z.object({
-	// Métadonnées système (reprises de EventsRecord)
-	id: z.string().optional(),
-	created: z.string().datetime().optional(),
-	updated: z.string().datetime().optional(),
-	created_by: z.string().optional(),
-	space: z.string(),
+const BaseEventFormSchema = z.object({
+	// Métadonnées système (reprises de EventsRecord) → nullable/optionnal car non géré par l'user
+	id: z.string().nullable().optional(),
+	created: z.string().nullable().optional(),
+	updated: z.string().nullable().optional(),
+	created_by: z.string().nullable().optional(),
+	space: z.string().nullable().optional(),
 
 	// Champs principaux avec validations UI
 	event_title: z
@@ -99,14 +170,12 @@ export const EventFormSchema = z.object({
 			1,
 			"Les horaires de réservation du lieux sont requises pour pouvoir confirmer l'événement"
 		),
-	start_public: z
-		.string()
-		.min(1, "L'horaire d'ouverture du lieu est requise pour pouvoir confirmer l'événement"),
-	start_event: z.string(),
+	start_public: z.string(),
+	start_event: z.string().optional(),
 
 	// Dates ISO pour les calculs internes
-	dateStart: z.string().datetime().optional(),
-	dateEnd: z.string().datetime().optional(),
+	dateStart: z.string().nullable().optional(),
+	dateEnd: z.string().nullable().optional(),
 
 	// Arrays avec validations
 	categories: z.array(z.string()).min(1, 'Sélectionnez au moins une catégorie'),
@@ -115,7 +184,7 @@ export const EventFormSchema = z.object({
 
 	// Descriptions
 	description: z.string().nullable().optional(),
-	desc_public: z.string().nullable().optional(),
+	desc_public: z.string(),
 
 	// Prix et restrictions
 	is_prix_libre: z.boolean().default(true),
@@ -146,7 +215,7 @@ export const EventFormSchema = z.object({
 	organizers: z.array(OrganizerSchema).min(1, 'Au moins un organisateur est requis'),
 
 	// Autres
-	link: z.string().url().nullable().optional(),
+	link: z.string().nullable().optional(),
 	image: z.array(z.string()).nullable().optional(),
 	duree: z.string().nullable().optional(),
 
@@ -157,8 +226,10 @@ export const EventFormSchema = z.object({
 
 	// Propositions externes
 	external_proposal: ExternalProposalSchema.nullable().optional(),
-	other_date_query: z.array(z.string()).optional()
+	other_date_query: z.array(z.string()).nullable().optional()
 });
+
+export const EventFormSchema = BaseEventFormSchema.superRefine(validateCommonFields);
 
 export type EventFormType = z.infer<typeof EventFormSchema>;
 
@@ -169,7 +240,7 @@ export type SyncEventRecord = Omit<EventsRecord, 'expand'> & {
 	organizers: OrganizerType[];
 	recurrence?: RecurrenceType;
 	rooms: string[];
-	tasks: TasksListType;
+	tasks: TaskType[];
 	external_proposal: ExternalProposalType;
 };
 
@@ -190,78 +261,68 @@ export type EventDateAndOrgType = Pick<
 >;
 
 // Schémas de validation spécifiques avec des règles plus strictes
-export const SaveEventSchema = EventFormSchema.pick({
+export const SaveEventSchema = BaseEventFormSchema.pick({
 	event_title: true
 });
 
-export const PublishEventSchema = EventFormSchema;
+// Schéma de publication avec validations spécifiques + communes
+export const PublishEventSchema = BaseEventFormSchema.extend({
+	recurrence: RecurrenceSchema,
+	// Pour tasks, on peut temporairement assouplir la validation
+	// en attendant la mise à jour de la config
+	tasks: z
+		.array(
+			z.object({
+				name: z.string(),
+				description: z.string(),
+				type: z.string() // Temporairement on accepte n'importe quelle string
+			})
+		)
+		.min(1, 'Au moins une tâche est requise')
+}).refine(
+	(data) => {
+		return !(data.isMasterRecurrent && !data.recurrence);
+	},
+	{
+		message: 'Les détails de récurrence sont requis pour un événement récurrent',
+		path: ['recurrence']
+	}
+);
 
-// Schéma pour les événements récurrents
-export const SaveRecurrentMasterSchema = EventFormSchema.extend({
-	recurrence: RecurrenceSchema.superRefine((recurrence, ctx) => {
-		if (!recurrence.firstDate) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: 'La date de début est requise',
-				path: ['firstDate']
-			});
-		}
-
-		if (!recurrence.lastDate) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: 'La date de fin est requise',
-				path: ['lastDate']
-			});
-		}
-
-		if (!recurrence.recurrenceType) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: 'Le type de récurrence est requis',
-				path: ['recurrenceType']
-			});
-		}
-
-		// Vérification spécifique pour les événements mensuels par jour
-		if (
-			recurrence.recurrenceType === 'MONTHLY_BY_DAY' &&
-			!recurrence.monthlyByDayOccurrences.length
-		) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: 'Veuillez sélectionner au moins une occurrence mensuelle',
-				path: ['monthlyByDayOccurrences']
-			});
-		}
-	})
+// Schéma récurrent avec validations spécifiques + communes
+export const SaveRecurrentMasterSchema = BaseEventFormSchema.extend({
+	recurrence: RequiredRecurrenceSchema,
+	organizers: z.array(OrganizerSchema).optional(),
+	dateStart: z.string().optional(),
+	dateEnd: z.string().optional(),
+	date_event: z.string().optional()
 });
 
 // schéma spécifique pour la page de proposition
-export const PropositionFormSchema = z.object({
-	event_title: z
-		.string()
-		.min(2, "Le titre de l'événement doit avoir au moins 2 caractères")
-		.max(80, "Le titre de l'événement doit avoir moins de 80 caractères")
-		.default(''),
-	description: z.string().optional(),
-	desc_public: z.string().optional().default('<p></p>'),
-	categories: z.string().array().nonempty({ message: 'Sélectionnez au moins une catégorie' }),
-	is_prix_libre: z.boolean().default(true),
-	prix: z.string().optional(),
-	isMixiteChoisie: z.boolean().default(false),
-	mixite: z.string().optional(),
-	isPublic: z.boolean().default(true),
-	is_age_no_restriction: z.boolean().default(true),
-	age_advice: z.string().optional(),
-	external_proposal: ExternalProposalSchema.nullable().optional(),
-	// Champs système nécessaires
-	isConfirmed: z.boolean().default(false),
-	space: z.string(),
-	created_by: z.string().optional(),
-	tasks: z.array(TaskSchema).min(1, 'Au moins une tâche est requise'),
-	duree: z.string().min(1, "La durée de l'événement est requise")
-});
+export const PropositionFormSchema = z
+	.object({
+		event_title: z
+			.string()
+			.min(2, "Le titre de l'événement doit avoir au moins 2 caractères")
+			.max(80, "Le titre de l'événement doit avoir moins de 80 caractères")
+			.default(''),
+		description: z.string().optional(),
+		desc_public: z.string().optional().default('<p></p>'),
+		categories: z.string().array().nonempty({ message: 'Sélectionnez au moins une catégorie' }),
+		is_prix_libre: z.boolean().default(true),
+		prix: z.string().optional(),
+		isMixiteChoisie: z.boolean().default(false),
+		mixite: z.string().optional(),
+		isPublic: z.boolean().default(true),
+		is_age_no_restriction: z.boolean().default(true),
+		age_advice: z.string().optional(),
+		external_proposal: ExternalProposalSchema.nullable().optional(),
+		// Champs système nécessaires
+		isConfirmed: z.boolean().default(false),
+		space: z.string(),
+		created_by: z.string().optional()
+	})
+	.superRefine(validateCommonFields);
 
 export type PropositionFormType = z.infer<typeof PropositionFormSchema>;
 
@@ -293,6 +354,11 @@ export function validateEvent(
 		return { success: true };
 	} catch (error) {
 		if (error instanceof z.ZodError) {
+			console.warn('Validation Zod errors:', {
+				formattedErrors: error.format(),
+				flattenedErrors: error.flatten(),
+				issues: error.issues
+			});
 			return { success: false, errors: error };
 		}
 		throw error;
@@ -315,11 +381,8 @@ export function getNewEvent(): EventType {
 		description: '',
 		desc_public: '',
 		is_prix_libre: true,
-		prix: '',
 		isMixiteChoisie: false,
-		mixite: '',
 		is_age_no_restriction: true,
-		age_advice: '',
 		isConfirmed: false,
 		isPublic: true,
 		isPublished: false,
@@ -329,11 +392,29 @@ export function getNewEvent(): EventType {
 		isMasterRecurrent: false,
 		isSondage: false,
 		organizers: [],
-		dates_proposed: [],
-		space: '', // À remplir par l'application
-		external_proposal: {
-			period_preference: '',
-			proposals: []
-		}
+		dates_proposed: []
+		// space: '', // À remplir par l'application
+		// external_proposal: {
+		// 	period_preference: '',
+		// 	proposals: []
+		// }
+	};
+}
+
+export function getDefaultRecurrence(): RecurrenceType {
+	return {
+		firstDate: '',
+		lastDate: '',
+		recurrenceDates: [],
+		recurrenceType: '',
+		monthlyByDayOccurrences: [],
+		recurrenceTeam: [],
+		tasks: [],
+		autoConfirm: false,
+		autoConfirmMin: 1,
+		notifyNoOrganizer: false,
+		notifyNoOrganizerDays: 1,
+		notifyNotConfirmed: false,
+		notifyNotConfirmedDays: 1
 	};
 }
