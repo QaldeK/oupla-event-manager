@@ -267,7 +267,7 @@ export const SaveEventSchema = BaseEventFormSchema.pick({
 
 // Schéma de publication avec validations spécifiques + communes
 export const PublishEventSchema = BaseEventFormSchema.extend({
-	recurrence: RecurrenceSchema,
+	recurrence: RecurrenceSchema.nullable().optional(), // Allow null or undefined
 	// Pour tasks, on peut temporairement assouplir la validation
 	// en attendant la mise à jour de la config
 	tasks: z
