@@ -170,12 +170,11 @@
 		}
 	});
 
-	$effect.pre(() => {
-		if (eventData.isRecurrent) {
-			eventData.recurrence = eventData.recurrence || getDefaultRecurrence();
-			eventData.date_event = '';
+	$effect(() => {
+		if (eventData.isRecurrent && !eventData.id) {
+			eventData.recurrence = getDefaultRecurrence();
 		} else {
-			eventData.recurrence = {};
+			eventData.recurrence = undefined;
 		}
 	});
 

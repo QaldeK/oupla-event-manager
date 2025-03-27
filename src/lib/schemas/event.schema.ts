@@ -413,8 +413,8 @@ export function getDefaultRecurrence(): RecurrenceType {
 		autoConfirm: false,
 		autoConfirmMin: 1,
 		notifyNoOrganizer: false,
-		notifyNoOrganizerDays: 1,
+		notifyNoOrganizerDays: 3,
 		notifyNotConfirmed: false,
-		notifyNotConfirmedDays: 1
+		notifyNotConfirmedDays: 3
 	};
 }
