@@ -170,10 +170,16 @@
 		}
 	});
 
-	$effect(() => {
-		if (eventData.isRecurrent && !eventData.id) {
-			eventData.recurrence = getDefaultRecurrence();
+	$effect.pre(() => {
+		if (eventData.isRecurrent) {
+			// Initialize recurrence only for NEW events if it doesn't exist yet
+			if (!eventData.id && !eventData.recurrence) {
+				eventData.recurrence = getDefaultRecurrence();
+			}
+			// For existing events (eventData.id exists), do nothing here,
+			// preserving the existing recurrence data loaded initially.
 		} else {
+			// Reset recurrence only when isRecurrent is explicitly false
 			eventData.recurrence = undefined;
 		}
 	});
