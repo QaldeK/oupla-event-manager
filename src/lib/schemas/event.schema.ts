@@ -279,15 +279,7 @@ export const PublishEventSchema = BaseEventFormSchema.extend({
 			})
 		)
 		.min(1, 'Au moins une tâche est requise')
-}).refine(
-	(data) => {
-		return !(data.isMasterRecurrent && !data.recurrence);
-	},
-	{
-		message: 'Les détails de récurrence sont requis pour un événement récurrent',
-		path: ['recurrence']
-	}
-);
+});
 
 // Schéma récurrent avec validations spécifiques + communes
 export const SaveRecurrentMasterSchema = BaseEventFormSchema.extend({
