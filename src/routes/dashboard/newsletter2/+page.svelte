@@ -379,7 +379,7 @@
 					bind:tipex={editor}
 					extensions={tipexExtensions}
 					controls={false}
-					class="h-full w-full flex-col"
+					class="h-full w-full"
 					focal={false}
 				>
 					{#snippet head(tipexInstance)}
