@@ -386,8 +386,7 @@
 					bind:tipex={editor}
 					extensions={tipexExtensions}
 					controls={false}
-					class="flex h-full flex-col" /* Ajustement classes Tipex */
-					style="" /* Style déplacé vers le panneau */
+					class="h-full w-full flex-col" /* Ajustement classes Tipex */
 					focal={false}
 				>
 					{#snippet head(tipexInstance)}
@@ -450,7 +449,7 @@
 	/* 👉 2. Ajouter les styles globaux pour l'éditeur Tipex */
 
 	/* Assurer que les h2, h3, h4 ont des marges par défaut raisonnables dans Tiptap */
-	/* :global(.tipex .ProseMirror h2) {
+	:global(.tipex .ProseMirror h2) {
 		margin-top: 1.5em;
 		margin-bottom: 0.8em;
 	}
@@ -464,7 +463,7 @@
 	}
 	:global(.tipex .ProseMirror p) {
 		margin-bottom: 1em;
-	} */
+	}
 
 	.period-selector fieldset {
 		display: flex;
