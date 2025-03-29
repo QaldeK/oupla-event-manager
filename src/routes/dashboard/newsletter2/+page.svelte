@@ -43,9 +43,32 @@
 	let generationOk = $state(false);
 	let generatedHtml = $state('');
 	let editor: Editor | undefined = $state();
-	let debounceTimer: ReturnType<typeof setTimeout>;
+let debounceTimer: ReturnType<typeof setTimeout>;
 
-	let isSending = $state(false);
+// Nouvelle fonction pour formater le texte brut
+function formatPlainText(rawText: string): string {
+	if (!rawText) return '';
+
+	// 1. Remplacer les marqueurs <hr class="event-separator-marker"> (qui deviennent souvent des lignes vides ou ---) par notre séparateur
+	//    On cible plusieurs sauts de ligne potentiels autour du marqueur implicite
+	//    (Tiptap peut transformer <hr> en différentes choses dans getText(), souvent juste des sauts de ligne)
+	//    On recherche 3 sauts de lignes ou plus comme indicateur potentiel de la <hr>
+	let formattedText = rawText.replace(/\n{3,}/g, '\n\n•••••••••••••\n\n');
+
+	// 2. Remplacer les séquences de 3 sauts de ligne ou plus (qui pourraient rester après l'étape 1 ou exister ailleurs) par exactement 2 sauts de ligne.
+	formattedText = formattedText.replace(/\n{3,}/g, '\n\n');
+
+	// 3. Supprimer les espaces blancs au début et à la fin
+	formattedText = formattedText.trim();
+
+	// 4. (Optionnel) Ajustement spécifique pour les listes si nécessaire.
+	//    Par exemple, si les puces ajoutent trop de sauts de ligne :
+	//    formattedText = formattedText.replace(/-\s*\n\n/g, '- \n'); // Exemple: réduit l'espace après un item de liste
+
+	return formattedText;
+}
+
+let isSending = $state(false);
 
 	let tipexExtensions = [...defaultExtensions];
 
@@ -100,6 +123,10 @@
 			htmlContent += `<p>${canceledMessage}</p>`;
 			canceledToSend.forEach((event) => {
 				htmlContent += generateEventHTML(event, true);
+				// Ajouter un séparateur distinctif après chaque événement annulé
+				// Sauf pour le dernier élément (bien que ce ne soit pas critique ici)
+				htmlContent += `<hr class="event-separator-marker">`;
+
 			});
 		}
 
@@ -126,7 +153,8 @@
 			eventsToSend.forEach((event, index) => {
 				htmlContent += generateEventHTML(event, false);
 				if (index < eventsToSend.length - 1) {
-					htmlContent += `<hr>`;
+					// Utiliser le marqueur spécifique au lieu d'une simple <hr>
+					htmlContent += `<hr class="event-separator-marker">`;
 				}
 			});
 		} else if (!includeCanceled || canceledToSend.length === 0) {
@@ -200,10 +228,10 @@
 
 	async function sendNewsletter() {
 		if (isSending || !editor) return;
-
+ 
 		// Récupérer le contenu ACTUEL de l'éditeur
 		const currentHtml = editor.getHTML();
-		const currentText = editor.getText(); // Tipex fournit une version texte
+		const currentText = formatPlainText(editor.getText()); // Utiliser notre fonction de formatage
 
 		if (!currentHtml || !currentText) {
 			console.warn("Contenu HTML ou texte vide, annulation de l'envoi.");
@@ -233,7 +261,7 @@
 	// 👉 3. Rendre la prévisualisation réactive au contenu de l'éditeur
 	let editorHtmlPreview = $derived(editor ? editor.getHTML() : generatedHtml);
 	// 👉 4. (Optionnel) Prévisualisation du texte brut
-	let editorTextPreview = $derived(editor ? editor.getText() : 'Chargement...');
+	let editorTextPreview = $derived(editor ? formatPlainText(editor.getText()) : 'Chargement...');
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
