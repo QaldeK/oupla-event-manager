@@ -47,7 +47,6 @@
 
 	let isSending = $state(false);
 
-	let isSending = $state(false);
 	let activeTab = $state<'editor' | 'htmlPreview' | 'textPreview'>('editor'); // Ajout de l'état pour l'onglet actif
 
 	let tipexExtensions = [...defaultExtensions];
@@ -126,6 +125,7 @@
 			// --- END: Added Summary List ---
 
 			htmlContent += `<h2>Événements à venir</h2>`;
+			htmlContent += `<span>━━━━━━ ◦ ❖ ◦ ━━━━━━</span>`;
 			eventsToSend.forEach((event, index) => {
 				htmlContent += generateEventHTML(event, false);
 				if (index < eventsToSend.length - 1) {
@@ -344,15 +344,12 @@
 		if (activeTab === 'textPreview' && html) {
 			// Calculer seulement si l'onglet texte est actif et que l'éditeur a du contenu
 			editorTextPreview = formatPlainTextFromHtml(html);
-		} else if (activeTab !== 'textPreview') {
-			// Optionnel: Réinitialiser ou afficher un message si l'onglet n'est pas actif
-			// editorTextPreview = 'Aperçu non actif';
 		}
 	});
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
-{$inspect('editor?.getText()', editor?.getText())}
+{$inspect('editorTextPreview', editorTextPreview)}
 <!-- Peut-être utile pour débugger les modifs manuelles -->
 
 <div class="period-selector">
@@ -380,7 +377,15 @@
 	<!-- Wrapper pour les onglets -->
 	<div role="tablist" class="tabs tabs-lifted">
 		<!-- Onglet Éditeur -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Éditeur" checked onclick={() => activeTab = 'editor'} />
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Éditeur"
+			checked
+			onclick={() => (activeTab = 'editor')}
+		/>
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box overflow-hidden p-0"
@@ -428,7 +433,14 @@
 		</div>
 
 		<!-- Onglet Prévisualisation HTML -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu HTML" onclick={() => activeTab = 'htmlPreview'} />
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Aperçu HTML"
+			onclick={() => (activeTab = 'htmlPreview')}
+		/>
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
@@ -440,7 +452,14 @@
 		</div>
 
 		<!-- Onglet Prévisualisation Texte -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu Texte" onclick={() => activeTab = 'textPreview'} />
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Aperçu Texte"
+			onclick={() => (activeTab = 'textPreview')}
+		/>
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
