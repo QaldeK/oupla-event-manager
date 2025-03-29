@@ -171,19 +171,11 @@
 	});
 
 	$effect.pre(() => {
-		// Initialise la récurrence SEULEMENT si c'est un NOUVEL événement marqué comme récurrent
-		// et que la récurrence n'est pas déjà définie (sécurité supplémentaire)
 		if (eventData.isRecurrent && !eventData.id && !eventData.recurrence) {
 			eventData.recurrence = getDefaultRecurrence();
-		}
-		// Réinitialise la récurrence SEULEMENT si c'est un NOUVEL événement
-		// qui est marqué comme NON récurrent.
-		else if (!eventData.isRecurrent && !eventData.id) {
+		} else if (!eventData.isRecurrent && !eventData.id) {
 			eventData.recurrence = undefined;
 		}
-		// Dans tous les autres cas (notamment lors de l'édition d'un événement existant, avec un id),
-		// cet $effect ne modifie PAS eventData.recurrence.
-		// La valeur chargée initialement pour l'événement existant est préservée.
 	});
 
 	// defaultTask est ajouté dès qu'il n'y a plus de tache

@@ -78,7 +78,7 @@ async function loadFreshData(spaceName: string) {
 
 		// Récupérer les événements publics et confirmés
 		const events = await pb.collection('events').getFullList({
-			filter: `space="${spaceInfo.id}" && isPublished=true && isConfirmed=true && date_event>="${new Date().toISOString().split('T')[0]}"`,
+			filter: `space="${spaceInfo.id}" && isConfirmed=true && date_event>="${new Date().toISOString().split('T')[0]}"`,
 			sort: 'date_event,time_start',
 			fields:
 				'id,event_title,date_event,time_start,time_end,start_public,start_event,categories,desc_public,is_prix_libre,prix,isMixiteChoisie,mixite,is_age_no_restriction,age_advice,canceled,isRecurrent,isMasterRecurrent,masterRecurrentId,image,duree,dateEnd,dateStart'

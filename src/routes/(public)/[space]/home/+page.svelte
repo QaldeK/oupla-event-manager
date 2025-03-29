@@ -20,7 +20,7 @@
 	{#if publicStore.spaceEvents.length === 0}
 		<p class="py-8 text-center">Aucun événement à venir pour le moment.</p>
 	{:else}
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+		<div class="flex gap-6">
 			{#each publicStore.spaceEvents as event (event.id)}
 				<PublicEventCard {event} spaceName={publicStore.spaceInfo?.name || ''} />
 			{/each}

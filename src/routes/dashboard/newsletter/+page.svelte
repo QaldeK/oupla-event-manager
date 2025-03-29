@@ -1,5 +1,4 @@
-<script>
-	import SeparatorSelect from '$lib/components/SeparatorSelect.svelte';
+<script lang="ts">
 	import { eventsStore } from '$lib/shared/eventsStore.svelte';
 	import { lisibleDate } from '$lib/utils';
 	import { sendEmail } from '$lib/pocketbase.svelte';
@@ -10,28 +9,34 @@
 	import 'quill/dist/quill.snow.css';
 
 	import { onMount } from 'svelte';
+	import { Edit } from 'lucide-svelte';
 
 	const confirmedEvents = eventsStore.confirmedEvents;
 	// ::: génération automatique du contenu quilljs
+	// ::: __ special chars
+	let textSeparatorEvent = $state('◦ ❖ ◦');
+	let textSeparatorTitle = $state('· · · · · · · · ·');
+	let textPreDate = $state('▲');
+	let textPreEvent = $state('▼');
+	let textPreCanceled = $state('⚠');
 
-	// Function to get future events within a specified number of days
-	function getFutureEvents(events, daysAhead = 30) {
-		const today = new Date();
-		const futureDate = addDays(today, daysAhead);
+	// const preEventOptions = [
 
-		return events.filter((event) => {
-			// Ensure the event has a valid date
-			if (!event.date_event || event.canceled) return false;
+	// 	{ label: '✱', value: '✱' },
+	// 	{ label: '✲', value: '✲' },
+	// 	{ label: '✳', value: '✳' },
+	// 	{ label: '✴', value: '✴' },
+	// 	{ label: '✵', value: '✵' },
+	// ];
 
-			// Parse the event date
-			const eventDate = new Date(event.date_event);
+	// Mettre à jour le contenu de la newsletter quand les événements changent
+	let generationOk = $state(false);
+	let debounceTimer;
 
-			// Check if the event is within the future interval
-			return isWithinInterval(eventDate, { start: today, end: futureDate });
-		});
-	}
+	let htmlContentForEditor = $state('');
+	let textVersion = $state('');
+	let editedHtml = $state('');
 
-	// Mapping of radio button labels to days
 	const periodOptions = [
 		{ label: 'Semaine prochaine', days: 7 },
 		{ label: '30 prochains jours', days: 30 },
@@ -50,6 +55,10 @@
 	);
 	let canceledToSend = $state([]);
 
+	let isSending = $state(false);
+
+	// Mapping of radio button labels to days
+
 	$effect(() => {
 		canceledToSend = confirmedEvents.filter((event) => event.canceled);
 	});
@@ -61,146 +70,177 @@
 
 	let eventsToSend = $derived(eventsInPeriod.filter((event) => !event.isSendToNewsletter));
 
+	function getFutureEvents(events, daysAhead = 30) {
+		const today = new Date();
+		const futureDate = addDays(today, daysAhead);
+
+		return events.filter((event) => {
+			// Ensure the event has a valid date
+			if (!event.date_event || event.canceled) return false;
+
+			// Parse the event date
+			const eventDate = new Date(event.date_event);
+
+			// Check if the event is within the future interval
+			return isWithinInterval(eventDate, { start: today, end: futureDate });
+		});
+	}
+
 	// Fonction pour générer le contenu HTML de la newsletter
 	function generateNewsletterHTML() {
 		let html = '';
-
-		// Ajouter le message d'introduction
 		html += `<p>${introMessage}</p><br>`;
 
-		// Ajouter le message d'annulation si inclus
 		if (includeCanceled && canceledToSend.length > 0) {
-			html += `<p> ${canceledMessage}</p><br>`;
+			html += `<p>${canceledMessage}</p><br>`;
 			canceledToSend.forEach((event) => {
-				html += generateEventHTML(event, true) + '<br><hr>';
+				// 👉 Appel de la version HTML
+				html += generateEventHTML(event, true) + '<br>';
 			});
+			// 👉 Séparateur HTML après les annulations
+			html += `<hr>`;
 		}
 
-		// Ajouter les événements à venir
-		html += `<p>━━━━━━ ◦ ❖ ◦ ━━━━━━</p><h2>Événements à venir : </h2>  <br> `;
+		html += `<h2>Événements à venir :</h2><br>`;
 		eventsToSend.forEach((event) => {
+			// 👉 Appel de la version HTML
 			html += generateEventHTML(event, false);
+			html += `<hr>`;
 		});
 
-		// Ajouter le message de fin
-		html += `<p>${outroMessage}</p>`;
-
+		html += `<br><p>${outroMessage}</p>`;
 		return html;
 	}
-	// ::: mail events format
 
 	function generateEventHTML(event, isCanceled) {
 		const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
 
 		if (isCanceled) {
-			if (event.reportedTo) {
-				return `
-<p>${preCanceled} ANNULÉ ${event.event_title}, initialement prévu le ${eventDate}, est REPORTÉ au <strong>${lisibleDate(event.reportedTo)}</strong> </p>
-<p> ${separatorTitle}</p>
-`;
-			} else {
-				return `
-<p>${preCanceled} ANNULÉ: ${event.event_title}, initialement prévu le ${eventDate}</p>${separatorTitle}
-				`;
-			}
+			const reportedDate = event.reportedTo ? lisibleDate(event.reportedTo) : null;
+			return `
+			<div>
+				<p>ANNULÉ:</strong> ${event.event_title}, initialement prévu le ${eventDate}${reportedDate ? `, est REPORTÉ au <strong>${reportedDate}</strong>` : ''}</p>
+				<br><hr/>
+
+		</div>
+						`;
 		} else {
 			return `
-<p> ${separatorEvent}</p>
-<p><strong>${preDate} ${eventDate.toUpperCase()} ${event?.start_public}</strong></p>
-<p><strong>${preEvent} ${event.event_title}</strong></p>${separatorTitle}
-<p>${generateEventDetailsHTML(event)}</p>
-${event?.start_event !== event?.start_public ? `<p><strong>ouverture: ${event?.start_public} - début prévu à ${event?.start_event} </strong></p>` : ''}
-<p>${event?.desc_public}</p>
-<br>
-`;
+			<div>
+						<hr>
+					<p> ${eventDate.toUpperCase()} ${event?.start_public ? `- ${event.start_public}` : ''}</p>
+						<p> ${event.event_title}</p>
+						${generateEventDetailsHTML(event)}
+						${event?.start_event && event.start_event !== event.start_public ? `<p>Ouverture: ${event.start_public} - Début prévu à ${event.start_event}</p>` : ''}
+						${event?.desc_public ? `<div>${event.desc_public}</p>` : ''}
+						<br>
+				</div>
+						`;
 		}
 	}
 
 	function generateEventDetailsHTML(event) {
-		if (
-			event.isMixiteChoisie ||
-			!event.is_age_no_restriction ||
-			event.duree ||
-			!event.is_prix_libre
-		) {
-			return `
-				<p>
-						${event.is_prix_libre ? '' : `Prix: ${event.prix}`}
-						${event.isMixiteChoisie ? ` - mixité : ${event.mixite}` : ''}
-						${event.is_age_no_restriction ? '' : ` - Age : ${event.age_advice}`}
-						${event.duree ? ` - Durée : ${event.duree}` : ''}
-					</p>
-			`;
+		const details = [];
+		if (!event.is_prix_libre && event.prix) details.push(`Prix: ${event.prix}`);
+		if (event.isMixiteChoisie && event.mixite) details.push(`Mixité: ${event.mixite}`);
+		if (!event.is_age_no_restriction && event.age_advice) details.push(`Age: ${event.age_advice}`);
+		if (event.duree) details.push(`Durée: ${event.duree}`);
+
+		if (details.length > 0) {
+			// Utiliser une liste ou simplement des spans séparés par exemple
+			// return `<ul class="event-details"><li>${details.join('</li><li>')}</li></ul>`;
+			return `<p>${details.join(' - ')}</p>`;
 		} else {
 			return '';
 		}
 	}
+	// ::: mail events format
 
-	// ::: __ special chars
-	let separatorEvent = $state('<p> ◦ ❖ ◦ </p>');
-	let separatorTitle = $state('<p>· · · · · · · · ·<p>');
-	let preDate = $state('▲');
-	let preEvent = $state('▼');
-	let preCanceled = $state('⚠');
+	function generateNewsletterText() {
+		let text = '';
+		text += `${introMessage}\n\n`; // Saut de ligne pour le texte
 
-	const preEventOptions = [
-		{ label: '▼', value: '▼' },
-		{ label: '▲', value: '▲' },
-		{ label: '✱', value: '✱' },
-		{ label: '✲', value: '✲' },
-		{ label: '✳', value: '✳' },
-		{ label: '✴', value: '✴' },
-		{ label: '✵', value: '✵' },
-		{ label: '✶', value: '✶' },
-		{ label: '✷', value: '✷' },
-		{ label: '✸', value: '✸' },
-		{ label: '✹', value: '✹' },
-		{ label: '✺', value: '✺' },
-		{ label: '✻', value: '✻' },
-		{ label: '✽', value: '✽' },
-		{ label: '✾', value: '✾' },
-		{ label: '✿', value: '✿' },
-		{ label: '❀', value: '❀' },
-		{ label: '❁', value: '❁' },
-		{ label: '❂', value: '❂' },
-		{ label: '❃', value: '❃' },
-		{ label: '✪', value: '✪' },
-		{ label: '✫', value: '✫' },
-		{ label: '✬', value: '✬' },
-		{ label: '✯', value: '✯' },
-		{ label: '❖', value: '❖' },
-		{ label: '♠', value: '♠' },
-		{ label: '♣', value: '♣' },
-		{ label: '♥', value: '♥' },
-		{ label: '◆', value: '◆' },
-		{ label: '◦', value: '◦' }
-	];
+		if (includeCanceled && canceledToSend.length > 0) {
+			text += `${canceledMessage}\n\n`;
+			canceledToSend.forEach((event) => {
+				text += generateEventText(event, true) + '\n'; // Saut de ligne
+			});
+			// 👉 Séparateur texte après les annulations
+			text += `\n━━━━━━ ◦ ❖ ◦ ━━━━━━\n\n`;
+		}
 
-	// ::: quilljs functions
-	// Mettre à jour le contenu de la newsletter quand les événements changent
-	let generationOk = $state(false);
-	let data = $state('');
-	let html = $state('');
-	let text = $state('');
-	let debounceTimer;
-	$inspect('data', data);
+		text += `Événements à venir :\n\n`;
+		eventsToSend.forEach((event) => {
+			text += generateEventText(event, false);
+		});
+
+		text += `\n${outroMessage}\n`;
+		return text;
+	}
+
+	// 👉 Nouvelle fonction pour générer le texte d'un événement
+	function generateEventText(event, isCanceled) {
+		const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
+
+		if (isCanceled) {
+			const reportedDate = event.reportedTo ? lisibleDate(event.reportedTo) : null;
+			return `
+${textPreCanceled} ANNULÉ: ${event.event_title}, initialement prévu le ${eventDate}${reportedDate ? `, est REPORTÉ au ${reportedDate}` : ''}
+${textSeparatorTitle}
+      `.trim(); // .trim() pour enlever les espaces/sauts de ligne superflus au début/fin
+		} else {
+			return (
+				`
+${textSeparatorEvent}
+${textPreDate} ${eventDate.toUpperCase()} ${event?.start_public ? `- ${event.start_public}` : ''}
+${textPreEvent} ${event.event_title}
+${textSeparatorTitle}
+${generateEventDetailsText(event)}
+${event?.start_event && event.start_event !== event.start_public ? `Ouverture: ${event.start_public} - Début prévu à ${event.start_event}` : ''}
+${event?.desc_public ? `\n${event.desc_public}` : ''}
+
+`.trim() + '\n'
+			); // Ajoute un saut de ligne final pour séparer les événements
+		}
+	}
+
+	// 👉 Nouvelle fonction pour générer les détails en texte
+	function generateEventDetailsText(event) {
+		const details = [];
+		if (!event.is_prix_libre && event.prix) details.push(`Prix: ${event.prix}`);
+		if (event.isMixiteChoisie && event.mixite) details.push(`Mixité: ${event.mixite}`);
+		if (!event.is_age_no_restriction && event.age_advice) details.push(`Age: ${event.age_advice}`);
+		if (event.duree) details.push(`Durée: ${event.duree}`);
+
+		if (details.length > 0) {
+			return details.join(' - ') + '\n'; // Saut de ligne après les détails
+		} else {
+			return ''; // Pas de saut de ligne si pas de détails
+		}
+	}
 
 	function btnGenerate() {
 		generationOk = false;
-		console.log('Generating newsletter...');
+		console.log('Generating newsletter HTML and Text...');
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
-			data = generateNewsletterHTML();
-			// html = data;
+			const generatedHtml = generateNewsletterHTML();
+			const generatedText = generateNewsletterText();
+
+			htmlContentForEditor = generatedHtml; // Pour l'affichage initial de Quill
+			textVersion = generatedText; // Stocke la version texte générée
+
+			editedHtml = generatedHtml; // Initialise le HTML édité
+			// editedText = generatedText; // On pourrait initialiser ici aussi
+
 			generationOk = true;
+			console.log('Generation complete.');
 		}, 200);
 	}
 	let toolbarOptions = [
 		[{ header: 1 }, { header: 2 }, { header: 3 }],
-		['bold', 'italic', 'underline', 'strike'],
-		[{ list: 'ordered' }, { list: 'bullet' }],
-		[{ align: [] }],
-		['clean']
+		['bold', 'italic', 'underline'],
+		[{ list: 'ordered' }, { list: 'bullet' }]
 	];
 
 	const options = {
@@ -210,22 +250,34 @@ ${event?.start_event !== event?.start_public ? `<p><strong>ouverture: ${event?.s
 		theme: 'snow'
 	};
 
-	const onTextChange = (event) => {
+	const onTextChange = (newHtml: string | null /*, newText: string | null */) => {
 		clearTimeout(debounceTimer);
-
 		debounceTimer = setTimeout(() => {
-			({ text, html } = event?.detail ?? {});
-			data = html;
+			editedHtml = newHtml ?? ''; // Met à jour le HTML édité depuis Quill
+			// editedText = newText ?? ''; // Optionnel: mettre à jour le texte depuis Quill
+			console.log('Editor content updated.');
 		}, 500);
 	};
 
-	let isSending = $state(false);
-
-	function sendNewsletter() {
-		if (isSending) return;
+	async function sendNewsletter() {
+		// Utilise editedHtml (depuis Quill) et textVersion (générée initialement)
+		if (isSending || !editedHtml || !textVersion) return;
 		isSending = true;
-		sendEmail(html, text);
-		isSending = false;
+		console.log('Sending newsletter...');
+		console.log('HTML:', editedHtml); // Pour débogage
+		console.log('---');
+		console.log('Text:', textVersion); // Pour débogage
+		try {
+			// 👉 Assurez-vous que sendEmail accepte deux arguments
+			await sendEmail(editedHtml, textVersion);
+			console.log('Newsletter sent successfully.');
+			// Potentiellement marquer les événements comme envoyés ici
+		} catch (error) {
+			console.error('Failed to send newsletter:', error);
+			// Afficher une notification d'erreur à l'utilisateur
+		} finally {
+			isSending = false;
+		}
 	}
 
 	// TEST
@@ -235,11 +287,14 @@ ${event?.start_event !== event?.start_public ? `<p><strong>ouverture: ${event?.s
 	});
 </script>
 
+{$inspect('editedHtml', editedHtml)}
+{$inspect('htmlContentForEditor', htmlContentForEditor)}
+
 <div class="period-selector">
 	<fieldset>
 		<legend>Evénements à inclure dans la newsletters</legend>
 		<div>
-			{#each periodOptions as option}
+			{#each periodOptions as option (option.days)}
 				<label>
 					<input type="radio" name="period" value={option.days} bind:group={selectedPeriod} />
 					{option.label}
@@ -261,15 +316,6 @@ ${event?.start_event !== event?.start_public ? `<p><strong>ouverture: ${event?.s
 		<label for="select" class="text-fluid-sm block font-medium text-gray-700"
 			>Sélectionnez un template</label
 		>
-		<select
-			id="select"
-			class="mt-1 block w-full rounded-lg border border-gray-300 bg-gray-50 pl-10 text-base text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-			bind:value={preEvent}
-		>
-			{#each preEventOptions as template}
-				<option value={template.value}>{template.label}</option>
-			{/each}
-		</select>
 	</div>
 </div>
 <div>
@@ -280,23 +326,39 @@ ${event?.start_event !== event?.start_public ? `<p><strong>ouverture: ${event?.s
 
 	<button
 		class="rounded bg-gray-500 px-4 py-2 font-bold text-white hover:bg-gray-700"
-		onclick={() => navigator.clipboard.writeText(html)}>copier</button
+		onclick={() => navigator.clipboard.writeText(editedHtml)}>copier</button
 	>
-
+	<button class="btn btn-secondary" onclick={() => navigator.clipboard.writeText(textVersion)}>
+		Copier Texte
+	</button>
 	{#if generationOk}
-		<Editor {options} {data} on:text-change={onTextChange} />
+		<Editor {options} {onTextChange}>{@html $state.snapshot(htmlContentForEditor)}</Editor>
 	{/if}
 
 	<button
-		class="rounded bg-green-500 px-4 py-2 font-bold text-white hover:bg-green-700 disabled:bg-gray-400"
+		class="btn btn-success"
 		onclick={sendNewsletter}
-		disabled={isSending}
+		disabled={isSending || !editedHtml || !textVersion}
 	>
-		{isSending ? 'Envoi en cours...' : 'Envoyer la newsletter'}
+		{#if isSending}
+			<span class="loading loading-spinner"></span>
+			Envoi en cours...
+		{:else}
+			Envoyer la newsletter
+		{/if}
 	</button>
 </div>
 
-<!-- {@html data} -->
+<div class="grid-row my-8 grid gap-6">
+	<div class="border p-4">
+		{@html editedHtml}
+	</div>
+	<div class="border p-4">
+		<h3>plaintext</h3>
+		<pre>{textVersion}</pre>
+	</div>
+</div>
+
 <style>
 	.period-selector {
 		margin-bottom: 1rem;

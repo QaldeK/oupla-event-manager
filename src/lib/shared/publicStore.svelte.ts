@@ -106,7 +106,7 @@ async function loadPublicEvents(spaceId: string): Promise<PublicEventInfo[]> {
 
 		// Récupérer les événements publics et confirmés
 		const events = await pb.collection('events').getFullList({
-			filter: `space="${spaceId}" && isPublished=true && isConfirmed=true && date_event>="${new Date().toISOString().split('T')[0]}" && canceled=false`,
+			filter: `space="${spaceId}" && isConfirmed=true && date_event>="${new Date().toISOString().split('T')[0]}" && canceled=false`,
 			sort: 'date_event,time_start',
 			fields:
 				'id,event_title,date_event,time_start,time_end,start_public,start_event,categories,desc_public,is_prix_libre,prix,isMixiteChoisie,mixite,is_age_no_restriction,age_advice,canceled,isRecurrent,isMasterRecurrent,masterRecurrentId,image,duree,dateEnd,dateStart'

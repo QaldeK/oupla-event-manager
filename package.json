@@ -52,8 +52,10 @@
 		"vitest": "^3.0.0"
 	},
 	"dependencies": {
+		"@friendofsvelte/tipex": "^0.0.8-dev.0",
 		"daisyui": "^5.0.4",
 		"date-fns": "^4.1.0",
+		"install": "^0.13.0",
 		"lucide-svelte": "^0.482.0",
 		"pocketbase": "^0.25.2"
 	}
