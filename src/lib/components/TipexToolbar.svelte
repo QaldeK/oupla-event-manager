@@ -3,7 +3,6 @@
 	import Bold from 'lucide-svelte/icons/bold';
 	import Italic from 'lucide-svelte/icons/italic';
 	import LinkIcon from 'lucide-svelte/icons/link';
-	import Heading1 from 'lucide-svelte/icons/heading-1';
 	import Heading2 from 'lucide-svelte/icons/heading-2';
 	import Heading3 from 'lucide-svelte/icons/heading-3';
 	import Heading4 from 'lucide-svelte/icons/heading-4';

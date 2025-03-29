@@ -144,17 +144,15 @@
 			// Détails
 			const detailsHtml = generateEventDetailsHTML(event);
 			if (detailsHtml) {
-				eventHtml += `<p>${detailsHtml}</p>`;
+				eventHtml += `<p><em>${detailsHtml}</em></p>`;
 			}
 			// Heure d'ouverture vs début
 			if (event?.start_event && event?.start_public && event.start_event !== event.start_public) {
-				eventHtml += `<p>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</p>`;
+				eventHtml += `<p><em>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</em></p>`;
 			}
 			// Description publique
 			if (event.desc_public) {
-				// Keep the <br> replacement logic as it affects content, not just style
-				const formattedDesc = event.desc_public; // .replace(/\n/g, '<br>'); // Decided against replacing \n, Tiptap handles paragraphs better
-				eventHtml += `<div>${formattedDesc}</div>`;
+				eventHtml += `<ul><li>${event.desc_public}</li></ul>`;
 			}
 		}
 
@@ -254,7 +252,7 @@
 				bind:tipex={editor}
 				extensions={tipexExtensions}
 				controls={false}
-				class="mt-4 mb-0 rounded-lg border border-neutral-300 shadow-sm"
+				class="overflow-y mt-4 mb-0 rounded-lg border border-neutral-300 shadow-sm"
 				style="min-height: 400px; height: 70vh;"
 				focal={false}
 			>
@@ -322,103 +320,9 @@
 
 <style>
 	/* 👉 2. Ajouter les styles globaux pour l'éditeur Tipex */
-	:global(.tipex .ProseMirror .newsletter-event) {
-		margin-bottom: 20px;
-		/* Ajoutez ici d'autres styles si nécessaire pour le conteneur */
-	}
-
-	:global(.tipex .ProseMirror .newsletter-intro),
-	:global(.tipex .ProseMirror .newsletter-outro),
-	:global(.tipex .ProseMirror .newsletter-empty) {
-		margin-bottom: 15px;
-		/* Styles spécifiques si besoin */
-	}
-
-	:global(.tipex .ProseMirror .section-title) {
-		margin-bottom: 10px; /* Ajusté */
-		font-weight: 600;
-	}
-	:global(.tipex .ProseMirror .section-title-canceled) {
-		color: #e74c3c; /* Rouge pour annulé */
-	}
-	:global(.tipex .ProseMirror .section-title-upcoming) {
-		margin-bottom: 20px; /* Plus d'espace pour le titre principal */
-		font-size: 1.3em; /* Un peu plus grand */
-	}
-
-	:global(.tipex .ProseMirror .section-subtitle) {
-		margin-bottom: 15px;
-		font-style: italic;
-		color: #555;
-	}
-
-	:global(.tipex .ProseMirror .event-canceled) {
-		color: #e74c3c;
-		margin-bottom: 5px;
-	}
-	:global(.tipex .ProseMirror .event-canceled strong) {
-		font-weight: bold; /* Assure que strong est bien en gras */
-	}
-	:global(.tipex .ProseMirror .event-reported) {
-		/* Style spécifique pour "REPORTÉ AU ..." si nécessaire */
-		font-weight: bold;
-	}
-
-	:global(.tipex .ProseMirror .event-date) {
-		margin-bottom: 5px;
-		color: #3498db;
-		font-weight: bold; /* Remplacer text-transform si Tiptap le gère mal */
-		text-transform: uppercase;
-		font-size: 1.05em;
-	}
-
-	:global(.tipex .ProseMirror .event-title) {
-		margin-top: 0;
-		margin-bottom: 10px;
-		font-size: 1.15em;
-		font-weight: 600;
-	}
-
-	:global(.tipex .ProseMirror .event-details) {
-		font-size: 0.9em;
-		color: #555;
-		margin-bottom: 10px;
-	}
-	/* Style optionnel pour les spans DANS les détails */
-	:global(.tipex .ProseMirror .event-details span) {
-		/* Peut-être un léger margin-right si le séparateur ⋅ n'est pas assez */
-		/* margin-right: 5px; */
-	}
-
-	:global(.tipex .ProseMirror .event-timing) {
-		font-size: 0.9em;
-		font-style: italic;
-		margin-bottom: 10px;
-		color: #666;
-	}
-
-	:global(.tipex .ProseMirror .event-description) {
-		/* Styles pour la description - Tiptap appliquera ses styles de paragraphe par défaut */
-		line-height: 1.6;
-	}
-	/* Cibler les <br> si Tiptap les conserve (peu probable) */
-	:global(.tipex .ProseMirror .event-description br) {
-		/* Tiptap les transforme souvent en fin de paragraphe */
-	}
-
-	:global(.tipex .ProseMirror hr.section-separator) {
-		border: none;
-		border-top: 1px solid #ddd;
-		margin: 25px 0;
-	}
-	:global(.tipex .ProseMirror hr.event-separator) {
-		border: none;
-		border-top: 1px solid #eee;
-		margin: 25px 0;
-	}
 
 	/* Assurer que les h2, h3, h4 ont des marges par défaut raisonnables dans Tiptap */
-	:global(.tipex .ProseMirror h2) {
+	/* :global(.tipex .ProseMirror h2) {
 		margin-top: 1.5em;
 		margin-bottom: 0.8em;
 	}
@@ -432,7 +336,7 @@
 	}
 	:global(.tipex .ProseMirror p) {
 		margin-bottom: 1em;
-	}
+	} */
 
 	.period-selector fieldset {
 		display: flex;
