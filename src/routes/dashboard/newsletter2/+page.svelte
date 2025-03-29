@@ -71,9 +71,9 @@
 						case 'h3':
 							text += '\n\n ■ '; // Séparation et marqueur H3 début
 							break;
-						case 'li':
-							text += '\n• '; // Marqueur de liste
-							break;
+						// case 'li':
+						// 	text += '\n• '; // Marqueur de liste
+						// 	break;
 						case 'p':
 							text += '\n\n'; // Assurer une séparation avant le paragraphe
 							break;
@@ -134,9 +134,8 @@
 			text = text.trim();
 
 			return text;
-
 		} catch (error) {
-			console.error("Erreur lors du formatage du texte depuis HTML:", error);
+			console.error('Erreur lors du formatage du texte depuis HTML:', error);
 			// Retourner le HTML brut ou une chaîne d'erreur en cas d'échec du parsing
 			// Alternative: essayer editor.getText() comme fallback ?
 			return html; // Ou une version très basique: html.replace(/<[^>]+>/g, '');
@@ -198,9 +197,6 @@
 			htmlContent += `<p>${canceledMessage}</p>`;
 			canceledToSend.forEach((event) => {
 				htmlContent += generateEventHTML(event, true);
-				// Utiliser une simple <hr> comme séparateur
-				htmlContent += `<hr>`;
-
 			});
 		}
 
@@ -236,6 +232,8 @@
 		}
 
 		// Outro
+		htmlContent += `<hr>`;
+
 		htmlContent += `<br><p>${outroMessage}</p>`;
 
 		return htmlContent;
@@ -335,7 +333,9 @@
 	// 👉 3. Rendre la prévisualisation réactive au contenu de l'éditeur
 	let editorHtmlPreview = $derived(editor ? editor.getHTML() : generatedHtml);
 	// 👉 4. (Optionnel) Prévisualisation du texte brut
-	let editorTextPreview = $derived(editor ? formatPlainTextFromHtml(editor.getHTML()) : 'Chargement...');
+	let editorTextPreview = $derived(
+		editor ? formatPlainTextFromHtml(editor.getHTML()) : 'Chargement...'
+	);
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
