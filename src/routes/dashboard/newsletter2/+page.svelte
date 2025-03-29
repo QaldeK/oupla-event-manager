@@ -95,18 +95,18 @@
 
 		// Annulations
 		if (includeCanceled && canceledToSend.length > 0) {
+			htmlContent += `<hr>`;
 			htmlContent += `<h2>Événements Annulés/Reportés</h2>`;
 			htmlContent += `<p>${canceledMessage}</p>`;
 			canceledToSend.forEach((event) => {
 				htmlContent += generateEventHTML(event, true);
 			});
-			htmlContent += `<hr>`;
 		}
 
 		// Événements à venir
 		if (eventsToSend.length > 0) {
 			// --- START: Added Summary List ---
-			htmlContent += `<hr>`; // Règle avant le résumé
+			htmlContent += `<hr><p><strong><em>Résumé des événements à venir</em></strong></p>`;
 			htmlContent += `<ul>`;
 			eventsToSend.forEach((event) => {
 				const formattedDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
@@ -119,7 +119,7 @@
 				htmlContent += `</li>`;
 			});
 			htmlContent += `</ul>`;
-			htmlContent += `<hr>`; // Règle après le résumé
+			htmlContent += `<hr>`;
 			// --- END: Added Summary List ---
 
 			htmlContent += `<h2>Événements à venir</h2>`;
@@ -237,7 +237,7 @@
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
-{$inspect('editor?.getHTML()', editor?.getHTML())}
+{$inspect('editor?.getText()', editor?.getText())}
 <!-- Peut être utile pour débugger les modifs manuelles -->
 
 <div class="period-selector">
