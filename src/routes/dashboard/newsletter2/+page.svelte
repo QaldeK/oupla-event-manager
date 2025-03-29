@@ -336,9 +336,19 @@
 	// 👉 3. Rendre la prévisualisation réactive au contenu de l'éditeur
 	let editorHtmlPreview = $derived(editor ? editor.getHTML() : generatedHtml);
 	// 👉 4. (Optionnel) Prévisualisation du texte brut
-	let editorTextPreview = $derived(
-		editor ? formatPlainTextFromHtml(editor.getHTML()) : 'Chargement...'
-	);
+	let editorTextPreview = $state('Chargement...'); // Transformer en $state
+
+	// Ajouter cet $effect après la définition de editorTextPreview
+	$effect(() => {
+		const html = editor?.getHTML(); // Dépendance au contenu de l'éditeur
+		if (activeTab === 'textPreview' && html) {
+			// Calculer seulement si l'onglet texte est actif et que l'éditeur a du contenu
+			editorTextPreview = formatPlainTextFromHtml(html);
+		} else if (activeTab !== 'textPreview') {
+			// Optionnel: Réinitialiser ou afficher un message si l'onglet n'est pas actif
+			// editorTextPreview = 'Aperçu non actif';
+		}
+	});
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
