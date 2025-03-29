@@ -123,9 +123,8 @@ let isSending = $state(false);
 			htmlContent += `<p>${canceledMessage}</p>`;
 			canceledToSend.forEach((event) => {
 				htmlContent += generateEventHTML(event, true);
-				// Ajouter un séparateur distinctif après chaque événement annulé
-				// Sauf pour le dernier élément (bien que ce ne soit pas critique ici)
-				htmlContent += `<hr class="event-separator-marker">`;
+				// Utiliser une simple <hr> comme séparateur
+				htmlContent += `<hr>`;
 
 			});
 		}
@@ -153,8 +152,8 @@ let isSending = $state(false);
 			eventsToSend.forEach((event, index) => {
 				htmlContent += generateEventHTML(event, false);
 				if (index < eventsToSend.length - 1) {
-					// Utiliser le marqueur spécifique au lieu d'une simple <hr>
-					htmlContent += `<hr class="event-separator-marker">`;
+					// Utiliser une simple <hr> comme séparateur
+					htmlContent += `<hr>`;
 				}
 			});
 		} else if (!includeCanceled || canceledToSend.length === 0) {
@@ -261,12 +260,12 @@ let isSending = $state(false);
 	// 👉 3. Rendre la prévisualisation réactive au contenu de l'éditeur
 	let editorHtmlPreview = $derived(editor ? editor.getHTML() : generatedHtml);
 	// 👉 4. (Optionnel) Prévisualisation du texte brut
-	let editorTextPreview = $derived(editor ? formatPlainText(editor.getText()) : 'Chargement...');
+	let editorTextPreview = $derived(editor ? formatPlainTextFromHtml(editor.getHTML()) : 'Chargement...');
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
 {$inspect('editor?.getText()', editor?.getText())}
-<!-- Peut être utile pour débugger les modifs manuelles -->
+<!-- Peut-être utile pour débugger les modifs manuelles -->
 
 <div class="period-selector">
 	<!-- ... reste du fieldset inchangé ... -->
