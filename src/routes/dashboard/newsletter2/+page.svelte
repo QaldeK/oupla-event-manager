@@ -365,18 +365,10 @@
 
 <div class="mt-4">
 	<!-- Wrapper pour les onglets -->
-	<div role="tablist" class="tabs tabs-lifted">
+	<div class="tabs tabs-lifted">
 		<!-- Onglet Éditeur -->
-		<input
-			type="radio"
-			name="content_tabs"
-			role="tab"
-			class="tab"
-			aria-label="Éditeur"
-			checked
-		/>
+		<input type="radio" name="content_tabs" class="tab" aria-label="Éditeur" checked="checked" />
 		<div
-			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex flex-col overflow-hidden p-0"
 			style="min-height: 400px; height: 70vh; border-top-left-radius: 0;"
 		>
@@ -386,7 +378,7 @@
 					bind:tipex={editor}
 					extensions={tipexExtensions}
 					controls={false}
-					class="h-full w-full flex-col" /* Ajustement classes Tipex */
+					class="h-full w-full flex-col"
 					focal={false}
 				>
 					{#snippet head(tipexInstance)}
@@ -415,18 +407,17 @@
 					{/snippet}
 				</Tipex>
 			{:else}
-				<div class="flex h-full items-center justify-center bg-base-200">
+				<div class="bg-base-200 flex h-full items-center justify-center">
 					<span class="loading loading-dots loading-lg"></span>
 				</div>
 			{/if}
 		</div>
 
 		<!-- Onglet Prévisualisation HTML -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu HTML" />
+		<input type="radio" name="content_tabs2" class="tab" aria-label="Aperçu HTML" />
 		<div
-			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
+			style="min-height: 400px; height: 70vh;"
 		>
 			<div class="prose prose-sm max-w-none">
 				{@html editorHtmlPreview}
@@ -434,13 +425,12 @@
 		</div>
 
 		<!-- Onglet Prévisualisation Texte -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu Texte" />
+		<input type="radio" name="content_tabs3" class="tab" aria-label="Aperçu Texte" />
 		<div
-			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
+			style="min-height: 400px; height: 70vh;"
 		>
-			<pre class="whitespace-pre-wrap text-sm">{editorTextPreview}</pre>
+			<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
 		</div>
 	</div>
 </div>
