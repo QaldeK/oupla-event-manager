@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { lisibleDate } from './index'; // Assurez-vous que le chemin est correct
+import { lisibleDate } from '$lib/utils';
 
 export function generateEventHTML(event: any, isCanceled: boolean) {
 	const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
@@ -46,7 +46,7 @@ export function generateEventHTML(event: any, isCanceled: boolean) {
 	return eventHtml;
 }
 
-function generateEventDetailsHTML(event: any) {
+export function generateEventDetailsHTML(event: any) {
 	let details = [];
 	// Remove classes from spans
 	if (!event.is_prix_libre && event.prix) {

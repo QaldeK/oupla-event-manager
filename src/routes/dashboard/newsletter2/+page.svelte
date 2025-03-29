@@ -119,7 +119,7 @@
 
 		// Outro
 		htmlContent += `<br><p>${outroMessage}</p>`;
-
+	}
 	async function sendNewsletter() {
 		if (isSending || !editor) return;
 
