@@ -366,14 +366,13 @@
 		/* Retirer le border-radius du haut car la toolbar l'a maintenant */
 		border-top-left-radius: 0;
 		border-top-right-radius: 0;
-		/* Assurer une hauteur minimale et le scroll */
-		min-height: 350px; /* Ajuster si besoin */
-		height: calc(
-			100% - 46px - 40px
-		); /* Hauteur totale moins toolbar (approx 46px) et footer (approx 40px) */
+		/* Assurer une hauteur minimale */
+		min-height: 100%; /* S'étend pour remplir le parent scrollable */
+		/* La hauteur et l'overflow sont gérés par .tipex-editor-section */
 		outline: none;
-		overflow-y: auto;
 		background-color: white;
+		/* Important: S'assurer qu'il n'y a pas d'overflow caché ici qui pourrait interférer */
+		overflow: visible;
 	}
 
 	/* 👉 Ajustement pour que le wrapper Tipex n'ait pas de padding inutile */
@@ -389,7 +388,8 @@
 		border-bottom-left-radius: inherit; /* Hérite du radius du parent Tipex */
 		border-bottom-right-radius: inherit;
 		border-radius: inherit; /* Assure que le wrapper hérite du radius */
-		overflow: hidden;
+		overflow-y: auto; /* Gère le scroll ici */
+		min-height: 0; /* Nécessaire pour que l'overflow fonctionne dans un conteneur flex */
 	}
 
 	:global(.tipex-editor-section) {
