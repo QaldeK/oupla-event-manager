@@ -379,7 +379,7 @@
 					bind:tipex={editor}
 					extensions={tipexExtensions}
 					controls={false}
-					class="h-full w-full flex-col" /* Ajustement classes Tipex */
+					class="h-full w-full flex-col"
 					focal={false}
 				>
 					{#snippet head(tipexInstance)}
@@ -419,7 +419,7 @@
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
+			style="min-height: 400px; height: 70vh;"
 		>
 			<div class="prose prose-sm max-w-none">
 				{@html editorHtmlPreview}
@@ -431,7 +431,7 @@
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
+			style="min-height: 400px; height: 70vh;"
 		>
 			<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
 		</div>
