@@ -2,7 +2,7 @@
 	import { eventsStore } from '$lib/shared/eventsStore.svelte';
 	import { lisibleDate } from '$lib/utils';
 	import { sendEmail } from '$lib/pocketbase.svelte';
-	import { Tipex } from '@friendofsvelte/tipex';
+	import { defaultExtensions, Tipex } from '@friendofsvelte/tipex';
 	import type { Editor } from '@tiptap/core';
 
 	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
@@ -46,6 +46,8 @@
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	let isSending = $state(false);
+
+	let tipexExtensions = [...defaultExtensions];
 
 	$effect(() => {
 		// Lire la variable pour assurer la dépendance
@@ -93,29 +95,29 @@
 
 		// Annulations
 		if (includeCanceled && canceledToSend.length > 0) {
-			htmlContent += `<h3 >Événements Annulés/Reportés</h3>`; // Removed class
+			htmlContent += `<h2>Événements Annulés/Reportés</h2>`;
 			htmlContent += `<p>${canceledMessage}</p>`;
 			canceledToSend.forEach((event) => {
 				htmlContent += generateEventHTML(event, true);
 			});
-			htmlContent += `<hr>`; // Removed class
+			htmlContent += `<hr>`;
 		}
 
 		// Événements à venir
 		if (eventsToSend.length > 0) {
-			htmlContent += `<h2>Événements à venir</h2>`; // Removed class
+			htmlContent += `<h2>Événements à venir</h2>`;
 			eventsToSend.forEach((event, index) => {
 				htmlContent += generateEventHTML(event, false);
 				if (index < eventsToSend.length - 1) {
-					htmlContent += `<hr>`; // Removed class
+					htmlContent += `<hr>`;
 				}
 			});
 		} else if (!includeCanceled || canceledToSend.length === 0) {
-			htmlContent += `<p>Aucun nouvel événement à annoncer pour cette période.</p>`; // Removed class
+			htmlContent += `<p>Aucun nouvel événement à annoncer pour cette période.</p>`;
 		}
 
 		// Outro
-		htmlContent += `<br><p>${outroMessage}</p>`; // Removed class
+		htmlContent += `<br><p>${outroMessage}</p>`;
 
 		return htmlContent;
 	}
@@ -123,36 +125,36 @@
 	function generateEventHTML(event, isCanceled) {
 		const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
 		// Remove classes
-		let eventHtml = '<div>'; // Removed class
+		let eventHtml = '<div>';
 
 		if (isCanceled) {
-			eventHtml += `<p>`; // Removed class
+			eventHtml += `<p>`;
 			eventHtml += `<strong>${preCanceled} ANNULÉ</strong>`;
 			if (event.reportedTo) {
-				eventHtml += `: ${event.event_title}, initialement prévu le ${eventDate}, est <strong>REPORTÉ au ${lisibleDate(event.reportedTo)}</strong>`; // Removed class from strong
+				eventHtml += `: ${event.event_title}, initialement prévu le ${eventDate}, est <strong>REPORTÉ au ${lisibleDate(event.reportedTo)}</strong>`;
 			} else {
 				eventHtml += `: ${event.event_title}, initialement prévu le ${eventDate}`;
 			}
 			eventHtml += `</p>`;
 		} else {
-			// Date et Heure
-			eventHtml += `<h4>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ''}</h4>`; // Removed class
 			// Titre
-			eventHtml += `<h3>${event.event_title}</h3>`; // Removed class
+			eventHtml += `<h3>${event.event_title}</h3>`;
+			// Date et Heure
+			eventHtml += `<h4>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ''}</h4>`;
 			// Détails
 			const detailsHtml = generateEventDetailsHTML(event);
 			if (detailsHtml) {
-				eventHtml += `<p>${detailsHtml}</p>`; // Removed class
+				eventHtml += `<p>${detailsHtml}</p>`;
 			}
 			// Heure d'ouverture vs début
 			if (event?.start_event && event?.start_public && event.start_event !== event.start_public) {
-				eventHtml += `<p>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</p>`; // Removed class
+				eventHtml += `<p>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</p>`;
 			}
 			// Description publique
 			if (event.desc_public) {
 				// Keep the <br> replacement logic as it affects content, not just style
 				const formattedDesc = event.desc_public; // .replace(/\n/g, '<br>'); // Decided against replacing \n, Tiptap handles paragraphs better
-				eventHtml += `<div>${formattedDesc}</div>`; // Removed class, use simple div
+				eventHtml += `<div>${formattedDesc}</div>`;
 			}
 		}
 
@@ -250,6 +252,7 @@
 			<Tipex
 				body={generatedHtml}
 				bind:tipex={editor}
+				extensions={tipexExtensions}
 				controls={false}
 				class="mt-4 mb-0 rounded-lg border border-neutral-300 shadow-sm"
 				style="min-height: 400px; height: 70vh;"

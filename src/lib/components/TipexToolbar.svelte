@@ -6,6 +6,7 @@
 	import Heading1 from 'lucide-svelte/icons/heading-1';
 	import Heading2 from 'lucide-svelte/icons/heading-2';
 	import Heading3 from 'lucide-svelte/icons/heading-3';
+	import Heading4 from 'lucide-svelte/icons/heading-4';
 
 	import List from 'lucide-svelte/icons/list';
 	import Quote from 'lucide-svelte/icons/quote';
@@ -41,7 +42,7 @@
 		}
 
 		// Sinon, on demande l'URL et on crée le lien
-		const url = prompt('Entrez l\'URL du lien :', ''); // Utilise prompt pour la simplicité
+		const url = prompt("Entrez l'URL du lien :", ''); // Utilise prompt pour la simplicité
 
 		// Si l'utilisateur annule ou ne met rien (on pourrait valider l'URL ici)
 		if (url === null) {
@@ -84,14 +85,6 @@
 		>
 			<Italic size={18} strokeWidth={2.5} />
 		</button>
-		<button
-			title="Ajouter/Supprimer un lien"
-			class="{btnClass} {editor.isActive('link') ? activeClass : ''}"
-			onclick={toggleLinkAction}
-			disabled={!editor.can().chain().focus().extendMarkRange('link').setLink({ href: 'test' }).run() && !editor.can().chain().focus().unsetLink().run()}
-		>
-			<LinkIcon size={18} strokeWidth={2.5} />
-		</button>
 
 		<!-- Titres -->
 		<button
@@ -110,8 +103,14 @@
 		>
 			<Heading3 size={18} strokeWidth={2.5} />
 		</button>
-
-		<div class="divider divider-horizontal mx-1 my-0 h-6 self-center"></div>
+		<button
+			title="Titre 4"
+			class="{btnClass} {editor.isActive('heading', { level: 4 }) ? activeClass : ''}"
+			onclick={() => setHeading(4)}
+			disabled={!editor.can().toggleHeading({ level: 4 })}
+		>
+			<Heading4 size={18} strokeWidth={2.5} />
+		</button>
 
 		<div class="divider divider-horizontal mx-1 my-0 h-6 self-center"></div>
 
@@ -139,6 +138,20 @@
 			disabled={!editor.can().setHorizontalRule()}
 		>
 			<Minus size={18} strokeWidth={2.5} />
+		</button>
+		<button
+			title="Ajouter/Supprimer un lien"
+			class="{btnClass} {editor.isActive('link') ? activeClass : ''}"
+			onclick={toggleLinkAction}
+			disabled={!editor
+				.can()
+				.chain()
+				.focus()
+				.extendMarkRange('link')
+				.setLink({ href: 'test' })
+				.run() && !editor.can().chain().focus().unsetLink().run()}
+		>
+			<LinkIcon size={18} strokeWidth={2.5} />
 		</button>
 
 		<div class="divider divider-horizontal mx-1 my-0 h-6 self-center"></div>
