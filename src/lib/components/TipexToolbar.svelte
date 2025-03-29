@@ -7,6 +7,7 @@
 	import Heading2 from 'lucide-svelte/icons/heading-2';
 	import Heading3 from 'lucide-svelte/icons/heading-3';
 	import Heading4 from 'lucide-svelte/icons/heading-4';
+	import Pilcrow from 'lucide-svelte/icons/pilcrow'; // Pour Paragraphe
 
 	import List from 'lucide-svelte/icons/list';
 	import Quote from 'lucide-svelte/icons/quote';
@@ -22,7 +23,8 @@
 	// --- Commandes Tiptap ---
 	const toggleBold = () => editor?.chain().focus().toggleBold().run();
 	const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
-	const setHeading = (level: 1 | 2 | 3) => editor?.chain().focus().toggleHeading({ level }).run();
+	const setHeading = (level: 1 | 2 | 3 | 4) => editor?.chain().focus().toggleHeading({ level }).run();
+	const setParagraph = () => editor?.chain().focus().setParagraph().run();
 	// const setTextAlign = (align: 'left' | 'center' | 'right' /* | 'justify' */) =>
 	// 	editor?.chain().focus().setTextAlign(align).run();
 	const toggleBulletList = () => editor?.chain().focus().toggleBulletList().run();
