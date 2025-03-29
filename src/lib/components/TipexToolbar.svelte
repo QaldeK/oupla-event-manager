@@ -2,6 +2,7 @@
 	import type { Editor } from '@tiptap/core';
 	import Bold from 'lucide-svelte/icons/bold';
 	import Italic from 'lucide-svelte/icons/italic';
+	import LinkIcon from 'lucide-svelte/icons/link';
 	import Heading1 from 'lucide-svelte/icons/heading-1';
 	import Heading2 from 'lucide-svelte/icons/heading-2';
 	import Heading3 from 'lucide-svelte/icons/heading-3';
@@ -29,6 +30,33 @@
 	const undo = () => editor?.chain().focus().undo().run();
 	const redo = () => editor?.chain().focus().redo().run();
 
+	// Fonction pour ajouter/supprimer un lien
+	const toggleLinkAction = () => {
+		if (!editor) return;
+
+		// Si le curseur est déjà sur un lien, on le supprime
+		if (editor.isActive('link')) {
+			editor.chain().focus().unsetLink().run();
+			return;
+		}
+
+		// Sinon, on demande l'URL et on crée le lien
+		const url = prompt('Entrez l\'URL du lien :', ''); // Utilise prompt pour la simplicité
+
+		// Si l'utilisateur annule ou ne met rien (on pourrait valider l'URL ici)
+		if (url === null) {
+			return; // Ne fait rien si l'utilisateur annule
+		}
+		// Si l'URL est vide, on supprime le lien potentiel (au cas où)
+		if (url === '') {
+			editor.chain().focus().extendMarkRange('link').unsetLink().run();
+			return;
+		}
+
+		// Applique le lien
+		editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+	};
+
 	// --- Styles des boutons ---
 	// Utilise les classes DaisyUI/Tailwind pour un style simple
 	const btnClass = 'btn btn-sm btn-ghost p-1 hover:bg-base-200';
@@ -55,6 +83,14 @@
 			disabled={!editor.can().toggleItalic()}
 		>
 			<Italic size={18} strokeWidth={2.5} />
+		</button>
+		<button
+			title="Ajouter/Supprimer un lien"
+			class="{btnClass} {editor.isActive('link') ? activeClass : ''}"
+			onclick={toggleLinkAction}
+			disabled={!editor.can().chain().focus().extendMarkRange('link').setLink({ href: 'test' }).run() && !editor.can().chain().focus().unsetLink().run()}
+		>
+			<LinkIcon size={18} strokeWidth={2.5} />
 		</button>
 
 		<!-- Titres -->
