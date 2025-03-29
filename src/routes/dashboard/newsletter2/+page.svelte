@@ -105,6 +105,23 @@
 
 		// Événements à venir
 		if (eventsToSend.length > 0) {
+			// --- START: Added Summary List ---
+			htmlContent += `<hr>`; // Règle avant le résumé
+			htmlContent += `<ul>`;
+			eventsToSend.forEach((event) => {
+				const formattedDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
+				htmlContent += `<li>`;
+				htmlContent += `<em>${formattedDate}</em>`;
+				if (event.start_public) {
+					htmlContent += ` - <em>${event.start_public}</em>`;
+				}
+				htmlContent += `: ${event.event_title}`;
+				htmlContent += `</li>`;
+			});
+			htmlContent += `</ul>`;
+			htmlContent += `<hr>`; // Règle après le résumé
+			// --- END: Added Summary List ---
+
 			htmlContent += `<h2>Événements à venir</h2>`;
 			eventsToSend.forEach((event, index) => {
 				htmlContent += generateEventHTML(event, false);
