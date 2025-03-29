@@ -129,18 +129,18 @@
 
 		if (isCanceled) {
 			eventHtml += `<p>`;
-			eventHtml += `<strong>${preCanceled} ANNULÉ</strong>`;
+			eventHtml += `<em>${preCanceled} annulé</em>`;
 			if (event.reportedTo) {
-				eventHtml += `: ${event.event_title}, initialement prévu le ${eventDate}, est <strong>REPORTÉ au ${lisibleDate(event.reportedTo)}</strong>`;
+				eventHtml += `: <strong>${event.event_title}</strong>, initialement prévu le ${eventDate}, est REPORTÉ au <strong>${lisibleDate(event.reportedTo)}</strong>`;
 			} else {
-				eventHtml += `: ${event.event_title}, initialement prévu le ${eventDate}`;
+				eventHtml += `: <strong>${event.event_title}</strong>, initialement prévu le ${eventDate}`;
 			}
 			eventHtml += `</p>`;
 		} else {
 			// Titre
 			eventHtml += `<h3>${event.event_title}</h3>`;
 			// Date et Heure
-			eventHtml += `<h4>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ''}</h4>`;
+			eventHtml += `<strong>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ''}</strong>`;
 			// Détails
 			const detailsHtml = generateEventDetailsHTML(event);
 			if (detailsHtml) {
@@ -148,7 +148,7 @@
 			}
 			// Heure d'ouverture vs début
 			if (event?.start_event && event?.start_public && event.start_event !== event.start_public) {
-				eventHtml += `<p><em>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</em></p>`;
+				eventHtml += `<em>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</em>`;
 			}
 			// Description publique
 			if (event.desc_public) {
