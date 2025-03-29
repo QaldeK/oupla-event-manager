@@ -23,7 +23,8 @@
 	// --- Commandes Tiptap ---
 	const toggleBold = () => editor?.chain().focus().toggleBold().run();
 	const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
-	const setHeading = (level: 1 | 2 | 3 | 4) => editor?.chain().focus().toggleHeading({ level }).run();
+	const setHeading = (level: 1 | 2 | 3 | 4) =>
+		editor?.chain().focus().toggleHeading({ level }).run();
 	const setParagraph = () => editor?.chain().focus().setParagraph().run();
 	// const setTextAlign = (align: 'left' | 'center' | 'right' /* | 'justify' */) =>
 	// 	editor?.chain().focus().setTextAlign(align).run();
@@ -88,6 +89,15 @@
 			<Italic size={18} strokeWidth={2.5} />
 		</button>
 
+		<!-- Styles de Texte -->
+		<button
+			title="Paragraphe"
+			class="{btnClass} {editor.isActive('paragraph') ? activeClass : ''}"
+			onclick={setParagraph}
+			disabled={!editor.can().setParagraph()}
+		>
+			<Pilcrow size={18} strokeWidth={2.5} />
+		</button>
 		<!-- Titres -->
 		<button
 			title="Titre 2"
