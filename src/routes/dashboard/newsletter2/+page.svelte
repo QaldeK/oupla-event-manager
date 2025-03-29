@@ -363,76 +363,85 @@
 	</fieldset>
 </div>
 
-<div class="flex gap-6">
-	<div>
-		{#if generationOk || editor}
-			<Tipex
-				body={generatedHtml}
-				bind:tipex={editor}
-				extensions={tipexExtensions}
-				controls={false}
-				class="overflow-y mt-4 mb-0 rounded-lg border border-neutral-300 shadow-sm"
-				style="min-height: 400px; height: 70vh;"
-				focal={false}
-			>
-				{#snippet head(tipexInstance)}
-					<!-- Rend notre barre d'outils personnalisée -->
-					<TipexToolbar editor={tipexInstance} />
-				{/snippet}
-				{#snippet foot()}
-					<div
-						class="border-base-300 bg-base-100/80 flex items-center justify-between rounded-b-lg border-t p-2 backdrop-blur-sm"
-					>
-						<span class="text-xs text-gray-500">Modifiez le contenu si nécessaire</span>
-						<button
-							class="btn btn-sm btn-primary"
-							onclick={sendNewsletter}
-							disabled={isSending || !editor || !editorHtmlPreview}
+<div class="mt-4">
+	<!-- Wrapper pour les onglets -->
+	<div role="tablist" class="tabs tabs-lifted">
+		<!-- Onglet Éditeur -->
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Éditeur"
+			checked
+		/>
+		<div
+			role="tabpanel"
+			class="tab-content bg-base-100 border-base-300 rounded-box flex flex-col overflow-hidden p-0"
+			style="min-height: 400px; height: 70vh; border-top-left-radius: 0;"
+		>
+			{#if generationOk || editor}
+				<Tipex
+					body={generatedHtml}
+					bind:tipex={editor}
+					extensions={tipexExtensions}
+					controls={false}
+					class="flex h-full flex-col" /* Ajustement classes Tipex */
+					style="" /* Style déplacé vers le panneau */
+					focal={false}
+				>
+					{#snippet head(tipexInstance)}
+						<!-- Barre d'outils personnalisée -->
+						<TipexToolbar editor={tipexInstance} />
+					{/snippet}
+					<!-- Le contenu de l'éditeur (ProseMirror) sera dans la section par défaut -->
+					{#snippet foot()}
+						<div
+							class="border-base-300 bg-base-100/80 flex items-center justify-between border-t p-2 backdrop-blur-sm"
 						>
-							{#if isSending}
-								<span class="loading loading-spinner loading-xs"></span>
-								Envoi...
-							{:else}
-								Envoyer la Newsletter
-							{/if}
-						</button>
-					</div>
-				{/snippet}
-			</Tipex>
-		{:else}
-			<div
-				class="bg-base-200 mt-4 mb-0 flex h-[70vh] min-h-[400px] items-center justify-center rounded-lg border border-neutral-200"
-			>
-				<span class="loading loading-dots loading-lg"></span>
-			</div>
-		{/if}
-	</div>
-
-	<!-- Colonne Prévisualisation -->
-
-	<div class="flex h-full flex-col">
-		<!-- Wrapper pour contrôler la hauteur si nécessaire -->
-		<div role="tablist" class="tabs tabs-lifted">
-			<input type="radio" name="preview_tabs" role="tab" class="tab" aria-label="HTML" checked />
-			<div
-				role="tabpanel"
-				class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-				style="border-top-left-radius: 0;"
-			>
-				<!-- 👉 Contenu de la prévisualisation HTML -->
-				<div class="prose prose-sm">
-					{@html editorHtmlPreview}
+							<span class="text-xs text-gray-500">Modifiez le contenu si nécessaire</span>
+							<button
+								class="btn btn-sm btn-primary"
+								onclick={sendNewsletter}
+								disabled={isSending || !editor || !editorHtmlPreview}
+							>
+								{#if isSending}
+									<span class="loading loading-spinner loading-xs"></span>
+									Envoi...
+								{:else}
+									Envoyer la Newsletter
+								{/if}
+							</button>
+						</div>
+					{/snippet}
+				</Tipex>
+			{:else}
+				<div class="flex h-full items-center justify-center bg-base-200">
+					<span class="loading loading-dots loading-lg"></span>
 				</div>
-			</div>
+			{/if}
+		</div>
 
-			<input type="radio" name="preview_tabs" role="tab" class="tab" aria-label="Texte" />
-			<div
-				role="tabpanel"
-				class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			>
-				<!-- 👉 Contenu de la prévisualisation Texte -->
-				<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
+		<!-- Onglet Prévisualisation HTML -->
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu HTML" />
+		<div
+			role="tabpanel"
+			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
+			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
+		>
+			<div class="prose prose-sm max-w-none">
+				{@html editorHtmlPreview}
 			</div>
+		</div>
+
+		<!-- Onglet Prévisualisation Texte -->
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu Texte" />
+		<div
+			role="tabpanel"
+			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
+			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
+		>
+			<pre class="whitespace-pre-wrap text-sm">{editorTextPreview}</pre>
 		</div>
 	</div>
 </div>
