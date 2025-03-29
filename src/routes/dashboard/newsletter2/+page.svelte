@@ -365,10 +365,11 @@
 
 <div class="mt-4">
 	<!-- Wrapper pour les onglets -->
-	<div class="tabs tabs-lifted">
+	<div role="tablist" class="tabs tabs-lifted">
 		<!-- Onglet Éditeur -->
-		<input type="radio" name="content_tabs" class="tab" aria-label="Éditeur" checked="checked" />
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Éditeur" checked />
 		<div
+			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex flex-col overflow-hidden p-0"
 			style="min-height: 400px; height: 70vh; border-top-left-radius: 0;"
 		>
@@ -378,7 +379,7 @@
 					bind:tipex={editor}
 					extensions={tipexExtensions}
 					controls={false}
-					class="h-full w-full flex-col"
+					class="h-full w-full flex-col" /* Ajustement classes Tipex */
 					focal={false}
 				>
 					{#snippet head(tipexInstance)}
@@ -414,10 +415,11 @@
 		</div>
 
 		<!-- Onglet Prévisualisation HTML -->
-		<input type="radio" name="content_tabs2" class="tab" aria-label="Aperçu HTML" />
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu HTML" />
 		<div
+			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;"
+			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
 		>
 			<div class="prose prose-sm max-w-none">
 				{@html editorHtmlPreview}
@@ -425,10 +427,11 @@
 		</div>
 
 		<!-- Onglet Prévisualisation Texte -->
-		<input type="radio" name="content_tabs3" class="tab" aria-label="Aperçu Texte" />
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu Texte" />
 		<div
+			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;"
+			style="min-height: 400px; height: 70vh;" /* Hauteur cohérente */
 		>
 			<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
 		</div>
