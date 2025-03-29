@@ -53,10 +53,17 @@
 	},
 	"dependencies": {
 		"@friendofsvelte/tipex": "^0.0.8-dev.0",
+		"@tiptap/core": "^2.11.6",
+		"@tiptap/extension-collaboration": "^2.11.6",
+		"@tiptap/extension-collaboration-cursor": "^2.11.6",
+		"@tiptap/extension-link": "^2.11.6",
+		"@tiptap/pm": "^2.11.6",
+		"@tiptap/starter-kit": "^2.11.6",
 		"daisyui": "^5.0.4",
 		"date-fns": "^4.1.0",
 		"install": "^0.13.0",
 		"lucide-svelte": "^0.482.0",
-		"pocketbase": "^0.25.2"
+		"pocketbase": "^0.25.2",
+		"yjs": "^13.6.24"
 	}
 }
