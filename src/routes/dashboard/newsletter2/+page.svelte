@@ -43,32 +43,107 @@
 	let generationOk = $state(false);
 	let generatedHtml = $state('');
 	let editor: Editor | undefined = $state();
-let debounceTimer: ReturnType<typeof setTimeout>;
+	let debounceTimer: ReturnType<typeof setTimeout>;
 
-// Nouvelle fonction pour formater le texte brut
-function formatPlainText(rawText: string): string {
-	if (!rawText) return '';
+	// Nouvelle fonction pour formater le texte brut à partir du HTML
+	function formatPlainTextFromHtml(html: string): string {
+		if (typeof document === 'undefined' || !html) return ''; // Garde-fou pour SSR ou HTML vide
 
-	// 1. Remplacer les marqueurs <hr class="event-separator-marker"> (qui deviennent souvent des lignes vides ou ---) par notre séparateur
-	//    On cible plusieurs sauts de ligne potentiels autour du marqueur implicite
-	//    (Tiptap peut transformer <hr> en différentes choses dans getText(), souvent juste des sauts de ligne)
-	//    On recherche 3 sauts de lignes ou plus comme indicateur potentiel de la <hr>
-	let formattedText = rawText.replace(/\n{3,}/g, '\n\n•••••••••••••\n\n');
+		try {
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(html, 'text/html');
+			let text = '';
 
-	// 2. Remplacer les séquences de 3 sauts de ligne ou plus (qui pourraient rester après l'étape 1 ou exister ailleurs) par exactement 2 sauts de ligne.
-	formattedText = formattedText.replace(/\n{3,}/g, '\n\n');
+			function walk(node: Node) {
+				if (node.nodeType === Node.TEXT_NODE) {
+					// Ajouter le contenu texte, en normalisant les espaces multiples en un seul
+					text += node.nodeValue?.replace(/\s+/g, ' ') || '';
+				} else if (node.nodeType === Node.ELEMENT_NODE) {
+					const element = node as HTMLElement;
+					const tagName = element.tagName.toLowerCase();
+					let childrenText = ''; // Pour capturer le texte des enfants avant de l'ajouter
 
-	// 3. Supprimer les espaces blancs au début et à la fin
-	formattedText = formattedText.trim();
+					// --- Préfixe et formatage avant les enfants ---
+					switch (tagName) {
+						case 'h2':
+							text += '\n\n ✱ '; // Séparation et marqueur H2
+							break;
+						case 'h3':
+							text += '\n\n ■ '; // Séparation et marqueur H3 début
+							break;
+						case 'li':
+							text += '\n• '; // Marqueur de liste
+							break;
+						case 'p':
+							text += '\n\n'; // Assurer une séparation avant le paragraphe
+							break;
+						case 'hr':
+							text += '\n\n··························\n\n'; // Remplacer <hr>
+							return; // Pas d'enfants à traiter pour <hr>
+						case 'br':
+							text += '\n'; // Remplacer <br> par un saut de ligne
+							return; // Pas d'enfants à traiter pour <br>
+						case 'ul':
+						case 'ol':
+							text += '\n'; // Ajouter un saut de ligne avant la liste
+							break;
+						// Ignorer les div, span, strong, em, a pour le formatage structurel,
+						// mais traiter leurs enfants
+					}
 
-	// 4. (Optionnel) Ajustement spécifique pour les listes si nécessaire.
-	//    Par exemple, si les puces ajoutent trop de sauts de ligne :
-	//    formattedText = formattedText.replace(/-\s*\n\n/g, '- \n'); // Exemple: réduit l'espace après un item de liste
+					// --- Traiter les enfants ---
+					element.childNodes.forEach(walk);
 
-	return formattedText;
-}
+					// --- Suffixe et formatage après les enfants ---
+					switch (tagName) {
+						case 'h2':
+							text += '\n\n'; // Séparation après H2
+							break;
+						case 'h3':
+							text += ' ■\n\n'; // Marqueur H3 fin et séparation
+							break;
+						case 'p':
+							text += '\n\n'; // Assurer une séparation après le paragraphe
+							break;
+						case 'ul':
+						case 'ol':
+							text += '\n'; // Ajouter un saut de ligne après la liste
+							break;
+					}
+				}
+			}
 
-let isSending = $state(false);
+			walk(doc.body);
+
+			// --- Nettoyage final ---
+			// 1. Décoder les entités HTML (au cas où le parser ne l'aurait pas fait complètement)
+			const textarea = document.createElement('textarea');
+			textarea.innerHTML = text;
+			text = textarea.value;
+
+			// 2. Normaliser les espaces multiples (sauf les sauts de ligne)
+			text = text.replace(/[ \t]+/g, ' ');
+
+			// 3. Supprimer les espaces juste avant les sauts de ligne
+			text = text.replace(/ +\n/g, '\n');
+
+			// 4. Réduire les sauts de ligne multiples à un maximum de deux
+			text = text.replace(/\n{3,}/g, '\n\n');
+
+			// 5. Supprimer les espaces/sauts de ligne au début et à la fin
+			text = text.trim();
+
+			return text;
+
+		} catch (error) {
+			console.error("Erreur lors du formatage du texte depuis HTML:", error);
+			// Retourner le HTML brut ou une chaîne d'erreur en cas d'échec du parsing
+			// Alternative: essayer editor.getText() comme fallback ?
+			return html; // Ou une version très basique: html.replace(/<[^>]+>/g, '');
+		}
+	}
+
+	let isSending = $state(false);
 
 	let tipexExtensions = [...defaultExtensions];
 
@@ -227,10 +302,10 @@ let isSending = $state(false);
 
 	async function sendNewsletter() {
 		if (isSending || !editor) return;
- 
+
 		// Récupérer le contenu ACTUEL de l'éditeur
 		const currentHtml = editor.getHTML();
-		const currentText = formatPlainText(editor.getText()); // Utiliser notre fonction de formatage
+		const currentText = formatPlainTextFromHtml(currentHtml); // Utiliser la nouvelle fonction basée sur HTML
 
 		if (!currentHtml || !currentText) {
 			console.warn("Contenu HTML ou texte vide, annulation de l'envoi.");
