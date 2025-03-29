@@ -47,6 +47,9 @@
 
 	let isSending = $state(false);
 
+	let isSending = $state(false);
+	let activeTab = $state<'editor' | 'htmlPreview' | 'textPreview'>('editor'); // Ajout de l'état pour l'onglet actif
+
 	let tipexExtensions = [...defaultExtensions];
 
 	$effect(() => {
@@ -206,7 +209,8 @@
 
 		// Récupérer le contenu ACTUEL de l'éditeur
 		const currentHtml = editor.getHTML();
-		const currentText = formatPlainTextFromHtml(currentHtml); // Utiliser la nouvelle fonction basée sur HTML
+		// Calculer le texte brut directement ici
+		const currentText = formatPlainTextFromHtml(currentHtml);
 
 		if (!currentHtml || !currentText) {
 			console.warn("Contenu HTML ou texte vide, annulation de l'envoi.");
@@ -366,7 +370,7 @@
 	<!-- Wrapper pour les onglets -->
 	<div role="tablist" class="tabs tabs-lifted">
 		<!-- Onglet Éditeur -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Éditeur" checked />
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Éditeur" checked onclick={() => activeTab = 'editor'} />
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box overflow-hidden p-0"
@@ -414,7 +418,7 @@
 		</div>
 
 		<!-- Onglet Prévisualisation HTML -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu HTML" />
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu HTML" onclick={() => activeTab = 'htmlPreview'} />
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
@@ -426,7 +430,7 @@
 		</div>
 
 		<!-- Onglet Prévisualisation Texte -->
-		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu Texte" />
+		<input type="radio" name="content_tabs" role="tab" class="tab" aria-label="Aperçu Texte" onclick={() => activeTab = 'textPreview'} />
 		<div
 			role="tabpanel"
 			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
