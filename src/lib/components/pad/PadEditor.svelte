@@ -13,6 +13,8 @@
 	} from '$lib/shared/padStore.svelte';
 	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
 	import { pb } from '$lib/pocketbase.svelte';
+	import Save from 'lucide-svelte/icons/save';
+	import Pencil from 'lucide-svelte/icons/pencil';
 	import '@friendofsvelte/tipex/styles/Tipex.css';
 	import '@friendofsvelte/tipex/styles/ProseMirror.css';
 	import '@friendofsvelte/tipex/styles/EditLink.css';
@@ -388,22 +390,7 @@
 					title="Terminer l'édition"
 					aria-label="Terminer l'édition"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-						<polyline points="17 21 17 13 7 13 7 21"></polyline>
-						<polyline points="7 3 7 8 15 8"></polyline>
-					</svg>
+					<Save size={16} />
 				</button>
 			{:else if padLockedByOther}
 				<span class="text-warning text-sm" title={lockStatusMessage ?? ''}>
@@ -413,21 +400,7 @@
 			{:else}
 				<span class="text-warning text-sm">Mode lecture</span>
 				<button class="btn btn-xs btn-primary" onclick={startEditing} title="Commencer à éditer">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M12 20h9"></path>
-						<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-					</svg>
+					<Pencil size={16} />
 					Éditer
 				</button>
 			{/if}
