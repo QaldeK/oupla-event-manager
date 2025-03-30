@@ -446,24 +446,25 @@
 	{/if}
 
 	<div
-		class="editor-wrapper bg-base-100 overflow-hidden rounded-lg shadow-md"
-		style="min-height: 500px; height: 75vh; margin-top: -1px;"
+		class="editor-wrapper bg-base-100 rounded-lg shadow-md"
+		style="margin-top: -1px;" /* Garde le style margin-top si nécessaire, sinon supprime aussi style */
 	>
 		{#if isLoading && !isEditing}
-			<div class="flex h-full items-center justify-center">
+			{/* Ajustement: plus de h-full ici car le parent n'a plus de hauteur fixe */}
+			<div class="flex items-center justify-center p-10">
 				<span class="loading loading-dots loading-lg"></span>
 				<span class="ml-4">Chargement de l'éditeur...</span>
 			</div>
 		{:else if isEditing}
 			<!-- Toolbar Sticky -->
-			<div class="bg-base-100 sticky top-0 z-10">
+			<div class="sticky top-0 z-10"> {/* Supprime bg-base-100 */}
 				<TipexToolbar {editor} />
 			</div>
 
 			<Tipex
 				bind:tipex={editor as TipexEditor}
 				controls={false}
-				class="h-full w-full"
+				class="w-full" /* Supprime h-full */
 				focal={false}
 				body={htmlContent}
 			/>
@@ -471,7 +472,7 @@
 			<!-- Mode Lecture: Affiche le HTML rendu -->
 			<!-- Ajout d'une clé `padId` pour forcer le re-rendu si on navigue entre pads sans recharger la page -->
 			{#key padId}
-				<div class="document-content prose h-full max-w-none overflow-auto p-4">
+				<div class="document-content prose max-w-none p-4"> {/* Supprime h-full et overflow-auto */}
 					{@html htmlContent || '<p><em>Ce document est vide.</em></p>'}
 				</div>
 			{/key}
@@ -538,29 +539,27 @@ Editor instance: {editor ? 'Oui' : 'Non'}
 <style>
 	:global(.tipex .ProseMirror) {
 		padding: 0.75rem 1rem;
-		/* Retirer le border-radius du haut car la toolbar l'a maintenant */
 		border-top-left-radius: 0;
 		border-top-right-radius: 0;
-		/* Assurer une hauteur minimale */
-		min-height: 100%; /* S'étend pour remplir le parent scrollable */
-		/* La hauteur et l'overflow sont gérés par .tipex-editor-section */
+		/* Définit une hauteur minimale pour cliquer dedans quand c'est vide */
+		min-height: 10rem; /* Ajuste si nécessaire */
+		height: auto; /* Permet au contenu de définir la hauteur */
 		outline: none;
 		background-color: white;
-		/* Important: S'assurer qu'il n'y a pas d'overflow caché ici qui pourrait interférer */
-		overflow: visible;
+		overflow: visible; /* Assure qu'aucun contenu n'est coupé */
 	}
 	:global(.tipex-editor-wrap) {
 		display: flex;
 		flex-direction: column;
-		height: 100%; /* Pour que le calcul de hauteur de ProseMirror fonctionne */
+		/* Pas de hauteur fixe ici */
 	}
 	:global(.tipex-editor-section) {
 		flex-grow: 1;
-		border-bottom-left-radius: inherit; /* Hérite du radius du parent Tipex */
+		border-bottom-left-radius: inherit;
 		border-bottom-right-radius: inherit;
-		border-radius: inherit; /* Assure que le wrapper hérite du radius */
-		overflow-y: auto; /* Gère le scroll ici */
-		min-height: 0; /* Nécessaire pour que l'overflow fonctionne dans un conteneur flex */
+		border-radius: inherit;
+		/* Pas d'overflow ici, le scroll se fait sur la page */
+		/* Pas de min-height: 0 ici */
 	}
 
 	:global(.tipex-editor-section .tipex) {
