@@ -148,11 +148,11 @@
 
 		// Écouter les mises à jour locales et les envoyer au serveur
 		yDoc.on('update', (update: Uint8Array, origin: any) => {
-			console.log(`yDoc 'update' event: ${update.length} octets, origine: ${origin}`);
+			// console.log(`yDoc 'update' event: ${update.length} octets, origine: ${origin}`);
 
 			// Ignorer les mises à jour provenant de l'application des updates distantes ou du chargement initial
 			if (origin === 'sync-provider' || origin === 'load') {
-				console.log(` > Mise à jour ignorée (origine: ${origin})`);
+				// console.log(` > Mise à jour ignorée (origine: ${origin})`);
 				return;
 			}
 
@@ -160,7 +160,7 @@
 			const updateBlob = new Blob([update], { type: 'application/octet-stream' });
 			const clientId = yDoc!.clientID.toString(); // yDoc est garanti d'exister ici
 
-			console.log(` > Envoi de la mise à jour incrémentielle (${update.length} octets)`);
+			// console.log(` > Envoi de la mise à jour incrémentielle (${update.length} octets)`);
 
 			createPadUpdate(padId, updateBlob, clientId).catch((err) => {
 				// TODO: Gérer l'erreur (ex: notifier l'utilisateur, réessayer ?)
@@ -174,21 +174,21 @@
 		// S'abonner aux mises à jour distantes via PocketBase
 		// 👉 Assurez-vous que subscribeToPadUpdates gère correctement la désinscription précédente si nécessaire
 		subscribeToPadUpdates(padId, async (data) => {
-			if (!yDoc) {
-				console.warn("Réception d'une mise à jour distante mais yDoc n'est pas prêt.");
-				return;
-			}
+            if (!yDoc) {
+                // console.warn("Réception d'une mise à jour distante mais yDoc n'est pas prêt.");
+                return;
+            }
 
 			// Vérifier que ce n'est pas notre propre mise à jour (basé sur le clientId enregistré dans PocketBase)
 			if (data.clientId === yDoc.clientID.toString()) {
-				console.log('Ignorer notre propre mise à jour distante.');
+				// console.log('Ignorer notre propre mise à jour distante.');
 				return;
 			}
 
 			try {
 				// Récupérer le contenu binaire de la mise à jour
 				const updateUrl = pb.files.getUrl(data, data.updateData);
-				console.log(`Réception d'une mise à jour distante de ${data.clientId}, URL: ${updateUrl}`);
+				// console.log(`Réception d'une mise à jour distante de ${data.clientId}, URL: ${updateUrl}`);
 
 				const response = await fetch(updateUrl);
 				if (!response.ok) {
@@ -201,21 +201,21 @@
 				}
 
 				const buffer = await response.arrayBuffer();
-				if (buffer.byteLength === 0) {
-					console.warn('Mise à jour distante récupérée mais vide.');
-					return;
-				}
-				console.log(`Mise à jour distante récupérée (${buffer.byteLength} octets)`);
+                if (buffer.byteLength === 0) {
+                    // console.warn('Mise à jour distante récupérée mais vide.');
+                    return;
+                }
+                // console.log(`Mise à jour distante récupérée (${buffer.byteLength} octets)`);
 
 				// Appliquer la mise à jour au document Yjs local
 				// Utiliser 'sync-provider' comme origine pour l'ignorer dans le listener 'update' local
 				Y.applyUpdate(yDoc, new Uint8Array(buffer), 'sync-provider');
 
-				// Vérification (optionnelle mais utile pour le débogage)
-				const content = yDoc.getText(yjsContentType);
-				console.log(
-					`Après application de la mise à jour distante: document contient ${content.length} caractères`
-				);
+                // Vérification (optionnelle mais utile pour le débogage)
+                // const content = yDoc.getText(yjsContentType);
+                // console.log(
+                //  `Après application de la mise à jour distante: document contient ${content.length} caractères`
+                // );
 			} catch (err) {
 				console.error("Erreur lors de l'application d'une mise à jour distante:", err);
 				// TODO: Gérer l'erreur (ex: afficher une notification ?)
