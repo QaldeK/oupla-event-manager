@@ -1,359 +1,392 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import { Tipex } from '@friendofsvelte/tipex';
-	import type { Editor, Extension } from '@tiptap/core';
-	import { Collaboration } from '@tiptap/extension-collaboration';
-	// Désactivation de CollaborationCursor en raison de problèmes avec le provider null
-	// import { CollaborationCursor } from '@tiptap/extension-collaboration-cursor';
+	import type { TipexEditor } from '@friendofsvelte/tipex';
+	import { Editor } from '@tiptap/core';
+	import type { PadResponse } from '$lib/types/pad/pad.types';
+
 	import {
-		createPadUpdate,
-		subscribeToPadUpdates,
-		unsubscribeFromPadUpdates,
-		updatePadContent
+		loadPad,
+		updatePadContent,
+		acquirePadLock,
+		releasePadLock,
+		refreshPadLock
 	} from '$lib/shared/padStore.svelte';
 	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
 	import { pb } from '$lib/pocketbase.svelte';
-	import * as Y from 'yjs';
 	import '@friendofsvelte/tipex/styles/Tipex.css';
 	import '@friendofsvelte/tipex/styles/ProseMirror.css';
 	import '@friendofsvelte/tipex/styles/EditLink.css';
 
 	interface Props {
 		padId: string;
-		initialContentUrl?: string;
-		padTitle: string;
 	}
 
-	const { padId, initialContentUrl, padTitle } = $props<Props>();
+	const { padId }: Props = $props();
 
 	// État de l'éditeur
-	let editor: Editor | undefined = $state();
-	let isInitialized = $state(false);
-	let isSaving = $state(false);
+	let editor: TipexEditor | undefined = $state();
+	let isEditing = $state(false);
 	let isLoading = $state(true);
+	let isSaving = $state(false);
 	let error = $state<string | null>(null);
-	let debounceTimer: ReturnType<typeof setTimeout>;
-	let autoSaveTimer: ReturnType<typeof setInterval>;
-	let yDoc: Y.Doc | undefined = $state(); // 👉 Initialiser à undefined pour vérifier sa création
+	let lastActivity = $state(Date.now());
+	let padTitle = $state('');
+	let htmlContent = $state(''); // État local pour le contenu venant de la DB ou sauvegardé
 
-	// Utiliser un nom de type unique spécifique à ce pad pour éviter les conflits
-	const yjsContentType = `oupla-pad-${padId}`;
+	// --- État Externe (PocketBase, via subscription) ---
+	let padLockedByOther = $state(false); // Le pad est-il verrouillé par qqn d'autre ?
+	let externalEditorUsername = $state<string | null>(null); // Nom de l'autre éditeur
+	let lockStatusMessage = $state<string | null>(null); // Message de statut du verrou
 
-	let tipexExtensions: Extension[] = []; // Pas besoin de $state ici, défini une fois à l'init
+	// Timers et intervalles
+	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+	let debounceTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+	let inactivityTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+	let unsubscribe: (() => void) | null = null; //
 
-	// Couleurs pour les curseurs collaboratifs (aléatoires pour chaque utilisateur)
-	// ... reste des couleurs inchangé ...
+	// Durée d'inactivité avant libération auto du verrou (10 minutes)
+	const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+	// Intervalle d'envoi du heartbeat (1 minute)
+	const HEARTBEAT_INTERVAL_MS = 60 * 1000;
+	const SAVE_DEBOUNCE_MS = 2000;
 
-	// Attribuer une couleur aléatoire à l'utilisateur actuel
-	// ... reste de l'attribution inchangé ...
+	const currentUserId = pb.authStore.model?.id;
+	// --- Fonctions Principales ---
 
-	// Fonction pour initialiser l'éditeur avec Yjs
-	async function initializeEditor() {
-		// 👉 Réinitialisation plus propre au début
+	// 👉 Chargement initial et mise en place de la subscription
+	async function initializeAndSubscribe() {
 		isLoading = true;
 		error = null;
-		isInitialized = false;
-		yDoc = undefined;
-		tipexExtensions = [];
+		lockStatusMessage = null;
+		padLockedByOther = false;
+		externalEditorUsername = null;
 
 		try {
-			console.log(`Initialisation de l'éditeur pour padId: ${padId}`);
+			console.log(`Initialisation pour padId: ${padId}`);
+			const initialPad = await loadPad(padId);
+			padTitle = initialPad.title;
+			// *** Correction Bug Contenu Vide ***
+			// Définit le contenu initial SEULEMENT si htmlContent est vide ou si le contenu chargé est différent
+			// Cela évite d'écraser le contenu de l'éditeur s'il a déjà été modifié localement mais pas encore sauvé
+			// (cas peu probable au chargement initial, mais plus sûr)
+			// Plus important : Cela assure que le contenu est bien chargé avant de potentiellement passer en édition.
 
-			// Créer un nouveau document Yjs
-			yDoc = new Y.Doc();
-			console.log(`Nouveau Y.Doc créé, clientID: ${yDoc.clientID}`);
-
-			// Créer explicitement le type de texte pour ce document AVANT de configurer Collaboration
-			const yText = yDoc.getText(yjsContentType);
-			console.log(`Type de texte Yjs créé: ${yjsContentType}, longueur initiale: ${yText.length}`);
-
-			// Si nous avons une URL initiale, charger l'état Yjs
-			if (initialContentUrl) {
-				try {
-					console.log("Chargement de l'état initial depuis:", initialContentUrl);
-					const response = await fetch(initialContentUrl);
-					if (response.ok) {
-						const buffer = await response.arrayBuffer();
-						if (buffer.byteLength > 0) {
-							console.log(`État initial chargé (${buffer.byteLength} octets)`);
-							// Appliquer l'état au document Yjs
-							// 👉 Utiliser 'load' comme origine pour potentiellement l'ignorer dans les listeners si nécessaire
-							Y.applyUpdate(yDoc, new Uint8Array(buffer), 'load');
-							console.log(`État chargé: document contient ${yText.length} caractères`);
-						} else {
-							console.warn('État initial vide reçu du serveur.');
-						}
-					} else {
-						console.warn(
-							`Échec du chargement de l'état initial: ${response.status} ${response.statusText}`
-						);
-						// Ne pas considérer cela comme une erreur bloquante, continuer avec un doc vide
-					}
-				} catch (e) {
-					console.error("Erreur lors du chargement ou de l'application de l'état initial:", e);
-					// Ne pas considérer cela comme une erreur bloquante, continuer avec un doc vide
+			if (!htmlContent || htmlContent !== initialPad.content) {
+				htmlContent = initialPad.content || '';
+				// Si l'éditeur existe déjà, on met son contenu à jour (utile si rechargement forcé)
+				if (editor && editor.getHTML() !== htmlContent) {
+					editor.commands.setContent(htmlContent, false); // false pour ne pas déclencher d'événement 'update'
 				}
-			} else {
-				console.log("Pas d'URL d'état initial, démarrage avec un document vide.");
 			}
+			console.log(`Contenu initial chargé (${htmlContent.length} caractères)`);
 
-			// 👉 Configuration des extensions Tiptap/Yjs SANS setTimeout
-			console.log(`Configuration de Yjs Collaboration avec le champ "${yjsContentType}"`);
-			tipexExtensions = [
-				Collaboration.configure({
-					document: yDoc,
-					field: yjsContentType
-					// 👉 Supprimer le onUpdate ici, on utilisera yDoc.on('update')
-				})
-				// CollaborationCursor peut être ajouté ici si vous le réactivez
-				// CollaborationCursor.configure({
-				//   provider: null, // Nécessite un vrai provider (ex: Hocuspocus, Tiptap Collab)
-				//   user: { name: username, color: userColor },
-				// }),
-			];
+			// Met à jour l'état de verrouillage externe initial
+			updateLockStatus(initialPad);
 
-			// Utiliser snapshot pour éviter les avertissements et problèmes potentiels avec les proxys $state dans les logs
-			console.log('Extensions Tipex configurées:', $state.snapshot(tipexExtensions));
+			// S'abonner aux changements sur ce pad spécifique
+			unsubscribe = await pb.collection('pads').subscribe(padId, ({ action, record }) => {
+				console.log(`Subscription event: ${action}`, record);
+				if (action === 'update') {
+					updateLockStatus(record as PadResponse);
 
-			// Configurer les écouteurs pour les mises à jour Yjs AVANT de marquer comme initialisé
-			setupYjsListeners();
-
-			// Marquer comme initialisé SEULEMENT APRÈS que tout soit prêt
-			isInitialized = true;
-			console.log('Éditeur marqué comme initialisé.');
-
-			// Sauvegarde automatique périodique
-			autoSaveTimer = setInterval(() => {
-				// 👉 Appeler saveFullState seulement si l'éditeur est prêt
-				if (isInitialized && yDoc) {
-					saveFullState();
+					// Si qqn d'autre modifie le contenu pendant qu'on est en lecture seule, mettre à jour notre vue
+					if (!isEditing && record.content !== htmlContent) {
+						console.log('Contenu mis à jour via subscription (mode lecture)');
+						htmlContent = record.content || '';
+						if (editor) {
+							// Mettre à jour l'éditeur Tipex s'il est visible (ce qui ne devrait pas arriver en lecture seule, mais par sécurité)
+							editor.commands.setContent(htmlContent, false);
+						}
+					}
 				}
-			}, 30000); // Sauvegarder toutes les 30 secondes
-		} catch (e) {
-			error = `Erreur critique lors de l'initialisation de l'éditeur: ${e instanceof Error ? e.message : String(e)}`;
-			console.error(e);
-			isInitialized = false; // Assurer que l'éditeur n'est pas marqué comme prêt
+				if (action === 'delete') {
+					error = 'Le pad a été supprimé.';
+					// Gérer la redirection ou le blocage de l'interface ici
+				}
+			});
+			console.log(`Subscription établie pour padId: ${padId}`);
+		} catch (e: any) {
+			console.error("Erreur lors de l'initialisation ou la subscription:", e);
+			error = `Impossible de charger le pad ou de s'y abonner: ${e.message}`;
 		} finally {
 			isLoading = false;
 		}
 	}
 
-	// Fonction pour configurer les écouteurs Yjs
-	function setupYjsListeners() {
-		if (!yDoc) {
-			console.error('Tentative de configuration des listeners Yjs sans yDoc initialisé.');
-			return;
-		}
+	// 👉 Met à jour l'état local basé sur les infos de verrouillage du pad
+	function updateLockStatus(pad: PadResponse) {
+		const isLocked = pad.isEditing ?? false;
+		const editorId = pad.editingUser ?? null;
+		const editorIsCurrentUser = editorId === currentUserId;
 
-		console.log('Configuration des listeners Yjs...');
+		padLockedByOther = isLocked && !editorIsCurrentUser;
 
-		// Écouter les mises à jour locales et les envoyer au serveur
-		yDoc.on('update', (update: Uint8Array, origin: any) => {
-			// console.log(`yDoc 'update' event: ${update.length} octets, origine: ${origin}`);
+		if (padLockedByOther) {
+			externalEditorUsername = pad.expand?.editingUser?.username || 'un autre utilisateur';
+			lockStatusMessage = `Document édité par ${externalEditorUsername}. Mode lecture seule.`;
+			console.log(`Pad verrouillé par ${externalEditorUsername} (${editorId})`);
 
-			// Ignorer les mises à jour provenant de l'application des updates distantes ou du chargement initial
-			if (origin === 'sync-provider' || origin === 'load') {
-				// console.log(` > Mise à jour ignorée (origine: ${origin})`);
-				return;
+			// Si l'utilisateur actuel était en train d'éditer, le forcer à sortir
+			if (isEditing) {
+				console.warn(
+					'Le verrou a été pris par un autre utilisateur. Passage forcé en mode lecture.'
+				);
+				forceStopEditing('Le verrou a été pris par ' + externalEditorUsername);
 			}
-
-			// Envoyer la mise à jour incrémentielle à PocketBase
-			const updateBlob = new Blob([update], { type: 'application/octet-stream' });
-			const clientId = yDoc!.clientID.toString(); // yDoc est garanti d'exister ici
-
-			// console.log(` > Envoi de la mise à jour incrémentielle (${update.length} octets)`);
-
-			createPadUpdate(padId, updateBlob, clientId).catch((err) => {
-				// TODO: Gérer l'erreur (ex: notifier l'utilisateur, réessayer ?)
-				console.error("Erreur lors de l'envoi d'une mise à jour incrémentielle au serveur:", err);
-			});
-
-			// Planifier la sauvegarde de l'état complet après un délai d'inactivité
-			scheduleSaveFullState();
-		});
-
-		// S'abonner aux mises à jour distantes via PocketBase
-		// 👉 Assurez-vous que subscribeToPadUpdates gère correctement la désinscription précédente si nécessaire
-		subscribeToPadUpdates(padId, async (data) => {
-            if (!yDoc) {
-                // console.warn("Réception d'une mise à jour distante mais yDoc n'est pas prêt.");
-                return;
-            }
-
-			// Vérifier que ce n'est pas notre propre mise à jour (basé sur le clientId enregistré dans PocketBase)
-			if (data.clientId === yDoc.clientID.toString()) {
-				// console.log('Ignorer notre propre mise à jour distante.');
-				return;
-			}
-
-			try {
-				// Récupérer le contenu binaire de la mise à jour
-				const updateUrl = pb.files.getUrl(data, data.updateData);
-				// console.log(`Réception d'une mise à jour distante de ${data.clientId}, URL: ${updateUrl}`);
-
-				const response = await fetch(updateUrl);
-				if (!response.ok) {
-					// Gérer le cas où l'URL n'est plus valide (ex: fichier supprimé)
-					if (response.status === 404) {
-						console.warn(`Impossible de récupérer la mise à jour distante (404): ${updateUrl}`);
-						return; // Ne pas planter, juste ignorer cette mise à jour
-					}
-					throw new Error(`Impossible de récupérer la mise à jour (${response.status})`);
-				}
-
-				const buffer = await response.arrayBuffer();
-                if (buffer.byteLength === 0) {
-                    // console.warn('Mise à jour distante récupérée mais vide.');
-                    return;
-                }
-                // console.log(`Mise à jour distante récupérée (${buffer.byteLength} octets)`);
-
-				// Appliquer la mise à jour au document Yjs local
-				// Utiliser 'sync-provider' comme origine pour l'ignorer dans le listener 'update' local
-				Y.applyUpdate(yDoc, new Uint8Array(buffer), 'sync-provider');
-
-                // Vérification (optionnelle mais utile pour le débogage)
-                // const content = yDoc.getText(yjsContentType);
-                // console.log(
-                //  `Après application de la mise à jour distante: document contient ${content.length} caractères`
-                // );
-			} catch (err) {
-				console.error("Erreur lors de l'application d'une mise à jour distante:", err);
-				// TODO: Gérer l'erreur (ex: afficher une notification ?)
-			}
-		});
-	}
-
-	// Fonction pour planifier la sauvegarde de l'état complet
-	function scheduleSaveFullState() {
-		clearTimeout(debounceTimer);
-		// 👉 Sauvegarder seulement si l'éditeur est prêt
-		if (isInitialized && yDoc) {
-			debounceTimer = setTimeout(saveFullState, 5000); // Sauvegarder après 5 secondes d'inactivité
-		}
-	}
-
-	// Fonction pour forcer une sauvegarde
-	function forceSaveFullState() {
-		clearTimeout(debounceTimer);
-		// 👉 Sauvegarder seulement si l'éditeur est prêt
-		if (isInitialized && yDoc) {
-			saveFullState();
 		} else {
-			console.warn("Tentative de sauvegarde forcée alors que l'éditeur n'est pas prêt.");
+			externalEditorUsername = null;
+			lockStatusMessage = null; // Efface le message si le verrou est levé ou si c'est nous
+		}
+	}
+	// Fonction pour démarrer l'édition (acquérir le verrou)
+	async function startEditing() {
+		if (isEditing || padLockedByOther) return; // Ne rien faire si déjà en édition ou verrouillé par un autre
+
+		isLoading = true;
+		error = null;
+		try {
+			const lockedPad = await acquirePadLock(padId);
+			if (lockedPad && lockedPad.editingUser === currentUserId) {
+				isEditing = true;
+
+				// Démarrer le heartbeat pour maintenir le verrou
+				startHeartbeat();
+
+				// Réinitialiser le timer d'inactivité
+				resetInactivityTimer();
+			} else {
+				error =
+					"Impossible d'acquérir le verrou d'édition. Le document est peut-être déjà en cours d'édition.";
+				// Re-vérifier l'état au cas où la subscription n'aurait pas encore mis à jour
+				const currentPad = await loadPad(padId);
+				updateLockStatus(currentPad);
+			}
+		} catch (e) {
+			console.error("Erreur lors de l'acquisition du verrou:", e);
+			error = "Erreur lors de l'acquisition du verrou d'édition";
+		} finally {
+			isLoading = false;
 		}
 	}
 
-	// Fonction pour sauvegarder l'état complet du document
-	async function saveFullState() {
-		// 👉 Vérification simplifiée : on a besoin de yDoc et de ne pas être déjà en train de sauvegarder
-		if (!yDoc || isSaving) {
-			console.log(`Sauvegarde complète ignorée (yDoc: ${!!yDoc}, isSaving: ${isSaving})`);
+	// 👉 Forcer l'arrêt de l'édition (sans libérer le verrou, car qqn d'autre l'a pris)
+	// XXX Normalement impossible ?
+	function forceStopEditing(reason: string) {
+		if (!isEditing) return;
+		console.log(`Arrêt forcé de l'édition. Raison: ${reason}`);
+		isEditing = false;
+		error = reason; // Afficher la raison à l'utilisateur
+		cleanupTimers(); // Arrêter heartbeat et timers
+	}
+
+	// 👉 Arrêter l'édition (sauvegarder et libérer le verrou)
+	async function stopEditing(saveFirst = true) {
+		if (!isEditing) return;
+		console.log("Arrêt de l'édition demandé...");
+		// Empêche les sauvegardes automatiques pendant le processus d'arrêt
+		clearTimeout(debounceTimer);
+		debounceTimer = undefined;
+
+		if (saveFirst && editor) {
+			const contentToSave = editor.getHTML();
+			if (contentToSave !== htmlContent) {
+				await saveContent(contentToSave, true); // true = force save even if isSaving is true (needed for beforeunload)
+			}
+		}
+		isLoading = true; // Indicateur visuel pendant la libération
+		try {
+			await releasePadLock(padId);
+			console.log("Verrou d'édition libéré avec succès.");
+			isEditing = false;
+			cleanupTimers(); // Arrête heartbeat et timers *après* la libération réussie
+		} catch (e: any) {
+			console.error('Erreur lors de la libération du verrou:', e);
+			error = `Erreur lors de l'arrêt de l'édition: ${e.message}`;
+			// Que faire ici ? L'utilisateur est toujours en mode édition localement mais le verrou n'a pas pu être libéré.
+			// On pourrait laisser en édition, mais c'est risqué. Forcer la sortie ?
+			isEditing = false; // Forcer la sortie locale pour éviter incohérences
+			cleanupTimers();
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Sauvegarder le contenu actuel
+	async function saveContent(content: string, force = false) {
+		// Ne pas sauvegarder si pas en mode édition, ou si déjà en sauvegarde (sauf si forcé), ou si contenu inchangé
+		if (!isEditing || (isSaving && !force) || content === htmlContent) {
 			return;
 		}
-
-		const yText = yDoc.getText(yjsContentType); // Pour le log
 
 		isSaving = true;
+		console.log(`Sauvegarde du contenu (${content.length} caractères)...`);
 		try {
-			// Encoder l'état complet du document Yjs
-			const fullState = Y.encodeStateAsUpdate(yDoc);
-
-			// 👉 Vérifier si l'état encodé est vide. Si oui, pas besoin de sauvegarder.
-			if (fullState.length === 0) {
-				console.log('État complet encodé vide, pas de sauvegarde effectuée.');
-				// On pourrait vouloir sauvegarder un état vide si le but est d'effacer le contenu existant.
-				// Si c'est le cas, il faudrait une logique différente ici.
-				// Pour l'instant, on suppose qu'un état vide ne nécessite pas d'écriture.
-				return;
-			}
-
-			console.log(
-				`Sauvegarde de l'état complet (${fullState.length} octets), contenu actuel: ${yText.length} caractères`
-			);
-
-			const stateBlob = new Blob([fullState], { type: 'application/octet-stream' });
-
-			// Mettre à jour l'enregistrement du pad avec l'état complet
-			await updatePadContent(padId, stateBlob);
-			console.log('État complet du document sauvegardé avec succès via updatePadContent.');
-		} catch (err) {
-			console.error("Erreur lors de la sauvegarde de l'état complet:", err);
-			// TODO: Gérer l'erreur (notifier l'utilisateur ?)
+			await updatePadContent(padId, content);
+			htmlContent = content;
+			console.log('Contenu sauvegardé avec succès.');
+		} catch (e) {
+			console.error('Erreur lors de la sauvegarde:', e);
+			error = 'Impossible de sauvegarder les modifications';
 		} finally {
 			isSaving = false;
 		}
 	}
 
-	// Initialiser l'éditeur au chargement du composant
-	$effect(() => {
-		// S'assure que l'initialisation n'est lancée qu'une seule fois ou si padId change
-		console.log('Effect triggered: Initializing editor...');
-		initializeEditor();
-
-		// Fonction de nettoyage pour $effect
-		return () => {
-			console.log('Effect cleanup: Destroying editor resources...');
-			// Sauvegarder l'état final avant de quitter si possible
-			if (yDoc && !isSaving) {
-				// Pas besoin de forceSaveFullState ici car le debounce est géré par scheduleSaveFullState
-				// On peut juste s'assurer que le timer est nettoyé
-				clearTimeout(debounceTimer);
-				// Optionnel: lancer une dernière sauvegarde synchrone si l'application le permettait
-				// await saveFullState(); // Attention: peut ralentir la navigation
-				console.log('Cleanup: State will be saved by regular mechanism if pending.');
+	// Envoyer un heartbeat pour maintenir le verrou
+	function startHeartbeat() {
+		cleanupTimers(); // Assure qu'il n'y a qu'un seul intervalle actif
+		heartbeatInterval = setInterval(async () => {
+			if (!isEditing) {
+				console.log('Heartbeat arrêté car plus en mode édition.');
+				cleanupTimers();
+				return;
 			}
 
-			// Se désabonner des mises à jour PocketBase
-			unsubscribeFromPadUpdates();
-
-			// Arrêter la sauvegarde automatique
-			clearInterval(autoSaveTimer);
-
-			// Détruire le document Yjs pour libérer les ressources et stopper les listeners internes
-			if (yDoc) {
-				console.log('Destroying Y.Doc...');
-				yDoc.destroy();
-				yDoc = undefined; // Nettoyer la référence
+			try {
+				const refreshedPad = await refreshPadLock(padId);
+				if (refreshedPad) {
+					console.log('Heartbeat réussi.');
+					resetInactivityTimer(); // Réinitialise aussi l'inactivité à chaque heartbeat réussi
+				} else {
+					// Le rafraîchissement a échoué (probablement parce qu'on n'est plus l'éditeur légitime)
+					console.error('Échec du rafraîchissement du verrou (heartbeat).');
+					forceStopEditing("La session d'édition a expiré ou a été interrompue.");
+				}
+			} catch (e) {
+				console.error("Erreur lors de l'envoi du heartbeat:", e);
+				error = "La connexion pour maintenir l'édition a été perdue. Passage en mode lecture.";
+				forceStopEditing("Erreur de connexion lors du maintien de la session d'édition.");
 			}
-
-			// Nettoyer le timer de debounce une dernière fois
-			clearTimeout(debounceTimer);
-			isInitialized = false; // Marquer comme non initialisé
-			console.log('Effect cleanup completed.');
-		};
-	});
-
-	// Fonction pour vérifier l'état actuel du document
-	function debugDocument() {
-		if (!yDoc) return 'Document YJS non initialisé';
-		const yText = yDoc.getText(yjsContentType);
-		const stateVector = Y.encodeStateVector(yDoc);
-		return `Document YJS:\n  ClientID: ${yDoc.clientID}\n  Type: ${yjsContentType}\n  Caractères: ${yText.length}\n  État (vector): ${stateVector.byteLength} octets`;
+		}, HEARTBEAT_INTERVAL_MS);
 	}
 
-	// 👉 onDestroy n'est plus nécessaire ici car le nettoyage est géré par le return de $effect
-	// onDestroy(() => { ... });
+	// Réinitialiser le timer d'inactivité
+	function resetInactivityTimer() {
+		clearTimeout(inactivityTimer);
+		inactivityTimer = undefined;
+
+		lastActivity = Date.now();
+
+		if (isEditing) {
+			inactivityTimer = setTimeout(async () => {
+				console.log(`Inactivité de ${INACTIVITY_TIMEOUT_MS}ms détectée, libération du verrou`);
+				await stopEditing(true);
+				error = "Vous avez été déconnecté de l'édition pour inactivité.";
+			}, INACTIVITY_TIMEOUT_MS);
+		}
+	}
+
+	// 👉 Gérer l'activité utilisateur (appelée par le DOM et l'éditeur)
+	function handleUserActivity() {
+		if (isEditing) {
+			resetInactivityTimer();
+		}
+	}
+
+	function cleanupTimers() {
+		clearInterval(heartbeatInterval);
+		heartbeatInterval = undefined;
+		clearTimeout(inactivityTimer);
+		inactivityTimer = undefined;
+		clearTimeout(debounceTimer);
+		debounceTimer = undefined;
+		console.log('Timers nettoyés.');
+	}
+
+	// 👉 Handler pour l'événement 'update' de Tipex
+	function handleEditorUpdate({ editor: updatedEditor }: EditorEvents['update']) {
+		// 1. Gérer l'activité utilisateur
+		handleUserActivity();
+
+		// 2. Lancer la sauvegarde avec debounce si en mode édition
+		if (isEditing) {
+			clearTimeout(debounceTimer);
+			debounceTimer = setTimeout(() => {
+				// Vérifier à nouveau isEditing et l'état de l'éditeur au moment de l'exécution
+				if (isEditing && updatedEditor && !updatedEditor.isDestroyed) {
+					const currentContent = updatedEditor.getHTML();
+					// saveContent vérifie déjà si le contenu a changé par rapport à htmlContent
+					saveContent(currentContent);
+				}
+			}, SAVE_DEBOUNCE_MS);
+		}
+	}
+	// --- Effets et Cycle de Vie ---
+
+	$effect(() => {
+		console.log('Effet principal: Initialisation et mise en place...');
+		initializeAndSubscribe();
+
+		// Gestionnaire simple pour beforeunload (tentative de sauvegarde/libération)
+		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+			// On ne bloque plus la fermeture, on essaie juste de nettoyer
+			if (isEditing) {
+				console.warn(
+					'Tentative de sauvegarde et libération du verrou avant fermeture/rechargement (best effort).'
+				);
+				// On ne peut pas utiliser await ici.
+				// saveContent est appelé dans stopEditing.
+				stopEditing(true).catch((e) =>
+					console.error('Erreur (non bloquante) cleanup beforeunload:', e)
+				);
+			}
+		};
+
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		// Cleanup lors de la destruction du composant
+		return () => {
+			console.log('Cleanup global: Désabonnement et nettoyage des timers...');
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+
+			// Désabonnement immédiat
+			if (unsubscribe) {
+				unsubscribe();
+				console.log('Désabonnement PocketBase effectué.');
+				unsubscribe = null;
+			}
+
+			// Nettoyer tous les timers restants
+			cleanupTimers();
+
+			// Libérer le verrou si on était en train d'éditer (best effort, sans await)
+			// Note: stopEditing contient déjà la logique de sauvegarde et cleanupTimers,
+			// mais l'appeler ici pourrait être redondant ou causer des problèmes sans await.
+			// On se contente de libérer le verrou directement si besoin.
+			if (isEditing) {
+				console.warn('Tentative de libération du verrou lors du cleanup (best effort).');
+				// On capture la valeur avant l'appel asynchrone potentiel
+				const padToRelease = padId;
+				releasePadLock(padToRelease).catch((e) =>
+					console.error('Erreur (non bloquante) cleanup releasePadLock:', e)
+				);
+				// Important: Mettre isEditing à false localement pour refléter l'état attendu
+				isEditing = false;
+			}
+		};
+	});
 </script>
 
-<div class="pad-editor-container">
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div class="pad-editor-container" role="region" aria-label="Éditeur de Pad" tabindex="0">
 	<div class="mb-4 flex items-center justify-between">
-		<h1 class="text-2xl font-bold">{padTitle}</h1>
+		<h1 class="text-2xl font-bold">{padTitle || 'Chargement...'}</h1>
 
 		<div class="status-indicator flex items-center gap-2">
 			{#if isLoading}
-				<span class="text-base-content/70 text-sm">Initialisation...</span>
+				<span class="loading loading-spinner loading-xs"></span>
+				<span class="text-base-content/70 text-sm">Chargement...</span>
 			{:else if isSaving}
 				<span class="loading loading-spinner loading-xs"></span>
 				<span class="text-base-content/70 text-sm">Enregistrement...</span>
-			{:else if error}
-				<span class="text-error text-sm" title={error}>Erreur</span>
-			{:else if isInitialized}
-				<span class="text-success text-sm">Connecté</span>
+			{:else if isEditing}
+				<span class="text-success text-sm">Mode édition</span>
 				<button
 					class="btn btn-xs btn-ghost"
-					onclick={forceSaveFullState}
-					title="Forcer la sauvegarde manuelle"
+					onclick={() => stopEditing(true)}
+					title="Terminer l'édition"
+					aria-label="Terminer l'édition"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -365,19 +398,43 @@
 						stroke-width="2"
 						stroke-linecap="round"
 						stroke-linejoin="round"
+						aria-hidden="true"
 					>
 						<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
 						<polyline points="17 21 17 13 7 13 7 21"></polyline>
 						<polyline points="7 3 7 8 15 8"></polyline>
 					</svg>
 				</button>
+			{:else if padLockedByOther}
+				<span class="text-warning text-sm" title={lockStatusMessage ?? ''}>
+					Lecture seule (édité par {externalEditorUsername})
+				</span>
+				<!-- Pas de bouton Éditer si verrouillé par un autre -->
 			{:else}
-				<span class="text-warning text-sm">Non connecté</span>
+				<span class="text-warning text-sm">Mode lecture</span>
+				<button class="btn btn-xs btn-primary" onclick={startEditing} title="Commencer à éditer">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M12 20h9"></path>
+						<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+					</svg>
+					Éditer
+				</button>
 			{/if}
 		</div>
 	</div>
 
-	{#if error && !isLoading}
+	{#if error}
 		<div class="alert alert-error mb-4">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -391,7 +448,28 @@
 					d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
 				/></svg
 			>
-			<span>Erreur: {error}</span>
+			<span>{error}</span>
+			<button class="btn btn-sm" onclick={() => (error = null)}>Fermer</button>
+		</div>
+	{/if}
+
+	<!-- 👉 Affichage du message de verrouillage par autrui (non critique) -->
+	{#if lockStatusMessage && !error}
+		<div class="alert alert-warning mb-4">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				fill="none"
+				viewBox="0 0 24 24"
+				class="stroke-info h-6 w-6 shrink-0"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+				></path></svg
+			>
+			<span>{lockStatusMessage}</span>
+			<button class="btn btn-sm btn-ghost" onclick={() => (lockStatusMessage = null)}>Ok</button>
 		</div>
 	{/if}
 
@@ -399,48 +477,86 @@
 		class="editor-wrapper bg-base-100 overflow-hidden rounded-lg shadow-md"
 		style="min-height: 500px; height: 75vh;"
 	>
-		{#if isLoading}
+		{#if isLoading && !isEditing}
 			<div class="flex h-full items-center justify-center">
 				<span class="loading loading-dots loading-lg"></span>
 				<span class="ml-4">Chargement de l'éditeur...</span>
 			</div>
-		{:else if isInitialized && yDoc}
-			<!-- 👉 Condition ajoutée pour s'assurer que yDoc est prêt -->
+		{:else if isEditing}
 			<Tipex
-				bind:tipex={editor}
-				extendExtensions={(extensions) => [...extensions, ...tipexExtensions]}
+				bind:tipex={editor as TipexEditor}
 				controls={false}
 				class="h-full w-full"
 				focal={false}
-				content={undefined}
+				body={htmlContent}
 			>
 				{#snippet head(tipexInstance)}
+					<!-- 👉 Cast de `tipexInstance` vers `Editor` pour correspondre au type attendu par TipexToolbar -->
 					<TipexToolbar editor={tipexInstance} />
 				{/snippet}
 			</Tipex>
-		{:else if !error}
-			<div class="text-error flex h-full items-center justify-center">
-				Impossible d'initialiser l'éditeur. Vérifiez la console pour les erreurs.
-			</div>
+		{:else}
+			<!-- Mode Lecture: Affiche le HTML rendu -->
+			<!-- Ajout d'une clé `padId` pour forcer le re-rendu si on navigue entre pads sans recharger la page -->
+			{#key padId}
+				<div class="document-content prose h-full max-w-none overflow-auto p-4">
+					{@html htmlContent || '<p><em>Ce document est vide.</em></p>'}
+				</div>
+			{/key}
 		{/if}
 	</div>
 
-	<!-- Bouton de débogage -->
+	<!-- Informations sur le temps d'inactivité restant (seulement en mode édition) -->
+	{#if isEditing}
+		<div class="mt-2 text-xs text-gray-500">
+			Vous serez automatiquement déconnecté de l'édition après {Math.round(
+				(INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity)) / 60000
+			)} minutes d'inactivité.
+		</div>
+	{/if}
+
+	<!-- Boutons de débogage (inchangés) -->
 	{#if import.meta.env.DEV}
-		<!-- 👉 Utiliser import.meta.env.DEV pour la détection du mode dev -->
 		<div class="mt-4 text-xs text-gray-500">
 			<details>
 				<summary class="cursor-pointer">Informations de débogage</summary>
 				<pre
-					class="mt-1 rounded bg-gray-100 p-2 whitespace-pre-wrap dark:bg-gray-800 dark:text-gray-300">{debugDocument()}</pre>
+					class="mt-1 rounded bg-gray-100 p-2 whitespace-pre-wrap dark:bg-gray-800 dark:text-gray-300">
+État Local: {isLoading ? 'Chargement' : isEditing ? 'Édition' : 'Lecture'} {isSaving
+						? '(Sauvegarde...)'
+						: ''}
+Verrouillé par Autre: {padLockedByOther ? `Oui (${externalEditorUsername})` : 'Non'}
+Dernière activité: {new Date(lastActivity).toLocaleTimeString()}
+Contenu HTML ($state): {htmlContent?.length || 0} caractères
+Erreur: {error || 'Aucune'}
+Lock Msg: {lockStatusMessage || 'Aucun'}
+Editor instance: {editor ? 'Oui' : 'Non'}
+				</pre>
 				<button
 					class="btn btn-xs btn-ghost mt-1"
-					onclick={() => console.log('Current yDoc state:', yDoc)}>Log yDoc state</button
+					onclick={() => console.log('$state.htmlContent:', htmlContent)}
+					>Log $state.htmlContent</button
+				>
+				{#if editor}<button
+						class="btn btn-xs btn-ghost mt-1"
+						onclick={() => {
+							const editorHtml = editor?.getHTML();
+							console.log('editor.getHTML():', editorHtml);
+							console.log('Comparison:', editorHtml === htmlContent);
+						}}>Log editor.getHTML()</button
+					>{/if}
+				<button class="btn btn-xs btn-warning mt-1" onclick={initializeAndSubscribe}
+					>Reload Content & Sub</button
 				>
 				<button
-					class="btn btn-xs btn-ghost mt-1"
-					onclick={() => console.log('Current editor state:', editor?.state.doc.toJSON())}
-					>Log Editor state</button
+					class="btn btn-xs btn-info mt-1"
+					onclick={startEditing}
+					disabled={isEditing || padLockedByOther}>Force Start Editing</button
+				>
+				<button
+					class="btn btn-xs btn-error mt-1"
+					onclick={() => stopEditing(true)}
+					disabled={!isEditing}>Force Stop Editing</button
 				>
 			</details>
 		</div>
@@ -448,32 +564,72 @@
 </div>
 
 <style>
-	/* ... styles inchangés ... */
 	:global(.tipex .ProseMirror) {
-		padding: 1rem;
-		min-height: calc(75vh - 60px); /* Hauteur moins la barre d'outils */
-		overflow-y: auto;
+		padding: 0.75rem 1rem;
+		/* Retirer le border-radius du haut car la toolbar l'a maintenant */
+		border-top-left-radius: 0;
+		border-top-right-radius: 0;
+		/* Assurer une hauteur minimale */
+		min-height: 100%; /* S'étend pour remplir le parent scrollable */
+		/* La hauteur et l'overflow sont gérés par .tipex-editor-section */
 		outline: none;
-		/* 👉 Assurer un fond pour la visibilité */
-		background-color: var(--fallback-b1, oklch(var(--b1) / 1));
-		color: var(--fallback-bc, oklch(var(--bc) / 1));
+		background-color: white;
+		/* Important: S'assurer qu'il n'y a pas d'overflow caché ici qui pourrait interférer */
+		overflow: visible;
 	}
-
 	:global(.tipex-editor-wrap) {
 		display: flex;
 		flex-direction: column;
-		height: 100%;
+		height: 100%; /* Pour que le calcul de hauteur de ProseMirror fonctionne */
 	}
-
 	:global(.tipex-editor-section) {
 		flex-grow: 1;
-		overflow-y: auto;
-		min-height: 0;
-		/* 👉 Assurer que l'éditeur prend la place */
-		display: flex;
+		border-bottom-left-radius: inherit; /* Hérite du radius du parent Tipex */
+		border-bottom-right-radius: inherit;
+		border-radius: inherit; /* Assure que le wrapper hérite du radius */
+		overflow-y: auto; /* Gère le scroll ici */
+		min-height: 0; /* Nécessaire pour que l'overflow fonctionne dans un conteneur flex */
+	}
+
+	:global(.tipex-editor-section .tipex) {
+		flex-grow: 1; /* Fait que le composant Tipex grandit */
+		display: flex; /* Pour que ProseMirror à l'intérieur puisse grandir */
 		flex-direction: column;
 	}
-	:global(.tipex-editor-section .tipex) {
-		flex-grow: 1;
+
+	/* Style pour le contenu en mode lecture */
+	.document-content {
+		background-color: white;
+		border: 3px solid var(--fallback-warning, oklch(var(--wa) / 1));
+	}
+
+	.document-content :global(p) {
+		margin-bottom: 1em;
+	}
+
+	.document-content :global(blockquote) {
+		border-left: 4px solid var(--fallback-neutral, oklch(var(--n) / 1));
+		padding-left: 1em;
+		margin-left: 0;
+		font-style: italic;
+	}
+
+	.document-content :global(pre) {
+		background-color: var(--fallback-base-300, oklch(var(--b3) / 1));
+		padding: 1em;
+		border-radius: 0.5em;
+		overflow-x: auto;
+	}
+
+	.document-content :global(code) {
+		background-color: var(--fallback-base-300, oklch(var(--b3) / 1));
+		padding: 0.2em 0.4em;
+		border-radius: 0.2em;
+	}
+
+	.document-content :global(table) {
+		border-collapse: collapse;
+		width: 100%;
+		margin-bottom: 1em;
 	}
 </style>
