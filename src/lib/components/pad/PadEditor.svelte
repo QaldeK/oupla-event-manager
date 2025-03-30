@@ -448,7 +448,7 @@
 
 	<div
 		class="editor-wrapper bg-base-100 overflow-hidden rounded-lg shadow-md"
-		style="min-height: 500px; height: 75vh;"
+		style="min-height: 500px; height: 75vh; margin-top: -1px;" /* Compensation pour la toolbar sticky */
 	>
 		{#if isLoading && !isEditing}
 			<div class="flex h-full items-center justify-center">
@@ -456,18 +456,18 @@
 				<span class="ml-4">Chargement de l'éditeur...</span>
 			</div>
 		{:else if isEditing}
+			<!-- Toolbar Sticky -->
+			<div class="sticky top-0 z-10 bg-base-100">
+				<TipexToolbar editor={editor} />
+			</div>
+			
 			<Tipex
 				bind:tipex={editor as TipexEditor}
 				controls={false}
 				class="h-full w-full"
 				focal={false}
 				body={htmlContent}
-			>
-				{#snippet head(tipexInstance)}
-					<!-- 👉 Cast de `tipexInstance` vers `Editor` pour correspondre au type attendu par TipexToolbar -->
-					<TipexToolbar editor={tipexInstance} />
-				{/snippet}
-			</Tipex>
+			/>
 		{:else}
 			<!-- Mode Lecture: Affiche le HTML rendu -->
 			<!-- Ajout d'une clé `padId` pour forcer le re-rendu si on navigue entre pads sans recharger la page -->
