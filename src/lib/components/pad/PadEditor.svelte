@@ -370,7 +370,6 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="pad-editor-container" role="region" aria-label="Éditeur de Pad" tabindex="0">
 	<div class="mb-4 flex items-center justify-between">
 		<h1 class="text-2xl font-bold">{padTitle || 'Chargement...'}</h1>
@@ -448,7 +447,7 @@
 
 	<div
 		class="editor-wrapper bg-base-100 overflow-hidden rounded-lg shadow-md"
-		style="min-height: 500px; height: 75vh; margin-top: -1px;" /* Compensation pour la toolbar sticky */
+		style="min-height: 500px; height: 75vh; margin-top: -1px;"
 	>
 		{#if isLoading && !isEditing}
 			<div class="flex h-full items-center justify-center">
@@ -457,10 +456,10 @@
 			</div>
 		{:else if isEditing}
 			<!-- Toolbar Sticky -->
-			<div class="sticky top-0 z-10 bg-base-100">
-				<TipexToolbar editor={editor} />
+			<div class="bg-base-100 sticky top-0 z-10">
+				<TipexToolbar {editor} />
 			</div>
-			
+
 			<Tipex
 				bind:tipex={editor as TipexEditor}
 				controls={false}
