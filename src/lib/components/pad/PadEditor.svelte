@@ -39,7 +39,7 @@
 	// Utiliser un nom de type unique spécifique à ce pad pour éviter les conflits
 	const yjsContentType = `oupla-pad-${padId}`;
 
-	let tipexExtensions: Extension[] = $state([]); // 👉 Initialiser comme $state pour la réactivité si nécessaire
+	let tipexExtensions: Extension[] = []; // Pas besoin de $state ici, défini une fois à l'init
 
 	// Couleurs pour les curseurs collaboratifs (aléatoires pour chaque utilisateur)
 	// ... reste des couleurs inchangé ...
