@@ -52,14 +52,15 @@ export async function createPad(title: string): Promise<PadResponse> {
 }
 
 // Mettre à jour le contenu d'un pad (état complet)
-export async function updatePadContent(padId: string, content: Blob): Promise<PadResponse> {
+export async function updatePadContent(padId: string, content: string): Promise<PadResponse> {
   try {
-    console.log(`Mise à jour du contenu du pad ${padId}, taille: ${content.size} octets`);
+    console.log(`Mise à jour du contenu du pad ${padId}`);
     
-    const formData = new FormData();
-    formData.append('content', content);
+    const data = {
+      content: content,
+    };
     
-    const record = await pb.collection('pads').update<PadResponse>(padId, formData);
+    const record = await pb.collection('pads').update<PadResponse>(padId, data);
     console.log(`Pad mis à jour avec succès, id: ${record.id}`);
     return record;
   } catch (error) {
@@ -68,44 +69,48 @@ export async function updatePadContent(padId: string, content: Blob): Promise<Pa
   }
 }
 
-// Créer une mise à jour pour un pad
-export async function createPadUpdate(padId: string, updateData: Blob, clientId: string): Promise<PadUpdateResponse> {
+// Acquérir le verrou d'édition
+export async function acquirePadLock(padId: string): Promise<PadResponse | null> {
   try {
-    console.log(`Création d'une mise à jour pour le pad ${padId}, taille: ${updateData.size} octets, clientId: ${clientId}`);
-    
-    const formData = new FormData();
-    formData.append('pad', padId);
-    formData.append('updateData', updateData);
-    formData.append('clientId', clientId);
-    
-    const record = await pb.collection('pad_updates').create<PadUpdateResponse>(formData);
-    console.log(`Mise à jour créée avec succès, id: ${record.id}`);
+    console.log(`Tentative d'acquisition du verrou pour le pad ${padId}`);
+
+    const userId = pb.authStore.model?.id;
+    if (!userId) {
+      console.error("Utilisateur non authentifié.");
+      return null;
+    }
+
+    const data = {
+      isEditing: true,
+      editingUser: userId,
+      lastEditHeartbeat: new Date().toISOString(),
+    };
+
+    const record = await pb.collection('pads').update<PadResponse>(padId, data);
+    console.log(`Verrou acquis avec succès pour le pad ${padId} par l'utilisateur ${userId}`);
     return record;
   } catch (error) {
-    console.error(`Erreur lors de la création d'une mise à jour pour le pad ${padId}:`, error);
-    throw error;
+    console.error(`Erreur lors de l'acquisition du verrou pour le pad ${padId}:`, error);
+    // Gérer les erreurs de concurrence (ex: quelqu'un d'autre a déjà le verrou)
+    return null;
   }
 }
 
-// S'abonner aux mises à jour d'un pad
-export function subscribeToPadUpdates(
-  padId: string, 
-  callback: (update: PadUpdateResponse) => void
-): void {
-  console.log(`Abonnement aux mises à jour du pad ${padId}`);
-  
-  pb.collection('pad_updates').subscribe<PadUpdateResponse>('*', (data) => {
-    if (data.action === 'create') {
-      console.log(`Nouvelle mise à jour reçue pour le pad ${padId}`);
-      callback(data.record);
-    }
-  }, {
-    filter: `pad = "${padId}"`
-  });
-}
+// Libérer le verrou d'édition
+export async function releasePadLock(padId: string): Promise<PadResponse> {
+  try {
+    console.log(`Libération du verrou pour le pad ${padId}`);
 
-// Se désabonner des mises à jour
-export function unsubscribeFromPadUpdates(): void {
-  console.log('Désabonnement des mises à jour');
-  pb.collection('pad_updates').unsubscribe();
+    const data = {
+      isEditing: false,
+      editingUser: null,
+    };
+
+    const record = await pb.collection('pads').update<PadResponse>(padId, data);
+    console.log(`Verrou libéré avec succès pour le pad ${padId}`);
+    return record;
+  } catch (error) {
+    console.error(`Erreur lors de la libération du verrou pour le pad ${padId}:`, error);
+    throw error;
+  }
 }
