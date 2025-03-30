@@ -112,7 +112,8 @@
 				// }),
 			];
 
-			console.log('Extensions Tipex configurées:', tipexExtensions);
+			// Utiliser snapshot pour éviter les avertissements et problèmes potentiels avec les proxys $state dans les logs
+			console.log('Extensions Tipex configurées:', $state.snapshot(tipexExtensions));
 
 			// Configurer les écouteurs pour les mises à jour Yjs AVANT de marquer comme initialisé
 			setupYjsListeners();
