@@ -3,7 +3,6 @@
 	import { TextAlign } from '@tiptap/extension-text-align';
 
 	import type { TipexEditor } from '@friendofsvelte/tipex';
-	import { Editor } from '@tiptap/core';
 	import type { PadResponse } from '$lib/types/pad/pad.types';
 
 	import {
@@ -21,6 +20,7 @@
 	import '@friendofsvelte/tipex/styles/Tipex.css';
 	import '@friendofsvelte/tipex/styles/ProseMirror.css';
 	import '@friendofsvelte/tipex/styles/EditLink.css';
+	import { fade, slide } from 'svelte/transition';
 
 	interface Props {
 		padId: string;
@@ -380,30 +380,59 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="pad-editor-container" role="region" aria-label="Éditeur de Pad" tabindex="0">
-	<div class="mb-4 flex items-center justify-between">
+	<div class="mb-4 flex items-center justify-between gap-4">
 		<h1 class="text-2xl font-bold">{padTitle || 'Chargement...'}</h1>
 
-		<div class="status-indicator flex items-center gap-2">
-			{#if isLoading}
-				<span class="loading loading-spinner loading-xs"></span>
-				<span class="text-base-content/70 text-sm">Chargement...</span>
-			{:else if isSaving}
-				<span class="loading loading-spinner loading-xs"></span>
-				<span class="text-base-content/70 text-sm">Enregistrement...</span>
-			{:else if isEditing}
-				<span class="text-success text-sm">Mode édition</span>
-			{:else if padLockedByOther}
-				<span class="text-warning text-sm" title={lockStatusMessage ?? ''}>
-					Lecture seule (édité par {externalEditorUsername})
-				</span>
-				<!-- Pas de bouton Éditer si verrouillé par un autre -->
-			{:else}
-				<span class="text-warning text-sm">Mode lecture</span>
-				<button class="btn btn-xs btn-primary" onclick={startEditing} title="Commencer à éditer">
-					<Pencil size={16} />
-					Éditer
+		<div class="flex items-center gap-2">
+			<!-- Tabs pour choisir le mode -->
+			<div role="tablist" class="tabs ttabs-border">
+				<button
+					role="tab"
+					class="tab"
+					class:tab-active={!isEditing}
+					onclick={() => {
+						if (isEditing) stopEditing(true);
+					}}
+					disabled={isLoading || isSaving}
+					aria-selected={!isEditing}
+					aria-controls="pad-content"
+				>
+					Lecture
 				</button>
-			{/if}
+				<button
+					role="tab"
+					class="tab"
+					class:tab-active={isEditing}
+					onclick={() => {
+						if (!isEditing) startEditing();
+					}}
+					disabled={padLockedByOther || isLoading || isSaving}
+					aria-selected={isEditing}
+					aria-controls="pad-editor"
+				>
+					<Pencil size={16} />
+					<span class="p-2">Édition</span>
+				</button>
+			</div>
+
+			<!-- Indicateurs de statut (chargement, sauvegarde, verrouillage) -->
+			<div class="status-indicator flex items-center gap-1">
+				{#if isLoading}
+					<span class="loading loading-spinner loading-xs"></span>
+					<span class="text-base-content/70 text-xs">Chargement...</span>
+				{:else if isSaving}
+					<span class="loading loading-spinner loading-xs"></span>
+					<span class="text-base-content/70 text-xs">Enreg...</span>
+				{:else if padLockedByOther}
+					<span
+						class="text-warning flex items-center gap-1 text-xs"
+						title={lockStatusMessage ?? `Verrouillé par ${externalEditorUsername}`}
+					>
+						<Info size={14} />
+						Verrouillé par {externalEditorUsername}
+					</span>
+				{/if}
+			</div>
 		</div>
 	</div>
 
@@ -442,7 +471,7 @@
 				<span class="ml-4">Chargement de l'éditeur...</span>
 			</div>
 		{:else if isEditing}
-			<div class="editing-area">
+			<div class="editing-area" transition:fade>
 				<div class="bg-base-200 flex items-center">
 					<div class="sticky top-0 z-10">
 						<TipexToolbar {editor} />
@@ -467,11 +496,11 @@
 				></Tipex>
 			</div>
 		{:else}
-			{#key padId}
+			<div>
 				<div class="document-content prose max-w-none p-4">
 					{@html htmlContent || '<p><em>Ce document est vide.</em></p>'}
 				</div>
-			{/key}
+			</div>
 		{/if}
 	</div>
 
