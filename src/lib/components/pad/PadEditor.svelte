@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Tipex } from '@friendofsvelte/tipex';
+	import { Tipex, defaultExtensions } from '@friendofsvelte/tipex';
+	import { TextAlign } from '@tiptap/extension-text-align';
+
 	import type { TipexEditor } from '@friendofsvelte/tipex';
 	import { Editor } from '@tiptap/core';
 	import type { PadResponse } from '$lib/types/pad/pad.types';
@@ -53,6 +55,12 @@
 	const SAVE_DEBOUNCE_MS = 2000;
 
 	const currentUserId = pb.authStore.model?.id;
+
+	const extensions = [
+		TextAlign.configure({
+			types: ['heading', 'paragraph']
+		})
+	];
 	// --- Fonctions Principales ---
 
 	// 👉 Chargement initial et mise en place de la subscription
@@ -445,34 +453,30 @@
 		</div>
 	{/if}
 
-	<div
-		class="editor-wrapper bg-base-100 rounded-lg shadow-md"
-		style="margin-top: -1px;" /* Garde le style margin-top si nécessaire, sinon supprime aussi style */
-	>
+	<div class="editor-wrapper bg-base-100 rounded-lg shadow-md" style="margin-top: -1px;">
 		{#if isLoading && !isEditing}
-			{/* Ajustement: plus de h-full ici car le parent n'a plus de hauteur fixe */}
 			<div class="flex items-center justify-center p-10">
 				<span class="loading loading-dots loading-lg"></span>
 				<span class="ml-4">Chargement de l'éditeur...</span>
 			</div>
 		{:else if isEditing}
-			<!-- Toolbar Sticky -->
-			<div class="sticky top-0 z-10"> {/* Supprime bg-base-100 */}
-				<TipexToolbar {editor} />
+			<div class="editing-area">
+				<div class="sticky top-0 z-10">
+					<TipexToolbar {editor} />
+				</div>
+				<Tipex
+					bind:tipex={editor as TipexEditor}
+					extensions={[...defaultExtensions, ...extensions]}
+					controls={false}
+					class="w-full"
+					focal={false}
+					body={htmlContent}
+					onupdate={handleEditorUpdate}
+				></Tipex>
 			</div>
-
-			<Tipex
-				bind:tipex={editor as TipexEditor}
-				controls={false}
-				class="w-full" /* Supprime h-full */
-				focal={false}
-				body={htmlContent}
-			/>
 		{:else}
-			<!-- Mode Lecture: Affiche le HTML rendu -->
-			<!-- Ajout d'une clé `padId` pour forcer le re-rendu si on navigue entre pads sans recharger la page -->
 			{#key padId}
-				<div class="document-content prose max-w-none p-4"> {/* Supprime h-full et overflow-auto */}
+				<div class="document-content prose max-w-none p-4">
 					{@html htmlContent || '<p><em>Ce document est vide.</em></p>'}
 				</div>
 			{/key}
@@ -537,6 +541,28 @@ Editor instance: {editor ? 'Oui' : 'Non'}
 </div>
 
 <style>
+	.editor-wrapper {
+		/* Peut-être définir une hauteur max ici si tu veux limiter l'expansion globale */
+		/* max-height: 80vh; */
+		/* overflow: hidden; */ /* Empêche le contenu interne de déborder visuellement du wrapper */
+		display: flex; /* Nécessaire pour que flex-grow fonctionne sur l'enfant */
+		flex-direction: column;
+	}
+
+	.editing-area {
+		display: flex;
+		flex-direction: column;
+		/* Fait en sorte que cette zone prenne la hauteur disponible dans editor-wrapper si une hauteur max est définie sur ce dernier */
+		flex-grow: 1;
+		/* Important: Permet au sticky de fonctionner correctement à l'intérieur */
+		overflow: hidden; /* Cache tout débordement, le scroll sera géré par scrollable-tipex-container */
+		/* Définit une hauteur (ou max-height) pour que le scroll interne ait un sens */
+		/* Exemple: utiliser la hauteur restante de la fenêtre */
+		height: calc(100vh - 250px); /* Ajuste 250px selon la hauteur de tes éléments hors éditeur */
+		/* Ou une hauteur fixe/max si tu préfères */
+		/* max-height: 600px; */
+	}
+
 	:global(.tipex .ProseMirror) {
 		padding: 0.75rem 1rem;
 		border-top-left-radius: 0;

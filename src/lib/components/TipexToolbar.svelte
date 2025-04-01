@@ -7,8 +7,12 @@
 	import Heading3 from 'lucide-svelte/icons/heading-3';
 	import Heading4 from 'lucide-svelte/icons/heading-4';
 	import Pilcrow from 'lucide-svelte/icons/pilcrow'; // Pour Paragraphe
-
+	import AlignJustify from 'lucide-svelte/icons/align-justify';
+	import AlignLeft from 'lucide-svelte/icons/align-left';
+	import AlignRight from 'lucide-svelte/icons/align-right';
+	import AlignCenter from 'lucide-svelte/icons/align-center';
 	import List from 'lucide-svelte/icons/list';
+	import ListOrdered from 'lucide-svelte/icons/list-ordered';
 	import Quote from 'lucide-svelte/icons/quote';
 	import Minus from 'lucide-svelte/icons/minus'; // Pour horizontal rule
 	import Undo from 'lucide-svelte/icons/undo-2';
@@ -30,6 +34,11 @@
 	const toggleBulletList = () => editor?.chain().focus().toggleBulletList().run();
 	const toggleBlockquote = () => editor?.chain().focus().toggleBlockquote().run();
 	const setHorizontalRule = () => editor?.chain().focus().setHorizontalRule().run();
+	const toggleOrderedList = () => editor?.chain().focus().toggleOrderedList().run();
+	const alignLeft = () => editor?.chain().focus().setTextAlign('left').run();
+	const alignCenter = () => editor?.chain().focus().setTextAlign('center').run();
+	const alignRight = () => editor?.chain().focus().setTextAlign('right').run();
+	const justify = () => editor?.chain().focus().setTextAlign('justify').run();
 	const undo = () => editor?.chain().focus().undo().run();
 	const redo = () => editor?.chain().focus().redo().run();
 
@@ -68,7 +77,7 @@
 
 {#if editor}
 	<div
-		class="border-base-300 bg-base-100 flex flex-wrap items-center gap-1 rounded-t-lg border-b p-2"
+		class="border-base-300 bg-base-200 flex flex-wrap items-center gap-1 rounded-t-lg border-b p-2"
 	>
 		<!-- Style -->
 		<button
@@ -97,6 +106,15 @@
 		>
 			<Pilcrow size={18} strokeWidth={2.5} />
 		</button>
+		<button
+			title="Citation"
+			class="{btnClass} {editor.isActive('blockquote') ? activeClass : ''}"
+			onclick={toggleBlockquote}
+			disabled={!editor.can().toggleBlockquote()}
+		>
+			<Quote size={18} strokeWidth={2.5} />
+		</button>
+		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
 		<!-- Titres -->
 		<button
 			title="Titre 2"
@@ -123,7 +141,7 @@
 			<Heading4 size={18} strokeWidth={2.5} />
 		</button>
 
-		<div class="divider divider-horizontal mx-1 my-0 h-6 self-center"></div>
+		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
 
 		<!-- Blocs -->
 		<button
@@ -134,14 +152,46 @@
 		>
 			<List size={18} strokeWidth={2.5} />
 		</button>
+
 		<button
-			title="Citation"
-			class="{btnClass} {editor.isActive('blockquote') ? activeClass : ''}"
-			onclick={toggleBlockquote}
-			disabled={!editor.can().toggleBlockquote()}
+			title="Liste numérotée"
+			class="{btnClass} {editor.isActive('orderedList') ? activeClass : ''}"
+			onclick={toggleOrderedList}
+			disabled={!editor.can().toggleOrderedList()}
 		>
-			<Quote size={18} strokeWidth={2.5} />
+			<ListOrdered size={18} strokeWidth={2.5} />
 		</button>
+
+		<button
+			title="aligner à gauche"
+			class="{btnClass} {editor.isActive('alignLeft') ? activeClass : ''}"
+			onclick={alignLeft}
+		>
+			<AlignLeft size={18} strokeWidth={2.5} />
+		</button>
+		<button
+			title="aligner au centre"
+			class="{btnClass} {editor.isActive('alignCenter') ? activeClass : ''}"
+			onclick={alignCenter}
+		>
+			<AlignCenter size={18} strokeWidth={2.5} />
+		</button>
+		<button
+			title="aligner à droite"
+			class="{btnClass} {editor.isActive('alignRight') ? activeClass : ''}"
+			onclick={alignRight}
+		>
+			<AlignRight size={18} strokeWidth={2.5} />
+		</button>
+		<button
+			title="justifier"
+			class="{btnClass} {editor.isActive('justify') ? activeClass : ''}"
+			onclick={justify}
+		>
+			<AlignJustify size={18} strokeWidth={2.5} />
+		</button>
+		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
+
 		<button
 			title="Ligne horizontale"
 			class={btnClass}
@@ -165,7 +215,7 @@
 			<LinkIcon size={18} strokeWidth={2.5} />
 		</button>
 
-		<div class="divider divider-horizontal mx-1 my-0 h-6 self-center"></div>
+		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
 
 		<!-- Historique -->
 		<button title="Annuler" class={btnClass} onclick={undo} disabled={!editor.can().undo()}>
