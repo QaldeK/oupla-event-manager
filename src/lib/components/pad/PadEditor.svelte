@@ -17,6 +17,7 @@
 	import { pb } from '$lib/pocketbase.svelte';
 	import Save from 'lucide-svelte/icons/save';
 	import Pencil from 'lucide-svelte/icons/pencil';
+	import Info from 'lucide-svelte/icons/info';
 	import '@friendofsvelte/tipex/styles/Tipex.css';
 	import '@friendofsvelte/tipex/styles/ProseMirror.css';
 	import '@friendofsvelte/tipex/styles/EditLink.css';
@@ -29,7 +30,7 @@
 
 	// État de l'éditeur
 	let editor: TipexEditor | undefined = $state();
-	let isEditing = $state(false);
+	let isEditing = $state(true);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
 	let error = $state<string | null>(null);
@@ -391,14 +392,6 @@
 				<span class="text-base-content/70 text-sm">Enregistrement...</span>
 			{:else if isEditing}
 				<span class="text-success text-sm">Mode édition</span>
-				<button
-					class="btn btn-xs btn-ghost"
-					onclick={() => stopEditing(true)}
-					title="Terminer l'édition"
-					aria-label="Terminer l'édition"
-				>
-					<Save size={16} />
-				</button>
 			{:else if padLockedByOther}
 				<span class="text-warning text-sm" title={lockStatusMessage ?? ''}>
 					Lecture seule (édité par {externalEditorUsername})
@@ -436,18 +429,7 @@
 	<!-- 👉 Affichage du message de verrouillage par autrui (non critique) -->
 	{#if lockStatusMessage && !error}
 		<div class="alert alert-warning mb-4">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				fill="none"
-				viewBox="0 0 24 24"
-				class="stroke-info h-6 w-6 shrink-0"
-				><path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-				></path></svg
-			>
+			<Info />
 			<span>{lockStatusMessage}</span>
 			<button class="btn btn-sm btn-ghost" onclick={() => (lockStatusMessage = null)}>Ok</button>
 		</div>
@@ -461,8 +443,18 @@
 			</div>
 		{:else if isEditing}
 			<div class="editing-area">
-				<div class="sticky top-0 z-10">
-					<TipexToolbar {editor} />
+				<div class="bg-base-200 flex items-center">
+					<div class="sticky top-0 z-10">
+						<TipexToolbar {editor} />
+					</div>
+					<button
+						class="btn btn-ghost mr-4 ml-auto"
+						onclick={() => stopEditing(true)}
+						title="Terminer l'édition"
+						aria-label="Terminer l'édition"
+					>
+						<Save size={24} />
+					</button>
 				</div>
 				<Tipex
 					bind:tipex={editor as TipexEditor}
