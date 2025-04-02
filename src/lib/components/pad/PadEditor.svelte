@@ -20,17 +20,17 @@
 	import '@friendofsvelte/tipex/styles/Tipex.css';
 	import '@friendofsvelte/tipex/styles/ProseMirror.css';
 	import '@friendofsvelte/tipex/styles/EditLink.css';
-	import { fade, slide } from 'svelte/transition';
 
 	interface Props {
-		padId: string;
+		docId: string;
+		collection: string;
 	}
 
-	const { padId }: Props = $props();
+	const { docId, collection }: Props = $props();
 
 	// État de l'éditeur
 	let editor: TipexEditor | undefined = $state();
-	let isEditing = $state(true);
+	let isEditing = $state(false);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
 	let error = $state<string | null>(null);
@@ -73,8 +73,7 @@
 		externalEditorUsername = null;
 
 		try {
-			console.log(`Initialisation pour padId: ${padId}`);
-			const initialPad = await loadPad(padId);
+			const initialPad = await loadPad(docId);
 			padTitle = initialPad.title;
 			// *** Correction Bug Contenu Vide ***
 			// Définit le contenu initial SEULEMENT si htmlContent est vide ou si le contenu chargé est différent
@@ -94,8 +93,14 @@
 			// Met à jour l'état de verrouillage externe initial
 			updateLockStatus(initialPad);
 
+			// *** Appel API si initialement verrouillé ***
+			if (initialPad.isEditing) {
+				// On lance l'appel sans attendre (await) pour ne pas bloquer l'initialisation
+				checkAndCleanLock(docId);
+			}
+
 			// S'abonner aux changements sur ce pad spécifique
-			unsubscribe = await pb.collection('pads').subscribe(padId, ({ action, record }) => {
+			unsubscribe = await pb.collection({ collection }).subscribe(docId, ({ action, record }) => {
 				console.log(`Subscription event: ${action}`, record);
 				if (action === 'update') {
 					updateLockStatus(record as PadResponse);
@@ -115,12 +120,42 @@
 					// Gérer la redirection ou le blocage de l'interface ici
 				}
 			});
-			console.log(`Subscription établie pour padId: ${padId}`);
+			console.log(`Subscription établie pour padId: ${docId}`);
 		} catch (e: any) {
 			console.error("Erreur lors de l'initialisation ou la subscription:", e);
 			error = `Impossible de charger le pad ou de s'y abonner: ${e.message}`;
 		} finally {
 			isLoading = false;
+		}
+	}
+
+	async function checkAndCleanLock(docIdToCheck: string) {
+		console.log(`[Client] Checking lock status via API for pad ${docIdToCheck}`);
+		try {
+			// Utilise l'instance pb pour construire l'URL et gérer l'authentification
+			const response = await pb.send(`/pad_check_and_clean_lock/${docIdToCheck}`, {
+				method: 'GET'
+			});
+
+			console.log('[Client] Lock check API response:', response);
+
+			// Si l'API a nettoyé le verrou, la souscription temps réel
+			// devrait recevoir la mise à jour peu après. On pourrait
+			// forcer une mise à jour locale si nécessaire, mais laissons
+			// la souscription faire son travail pour la cohérence.
+			if (response?.cleanedUp) {
+				console.log(`[Client] API indicated lock for pad ${docIdToCheck} was cleaned up.`);
+			}
+		} catch (error: any) {
+			// Gérer les erreurs réseau ou les erreurs 4xx/5xx de l'API
+			console.error(`[Client] Error checking/cleaning lock for pad ${docIdToCheck}:`, error);
+			if (error.status === 404) {
+				// Le pad n'existe plus, gérer comme l'événement 'delete' de la souscription
+				// error = 'Le pad a été supprimé ou est introuvable.';
+			} else {
+				// Autre erreur serveur ou réseau
+				// error = 'Erreur lors de la vérification du verrou.';
+			}
 		}
 	}
 
@@ -156,7 +191,7 @@
 		isLoading = true;
 		error = null;
 		try {
-			const lockedPad = await acquirePadLock(padId);
+			const lockedPad = await acquirePadLock(docId);
 			if (lockedPad && lockedPad.editingUser === currentUserId) {
 				isEditing = true;
 
@@ -169,7 +204,7 @@
 				error =
 					"Impossible d'acquérir le verrou d'édition. Le document est peut-être déjà en cours d'édition.";
 				// Re-vérifier l'état au cas où la subscription n'aurait pas encore mis à jour
-				const currentPad = await loadPad(padId);
+				const currentPad = await loadPad(docId);
 				updateLockStatus(currentPad);
 			}
 		} catch (e) {
@@ -206,7 +241,7 @@
 		}
 		isLoading = true; // Indicateur visuel pendant la libération
 		try {
-			await releasePadLock(padId);
+			await releasePadLock(docId);
 			console.log("Verrou d'édition libéré avec succès.");
 			isEditing = false;
 			cleanupTimers(); // Arrête heartbeat et timers *après* la libération réussie
@@ -232,7 +267,7 @@
 		isSaving = true;
 		console.log(`Sauvegarde du contenu (${content.length} caractères)...`);
 		try {
-			await updatePadContent(padId, content);
+			await updatePadContent(docId, content);
 			htmlContent = content;
 			console.log('Contenu sauvegardé avec succès.');
 		} catch (e) {
@@ -247,7 +282,7 @@
 	function startHeartbeat() {
 		cleanupTimers();
 		let lastSuccess = Date.now();
-		
+
 		// Fonction de vérification de connexion
 		const checkConnection = async () => {
 			if (!isEditing) {
@@ -257,7 +292,7 @@
 			}
 
 			try {
-				const refreshedPad = await refreshPadLock(padId);
+				const refreshedPad = await refreshPadLock(docId);
 				if (refreshedPad) {
 					lastSuccess = Date.now();
 					console.log('Heartbeat réussi.');
@@ -267,17 +302,17 @@
 					forceStopEditing("Session d'édition expirée.");
 				}
 			} catch (e) {
-				console.error("Erreur heartbeat:", e);
+				console.error('Erreur heartbeat:', e);
 				// Si pas de réponse depuis plus de 2 intervalles, considérer la connexion perdue
 				if (Date.now() - lastSuccess > HEARTBEAT_INTERVAL_MS * 2) {
-					forceStopEditing("Connexion perdue. Mode lecture forcé.");
+					forceStopEditing('Connexion perdue. Mode lecture forcé.');
 				}
 			}
 		};
-		
+
 		// Premier heartbeat immédiat
 		checkConnection();
-		
+
 		// Puis intervalle régulier
 		heartbeatInterval = setInterval(checkConnection, HEARTBEAT_INTERVAL_MS);
 	}
@@ -316,7 +351,7 @@
 	}
 
 	// 👉 Handler pour l'événement 'update' de Tipex
-	function handleEditorUpdate({ editor: updatedEditor }: EditorEvents['update']) {
+	function handleEditorUpdate({ editor: updatedEditor }) {
 		// 1. Gérer l'activité utilisateur
 		handleUserActivity();
 
@@ -344,7 +379,7 @@
 				console.warn('Tentative de libération du verrou avant fermeture (best effort)');
 
 				// 1. Envoyer un beacon pour libérer le verrou
-				const releaseUrl = `${pb.baseUrl}/api/collections/pads/records/${padId}`;
+				const releaseUrl = `${pb.baseUrl}/api/collections/pads/records/${docId}`;
 				const data = new FormData();
 				data.append('isEditing', 'false');
 				data.append('editingUser', '');
@@ -368,7 +403,7 @@
 				// 2. Forcer la sauvegarde si possible
 				if (editor) {
 					const content = editor.getHTML();
-					const saveUrl = `${pb.baseUrl}/api/collections/pads/records/${padId}`;
+					const saveUrl = `${pb.baseUrl}/api/collections/pads/records/${docId}`;
 					const saveData = new FormData();
 					saveData.append('content', content);
 					navigator.sendBeacon(saveUrl, saveData);
@@ -400,7 +435,7 @@
 			if (isEditing) {
 				console.warn('Tentative de libération du verrou lors du cleanup (best effort).');
 				// On capture la valeur avant l'appel asynchrone potentiel
-				const padToRelease = padId;
+				const padToRelease = docId;
 				releasePadLock(padToRelease).catch((e) =>
 					console.error('Erreur (non bloquante) cleanup releasePadLock:', e)
 				);
@@ -436,7 +471,7 @@
 				{/if}
 			</div>
 			<!-- Tabs pour choisir le mode -->
-			<div role="tablist" class="tabs ttabs-border">
+			<div role="tablist" class="tabs tabs-border">
 				<button
 					role="tab"
 					class="tab"
@@ -496,40 +531,36 @@
 		</div>
 	{/if} -->
 
-	<div class="editor-wrapper bg-base-100 rounded-lg shadow-md" style="margin-top: -1px;">
+	<div class="editor-wrapper bg-base-100 rounded-lg shadow-md">
 		{#if isLoading && !isEditing}
 			<div class="flex items-center justify-center p-10">
 				<span class="loading loading-dots loading-lg"></span>
 				<span class="ml-4">Chargement de l'éditeur...</span>
 			</div>
 		{:else if isEditing}
-			<div class="editing-area" transition:fade>
-				<div class="bg-base-200 flex items-center">
-					<div class="sticky top-0 z-10">
-						<TipexToolbar {editor} />
-					</div>
-					<button
-						class="btn btn-ghost mr-4 ml-auto"
-						onclick={() => stopEditing(true)}
-						title="Terminer l'édition"
-						aria-label="Terminer l'édition"
-					>
-						<Save size={24} />
-					</button>
-				</div>
-				<Tipex
-					bind:tipex={editor as TipexEditor}
-					extensions={[...defaultExtensions, ...extensions]}
-					controls={false}
-					class="w-full"
-					focal={false}
-					body={htmlContent}
-					onupdate={handleEditorUpdate}
-				></Tipex>
+			<div class="bg-base-200 flex items-center">
+				<TipexToolbar {editor} />
+				<button
+					class="btn btn-ghost mr-4 ml-auto"
+					onclick={() => stopEditing(true)}
+					title="Terminer l'édition"
+					aria-label="Terminer l'édition"
+				>
+					<Save size={24} />
+				</button>
 			</div>
+			<Tipex
+				bind:tipex={editor as TipexEditor}
+				extensions={[...defaultExtensions, ...extensions]}
+				controls={false}
+				class="flex-grow"
+				focal={false}
+				body={htmlContent}
+				onupdate={handleEditorUpdate}
+			></Tipex>
 		{:else}
 			<div>
-				<div class="document-content prose max-w-none p-4">
+				<div class="document-content prose p-4">
 					{@html htmlContent || '<p><em>Ce document est vide.</em></p>'}
 				</div>
 			</div>
@@ -595,91 +626,37 @@ Editor instance: {editor ? 'Oui' : 'Non'}
 
 <style>
 	.editor-wrapper {
-		/* Peut-être définir une hauteur max ici si tu veux limiter l'expansion globale */
-		/* max-height: 80vh; */
-		/* overflow: hidden; */ /* Empêche le contenu interne de déborder visuellement du wrapper */
 		display: flex; /* Nécessaire pour que flex-grow fonctionne sur l'enfant */
 		flex-direction: column;
-	}
-
-	.editing-area {
-		display: flex;
-		flex-direction: column;
-		/* Fait en sorte que cette zone prenne la hauteur disponible dans editor-wrapper si une hauteur max est définie sur ce dernier */
-		flex-grow: 1;
-		/* Important: Permet au sticky de fonctionner correctement à l'intérieur */
-		overflow: hidden; /* Cache tout débordement, le scroll sera géré par scrollable-tipex-container */
-		/* Définit une hauteur (ou max-height) pour que le scroll interne ait un sens */
-		/* Exemple: utiliser la hauteur restante de la fenêtre */
-		height: calc(100vh - 250px); /* Ajuste 250px selon la hauteur de tes éléments hors éditeur */
-		/* Ou une hauteur fixe/max si tu préfères */
-		/* max-height: 600px; */
+		max-width: 1000px;
+		height: calc(100vh - 200px);
+		padding-bottom: 1rem;
 	}
 
 	:global(.tipex .ProseMirror) {
-		padding: 0.75rem 1rem;
 		border-top-left-radius: 0;
 		border-top-right-radius: 0;
-		/* Définit une hauteur minimale pour cliquer dedans quand c'est vide */
-		min-height: 10rem; /* Ajuste si nécessaire */
-		height: auto; /* Permet au contenu de définir la hauteur */
 		outline: none;
 		background-color: white;
+		flex-grow: 1;
 		overflow: visible; /* Assure qu'aucun contenu n'est coupé */
 	}
-	:global(.tipex-editor-wrap) {
-		display: flex;
-		flex-direction: column;
-		/* Pas de hauteur fixe ici */
-	}
-	:global(.tipex-editor-section) {
-		flex-grow: 1;
-		border-bottom-left-radius: inherit;
-		border-bottom-right-radius: inherit;
-		border-radius: inherit;
-		/* Pas d'overflow ici, le scroll se fait sur la page */
-		/* Pas de min-height: 0 ici */
+	/* 👉 Style pour les séparateurs horizontaux (hr) dans l'éditeur */
+	:global(hr) {
+		margin-top: 3rem !important; /* Marge supérieure, ajustez si besoin (ex: 1em, 20px) */
+		margin-bottom: 3rem; /* Marge inférieure, ajustez si besoin */
+		border-top-width: 1px; /* Épaisseur de la ligne */
 	}
 
-	:global(.tipex-editor-section .tipex) {
-		flex-grow: 1; /* Fait que le composant Tipex grandit */
-		display: flex; /* Pour que ProseMirror à l'intérieur puisse grandir */
-		flex-direction: column;
-	}
-
-	/* Style pour le contenu en mode lecture */
+	/* Style pour le contenu en lecture seule */
 	.document-content {
-		background-color: white;
-		border: 3px solid var(--fallback-warning, oklch(var(--wa) / 1));
-	}
-
-	.document-content :global(p) {
-		margin-bottom: 1em;
-	}
-
-	.document-content :global(blockquote) {
-		border-left: 4px solid var(--fallback-neutral, oklch(var(--n) / 1));
-		padding-left: 1em;
-		margin-left: 0;
-		font-style: italic;
-	}
-
-	.document-content :global(pre) {
-		background-color: var(--fallback-base-300, oklch(var(--b3) / 1));
-		padding: 1em;
-		border-radius: 0.5em;
-		overflow-x: auto;
-	}
-
-	.document-content :global(code) {
-		background-color: var(--fallback-base-300, oklch(var(--b3) / 1));
-		padding: 0.2em 0.4em;
-		border-radius: 0.2em;
-	}
-
-	.document-content :global(table) {
-		border-collapse: collapse;
-		width: 100%;
-		margin-bottom: 1em;
+		padding: 2rem;
+		overflow-y: auto; /* Permet le défilement si nécessaire */
+		/* Assurez une hauteur cohérente avec l'éditeur si possible */
+		min-height: 400px; /* Même min-height que .editor-wrapper */
+		max-height: calc(100vh - 200px); /* Même max-height que .editor-wrapper */
+		border-radius: inherit;
+		max-width: none; /* Assure que la classe prose ne limite pas la largeur */
+		width: 100%; /* Prend toute la largeur disponible */
 	}
 </style>

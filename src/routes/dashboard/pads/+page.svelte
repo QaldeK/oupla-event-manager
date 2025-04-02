@@ -58,38 +58,7 @@
 </script>
 
 <div class="container mx-auto px-4 py-8">
-	<div class="mb-8 flex items-center justify-between">
-		<h1 class="text-3xl font-bold">Mes documents collaboratifs</h1>
-
-		<div class="card bg-base-100 mx-auto max-w-md p-4 shadow-md">
-			<div class="card-body p-4">
-				<h2 class="card-title mb-2 text-xl">Créer un nouveau pad</h2>
-				<div class="flex gap-2">
-					<input
-						type="text"
-						class="input input-bordered w-full"
-						placeholder="Titre du nouveau pad"
-						bind:value={newPadTitle}
-						onkeydown={(e) => e.key === 'Enter' && handleCreatePad()}
-					/>
-					<button
-						class="btn btn-primary"
-						onclick={handleCreatePad}
-						disabled={isCreating || !newPadTitle}
-					>
-						{#if isCreating}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							Créer
-						{/if}
-					</button>
-				</div>
-				{#if error}
-					<p class="text-error mt-2 text-sm">{error}</p>
-				{/if}
-			</div>
-		</div>
-	</div>
+	<h1 class="text-3xl font-bold">Mes documents collaboratifs</h1>
 
 	{#if isLoading}
 		<div class="flex justify-center py-12">
@@ -104,6 +73,34 @@
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+			<div class="card bg-base-200 max-w-md p-4 shadow-md">
+				<div class="card-body p-4">
+					<h2 class="card-title mb-2 text-xl">Créer un nouveau pad</h2>
+					<div class="flex gap-2">
+						<input
+							type="text"
+							class="input input-bordered w-full"
+							placeholder="Titre du nouveau pad"
+							bind:value={newPadTitle}
+							onkeydown={(e) => e.key === 'Enter' && handleCreatePad()}
+						/>
+						<button
+							class="btn btn-primary"
+							onclick={handleCreatePad}
+							disabled={isCreating || !newPadTitle}
+						>
+							{#if isCreating}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else}
+								Créer
+							{/if}
+						</button>
+					</div>
+					{#if error}
+						<p class="text-error mt-2 text-sm">{error}</p>
+					{/if}
+				</div>
+			</div>
 			{#each pads as pad (pad.id)}
 				<a
 					href={`/dashboard/pads/${pad.id}`}

@@ -7,7 +7,8 @@ export async function loadPads(): Promise<PadResponse[]> {
 	try {
 		const pads = await pb.collection('pads').getFullList<PadResponse>({
 			sort: '-created',
-			filter: `space = '${getSpace.id}'`
+			filter: `space = '${getSpace.id}'`,
+			fields: 'id,title,created_by,created,updated'
 		});
 		return pads;
 	} catch (error) {

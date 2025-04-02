@@ -13,6 +13,8 @@
 	// Valeur dérivée pour la validation du formulaire
 	let isValid = $derived(!!email && !!username);
 
+	// TODO Gestion de l'erreur si l'user / email existe déjà
+
 	async function handleSubmit() {
 		if (!isValid) {
 			showAlert("L'email et le nom d'utilisateur sont requis", 'error');
@@ -47,7 +49,6 @@
 			// Générer et afficher le lien d'invitation
 			invitationLink = `${window.location.origin}/auth/invitation-setpassword?token=${invitationToken}&mail=${encodeURIComponent(email)}&uname=${encodeURIComponent(username)}`;
 
-			/* Commenté pour les tests
 			await pb.send('/api/send-invitation', {
 				method: 'POST',
 				body: {
@@ -57,7 +58,6 @@
 					space: getSpace.name
 				}
 			});
-			*/
 
 			showAlert('Invitation créée avec succès', 'success');
 		} catch (error) {

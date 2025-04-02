@@ -203,10 +203,7 @@
 	async function handleLogout() {
 		try {
 			// 1. Détruire tous les stores
-			await Promise.all([
-				eventsStore.clearAndDestroy(), 
-				messageStore.clearAndDestroy()
-			]);
+			await Promise.all([eventsStore.clearAndDestroy(), messageStore.clearAndDestroy()]);
 
 			// 2. Réinitialiser les états locaux
 			isInitialized = false;
@@ -217,7 +214,7 @@
 
 			// 4. Nettoyer l'authentification
 			pb.authStore.clear();
-			userDb.logout();  // S'assurer que userDb est aussi nettoyé
+			userDb.logout(); // S'assurer que userDb est aussi nettoyé
 
 			// 5. Rediriger
 			goto('/login');
@@ -253,7 +250,9 @@
 				</div>
 			{:else}
 				<!-- Top nav -->
-				<header class="navbar min-h-0 bg-neutral text-base-300 fixed top-0 right-0 left-0 z-50 shadow-sm">
+				<header
+					class="navbar bg-neutral text-base-300 fixed top-0 right-0 left-0 z-50 min-h-0 shadow-sm"
+				>
 					<div class="flex-none">
 						<button class="btn btn-square btn-ghost" onclick={sidebarActions.toggle}>
 							{#if sidebarState.isOpen && !sidebarState.isCompact}
@@ -264,7 +263,7 @@
 						</button>
 					</div>
 
-					<div class="flex-1 flex justify-center">
+					<div class="flex flex-1 justify-center">
 						<a href="/dashboard" class="text-lg"
 							>Oupla - {currentSpace.name} - {currentUser.username}</a
 						>
@@ -273,8 +272,10 @@
 					<div class="flex-none gap-2">
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
-								<button class="btn btn-outline"><CircleUserRound />
- 									{currentUser.username} </button>
+								<button class="btn btn-outline"
+									><CircleUserRound />
+									{currentUser.username}
+								</button>
 							</DropdownMenu.Trigger>
 							<DropdownMenu.Content class="menu bg-base-200 rounded-box w-56">
 								<DropdownMenu.Label class="menu-title">Mon compte</DropdownMenu.Label>
@@ -432,21 +433,33 @@
 										<span class:hidden={sidebarState.isCompact}>Newsletter</span>
 									</a>
 								</li>
-									<li>
-										<a
-											href="/dashboard/pads"
-											class:bg-primary-content={page.url.pathname.startsWith("/dashboard/pads")}
+								<li>
+									<a
+										href="/dashboard/pads"
+										class:bg-primary-content={page.url.pathname.startsWith('/dashboard/pads')}
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="24"
+											height="24"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
 										>
-											<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-												<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-												<polyline points="14 2 14 8 20 8"/>
-												<path d="M10.4 12.6a1 1 0 0 1 3.2 0"/>
-												<path d="M9 11h.01"/>
-												<path d="M15 11h.01"/>
-											</svg>
-											<span class:hidden={sidebarState.isCompact}>Documents collaboratifs</span>
-										</a>
-									</li>
+											<path
+												d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"
+											/>
+											<polyline points="14 2 14 8 20 8" />
+											<path d="M10.4 12.6a1 1 0 0 1 3.2 0" />
+											<path d="M9 11h.01" />
+											<path d="M15 11h.01" />
+										</svg>
+										<span class:hidden={sidebarState.isCompact}>Documents</span>
+									</a>
+								</li>
 							</ul>
 
 							<!-- Section du bas -->
@@ -472,7 +485,7 @@
 
 					<!-- Content -->
 					<main
-						class="mt-16 flex-1 overflow-y-auto p-4 transition-all duration-300
+						class="mt-2 flex-1 overflow-y-auto p-4 transition-all duration-300
 					{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-72' : ''}
 					{sidebarState.isOpen && sidebarState.isCompact ? 'ml-20' : ''}"
 					>
