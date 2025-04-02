@@ -243,10 +243,13 @@
 		}
 	}
 
-	// Envoyer un heartbeat pour maintenir le verrou
+	// Envoyer un heartbeat amélioré pour maintenir le verrou
 	function startHeartbeat() {
-		cleanupTimers(); // Assure qu'il n'y a qu'un seul intervalle actif
-		heartbeatInterval = setInterval(async () => {
+		cleanupTimers();
+		let lastSuccess = Date.now();
+		
+		// Fonction de vérification de connexion
+		const checkConnection = async () => {
 			if (!isEditing) {
 				console.log('Heartbeat arrêté car plus en mode édition.');
 				cleanupTimers();
@@ -256,19 +259,27 @@
 			try {
 				const refreshedPad = await refreshPadLock(padId);
 				if (refreshedPad) {
+					lastSuccess = Date.now();
 					console.log('Heartbeat réussi.');
-					resetInactivityTimer(); // Réinitialise aussi l'inactivité à chaque heartbeat réussi
+					resetInactivityTimer();
 				} else {
-					// Le rafraîchissement a échoué (probablement parce qu'on n'est plus l'éditeur légitime)
-					console.error('Échec du rafraîchissement du verrou (heartbeat).');
-					forceStopEditing("La session d'édition a expiré ou a été interrompue.");
+					console.error('Échec du rafraîchissement du verrou.');
+					forceStopEditing("Session d'édition expirée.");
 				}
 			} catch (e) {
-				console.error("Erreur lors de l'envoi du heartbeat:", e);
-				error = "La connexion pour maintenir l'édition a été perdue. Passage en mode lecture.";
-				forceStopEditing("Erreur de connexion lors du maintien de la session d'édition.");
+				console.error("Erreur heartbeat:", e);
+				// Si pas de réponse depuis plus de 2 intervalles, considérer la connexion perdue
+				if (Date.now() - lastSuccess > HEARTBEAT_INTERVAL_MS * 2) {
+					forceStopEditing("Connexion perdue. Mode lecture forcé.");
+				}
 			}
-		}, HEARTBEAT_INTERVAL_MS);
+		};
+		
+		// Premier heartbeat immédiat
+		checkConnection();
+		
+		// Puis intervalle régulier
+		heartbeatInterval = setInterval(checkConnection, HEARTBEAT_INTERVAL_MS);
 	}
 
 	// Réinitialiser le timer d'inactivité
@@ -328,18 +339,40 @@
 		console.log('Effet principal: Initialisation et mise en place...');
 		initializeAndSubscribe();
 
-		// Gestionnaire simple pour beforeunload (tentative de sauvegarde/libération)
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-			// On ne bloque plus la fermeture, on essaie juste de nettoyer
 			if (isEditing) {
-				console.warn(
-					'Tentative de sauvegarde et libération du verrou avant fermeture/rechargement (best effort).'
-				);
-				// On ne peut pas utiliser await ici.
-				// saveContent est appelé dans stopEditing.
-				stopEditing(true).catch((e) =>
-					console.error('Erreur (non bloquante) cleanup beforeunload:', e)
-				);
+				console.warn('Tentative de libération du verrou avant fermeture (best effort)');
+
+				// 1. Envoyer un beacon pour libérer le verrou
+				const releaseUrl = `${pb.baseUrl}/api/collections/pads/records/${padId}`;
+				const data = new FormData();
+				data.append('isEditing', 'false');
+				data.append('editingUser', '');
+
+				// Envoi synchrone si possible, sinon beacon
+				try {
+					if (navigator.sendBeacon) {
+						navigator.sendBeacon(releaseUrl, data);
+					} else {
+						// Fallback pour anciens navigateurs
+						fetch(releaseUrl, {
+							method: 'PATCH',
+							body: data,
+							keepalive: true // Permet à la requête de continuer après fermeture
+						}).catch(() => {});
+					}
+				} catch (e) {
+					console.error('Erreur beacon:', e);
+				}
+
+				// 2. Forcer la sauvegarde si possible
+				if (editor) {
+					const content = editor.getHTML();
+					const saveUrl = `${pb.baseUrl}/api/collections/pads/records/${padId}`;
+					const saveData = new FormData();
+					saveData.append('content', content);
+					navigator.sendBeacon(saveUrl, saveData);
+				}
 			}
 		};
 
@@ -384,6 +417,24 @@
 		<h1 class="text-2xl font-bold">{padTitle || 'Chargement...'}</h1>
 
 		<div class="flex items-center gap-2">
+			<!-- Indicateurs de statut (chargement, sauvegarde, verrouillage) -->
+			<div class="status-indicator flex items-center gap-1">
+				{#if isLoading}
+					<span class="loading loading-spinner loading-xs"></span>
+					<span class="text-base-content/70 text-xs">Chargement...</span>
+				{:else if isSaving}
+					<span class="loading loading-spinner loading-xs"></span>
+					<span class="text-base-content/70 text-xs">Enreg...</span>
+				{:else if padLockedByOther}
+					<span
+						class="text-content-warning bg-warning/40 flex items-center gap-1 rounded-xl px-4 py-2 text-xs"
+						title={lockStatusMessage ?? `Verrouillé par ${externalEditorUsername}`}
+					>
+						<Info size={14} />
+						Edition en cours par {externalEditorUsername}
+					</span>
+				{/if}
+			</div>
 			<!-- Tabs pour choisir le mode -->
 			<div role="tablist" class="tabs ttabs-border">
 				<button
@@ -414,29 +465,10 @@
 					<span class="p-2">Édition</span>
 				</button>
 			</div>
-
-			<!-- Indicateurs de statut (chargement, sauvegarde, verrouillage) -->
-			<div class="status-indicator flex items-center gap-1">
-				{#if isLoading}
-					<span class="loading loading-spinner loading-xs"></span>
-					<span class="text-base-content/70 text-xs">Chargement...</span>
-				{:else if isSaving}
-					<span class="loading loading-spinner loading-xs"></span>
-					<span class="text-base-content/70 text-xs">Enreg...</span>
-				{:else if padLockedByOther}
-					<span
-						class="text-warning flex items-center gap-1 text-xs"
-						title={lockStatusMessage ?? `Verrouillé par ${externalEditorUsername}`}
-					>
-						<Info size={14} />
-						Verrouillé par {externalEditorUsername}
-					</span>
-				{/if}
-			</div>
 		</div>
 	</div>
 
-	{#if error}
+	<!-- {#if error}
 		<div class="alert alert-error mb-4">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -453,16 +485,16 @@
 			<span>{error}</span>
 			<button class="btn btn-sm" onclick={() => (error = null)}>Fermer</button>
 		</div>
-	{/if}
+	{/if} -->
 
 	<!-- 👉 Affichage du message de verrouillage par autrui (non critique) -->
-	{#if lockStatusMessage && !error}
+	<!-- {#if lockStatusMessage && !error}
 		<div class="alert alert-warning mb-4">
 			<Info />
 			<span>{lockStatusMessage}</span>
 			<button class="btn btn-sm btn-ghost" onclick={() => (lockStatusMessage = null)}>Ok</button>
 		</div>
-	{/if}
+	{/if} -->
 
 	<div class="editor-wrapper bg-base-100 rounded-lg shadow-md" style="margin-top: -1px;">
 		{#if isLoading && !isEditing}
