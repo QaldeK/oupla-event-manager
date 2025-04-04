@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { loadPads, createPad } from '$lib/shared/padStore.svelte';
+	import { loadDocs, createPad } from './padStore.svelte';
 	import type { PadResponse } from '$lib/types/pad/pad.types';
 	import { format } from 'date-fns';
 	import { fr } from 'date-fns/locale';
@@ -15,7 +15,7 @@
 		isLoading = true;
 		error = null;
 		try {
-			pads = await loadPads();
+			pads = await loadDocs();
 		} catch (e) {
 			error = 'Erreur lors du chargement des pads';
 			console.error(e);
@@ -34,7 +34,7 @@
 		error = null;
 
 		try {
-			const newPad = await createPad(newPadTitle);
+			const newPad = await createPad(newPadTitle, { collection: 'pads' });
 			pads = [newPad, ...pads];
 			newPadTitle = '';
 			// Rediriger vers le pad nouvellement créé
@@ -59,7 +59,34 @@
 
 <div class="container mx-auto px-4 py-8">
 	<h1 class="text-3xl font-bold">Mes documents collaboratifs</h1>
-
+	<div class="card bg-base-200 mb-10 max-w-md p-4 shadow-md">
+		<div class="card-body p-4">
+			<h2 class="card-title mb-2 text-xl">Créer un nouveau pad</h2>
+			<div class="flex gap-2">
+				<input
+					type="text"
+					class="input input-bordered w-full"
+					placeholder="Titre du nouveau pad"
+					bind:value={newPadTitle}
+					onkeydown={(e) => e.key === 'Enter' && handleCreatePad()}
+				/>
+				<button
+					class="btn btn-primary"
+					onclick={handleCreatePad}
+					disabled={isCreating || !newPadTitle}
+				>
+					{#if isCreating}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						Créer
+					{/if}
+				</button>
+			</div>
+			{#if error}
+				<p class="text-error mt-2 text-sm">{error}</p>
+			{/if}
+		</div>
+	</div>
 	{#if isLoading}
 		<div class="flex justify-center py-12">
 			<span class="loading loading-dots loading-lg"></span>
@@ -73,34 +100,6 @@
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-			<div class="card bg-base-200 max-w-md p-4 shadow-md">
-				<div class="card-body p-4">
-					<h2 class="card-title mb-2 text-xl">Créer un nouveau pad</h2>
-					<div class="flex gap-2">
-						<input
-							type="text"
-							class="input input-bordered w-full"
-							placeholder="Titre du nouveau pad"
-							bind:value={newPadTitle}
-							onkeydown={(e) => e.key === 'Enter' && handleCreatePad()}
-						/>
-						<button
-							class="btn btn-primary"
-							onclick={handleCreatePad}
-							disabled={isCreating || !newPadTitle}
-						>
-							{#if isCreating}
-								<span class="loading loading-spinner loading-xs"></span>
-							{:else}
-								Créer
-							{/if}
-						</button>
-					</div>
-					{#if error}
-						<p class="text-error mt-2 text-sm">{error}</p>
-					{/if}
-				</div>
-			</div>
 			{#each pads as pad (pad.id)}
 				<a
 					href={`/dashboard/pads/${pad.id}`}

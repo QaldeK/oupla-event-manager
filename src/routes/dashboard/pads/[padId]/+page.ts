@@ -1,11 +1,11 @@
-import { loadPad } from '$lib/shared/padStore.svelte';
+import { loadDoc } from '../padStore.svelte';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ params }) => {
 	try {
 		const padId = params.padId;
-		const pad = await loadPad(padId);
+		const pad = await loadDoc(padId);
 
 		return {
 			pad
