@@ -114,7 +114,7 @@
 		>
 			<Quote size={18} strokeWidth={2.5} />
 		</button>
-		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
 		<!-- Titres -->
 		<button
 			title="Titre 2"
@@ -141,7 +141,7 @@
 			<Heading4 size={18} strokeWidth={2.5} />
 		</button>
 
-		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
 
 		<!-- Blocs -->
 		<button
@@ -162,35 +162,67 @@
 			<ListOrdered size={18} strokeWidth={2.5} />
 		</button>
 
-		<button
-			title="aligner à gauche"
-			class="{btnClass} {editor.isActive('alignLeft') ? activeClass : ''}"
-			onclick={alignLeft}
-		>
-			<AlignLeft size={18} strokeWidth={2.5} />
-		</button>
-		<button
-			title="aligner au centre"
-			class="{btnClass} {editor.isActive('alignCenter') ? activeClass : ''}"
-			onclick={alignCenter}
-		>
-			<AlignCenter size={18} strokeWidth={2.5} />
-		</button>
-		<button
-			title="aligner à droite"
-			class="{btnClass} {editor.isActive('alignRight') ? activeClass : ''}"
-			onclick={alignRight}
-		>
-			<AlignRight size={18} strokeWidth={2.5} />
-		</button>
-		<button
-			title="justifier"
-			class="{btnClass} {editor.isActive('justify') ? activeClass : ''}"
-			onclick={justify}
-		>
-			<AlignJustify size={18} strokeWidth={2.5} />
-		</button>
-		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
+		<div class="dropdown dropdown-hover">
+			<div
+				tabindex="0"
+				role="button"
+				class="{btnClass} {editor.isActive({ textAlign: 'left' }) ||
+				editor.isActive({ textAlign: 'center' }) ||
+				editor.isActive({ textAlign: 'right' }) ||
+				editor.isActive({ textAlign: 'justify' })
+					? activeClass
+					: ''}"
+			>
+				<AlignLeft size={18} strokeWidth={2.5} />
+			</div>
+			<ul class="dropdown-content menu bg-base-200 rounded-box z-[1] w-36 p-2 shadow">
+				<li>
+					<button
+						title="Aligner à gauche"
+						class="flex items-center {editor.isActive({ textAlign: 'left' }) ? 'bg-base-300' : ''}"
+						onclick={alignLeft}
+					>
+						<AlignLeft size={16} strokeWidth={2.5} />
+						<span class="ml-2">Gauche</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Aligner au centre"
+						class="flex items-center {editor.isActive({ textAlign: 'center' })
+							? 'bg-base-300'
+							: ''}"
+						onclick={alignCenter}
+					>
+						<AlignCenter size={16} strokeWidth={2.5} />
+						<span class="ml-2">Centre</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Aligner à droite"
+						class="flex items-center {editor.isActive({ textAlign: 'right' }) ? 'bg-base-300' : ''}"
+						onclick={alignRight}
+					>
+						<AlignRight size={16} strokeWidth={2.5} />
+						<span class="ml-2">Droite</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Justifier"
+						class="flex items-center {editor.isActive({ textAlign: 'justify' })
+							? 'bg-base-300'
+							: ''}"
+						onclick={justify}
+					>
+						<AlignJustify size={16} strokeWidth={2.5} />
+						<span class="ml-2">Justifier</span>
+					</button>
+				</li>
+			</ul>
+		</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
 
 		<button
 			title="Ligne horizontale"
@@ -215,7 +247,7 @@
 			<LinkIcon size={18} strokeWidth={2.5} />
 		</button>
 
-		<div class="divider mx-1 my-0 h-4 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
 
 		<!-- Historique -->
 		<button title="Annuler" class={btnClass} onclick={undo} disabled={!editor.can().undo()}>
