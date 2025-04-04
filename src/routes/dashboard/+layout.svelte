@@ -39,7 +39,8 @@
 		Settings,
 		UserPlus,
 		Users,
-		CircleUserRound
+		CircleUserRound,
+		Globe
 	} from 'lucide-svelte';
 
 	let { children } = $props();
@@ -431,6 +432,14 @@
 									>
 										<Mail size={24} />
 										<span class:hidden={sidebarState.isCompact}>Newsletter</span>
+									</a>
+								</li>
+								<li>
+									<a
+										href="/dashboard/site_pages"
+										class:bg-primary-content={page.url.pathname.startsWith('/dashboard/site_pages')}
+										><Globe size={24} />
+										<span class:hidden={sidebarState.isCompact}>Site public</span>
 									</a>
 								</li>
 								<li>
