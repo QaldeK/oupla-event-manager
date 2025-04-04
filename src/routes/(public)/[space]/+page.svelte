@@ -2,7 +2,9 @@
 	import { publicStore } from '$lib/shared/publicStore.svelte';
 	import PublicEventCard from '$lib/components/public/PublicEventCard.svelte';
 	import { Calendar } from 'lucide-svelte';
-	let { data } = $props();
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
 
 	// Synchroniser les données du serveur avec le store
 	$effect(() => {

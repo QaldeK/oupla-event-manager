@@ -2,40 +2,18 @@
 	import { eventsStore } from '$lib/shared/eventsStore.svelte';
 	import { lisibleDate } from '$lib/utils';
 	import { sendEmail } from '$lib/pocketbase.svelte';
-	import { Editor } from '@tadashi/svelte-editor-quill';
+	import { defaultExtensions, Tipex } from '@friendofsvelte/tipex';
+	import type { Editor } from '@tiptap/core';
+
+	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
 	import { addDays, format, isWithinInterval } from 'date-fns';
 	import { fr } from 'date-fns/locale';
-	import 'quill/dist/quill.core.css';
-	import 'quill/dist/quill.snow.css';
-
-	import { onMount } from 'svelte';
-	import { Edit } from 'lucide-svelte';
+	import '@friendofsvelte/tipex/styles/Tipex.css';
+	import '@friendofsvelte/tipex/styles/ProseMirror.css';
+	// import '@friendofsvelte/tipex/styles/Controls.css';
+	import '@friendofsvelte/tipex/styles/EditLink.css';
 
 	const confirmedEvents = eventsStore.confirmedEvents;
-	// ::: génération automatique du contenu quilljs
-	// ::: __ special chars
-	let textSeparatorEvent = $state('◦ ❖ ◦');
-	let textSeparatorTitle = $state('· · · · · · · · ·');
-	let textPreDate = $state('▲');
-	let textPreEvent = $state('▼');
-	let textPreCanceled = $state('⚠');
-
-	// const preEventOptions = [
-
-	// 	{ label: '✱', value: '✱' },
-	// 	{ label: '✲', value: '✲' },
-	// 	{ label: '✳', value: '✳' },
-	// 	{ label: '✴', value: '✴' },
-	// 	{ label: '✵', value: '✵' },
-	// ];
-
-	// Mettre à jour le contenu de la newsletter quand les événements changent
-	let generationOk = $state(false);
-	let debounceTimer;
-
-	let htmlContentForEditor = $state('');
-	let textVersion = $state('');
-	let editedHtml = $state('');
 
 	const periodOptions = [
 		{ label: 'Semaine prochaine', days: 7 },
@@ -43,32 +21,57 @@
 		{ label: '45 prochains jours', days: 45 }
 	];
 
-	let selectedPeriod = $state(30); // Default to 30 days
-	let eventsInPeriod = $state([]);
+	let selectedPeriod = $state(30);
 
 	let introMessage = $state('Et voici les prochains événements !');
 	let outroMessage = $state('A bientot !');
 
 	let includeCanceled = $state(true);
 	let canceledMessage = $state(
-		'Désolé, mais certains événement annoncé ont finalement du être annulés...'
+		'Désolé, mais certains événements annoncés ont finalement dû être annulés...'
 	);
-	let canceledToSend = $state([]);
+	let canceledToSend = $derived(confirmedEvents.filter((event) => event.canceled));
+
+	let futureEventsInPeriod = $derived.by(() => {
+		return getFutureEvents(confirmedEvents, selectedPeriod);
+	});
+
+	let eventsToSend = $derived(futureEventsInPeriod.filter((event) => !event.isSendToNewsletter));
+
+	let preCanceled = $state('⚠'); // Gardé pour le visuel
+
+	let generationOk = $state(false);
+	let generatedHtml = $state('');
+	let editor: Editor | undefined = $state();
+	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	let isSending = $state(false);
 
-	// Mapping of radio button labels to days
+	let activeTab = $state<'editor' | 'htmlPreview' | 'textPreview'>('editor'); // Ajout de l'état pour l'onglet actif
+
+	let tipexExtensions = [...defaultExtensions];
 
 	$effect(() => {
-		canceledToSend = confirmedEvents.filter((event) => event.canceled);
-	});
+		// Lire la variable pour assurer la dépendance
+		includeCanceled;
+		selectedPeriod;
+		confirmedEvents; // Dépendance implicite via les fonctions appelées
 
-	// Get events based on selected period
-	$effect(() => {
-		eventsInPeriod = getFutureEvents(confirmedEvents, selectedPeriod);
+		generationOk = false;
+		console.log('Generating newsletter...');
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			generatedHtml = generateNewsletterHTML(); // Recalcule l'HTML
+			generationOk = true;
+			// Met à jour le contenu de l'éditeur s'il existe déjà
+			if (editor) {
+				// Remplacer le contenu existant par le nouveau contenu généré
+				// Le 'false' empêche de déclencher un événement 'update' inutile ici
+				editor.commands.setContent(generatedHtml, false);
+			}
+			console.log('Newsletter HTML generated and maybe updated in editor.');
+		}, 300); // Un délai raisonnable pour éviter les régénérations trop fréquentes
 	});
-
-	let eventsToSend = $derived(eventsInPeriod.filter((event) => !event.isSendToNewsletter));
 
 	function getFutureEvents(events, daysAhead = 30) {
 		const today = new Date();
@@ -76,301 +79,493 @@
 
 		return events.filter((event) => {
 			// Ensure the event has a valid date
-			if (!event.date_event || event.canceled) return false;
+			const isInPeriod = isWithinInterval(event.date_event, { start: today, end: futureDate });
 
-			// Parse the event date
-			const eventDate = new Date(event.date_event);
-
-			// Check if the event is within the future interval
-			return isWithinInterval(eventDate, { start: today, end: futureDate });
+			if (!event.canceled) {
+				return isInPeriod;
+			}
+			return !event.canceled && isInPeriod;
 		});
 	}
 
 	// Fonction pour générer le contenu HTML de la newsletter
 	function generateNewsletterHTML() {
-		let html = '';
-		html += `<p>${introMessage}</p><br>`;
+		let htmlContent = '';
 
+		// Intro
+		htmlContent += `<p>${introMessage}</p>`;
+
+		// Annulations
 		if (includeCanceled && canceledToSend.length > 0) {
-			html += `<p>${canceledMessage}</p><br>`;
+			htmlContent += `<hr>`;
+			htmlContent += `<h2>Événements Annulés/Reportés</h2>`;
+			htmlContent += `<p>${canceledMessage}</p>`;
 			canceledToSend.forEach((event) => {
-				// 👉 Appel de la version HTML
-				html += generateEventHTML(event, true) + '<br>';
+				htmlContent += generateEventHTML(event, true);
 			});
-			// 👉 Séparateur HTML après les annulations
-			html += `<hr>`;
 		}
 
-		html += `<h2>Événements à venir :</h2><br>`;
-		eventsToSend.forEach((event) => {
-			// 👉 Appel de la version HTML
-			html += generateEventHTML(event, false);
-			html += `<hr>`;
-		});
+		// Événements à venir
+		if (eventsToSend.length > 0) {
+			// --- START: Added Summary List ---
+			htmlContent += `<hr><p><strong><em>Résumé des événements à venir</em></strong></p>`;
+			htmlContent += `<ul>`;
+			eventsToSend.forEach((event) => {
+				const formattedDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
+				htmlContent += `<li>`;
+				htmlContent += `<em>${formattedDate}</em>`;
+				if (event.start_public) {
+					htmlContent += ` - <em>${event.start_public}</em>`;
+				}
+				htmlContent += `: ${event.event_title}`;
+				htmlContent += `</li>`;
+			});
+			htmlContent += `</ul>`;
+			htmlContent += `<hr>`;
+			// --- END: Added Summary List ---
 
-		html += `<br><p>${outroMessage}</p>`;
-		return html;
+			htmlContent += `<h2>Événements à venir</h2>`;
+			htmlContent += `<span>━━━━━━ ◦ ❖ ◦ ━━━━━━</span>`;
+			eventsToSend.forEach((event, index) => {
+				htmlContent += generateEventHTML(event, false);
+				if (index < eventsToSend.length - 1) {
+					// Utiliser une simple <hr> comme séparateur
+					htmlContent += `<hr>`;
+				}
+			});
+		} else if (!includeCanceled || canceledToSend.length === 0) {
+			htmlContent += `<p>Aucun nouvel événement à annoncer pour cette période.</p>`;
+		}
+
+		// Outro
+		htmlContent += `<hr>`;
+
+		htmlContent += `<br><p>${outroMessage}</p>`;
+
+		return htmlContent;
 	}
 
 	function generateEventHTML(event, isCanceled) {
 		const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
+		// Remove classes
+		let eventHtml = '<div>';
 
 		if (isCanceled) {
-			const reportedDate = event.reportedTo ? lisibleDate(event.reportedTo) : null;
-			return `
-			<div>
-				<p>ANNULÉ:</strong> ${event.event_title}, initialement prévu le ${eventDate}${reportedDate ? `, est REPORTÉ au <strong>${reportedDate}</strong>` : ''}</p>
-				<br><hr/>
-
-		</div>
-						`;
+			eventHtml += `<p>`;
+			eventHtml += `<em>${preCanceled} annulé</em>`;
+			if (event.reportedTo) {
+				eventHtml += `: <strong>${event.event_title}</strong>, initialement prévu le ${eventDate}, est REPORTÉ au <strong>${lisibleDate(event.reportedTo)}</strong>`;
+			} else {
+				eventHtml += `: <strong>${event.event_title}</strong>, initialement prévu le ${eventDate}`;
+			}
+			eventHtml += `</p>`;
 		} else {
-			return `
-			<div>
-						<hr>
-					<p> ${eventDate.toUpperCase()} ${event?.start_public ? `- ${event.start_public}` : ''}</p>
-						<p> ${event.event_title}</p>
-						${generateEventDetailsHTML(event)}
-						${event?.start_event && event.start_event !== event.start_public ? `<p>Ouverture: ${event.start_public} - Début prévu à ${event.start_event}</p>` : ''}
-						${event?.desc_public ? `<div>${event.desc_public}</p>` : ''}
-						<br>
-				</div>
-						`;
+			// Titre
+			eventHtml += `<h3>${event.event_title}</h3>`;
+			// Date et Heure
+			eventHtml += `<strong>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ''}</strong>`;
+			// Détails
+			const detailsHtml = generateEventDetailsHTML(event);
+			if (detailsHtml) {
+				eventHtml += `<p><em>${detailsHtml}</em></p>`;
+			}
+			// Heure d'ouverture vs début
+			if (event?.start_event && event?.start_public && event.start_event !== event.start_public) {
+				eventHtml += `<em>Ouverture : ${event.start_public} - Début prévu : ${event.start_event}</em>`;
+			}
+			// Description publique
+			if (event.desc_public) {
+				eventHtml += `<ul><li>${event.desc_public}</li></ul>`;
+			}
 		}
+
+		eventHtml += '</div>';
+		return eventHtml;
 	}
 
 	function generateEventDetailsHTML(event) {
-		const details = [];
-		if (!event.is_prix_libre && event.prix) details.push(`Prix: ${event.prix}`);
-		if (event.isMixiteChoisie && event.mixite) details.push(`Mixité: ${event.mixite}`);
-		if (!event.is_age_no_restriction && event.age_advice) details.push(`Age: ${event.age_advice}`);
-		if (event.duree) details.push(`Durée: ${event.duree}`);
-
-		if (details.length > 0) {
-			// Utiliser une liste ou simplement des spans séparés par exemple
-			// return `<ul class="event-details"><li>${details.join('</li><li>')}</li></ul>`;
-			return `<p>${details.join(' - ')}</p>`;
-		} else {
-			return '';
+		let details = [];
+		// Remove classes from spans
+		if (!event.is_prix_libre && event.prix) {
+			details.push(`<span>Prix: ${event.prix}</span>`);
+		} else if (event.is_prix_libre) {
+			details.push(`<span>Prix Libre</span>`);
 		}
-	}
-	// ::: mail events format
-
-	function generateNewsletterText() {
-		let text = '';
-		text += `${introMessage}\n\n`; // Saut de ligne pour le texte
-
-		if (includeCanceled && canceledToSend.length > 0) {
-			text += `${canceledMessage}\n\n`;
-			canceledToSend.forEach((event) => {
-				text += generateEventText(event, true) + '\n'; // Saut de ligne
-			});
-			// 👉 Séparateur texte après les annulations
-			text += `\n━━━━━━ ◦ ❖ ◦ ━━━━━━\n\n`;
+		if (event.isMixiteChoisie && event.mixite) {
+			details.push(`<span>Mixité: ${event.mixite}</span>`);
 		}
-
-		text += `Événements à venir :\n\n`;
-		eventsToSend.forEach((event) => {
-			text += generateEventText(event, false);
-		});
-
-		text += `\n${outroMessage}\n`;
-		return text;
-	}
-
-	// 👉 Nouvelle fonction pour générer le texte d'un événement
-	function generateEventText(event, isCanceled) {
-		const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
-
-		if (isCanceled) {
-			const reportedDate = event.reportedTo ? lisibleDate(event.reportedTo) : null;
-			return `
-${textPreCanceled} ANNULÉ: ${event.event_title}, initialement prévu le ${eventDate}${reportedDate ? `, est REPORTÉ au ${reportedDate}` : ''}
-${textSeparatorTitle}
-      `.trim(); // .trim() pour enlever les espaces/sauts de ligne superflus au début/fin
-		} else {
-			return (
-				`
-${textSeparatorEvent}
-${textPreDate} ${eventDate.toUpperCase()} ${event?.start_public ? `- ${event.start_public}` : ''}
-${textPreEvent} ${event.event_title}
-${textSeparatorTitle}
-${generateEventDetailsText(event)}
-${event?.start_event && event.start_event !== event.start_public ? `Ouverture: ${event.start_public} - Début prévu à ${event.start_event}` : ''}
-${event?.desc_public ? `\n${event.desc_public}` : ''}
-
-`.trim() + '\n'
-			); // Ajoute un saut de ligne final pour séparer les événements
+		if (!event.is_age_no_restriction && event.age_advice) {
+			details.push(`<span>Âge conseillé: ${event.age_advice}</span>`);
 		}
-	}
-
-	// 👉 Nouvelle fonction pour générer les détails en texte
-	function generateEventDetailsText(event) {
-		const details = [];
-		if (!event.is_prix_libre && event.prix) details.push(`Prix: ${event.prix}`);
-		if (event.isMixiteChoisie && event.mixite) details.push(`Mixité: ${event.mixite}`);
-		if (!event.is_age_no_restriction && event.age_advice) details.push(`Age: ${event.age_advice}`);
-		if (event.duree) details.push(`Durée: ${event.duree}`);
-
-		if (details.length > 0) {
-			return details.join(' - ') + '\n'; // Saut de ligne après les détails
-		} else {
-			return ''; // Pas de saut de ligne si pas de détails
+		if (event.duree) {
+			details.push(`<span>Durée: ${event.duree}</span>`);
 		}
+		// Separator remains
+		return details.join(' ⋅ ');
 	}
-
-	function btnGenerate() {
-		generationOk = false;
-		console.log('Generating newsletter HTML and Text...');
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => {
-			const generatedHtml = generateNewsletterHTML();
-			const generatedText = generateNewsletterText();
-
-			htmlContentForEditor = generatedHtml; // Pour l'affichage initial de Quill
-			textVersion = generatedText; // Stocke la version texte générée
-
-			editedHtml = generatedHtml; // Initialise le HTML édité
-			// editedText = generatedText; // On pourrait initialiser ici aussi
-
-			generationOk = true;
-			console.log('Generation complete.');
-		}, 200);
-	}
-	let toolbarOptions = [
-		[{ header: 1 }, { header: 2 }, { header: 3 }],
-		['bold', 'italic', 'underline'],
-		[{ list: 'ordered' }, { list: 'bullet' }]
-	];
-
-	const options = {
-		modules: {
-			toolbar: toolbarOptions
-		},
-		theme: 'snow'
-	};
-
-	const onTextChange = (newHtml: string | null /*, newText: string | null */) => {
-		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => {
-			editedHtml = newHtml ?? ''; // Met à jour le HTML édité depuis Quill
-			// editedText = newText ?? ''; // Optionnel: mettre à jour le texte depuis Quill
-			console.log('Editor content updated.');
-		}, 500);
-	};
 
 	async function sendNewsletter() {
-		// Utilise editedHtml (depuis Quill) et textVersion (générée initialement)
-		if (isSending || !editedHtml || !textVersion) return;
+		if (isSending || !editor) return;
+
+		// Récupérer le contenu ACTUEL de l'éditeur
+		const currentHtml = editor.getHTML();
+		// Calculer le texte brut directement ici
+		const currentText = formatPlainTextFromHtml(currentHtml);
+
+		if (!currentHtml || !currentText) {
+			console.warn("Contenu HTML ou texte vide, annulation de l'envoi.");
+			alert('Le contenu de la newsletter est vide.');
+			return;
+		}
+
 		isSending = true;
 		console.log('Sending newsletter...');
-		console.log('HTML:', editedHtml); // Pour débogage
+		console.log('HTML:', currentHtml); // Pour débogage
 		console.log('---');
-		console.log('Text:', textVersion); // Pour débogage
+		console.log('Text:', currentText); // Pour débogage
+
 		try {
-			// 👉 Assurez-vous que sendEmail accepte deux arguments
-			await sendEmail(editedHtml, textVersion);
-			console.log('Newsletter sent successfully.');
-			// Potentiellement marquer les événements comme envoyés ici
+			await sendEmail(currentHtml, currentText); // Utilise les contenus de l'éditeur
+			console.log('Newsletter envoyée avec succès.');
+			alert('Newsletter envoyée avec succès !');
+			// Potentiellement marquer les événements comme envoyés ici (nécessite une logique supplémentaire)
 		} catch (error) {
-			console.error('Failed to send newsletter:', error);
-			// Afficher une notification d'erreur à l'utilisateur
+			console.error("Erreur lors de l'envoi de la newsletter:", error);
+			alert("Erreur lors de l'envoi: " + (error instanceof Error ? error.message : String(error)));
 		} finally {
 			isSending = false;
 		}
 	}
 
-	// TEST
-	onMount(() => {
-		selectedPeriod = 30;
-		btnGenerate();
+	function formatPlainTextFromHtml(html: string): string {
+		if (typeof document === 'undefined' || !html) return ''; // Garde-fou pour SSR ou HTML vide
+
+		try {
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(html, 'text/html');
+			let text = '';
+
+			function walk(node: Node) {
+				if (node.nodeType === Node.TEXT_NODE) {
+					// Ajouter le contenu texte, en normalisant les espaces multiples en un seul
+					text += node.nodeValue?.replace(/\s+/g, ' ') || '';
+				} else if (node.nodeType === Node.ELEMENT_NODE) {
+					const element = node as HTMLElement;
+					const tagName = element.tagName.toLowerCase();
+					let childrenText = ''; // Pour capturer le texte des enfants avant de l'ajouter
+
+					// --- Préfixe et formatage avant les enfants ---
+					switch (tagName) {
+						case 'h2':
+							text += '\n\n ✱ '; // Séparation et marqueur H2
+							break;
+						case 'h3':
+							text += '\n\n ■ '; // Séparation et marqueur H3 début
+							break;
+						// case 'li':
+						// 	text += '\n• '; // Marqueur de liste
+						// 	break;
+						case 'p':
+							text += '\n\n'; // Assurer une séparation avant le paragraphe
+							break;
+						case 'hr':
+							text += '\n\n··························\n\n'; // Remplacer <hr>
+							return; // Pas d'enfants à traiter pour <hr>
+						case 'br':
+							text += '\n'; // Remplacer <br> par un saut de ligne
+							return; // Pas d'enfants à traiter pour <br>
+						case 'ul':
+						case 'ol':
+							text += '\n'; // Ajouter un saut de ligne avant la liste
+							break;
+						// Ignorer les div, span, strong, em, a pour le formatage structurel,
+						// mais traiter leurs enfants
+					}
+
+					// --- Traiter les enfants ---
+					element.childNodes.forEach(walk);
+
+					// --- Suffixe et formatage après les enfants ---
+					switch (tagName) {
+						case 'h2':
+							text += '\n\n'; // Séparation après H2
+							break;
+						case 'h3':
+							text += ' ■\n\n'; // Marqueur H3 fin et séparation
+							break;
+						case 'p':
+							text += '\n\n'; // Assurer une séparation après le paragraphe
+							break;
+						case 'ul':
+						case 'ol':
+							text += '\n'; // Ajouter un saut de ligne après la liste
+							break;
+					}
+				}
+			}
+
+			walk(doc.body);
+
+			// --- Nettoyage final ---
+			// 1. Décoder les entités HTML (au cas où le parser ne l'aurait pas fait complètement)
+			const textarea = document.createElement('textarea');
+			textarea.innerHTML = text;
+			text = textarea.value;
+
+			// 2. Normaliser les espaces multiples (sauf les sauts de ligne)
+			text = text.replace(/[ \t]+/g, ' ');
+
+			// 3. Supprimer les espaces juste avant les sauts de ligne
+			text = text.replace(/ +\n/g, '\n');
+
+			// 4. Réduire les sauts de ligne multiples à un maximum de deux
+			text = text.replace(/\n{3,}/g, '\n\n');
+
+			// 5. Supprimer les espaces/sauts de ligne au début et à la fin
+			text = text.trim();
+
+			return text;
+		} catch (error) {
+			console.error('Erreur lors du formatage du texte depuis HTML:', error);
+			// Retourner le HTML brut ou une chaîne d'erreur en cas d'échec du parsing
+			// Alternative: essayer editor.getText() comme fallback ?
+			return html; // Ou une version très basique: html.replace(/<[^>]+>/g, '');
+		}
+	}
+
+	// 👉 3. Rendre la prévisualisation réactive au contenu de l'éditeur
+	let editorHtmlPreview = $derived(editor ? editor.getHTML() : generatedHtml);
+	// 👉 4. (Optionnel) Prévisualisation du texte brut
+	let editorTextPreview = $state('Chargement...'); // Transformer en $state
+
+	// Ajouter cet $effect après la définition de editorTextPreview
+	$effect(() => {
+		const html = editor?.getHTML(); // Dépendance au contenu de l'éditeur
+		if (activeTab === 'textPreview' && html) {
+			// Calculer seulement si l'onglet texte est actif et que l'éditeur a du contenu
+			editorTextPreview = formatPlainTextFromHtml(html);
+		}
 	});
 </script>
 
-{$inspect('editedHtml', editedHtml)}
-{$inspect('htmlContentForEditor', htmlContentForEditor)}
+<!-- {$inspect(generatedHtml)} -->
+{$inspect('editorTextPreview', editorTextPreview)}
+<!-- Peut-être utile pour débugger les modifs manuelles -->
 
 <div class="period-selector">
+	<!-- ... reste du fieldset inchangé ... -->
 	<fieldset>
 		<legend>Evénements à inclure dans la newsletters</legend>
 		<div>
 			{#each periodOptions as option (option.days)}
 				<label>
 					<input type="radio" name="period" value={option.days} bind:group={selectedPeriod} />
+					<!-- 👉 Génère à nouveau si la période change -->
 					{option.label}
 				</label>
 			{/each}
 		</div>
 		<label class="flex cursor-pointer items-center rounded-lg px-3 py-2 hover:bg-gray-200"
-			><input
-				type="checkbox"
-				class="h-5 w-5 cursor-pointer rounded shadow-sm transition-all"
-				bind:checked={includeCanceled}
-			/>
-			<span class="ml-1 cursor-pointer text-gray-600">Prévenir des annulations</span>
+			><input type="checkbox" class="checkbox checkbox-sm" bind:checked={includeCanceled} />
+			<span class="ml-2 cursor-pointer text-gray-600">Prévenir des annulations</span>
+			<!-- ml-2 pour espacement -->
 		</label>
 	</fieldset>
 </div>
-<div>
-	<div class="my-6">
-		<label for="select" class="text-fluid-sm block font-medium text-gray-700"
-			>Sélectionnez un template</label
+
+<div class="mt-4">
+	<!-- Wrapper pour les onglets -->
+	<div role="tablist" class="tabs tabs-lifted">
+		<!-- Onglet Éditeur -->
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Éditeur"
+			checked
+			onclick={() => (activeTab = 'editor')}
+		/>
+		<div
+			role="tabpanel"
+			class="tab-content bg-base-100 border-base-300 rounded-box overflow-hidden p-0"
+			style="min-height: 400px; height: 70vh; border-top-left-radius: 0;"
 		>
-	</div>
-</div>
-<div>
-	<button
-		class="rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
-		onclick={btnGenerate}>Générer</button
-	>
+			{#if generationOk || editor}
+				<Tipex
+					body={generatedHtml}
+					bind:tipex={editor}
+					extensions={tipexExtensions}
+					controls={false}
+					class="h-full w-full"
+					focal={false}
+				>
+					{#snippet head(tipexInstance)}
+						<!-- Barre d'outils personnalisée -->
+						<TipexToolbar editor={tipexInstance} />
+					{/snippet}
+					<!-- Le contenu de l'éditeur (ProseMirror) sera dans la section par défaut -->
+					{#snippet foot()}
+						<div
+							class="border-base-300 bg-base-100/80 flex items-center justify-between border-t p-2 backdrop-blur-sm"
+						>
+							<span class="text-xs text-gray-500">Modifiez le contenu si nécessaire</span>
+							<button
+								class="btn btn-sm btn-primary"
+								onclick={sendNewsletter}
+								disabled={isSending || !editor || !editorHtmlPreview}
+							>
+								{#if isSending}
+									<span class="loading loading-spinner loading-xs"></span>
+									Envoi...
+								{:else}
+									Envoyer la Newsletter
+								{/if}
+							</button>
+						</div>
+					{/snippet}
+				</Tipex>
+			{:else}
+				<div class="bg-base-200 flex h-full items-center justify-center">
+					<span class="loading loading-dots loading-lg"></span>
+				</div>
+			{/if}
+		</div>
 
-	<button
-		class="rounded bg-gray-500 px-4 py-2 font-bold text-white hover:bg-gray-700"
-		onclick={() => navigator.clipboard.writeText(editedHtml)}>copier</button
-	>
-	<button class="btn btn-secondary" onclick={() => navigator.clipboard.writeText(textVersion)}>
-		Copier Texte
-	</button>
-	{#if generationOk}
-		<Editor {options} {onTextChange}>{@html $state.snapshot(htmlContentForEditor)}</Editor>
-	{/if}
+		<!-- Onglet Prévisualisation HTML -->
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Aperçu HTML"
+			onclick={() => (activeTab = 'htmlPreview')}
+		/>
+		<div
+			role="tabpanel"
+			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
+			style="min-height: 400px; height: 70vh;"
+		>
+			<div class="prose prose-sm max-w-none">
+				{@html editorHtmlPreview}
+			</div>
+		</div>
 
-	<button
-		class="btn btn-success"
-		onclick={sendNewsletter}
-		disabled={isSending || !editedHtml || !textVersion}
-	>
-		{#if isSending}
-			<span class="loading loading-spinner"></span>
-			Envoi en cours...
-		{:else}
-			Envoyer la newsletter
-		{/if}
-	</button>
-</div>
-
-<div class="grid-row my-8 grid gap-6">
-	<div class="border p-4">
-		{@html editedHtml}
-	</div>
-	<div class="border p-4">
-		<h3>plaintext</h3>
-		<pre>{textVersion}</pre>
+		<!-- Onglet Prévisualisation Texte -->
+		<input
+			type="radio"
+			name="content_tabs"
+			role="tab"
+			class="tab"
+			aria-label="Aperçu Texte"
+			onclick={() => (activeTab = 'textPreview')}
+		/>
+		<div
+			role="tabpanel"
+			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
+			style="min-height: 400px; height: 70vh;"
+		>
+			<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
+		</div>
 	</div>
 </div>
 
 <style>
-	.period-selector {
-		margin-bottom: 1rem;
+	/* 👉 2. Ajouter les styles globaux pour l'éditeur Tipex */
+
+	/* Assurer que les h2, h3, h4 ont des marges par défaut raisonnables dans Tiptap */
+	:global(.tipex .ProseMirror h2) {
+		margin-top: 1.5em;
+		margin-bottom: 0.8em;
 	}
-	fieldset {
+	:global(.tipex .ProseMirror h3) {
+		margin-top: 1.3em;
+		margin-bottom: 0.6em;
+	}
+	:global(.tipex .ProseMirror h4) {
+		margin-top: 1.1em;
+		margin-bottom: 0.5em;
+	}
+	:global(.tipex .ProseMirror p) {
+		margin-bottom: 1em;
+	}
+
+	.period-selector fieldset {
 		display: flex;
-		gap: 1rem;
+		flex-wrap: wrap; /* Permet le retour à la ligne sur petits écrans */
+		gap: 1rem; /* Espace entre les groupes d'options */
+		border: 1px solid #e5e7eb; /* Bordure légère */
+		padding: 1rem; /* Espacement intérieur */
+		border-radius: 0.5rem; /* Coins arrondis */
+		align-items: center; /* Alignement vertical */
+		background-color: white;
+		margin-bottom: 1.5rem; /* Espace sous le fieldset */
+	}
+	.period-selector legend {
+		font-weight: 600; /* Police un peu plus épaisse */
+		padding: 0 0.5rem; /* Petit espace autour du texte */
+		font-size: 0.9rem;
+		color: #4b5563; /* Gris foncé */
+	}
+	.period-selector fieldset > div {
+		display: flex;
+		gap: 0.5rem; /* Espace réduit entre les boutons radio */
+		flex-wrap: wrap;
+	}
+
+	:global(.tipex .ProseMirror) {
+		padding: 0.75rem 1rem;
+		/* Retirer le border-radius du haut car la toolbar l'a maintenant */
+		border-top-left-radius: 0;
+		border-top-right-radius: 0;
+		/* Assurer une hauteur minimale */
+		min-height: 100%; /* S'étend pour remplir le parent scrollable */
+		/* La hauteur et l'overflow sont gérés par .tipex-editor-section */
+		outline: none;
+		background-color: white;
+		/* Important: S'assurer qu'il n'y a pas d'overflow caché ici qui pourrait interférer */
+		overflow: visible;
+	}
+
+	/* 👉 Ajustement pour que le wrapper Tipex n'ait pas de padding inutile */
+	:global(.tipex-editor-wrap) {
+		display: flex;
+		flex-direction: column;
+		height: 100%; /* Pour que le calcul de hauteur de ProseMirror fonctionne */
+	}
+
+	/* 👉 Ajustement pour que la section éditeur prenne la place restante */
+	:global(.tipex-editor-section) {
+		flex-grow: 1;
+		border-bottom-left-radius: inherit; /* Hérite du radius du parent Tipex */
+		border-bottom-right-radius: inherit;
+		border-radius: inherit; /* Assure que le wrapper hérite du radius */
+		overflow-y: auto; /* Gère le scroll ici */
+		min-height: 0; /* Nécessaire pour que l'overflow fonctionne dans un conteneur flex */
+	}
+
+	:global(.tipex-editor-section) {
+		flex-grow: 1;
+		/* Les radius bas sont maintenant gérés par le snippet foot ou le ProseMirror lui-même */
+		border-bottom-left-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+
+	/* Style pour la prévisualisation */
+	.prose {
+		/* Styles de base pour le contenu HTML rendu */
+		line-height: 1.6;
+	}
+
+	pre {
+		font-family: monospace;
+		font-size: 0.8rem;
+		line-height: 1.4;
+		color: #374151; /* Texte gris foncé */
+	}
+	:global(.tipex hr) {
 		border: none;
-	}
-	label {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
+		border-top: 1px solid #eee;
+		margin: 1em 0;
 	}
 </style>
