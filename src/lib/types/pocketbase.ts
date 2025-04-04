@@ -14,6 +14,8 @@ export enum Collections {
 	Events = "events",
 	EventsPast = "events_past",
 	Messages = "messages",
+	Pads = "pads",
+	SitePages = "site_pages",
 	SpaceMembers = "spaceMembers",
 	Spaces = "spaces",
 	SpacesOptions = "spaces_options",
@@ -183,6 +185,55 @@ export type MessagesRecord = {
 	user: RecordIdString
 }
 
+export type PadsRecord = {
+	content?: HTMLString
+	created?: IsoDateString
+	created_by: RecordIdString
+	editingUser?: RecordIdString
+	id: string
+	isEditing?: boolean
+	lastEditHeartbeat?: IsoDateString
+	space: RecordIdString
+	tags?: string
+	title: string
+	updated?: IsoDateString
+}
+
+export enum SitePagesSectionOptions {
+	"pad" = "pad",
+	"page" = "page",
+	"left_side" = "left_side",
+	"header" = "header",
+	"top" = "top",
+	"right_side" = "right_side",
+	"footer" = "footer",
+}
+
+export enum SitePagesBgColorOptions {
+	"primary" = "primary",
+	"secondary" = "secondary",
+	"outline" = "outline",
+	"warning" = "warning",
+	"error" = "error",
+	"success" = "success",
+}
+export type SitePagesRecord = {
+	bg_color?: SitePagesBgColorOptions
+	content?: HTMLString
+	created?: IsoDateString
+	created_by?: RecordIdString
+	editingUser?: RecordIdString
+	id: string
+	isEditing?: boolean
+	lastEditHeartbeat?: IsoDateString
+	pos?: number
+	section?: SitePagesSectionOptions
+	space: RecordIdString
+	tags?: string
+	title: string
+	updated?: IsoDateString
+}
+
 export enum SpaceMembersRoleOptions {
 	"admin" = "admin",
 	"helpers" = "helpers",
@@ -216,13 +267,16 @@ export type SpacesRecord<Tdeleted_records = unknown> = {
 	updated?: IsoDateString
 }
 
-export type SpacesOptionsRecord<Toptions = unknown> = {
+export type SpacesOptionsRecord<Tcategories = unknown, Toptions = unknown, Trooms = unknown, Ttasks = unknown> = {
+	categories?: null | Tcategories
 	created?: IsoDateString
 	id: string
 	mailSend?: HTMLString
 	options?: null | Toptions
 	public_site?: boolean
+	rooms?: null | Trooms
 	space?: RecordIdString
+	tasks?: null | Ttasks
 	updated?: IsoDateString
 }
 
@@ -251,9 +305,11 @@ export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> &
 export type EventsResponse<Tcategories = unknown, Tdates_proposed = unknown, Texternal_proposal = unknown, Torganizers = unknown, Tother_date_query = unknown, Trecurrence = unknown, Trooms = unknown, Ttasks = unknown, Texpand = unknown> = Required<EventsRecord<Tcategories, Tdates_proposed, Texternal_proposal, Torganizers, Tother_date_query, Trecurrence, Trooms, Ttasks>> & BaseSystemFields<Texpand>
 export type EventsPastResponse<Tcategories = unknown, Torganizers = unknown, Texpand = unknown> = Required<EventsPastRecord<Tcategories, Torganizers>> & BaseSystemFields<Texpand>
 export type MessagesResponse<Texpand = unknown> = Required<MessagesRecord> & BaseSystemFields<Texpand>
+export type PadsResponse<Texpand = unknown> = Required<PadsRecord> & BaseSystemFields<Texpand>
+export type SitePagesResponse<Texpand = unknown> = Required<SitePagesRecord> & BaseSystemFields<Texpand>
 export type SpaceMembersResponse<Texpand = unknown> = Required<SpaceMembersRecord> & BaseSystemFields<Texpand>
 export type SpacesResponse<Tdeleted_records = unknown, Texpand = unknown> = Required<SpacesRecord<Tdeleted_records>> & BaseSystemFields<Texpand>
-export type SpacesOptionsResponse<Toptions = unknown, Texpand = unknown> = Required<SpacesOptionsRecord<Toptions>> & BaseSystemFields<Texpand>
+export type SpacesOptionsResponse<Tcategories = unknown, Toptions = unknown, Trooms = unknown, Ttasks = unknown, Texpand = unknown> = Required<SpacesOptionsRecord<Tcategories, Toptions, Trooms, Ttasks>> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
 
 // Types containing all Records and Responses, useful for creating typing helper functions
@@ -267,6 +323,8 @@ export type CollectionRecords = {
 	events: EventsRecord
 	events_past: EventsPastRecord
 	messages: MessagesRecord
+	pads: PadsRecord
+	site_pages: SitePagesRecord
 	spaceMembers: SpaceMembersRecord
 	spaces: SpacesRecord
 	spaces_options: SpacesOptionsRecord
@@ -282,6 +340,8 @@ export type CollectionResponses = {
 	events: EventsResponse
 	events_past: EventsPastResponse
 	messages: MessagesResponse
+	pads: PadsResponse
+	site_pages: SitePagesResponse
 	spaceMembers: SpaceMembersResponse
 	spaces: SpacesResponse
 	spaces_options: SpacesOptionsResponse
@@ -300,6 +360,8 @@ export type TypedPocketBase = PocketBase & {
 	collection(idOrName: 'events'): RecordService<EventsResponse>
 	collection(idOrName: 'events_past'): RecordService<EventsPastResponse>
 	collection(idOrName: 'messages'): RecordService<MessagesResponse>
+	collection(idOrName: 'pads'): RecordService<PadsResponse>
+	collection(idOrName: 'site_pages'): RecordService<SitePagesResponse>
 	collection(idOrName: 'spaceMembers'): RecordService<SpaceMembersResponse>
 	collection(idOrName: 'spaces'): RecordService<SpacesResponse>
 	collection(idOrName: 'spaces_options'): RecordService<SpacesOptionsResponse>

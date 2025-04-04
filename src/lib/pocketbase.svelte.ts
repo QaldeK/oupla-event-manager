@@ -1,12 +1,5 @@
 import { eventsStore } from '$lib/shared/eventsStore.svelte';
-import type {
-	Collections,
-	EventsRecord,
-	EventsResponse,
-	MessagesResponse,
-	SpacesOptionsResponse,
-	UsersResponse
-} from '$lib/types/pocketbase';
+import type { Collections, EventsRecord, MessagesResponse } from '$lib/types/pocketbase';
 import { createDateFromString } from '$lib/utils';
 import { getSpace } from '$lib/shared/spaceOptions.svelte';
 import PocketBase from 'pocketbase';
@@ -14,7 +7,6 @@ import type {
 	ListOptions,
 	ListResult,
 	RecordModel,
-	RecordService,
 	SubscribeOptions,
 	TypedPocketBase
 } from 'pocketbase';
@@ -30,6 +22,34 @@ type GetOneOptions = {
 const pb = new PocketBase('http://127.0.0.1:8090') as TypedPocketBase;
 export { pb };
 
+// ::: Generic functions
+export const modifyRecord = async (collection: string, id: string, data: object) => {
+	try {
+		await pb.collection(collection).update(id, data);
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+};
+
+export const createRecord = async (collection: string, data: object) => {
+	try {
+		await pb.collection(collection).create(data);
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+};
+
+export const deleteRecord = async (collection: string, id: string) => {
+	try {
+		await pb.collection(collection).delete(id);
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+};
+
 // Pour les visiteurs non connectés
 export async function loadPublicEvents(spaceId: string) {
 	return await pb.collection('events').getFullList<EventType>({
@@ -38,19 +58,12 @@ export async function loadPublicEvents(spaceId: string) {
 	});
 }
 
-export const modifyRecord = async (collection: string, id: string, data: object) => {
-	try {
-		await pb.collection(collection).update(id, data);
-	} catch (error) {
-		console.error(error);
-	}
-};
-
 export const updateEvent = async (eventID: string, data: Partial<EventsRecord>) => {
 	try {
 		await pb.collection('events').update(eventID, data);
 	} catch (error) {
 		console.error(error);
+		throw error;
 	}
 };
 
@@ -58,29 +71,15 @@ export const createEvent = async (data: Partial<EventsRecord>) => {
 	try {
 		// S'assurer que created_by est toujours défini avec l'utilisateur actuel
 		const eventData = {
-				...data,
-				created_by: pb.authStore.record.id,
-				space: getSpace.id
+			...data,
+			created_by: pb.authStore.record.id,
+			space: getSpace.id
 		};
-		
+
 		const record = await pb.collection('events').create(eventData);
 		return record;
 	} catch (error) {
 		console.error(error);
-		throw error;
-	}
-};
-
-export const getList = async <T extends RecordModel>(
-	collectionName: Collections,
-	page: number = 1,
-	perPage: number = 50,
-	options?: ListOptions
-): Promise<ListResult<T>> => {
-	try {
-		return await pb.collection(collectionName).getList(page, perPage, options);
-	} catch (error) {
-		console.error(`Erreur lors de la récupération de la liste dans ${collectionName}:`, error);
 		throw error;
 	}
 };
@@ -118,6 +117,20 @@ export const getFirstListItem = async <T extends RecordModel>(
 			`Erreur lors de la récupération du premier élément dans ${collectionName}:`,
 			error
 		);
+		throw error;
+	}
+};
+
+export const getList = async <T extends RecordModel>(
+	collectionName: Collections,
+	page: number = 1,
+	perPage: number = 50,
+	options?: ListOptions
+): Promise<ListResult<T>> => {
+	try {
+		return await pb.collection(collectionName).getList(page, perPage, options);
+	} catch (error) {
+		console.error(`Erreur lors de la récupération de la liste dans ${collectionName}:`, error);
 		throw error;
 	}
 };
@@ -454,3 +467,130 @@ export const deleteMessage = async (message: MessagesResponse) => {
 		throw error;
 	}
 };
+
+// ::: locker edition
+
+/**
+ * Acquiert un verrou d'édition sur un document
+ * @param collection Nom de la collection
+ * @param recordId ID du document à verrouiller
+ * @returns Le document mis à jour avec les informations de verrouillage, ou null en cas d'échec
+ */
+export async function acquireLock<T extends RecordModel>(
+	collection: string,
+	recordId: string
+): Promise<T | null> {
+	try {
+		console.log(
+			`Tentative d'acquisition du verrou pour le document ${recordId} dans ${collection}`
+		);
+
+		const userId = pb.authStore.model?.id;
+		if (!userId) {
+			console.error('Utilisateur non authentifié.');
+			return null;
+		}
+
+		const data = {
+			isEditing: true,
+			editingUser: userId,
+			lastEditHeartbeat: new Date().toISOString()
+		};
+
+		const record = await pb.collection(collection).update<T>(recordId, data);
+		console.log(
+			`Verrou acquis avec succès pour le document ${recordId} par l'utilisateur ${userId}`
+		);
+		return record;
+	} catch (error) {
+		console.error(`Erreur lors de l'acquisition du verrou pour le document ${recordId}:`, error);
+		return null;
+	}
+}
+
+/**
+ * Rafraîchit le timestamp du verrou pour indiquer que l'utilisateur est toujours actif
+ * @param collection Nom de la collection
+ * @param recordId ID du document verrouillé
+ * @returns Le document mis à jour, ou null si l'utilisateur n'a plus le verrou
+ */
+export async function refreshLock<T extends RecordModel>(
+	collection: string,
+	recordId: string
+): Promise<T | null> {
+	try {
+		const userId = pb.authStore.model?.id;
+		if (!userId) {
+			console.error('Utilisateur non authentifié pour rafraîchir le verrou.');
+			return null;
+		}
+
+		const data = {
+			lastEditHeartbeat: new Date().toISOString()
+		};
+
+		// Utilise une condition dans l'update pour s'assurer qu'on est toujours l'éditeur
+		const record = await pb
+			.collection(collection)
+			.update<T>(recordId, data, { filter: `editingUser = '${userId}'` });
+
+		console.log(`Heartbeat rafraîchi pour le document ${recordId} par l'utilisateur ${userId}`);
+		return record;
+	} catch (error) {
+		// Si le filter échoue (l'utilisateur n'est plus l'éditeur), PocketBase lèvera une erreur
+		console.error(`Erreur lors du rafraîchissement du verrou pour le document ${recordId}:`, error);
+		return null;
+	}
+}
+
+/**
+ * Libère le verrou d'édition sur un document
+ * @param collection Nom de la collection
+ * @param recordId ID du document à déverrouiller
+ * @returns Le document mis à jour sans verrou
+ */
+export async function releaseLock<T extends RecordModel>(
+	collection: string,
+	recordId: string
+): Promise<T> {
+	try {
+		console.log(`Libération du verrou pour le document ${recordId} dans ${collection}`);
+
+		const data = {
+			isEditing: false,
+			editingUser: null
+		};
+
+		const record = await pb.collection(collection).update<T>(recordId, data);
+		console.log(`Verrou libéré avec succès pour le document ${recordId}`);
+		return record;
+	} catch (error) {
+		console.error(`Erreur lors de la libération du verrou pour le document ${recordId}:`, error);
+		throw error;
+	}
+}
+
+/**
+ * Vérifie l'état du verrou d'un document via l'API
+ * Utile pour nettoyer les verrous expirés ou détecter les conflits
+ * @param collection Nom de la collection
+ * @param recordId ID du document à vérifier
+ */
+export async function checkAndCleanLock(
+	collection: string,
+	recordId: string
+): Promise<{ cleanedUp: boolean } | null> {
+	console.log(`[Client] Checking lock status via API for document ${recordId} in ${collection}`);
+	try {
+		// Utilise l'instance pb pour construire l'URL et gérer l'authentification
+		const response = await pb.send(`/check_and_clean_lock/${collection}/${recordId}`, {
+			method: 'GET'
+		});
+
+		console.log('[Client] Lock check API response:', response);
+		return response;
+	} catch (error) {
+		console.error(`[Client] Error checking/cleaning lock for document ${recordId}:`, error);
+		return null;
+	}
+}
