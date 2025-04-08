@@ -94,7 +94,7 @@ export type SuperusersRecord = {
 }
 
 export type EventsRecord<Tcategories = unknown, Tdates_proposed = unknown, Texternal_proposal = unknown, Torganizers = unknown, Tother_date_query = unknown, Trecurrence = unknown, Trooms = unknown, Ttasks = unknown> = {
-	age_advice?: string
+	age_advice?: number
 	canceled?: boolean
 	categories?: null | Tcategories
 	created?: IsoDateString
@@ -202,10 +202,10 @@ export type PadsRecord = {
 export enum SitePagesSectionOptions {
 	"pad" = "pad",
 	"page" = "page",
-	"left_side" = "left_side",
+	"leftSide" = "leftSide",
 	"header" = "header",
 	"top" = "top",
-	"right_side" = "right_side",
+	"rightSide" = "rightSide",
 	"footer" = "footer",
 }
 
@@ -217,12 +217,15 @@ export enum SitePagesBgColorOptions {
 	"error" = "error",
 	"success" = "success",
 }
-export type SitePagesRecord = {
+export type SitePagesRecord<TcomponentConfig = unknown> = {
 	bg_color?: SitePagesBgColorOptions
+	componentConfig?: null | TcomponentConfig
+	componentType?: string
 	content?: HTMLString
 	created?: IsoDateString
 	created_by?: RecordIdString
 	editingUser?: RecordIdString
+	enabled?: boolean
 	id: string
 	isEditing?: boolean
 	lastEditHeartbeat?: IsoDateString
@@ -267,12 +270,13 @@ export type SpacesRecord<Tdeleted_records = unknown> = {
 	updated?: IsoDateString
 }
 
-export type SpacesOptionsRecord<Tcategories = unknown, Toptions = unknown, Trooms = unknown, Ttasks = unknown> = {
+export type SpacesOptionsRecord<Tcategories = unknown, Toptions = unknown, TpublicSiteTheme = unknown, Trooms = unknown, Ttasks = unknown> = {
 	categories?: null | Tcategories
 	created?: IsoDateString
 	id: string
 	mailSend?: HTMLString
 	options?: null | Toptions
+	publicSiteTheme?: null | TpublicSiteTheme
 	public_site?: boolean
 	rooms?: null | Trooms
 	space?: RecordIdString
@@ -306,10 +310,10 @@ export type EventsResponse<Tcategories = unknown, Tdates_proposed = unknown, Tex
 export type EventsPastResponse<Tcategories = unknown, Torganizers = unknown, Texpand = unknown> = Required<EventsPastRecord<Tcategories, Torganizers>> & BaseSystemFields<Texpand>
 export type MessagesResponse<Texpand = unknown> = Required<MessagesRecord> & BaseSystemFields<Texpand>
 export type PadsResponse<Texpand = unknown> = Required<PadsRecord> & BaseSystemFields<Texpand>
-export type SitePagesResponse<Texpand = unknown> = Required<SitePagesRecord> & BaseSystemFields<Texpand>
+export type SitePagesResponse<TcomponentConfig = unknown, Texpand = unknown> = Required<SitePagesRecord<TcomponentConfig>> & BaseSystemFields<Texpand>
 export type SpaceMembersResponse<Texpand = unknown> = Required<SpaceMembersRecord> & BaseSystemFields<Texpand>
 export type SpacesResponse<Tdeleted_records = unknown, Texpand = unknown> = Required<SpacesRecord<Tdeleted_records>> & BaseSystemFields<Texpand>
-export type SpacesOptionsResponse<Tcategories = unknown, Toptions = unknown, Trooms = unknown, Ttasks = unknown, Texpand = unknown> = Required<SpacesOptionsRecord<Tcategories, Toptions, Trooms, Ttasks>> & BaseSystemFields<Texpand>
+export type SpacesOptionsResponse<Tcategories = unknown, Toptions = unknown, TpublicSiteTheme = unknown, Trooms = unknown, Ttasks = unknown, Texpand = unknown> = Required<SpacesOptionsRecord<Tcategories, Toptions, TpublicSiteTheme, Trooms, Ttasks>> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
 
 // Types containing all Records and Responses, useful for creating typing helper functions

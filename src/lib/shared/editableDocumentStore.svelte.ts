@@ -207,24 +207,35 @@ export function createEditableDocumentStore<T extends RecordModel>({
 					updateLockStatusInternal(updatedRecord);
 
 					// Si on est PAS en train d'éditer, mettre à jour le contenu local
-					if (!state.isEditing && state.doc) {
-						let changed = false;
-						// Met à jour tous les champs (y compris titre, etc.)
-						for (const key in updatedRecord) {
-							if (Object.prototype.hasOwnProperty.call(updatedRecord, key)) {
-								// @ts-ignore
-								if (state.doc[key] !== updatedRecord[key]) {
+					if (!state.isEditing) {
+						if (state.doc) {
+							let changed = false;
+							// Compare chaque champ pour éviter une réaffectation inutile de state.doc
+							for (const key in updatedRecord) {
+								// @ts-ignore // Vérification plus sûre avec Object.hasOwn si possible/nécessaire
+								if (Object.prototype.hasOwnProperty.call(updatedRecord, key)) {
 									// @ts-ignore
-									state.doc[key] = updatedRecord[key];
-									changed = true;
+									if (state.doc[key] !== updatedRecord[key]) {
+										// @ts-ignore
+										state.doc[key] = updatedRecord[key];
+										changed = true;
+									}
 								}
 							}
-						}
-						if (changed) {
+							if (changed) {
+								console.log(
+									`[EditableStore ${docId}] Document mis à jour via subscription (mode lecture).`
+								);
+								// Mettre à jour la référence sauvée aussi en mode lecture pour la cohérence
+								lastSavedDoc = { ...state.doc };
+							}
+						} else {
+							// Si state.doc était null, on le met à jour (cas rare?)
+							state.doc = updatedRecord;
+							lastSavedDoc = { ...updatedRecord };
 							console.log(
-								`[EditableStore ${docId}] Document mis à jour via subscription (mode lecture).`
+								`[EditableStore ${docId}] Document initialisé via subscription (mode lecture).`
 							);
-							lastSavedDoc = { ...state.doc }; // Mettre à jour la référence sauvée aussi
 						}
 					}
 				} else if (action === 'delete') {

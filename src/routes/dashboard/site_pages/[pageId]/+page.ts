@@ -1,4 +1,4 @@
-import { loadDoc } from '../sitePageStore.svelte';
+import { loadDoc } from '$lib/shared/sitePageStore.svelte';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 

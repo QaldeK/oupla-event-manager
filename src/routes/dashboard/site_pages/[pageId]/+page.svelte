@@ -1,5 +1,5 @@
 <script lang="ts">
-	import PageBlockEditor from '../components/PageBlockEditor.svelte';
+	import PageBlockEditor from '$lib/components/public/PageBlockEditor.svelte';
 	import { goto } from '$app/navigation';
 	import { SquareArrowLeft } from 'lucide-svelte';
 	export let data;

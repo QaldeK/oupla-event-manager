@@ -5,36 +5,39 @@ import { SvelteMap } from 'svelte/reactivity';
 
 const collectionData = new SvelteMap<string, RecordModel[]>();
 
+interface SubscriptionOptions {
+	initialFields?: string; // Champs pour le chargement initial
+	filter?: string; // Filtre pour le chargement initial ET potentiellement pour la souscription (si PB le supporte un jour?)
+	sort?: string; // Tri pour le chargement initial
+}
+
 // Fonction générique pour s'abonner à une collection
 export function subscribeToCollection<T extends RecordModel>(
 	collection: string,
-	callback: () => void
+	callback: () => void,
+	options: SubscriptionOptions = {}
 ): () => Promise<void> {
 	let isInitialized = false;
 	let initialLoadPromise: Promise<void> | null = null;
-	// 👉 Variable pour stocker la *promesse* qui résoudra la fonction de désinscription
 	let unsubscribePromise: Promise<() => void> | null = null;
 
-	// 👉 Fonction pour charger et initialiser le cache
 	const initializeCache = async () => {
 		try {
 			console.log(`[${collection}] Initializing cache...`);
 			// Charger seulement les champs nécessaires pour la liste
 			const initialDocs = await pb.collection(collection).getFullList<T>(200 /* batch size */, {
-				sort: '-created', // ou 'pos' si pertinent pour la liste principale
-				filter: `space = '${getSpace.id}'`
-				// Ajuste les champs si nécessaire pour la vue liste
-				// fields: 'id,title,created_by,created,updated,type,pos,section'
+				sort: options.sort || '-created', // Garde un défaut si non fourni
+				filter: `space = '${getSpace.id}'`,
+				fields: options.initialFields || undefined // Utilise les champs fournis
 			});
 			collectionData.set(collection, initialDocs);
 			isInitialized = true;
-			console.log(`[${collection}] Cache initialized with ${initialDocs.length} documents.`);
+			// console.log(`[${collection}] Cache initialized with ${initialDocs.length} documents.`);
 			callback(); // Notifier que les données initiales sont prêtes
 		} catch (error) {
-			console.error(`[${collection}] Error initializing cache:`, error);
-			// Peut-être définir des données vides pour éviter des erreurs ?
+			// console.error(`[${collection}] Error initializing cache:`, error);
 			collectionData.set(collection, []);
-			isInitialized = true; // Marquer comme initialisé même en cas d'erreur pour débloquer getCollectionData
+			isInitialized = true;
 			callback();
 		}
 	};
@@ -52,7 +55,6 @@ export function subscribeToCollection<T extends RecordModel>(
 
 	// S'abonner aux événements PocketBase pour mettre à jour le cache en temps réel
 	unsubscribePromise = pb.collection(collection).subscribe('*', async (e) => {
-		// Attendre la fin du chargement initial si ce n'est pas déjà fait
 		if (initialLoadPromise) {
 			await initialLoadPromise;
 		}
@@ -99,9 +101,12 @@ export function subscribeToCollection<T extends RecordModel>(
 				break;
 			}
 		}
-		// Mettre à jour le cache avec la nouvelle liste
+
+		// TODO ? Re-trier la liste après modification si un tri est spécifié ? (Optionnel)
+		// if (options.sort) { ... logique de tri ... }
+
 		collectionData.set(collection, updatedList);
-		callback(); // Notifier les composants de la mise à jour
+		callback();
 	});
 
 	// Retourner la fonction de désabonnement
@@ -126,12 +131,15 @@ export function subscribeToCollection<T extends RecordModel>(
 }
 
 // Fonction pour charger tous les documents d'une collection
-export async function loadDocuments<T extends RecordModel>(collection: string): Promise<T[]> {
+export async function loadDocuments<T extends RecordModel>(
+	collection: string,
+	options?: { sort?: string; fields?: string; expand?: string }
+): Promise<T[]> {
 	try {
 		const documents = await pb.collection(collection).getFullList<T>({
-			sort: '-created',
+			sort: `${options?.sort ?? '-created'}`,
 			filter: `space = '${getSpace.id}'`,
-			fields: 'id,title,created_by,created,updated,type,pos'
+			fields: `${options?.fields ?? 'undefined'}`
 		});
 
 		// Mettre à jour le cache
@@ -167,19 +175,13 @@ export function getCollectionData<T extends RecordModel>(collection: string): T[
 
 // Créer un nouveau document
 export async function createDocument<T extends RecordModel>(
-	title: string,
 	collection: string,
-	additionalData: Record<string, unknown> = {}
+	data: Record<string, unknown>
 ): Promise<T> {
 	try {
-		const data = {
-			title,
-			space: getSpace.id,
-			created_by: pb.authStore.model?.id,
-			...additionalData
-		};
-
+		// Le code appelant est responsable de fournir 'space', 'created_by' si nécessaire
 		const newDoc = await pb.collection(collection).create<T>(data);
+		// La souscription ajoutera au cache
 		return newDoc;
 	} catch (error) {
 		console.error(`Erreur lors de la création du document dans ${collection}:`, error);
@@ -190,15 +192,14 @@ export async function createDocument<T extends RecordModel>(
 export async function updateDocument<T extends RecordModel, U extends Partial<T>>(
 	collection: string,
 	docId: string,
-	data: U
+	data: U,
+	options?: { expand?: string }
 ): Promise<T> {
 	try {
 		console.log(`Mise à jour du document ${docId} dans ${collection}`);
 
-		const record = await pb.collection(collection).update<T>(docId, data, {
-			// PB SDK attend Record | FormData
-			expand: 'editingUser'
-		});
+		const record = await pb.collection(collection).update<T>(docId, data, options);
+		// La souscription mettra à jour le cache
 		return record;
 	} catch (error) {
 		console.error(`Erreur lors de la mise à jour du document ${docId}:`, error);
@@ -209,8 +210,7 @@ export async function updateDocument<T extends RecordModel, U extends Partial<T>
 export async function deleteDocument(collection: string, docId: string): Promise<boolean> {
 	try {
 		await pb.collection(collection).delete(docId);
-		// Pas besoin de recharger manuellement - le subscribe s'en chargera
-		return true;
+		return true; // La souscription mettra à jour le cache
 	} catch (error) {
 		console.error(`Erreur lors de la suppression du document ${docId}:`, error);
 		throw error;

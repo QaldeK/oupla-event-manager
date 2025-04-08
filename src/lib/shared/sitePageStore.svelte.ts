@@ -1,5 +1,6 @@
 import { acquireLock, refreshLock, releaseLock } from '$lib/pocketbase.svelte';
-
+import { getSpace } from '$lib/shared/spaceOptions.svelte';
+import { pb } from '$lib/pocketbase.svelte';
 import {
 	subscribeToCollection,
 	getCollectionData,
@@ -17,10 +18,14 @@ import type { RecordModel } from 'pocketbase';
 type SitePagesType = SitePagesResponse & RecordModel;
 
 const COLLECTION = 'site_pages';
+const LIST_FIELDS = 'id,created,updated,title,section,pos,componentConfig';
 
 // Fonction pour s'abonner aux mises à jour des pages
 export function subscribeToPagesUpdates(callback: () => void): () => void {
-	return subscribeToCollection<SitePagesType>(COLLECTION, callback);
+	return subscribeToCollection<SitePagesType>(COLLECTION, callback, {
+		initialFields: LIST_FIELDS,
+		sort: '-pos'
+	});
 }
 
 // Fonction pour obtenir les pages actuelles
@@ -29,8 +34,12 @@ export function getPages(): SitePagesType[] {
 }
 
 // Fonctions spécifiques aux pages du site, fortement typées
-export async function loadDocs(): Promise<SitePagesType[]> {
-	return await loadDocuments<SitePagesType>(COLLECTION);
+export async function loadDocs(filter = ''): Promise<SitePagesType[]> {
+	return await loadDocuments<SitePagesType>(COLLECTION, {
+		fields: LIST_FIELDS,
+		sort: '-pos',
+		filter: `space = '${getSpace.id}' ${filter ? `&& ${filter}` : ''}`
+	});
 }
 
 export async function loadDoc(docId: string): Promise<SitePagesType> {
@@ -39,14 +48,18 @@ export async function loadDoc(docId: string): Promise<SitePagesType> {
 
 export async function createPad(
 	title: string,
-	collection: string = COLLECTION,
-	type: SitePagesSectionOptions = SitePagesSectionOptions.page,
+	section: SitePagesSectionOptions = SitePagesSectionOptions.page,
 	additionalData: Record<string, unknown> = {}
 ): Promise<SitePagesType> {
-	return await createDocument<SitePagesType>(title, collection, {
-		type,
+	// 👉 Construit l'objet de données complet ici
+	const data = {
+		title,
+		space: getSpace.id, // Ajoute l'ID de l'espace
+		created_by: pb.authStore.model?.id, // Ajoute l'ID de l'utilisateur
+		section,
 		...additionalData
-	});
+	};
+	return await createDocument<SitePagesType>(COLLECTION, data);
 }
 
 export async function updatePad(
@@ -54,7 +67,9 @@ export async function updatePad(
 	data: Partial<SitePagesType>
 ): Promise<SitePagesType> {
 	// Le type U de updateDocument doit correspondre à Partial<SitePagesType>
-	return await updateDocument<SitePagesType, Partial<SitePagesType>>(COLLECTION, docId, data);
+	return await updateDocument<SitePagesType, Partial<SitePagesType>>(COLLECTION, docId, data, {
+		expand: 'editingUser' // Garde l'expand ici car spécifique à la logique d'édition
+	});
 }
 
 export async function deletePad(docId: string): Promise<boolean> {

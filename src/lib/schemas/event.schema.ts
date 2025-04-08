@@ -192,7 +192,7 @@ const BaseEventFormSchema = z.object({
 	isMixiteChoisie: z.boolean().default(false),
 	mixite: z.string().nullable().optional(),
 	is_age_no_restriction: z.boolean().default(true),
-	age_advice: z.string().nullable().optional(),
+	age_advice: z.number().nullable().optional(),
 
 	// Statuts
 	isConfirmed: z.boolean().default(false),
@@ -307,7 +307,7 @@ export const PropositionFormSchema = z
 		mixite: z.string().optional(),
 		isPublic: z.boolean().default(true),
 		is_age_no_restriction: z.boolean().default(true),
-		age_advice: z.string().optional(),
+		age_advice: z.number().optional(),
 		external_proposal: ExternalProposalSchema.nullable().optional(),
 		// Champs système nécessaires
 		isConfirmed: z.boolean().default(false),

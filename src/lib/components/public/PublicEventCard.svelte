@@ -1,49 +1,39 @@
 <script lang="ts">
 	import { Clock, Calendar, Euro, Users, AlertTriangle, ChevronRight } from 'lucide-svelte';
-	import type { PublicEventInfo } from '$lib/shared/publicStore.svelte'; // Assurez-vous que ce chemin est correct
+	import type { PublicEventInfo, PublicSiteThemeOptions } from '$lib/shared/publicStore.svelte'; // Assurez-vous que ce chemin est correct
 
-	// 👉 Définition des Props avec $props
 	interface Props {
 		event: PublicEventInfo;
 		spaceName: string;
-		// Props optionnelles pour contrôler le layout depuis le parent si nécessaire un jour
-		initialImagePosition?: 'left' | 'top';
-		initialCardWidthClass?: string;
-		initialTruncateLines?: number;
+		cardOptions: PublicSiteThemeOptions['eventCard'];
+		eventImageUrl: string | null;
 	}
-	let {
-		event,
-		spaceName,
-		initialImagePosition = 'left', // Valeur par défaut 'left'
-		initialCardWidthClass = 'w-full', // Valeur par défaut 'w-full'
-		initialTruncateLines = 4 // Valeur par défaut 4 lignes
-	} = $props<Props>();
+	let { event, spaceName, cardOptions, eventImageUrl }: Props = $props();
 
-	// --- États Réactifs pour le Layout ---
-	// 👉 $state pour la position de l'image ('left' ou 'top')
-	let imagePosition = $state<'left' | 'top'>(initialImagePosition);
-	// 👉 $state pour les classes de largeur de la carte
-	let cardWidthClass = $state<string>(initialCardWidthClass);
-	// 👉 $state pour le nombre de lignes avant troncature
-	let truncateLines = $state<number>(initialTruncateLines);
+	let imagePosition = $derived(cardOptions.imagePosition);
+	let cardWidthClass = $derived(cardOptions.widthClass);
+	let truncateLines = $derived(cardOptions.truncateLines);
+
+	let fromColor = $derived(`from-${cardOptions.bgColor} `);
 
 	// --- États pour la troncature de la description ---
 	let isExpanded = $state(false);
-	let descriptionEl: HTMLElement | undefined = $state(undefined); // Initialiser à undefined
+	let descriptionEl: HTMLElement | undefined = $state(undefined);
 	let shouldTruncate = $state(false);
-	let maxHeight = $derived(truncateLines * 24); // Approximation: 24px par ligne (ajustez si nécessaire)
+
+	let maxHeight = $derived(truncateLines * 16); // Approximation: 16px par ligne (ajustez si nécessaire)
 
 	// --- Effets ---
 	// 👉 $effect pour recalculer la troncature quand descriptionEl ou truncateLines change
 	$effect(() => {
-		if (descriptionEl && descriptionEl.scrollHeight > maxHeight) {
+		if (descriptionEl && descriptionEl.isConnected && descriptionEl.scrollHeight > maxHeight) {
 			shouldTruncate = true;
 		} else {
 			shouldTruncate = false;
 		}
 		// Recalcul quand descriptionEl ou le nombre de lignes changent
-		$inspect(descriptionEl);
-		$inspect(truncateLines);
+		// $inspect(descriptionEl);
+		// $inspect(truncateLines);
 	});
 
 	// --- Fonctions Utilitaires ---
@@ -80,19 +70,16 @@
 			return 'Heure invalide';
 		}
 	}
-
-	// 👉 Classe CSS calculée pour la troncature dynamique
-	let truncateClass = $derived(`line-clamp-${truncateLines}`);
 </script>
 
 <!-- Base de la carte avec largeur réactive et classes flex conditionnelles -->
 <div
-	class="card bg-base-200 shadow-xl transition-all duration-300 hover:shadow-2xl {cardWidthClass}"
+	class="card round transition-all duration-300 {cardOptions.bgClass} {cardOptions.shadowClass} {cardOptions.roundedClass} {cardWidthClass}"
 	class:lg:flex-row={imagePosition === 'left'}
 	class:flex-col={imagePosition === 'top'}
 >
 	<!-- Section Image (position réactive) -->
-	{#if event.image && event.image.length > 0}
+	{#if eventImageUrl}
 		<figure
 			class="relative {imagePosition === 'left' ? 'lg:w-1/3' : ''}"
 			class:w-full={imagePosition === 'left'}
@@ -101,12 +88,13 @@
 			class:shrink-0={imagePosition === 'left'}
 		>
 			<img
-				src={event.image[0]}
+				src={eventImageUrl}
 				alt={event.event_title}
 				class="h-full w-full object-cover"
-				class:lg:rounded-l-2xl={imagePosition === 'left'}
+				class:lg:rounded-l-2xl={imagePosition === 'left' &&
+					cardOptions.roundedClass !== 'rounded-none'}
 				class:lg:rounded-tr-none={imagePosition === 'left'}
-				class:rounded-t-2xl={imagePosition === 'top'}
+				class:rounded-t-2xl={imagePosition === 'top' && cardOptions.roundedClass !== 'rounded-none'}
 			/>
 			{#if event.canceled}
 				<div class="bg-error bg-opacity-70 absolute inset-0 flex items-center justify-center">
@@ -114,58 +102,84 @@
 				</div>
 			{/if}
 		</figure>
-	{:else if imagePosition === 'top'}
-		<!-- Placeholder pour image en haut -->
-		<div class="bg-primary bg-opacity-10 flex h-24 items-center justify-center rounded-t-2xl">
-			<Calendar size={32} class="text-primary opacity-30" />
-		</div>
 	{/if}
 	<!-- /Section Image -->
 
 	<!-- Contenu de la carte (largeur réactive) -->
-	<div class="card-body {imagePosition === 'left' ? 'grow lg:w-2/3' : ''} ">
-		<!-- 👉 Section Date et Heure d'ouverture (déplacée et stylisée) -->
-		<div class="text-fluid-sm text-base-content/80 mb-2 text-right">
-			<span>{formatDate(event.date_event)}</span>
-			{#if event.start_public}
-				<span class="ml-2"> | Ouverture: {formatTime(event.start_public)}</span>
-			{/if}
+	<div class="card-body {imagePosition === 'left' ? 'grow lg:w-2/3' : ''} flex flex-col">
+		<!-- 👉 Titre -->
+		<div class="mb-2 flex flex-wrap justify-between">
+			<div class="flex flex-col gap-2">
+				<div class="{cardOptions.titleSizeClass || 'text-fluid-2xl'} font-semibold">
+					{event.event_title}
+				</div>
+				<div class="flex flex-wrap gap-x-4 gap-y-2">
+					{#each event.categories as category (category)}
+						<div
+							class="text-base-content/90 {cardOptions.categorySizeClass ||
+								'text-fluid-lg'} font-bold"
+						>
+							{category}
+						</div>
+					{/each}
+				</div>
+			</div>
+			<!-- 👉 Section Date et Heure d'ouverture  -->
+			<div class="text-base-content/80 flex flex-col text-right font-semibold">
+				<span class={cardOptions.dateSizeClass || 'text-fluid-lg'}
+					>{formatDate(event.date_event)}</span
+				>
+				{#if event.start_public}
+					<span class={cardOptions.timeSizeClass || 'text-fluid-base'}
+						>à partir de {formatTime(event.start_public)}</span
+					>
+				{/if}
+			</div>
 		</div>
 
-		<!-- 👉 Titre avec taille fluide -->
-		<h2 class="card-title text-fluid-lg font-bold">{event.event_title}</h2>
-
 		<!-- Section Informations détaillées -->
-		<div class="text-fluid-base my-3 flex flex-col gap-2">
+		<div class="  my-3 flex flex-wrap gap-x-4 gap-y-2">
 			<!-- Horaires Début Événement -->
 			{#if event.start_event}
-				<div class="flex items-center gap-2">
-					<Clock size={18} class="text-primary" />
-					<span><span class="opacity-70">Début :</span> {formatTime(event.start_event)}</span>
+				<div
+					class="badge {cardOptions.badgeSize ||
+						'badge-lg'} badge-info badge-outline flex items-center gap-2"
+				>
+					<Clock size={18} />
+					<span><span>Début :</span> {formatTime(event.start_event)}</span>
 				</div>
 			{/if}
 
 			<!-- Prix -->
 			{#if event.is_prix_libre || event.prix}
-				<div class="flex items-center gap-2">
-					<Euro size={18} class="text-primary" />
-					<span>{event.is_prix_libre ? 'Prix libre' : `${event.prix} €`}</span>
+				<div
+					class="badge {cardOptions.badgeSize ||
+						'badge-lg'} badge-info badge-outline flex items-center gap-2"
+				>
+					<Euro size={18} />
+					<span>{event.is_prix_libre ? 'Prix libre' : `${event.prix}`}</span>
 				</div>
 			{/if}
 
 			<!-- Mixité -->
 			{#if event.isMixiteChoisie && event.mixite}
-				<div class="flex items-center gap-2">
-					<Users size={18} class="text-primary" />
+				<div
+					class="badge {cardOptions.badgeSize ||
+						'badge-lg'} badge-error badge-outline flex items-center gap-2"
+				>
+					<Users size={18} />
 					<span>{event.mixite}</span>
 				</div>
 			{/if}
 
 			<!-- Âge -->
 			{#if !event.is_age_no_restriction && event.age_advice}
-				<div class="flex items-center gap-2">
-					<AlertTriangle size={18} class="text-warning" />
-					<span>{event.age_advice}</span>
+				<div
+					class="badge {cardOptions.badgeSize ||
+						'badge-lg'} badge-error badge-outline flex items-center gap-2"
+				>
+					<AlertTriangle size={18} />
+					<span>à partir de {event.age_advice} ans</span>
 				</div>
 			{/if}
 		</div>
@@ -184,35 +198,45 @@
 					class:line-clamp-dynamic={shouldTruncate && !isExpanded}
 				>
 					{@html event.desc_public}
+
+					{#if shouldTruncate && !isExpanded}
+						<!-- FIXIT : fromColor undefined -->
+						<div
+							class="from-base-200 pointer-events-none absolute right-0 bottom-0 left-0 h-24 bg-gradient-to-t to-transparent"
+							style="--tw-gradient-from: var(--{cardOptions.bgClass?.replace('bg-', '') ||
+								'base-200'})"
+						></div>
+					{/if}
 				</div>
 
 				{#if shouldTruncate}
-					<!-- Gradient pour indiquer la troncature -->
-					<div
-						class:hidden={isExpanded}
-						class="from-base-200 pointer-events-none absolute right-0 bottom-0 left-0 h-12 bg-gradient-to-t to-transparent"
-					></div>
-					<!-- Bouton Lire la suite / Voir moins -->
-					<button
-						class="text-primary hover:text-primary-focus text-fluid-sm mt-2 flex items-center font-medium"
-						onclick={() => (isExpanded = !isExpanded)}
-					>
-						{isExpanded ? 'Voir moins' : 'Lire la suite'}
-						<div class:rotate-180={isExpanded} class="transition-transform duration-200">
-							<ChevronRight size={16} class="ml-1 inline" />
-						</div>
-					</button>
+					<!-- Bouton Lire la suite / Voir moins (maintenant après le div texte) -->
+					<div class="text-right">
+						<button
+							class="btn btn-ghost btn-sm text-primary mt-1 py-0 hover:bg-transparent"
+							onclick={() => (isExpanded = !isExpanded)}
+						>
+							{isExpanded ? 'Voir moins' : 'Lire la suite'}
+							<ChevronRight
+								size={14}
+								class="transform transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
+							/>
+						</button>
+					</div>
+				{:else}
+					<!-- {/* Pour pousser les actions en bas si pas de description */} -->
+					<div class="flex-grow"></div>
 				{/if}
 			</div>
 		{/if}
 		<!-- /Description -->
 
 		<!-- Actions de la carte -->
-		<div class="card-actions mt-4 justify-end">
+		<!-- <div class="card-actions mt-4 justify-end">
 			<a href={`/${spaceName}/event/${event.id}`} class="btn btn-primary btn-sm text-fluid-sm">
 				Voir les détails
 			</a>
-		</div>
+		</div> -->
 		<!-- /Actions -->
 	</div>
 	<!-- /Contenu de la carte -->
