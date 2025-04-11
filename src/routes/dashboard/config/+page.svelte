@@ -9,23 +9,18 @@
 
 	let hasUnsavedChanges = $derived(JSON.stringify(spaceConfig) !== JSON.stringify(initialConfig));
 
-	let confirmResponse = $state('');
-
-	// $effect(() => {
-	// 	hasUnsavedChanges = JSON.stringify(spaceConfig) !== JSON.stringify(spaceConfig);
-	// });
-
 	let showModalConfirm = $state(false);
 	let defaultTaskIndex = $state(
 		spaceConfig.tasks.findIndex((task) => task.type === 'default') || 0
 	);
 
-	const handleModalResponse = (response) => {
+	// 👉 Références aux conteneurs des listes pour gérer le focus
+	let roomsContainer: HTMLDivElement | undefined = $state();
+	let categoriesContainer: HTMLDivElement | undefined = $state();
+
+	const handleModalResponse = (response: 'leave' | 'save') => {
 		// Fermer la modal
 		showModalConfirm = false;
-
-		// Réinitialiser la réponse de confirmation
-		confirmResponse = response;
 
 		switch (response) {
 			case 'leave':
@@ -132,7 +127,7 @@
 		<section class="rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold">Salles</h2>
 			<div class="space-y-3">
-				{#each spaceConfig.rooms as room, i (room)}
+				{#each spaceConfig.rooms, i (i)}
 					<div class="flex items-center gap-2">
 						<input
 							type="text"
@@ -173,7 +168,7 @@
 		<section class="rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold">Catégories</h2>
 			<div class="space-y-3">
-				{#each spaceConfig.categories as category, i (i)}
+				{#each spaceConfig.categories, i (i)}
 					<div class="flex items-center gap-2">
 						<input
 							type="text"
@@ -212,9 +207,9 @@
 		<section class="rounded-lg bg-white p-6 shadow-sm">
 			<h2 class="mb-4 text-xl font-semibold">Rôles organisationnels (mandats)</h2>
 
-			<div class="space-y-4 divide-y-3">
-				{#each spaceConfig.tasks as task, i (i)}
-					<div class="rounded-lg p-4">
+			<div class="space-y-4 divide-y-2 divide-dashed">
+				{#each spaceConfig.tasks, i (i)}
+					<div class="p-4">
 						<div class="flex flex-wrap items-center gap-3">
 							<!-- Nom de la tâche -->
 							<div class="flex-grow">
@@ -291,7 +286,7 @@
 		{#if hasUnsavedChanges}
 			<div
 				transition:slide={{ duration: 300, axis: 'y' }}
-				class="bg-opacity-50 fixed bottom-0 left-0 flex w-full justify-end gap-4 bg-gray-300 px-4 py-2 shadow-lg"
+				class="bg-base-300/70 shadow-t-lg fixed bottom-0 left-0 flex w-full justify-end gap-4 px-4 py-2"
 			>
 				<button
 					type="button"
@@ -320,20 +315,9 @@
 {/if}
 
 <style>
-	.form-group {
-		margin-bottom: 1rem;
-	}
-
 	label {
 		display: block;
 		margin-bottom: 0.5rem;
 		font-weight: 500;
-	}
-
-	input {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #e2e8f0;
-		border-radius: 0.375rem;
 	}
 </style>

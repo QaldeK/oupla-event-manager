@@ -13,7 +13,6 @@ import { getDefaultThemeOptions, type PublicSiteThemeOptions } from '$lib/types/
 export interface PublicSpaceInfo {
 	id: string;
 	name: string;
-	title?: string;
 	description: string;
 	categories: string[];
 	rooms: string[];

@@ -15,11 +15,11 @@
 	// Interface pour les props
 	interface Props {
 		docId: string;
-		onSaveAndClose?: () => void;
+		onClose?: () => void;
 		initialEditMode?: boolean;
 	}
 
-	const { docId, onSaveAndClose, initialEditMode = true }: Props = $props();
+	const { docId, onClose: onClose, initialEditMode = true }: Props = $props();
 	const collectionName = 'site_pages';
 
 	// Préparer les actions pour le store éditable
@@ -199,8 +199,8 @@
 		}
 
 		// Appeler le callback si fourni
-		if (onSaveAndClose) {
-			onSaveAndClose();
+		if (onClose) {
+			onClose();
 		}
 	}
 

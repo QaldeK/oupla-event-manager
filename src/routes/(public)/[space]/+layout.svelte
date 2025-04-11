@@ -11,7 +11,8 @@
 	// 👉 Importer le type SitePagesResponse
 	import type { SitePagesResponse } from '$lib/types/pocketbase';
 	import type { PublicSiteThemeOptions } from '$lib/types/theme';
-	import type { NavBarHeaderConfig } from '$lib/components/public/NavBarHeader.svelte';
+	import type { NavbarHeaderType } from '$lib/types/theme.d';
+
 	let { children } = $props();
 
 	let isLeftSidebarOpen = $state(false);
@@ -23,10 +24,28 @@
 	let themeOptions = $derived(publicStore.themeOptions); // Récupère les options du thème
 	let layoutSitePages = $derived(publicStore.layoutSitePages);
 
-	let theme = $state(themeOptions.daisyTheme || 'light'); // sécurité
+	let theme = $state();
 
 	let showNavBarHeader = $derived(themeOptions?.components?.navbarHeader?.enabled ?? false);
 	let shouldNavBarBeSticky = $derived(themeOptions?.components?.navbarHeader?.isFixed ?? false);
+
+	let configNavBarHeader: NavbarHeaderType = $derived({
+		enabled: showNavBarHeader,
+		pos: themeOptions.components.navbarHeader.pos,
+		bgClass: themeOptions.layoutSections.header.bgClass,
+		titleClass: [
+			...themeOptions.components.navbarHeader.titleClass,
+			themeOptions.layoutSections.header.textClass
+		],
+		isFixed: shouldNavBarBeSticky,
+		size: themeOptions.components.navbarHeader.size,
+		linkClass: [
+			...themeOptions.components.navbarHeader.linkClass,
+			themeOptions.layoutSections.header.textClass
+		]
+	});
+
+	let primaryNavLinks = $derived(themeOptions.components.primaryNavLinks);
 
 	let pagesBySection = $derived.by(() => {
 		const groups: Record<string, SitePagesResponse[]> = {
@@ -53,18 +72,6 @@
 		return groups;
 	});
 
-	let configNavBarHeader: NavBarHeaderConfig = $derived({
-		title: spaceInfo?.name || 'Mon Application',
-		bgClass: themeOptions.layoutSections.header.bgClass,
-		titleClass: themeOptions.components.navbarHeader.titleClass,
-		hasMenu: themeOptions.components.navbarHeader.hasMenu,
-		isFixed: shouldNavBarBeSticky,
-		size: themeOptions.components.navbarHeader.size,
-		linkClass: themeOptions.components.navbarHeader.linkClass,
-		links: themeOptions.components.navbarHeader.links,
-		toggleThemeMode
-	});
-
 	// --- Effet pour charger les données publiques ---
 
 	$effect(() => {
@@ -78,7 +85,13 @@
 			// setTimeout(() => goto('/'), 3000);
 			return; // Arrêter l'effet si pas de nom d'espace
 		}
-		publicStore.loadPublicData(spaceName);
+		// S'assurer que le store est nettoyé si on change d'espace
+		if (spaceInfo && spaceInfo.name !== spaceName) {
+			publicStore.clearStore();
+		}
+		if (!publicStore.isLoading && (!spaceInfo || spaceInfo.name !== spaceName)) {
+			publicStore.loadPublicData(spaceName);
+		}
 	});
 
 	let initialPathname = $state(page.url.pathname); // Stocker le pathname initial
@@ -112,6 +125,10 @@
 		theme = themeOptions.daisyTheme;
 	}
 
+	function toggleSidebar() {
+		isLeftSidebarOpen = !isLeftSidebarOpen;
+	}
+
 	function getSectionClasses(sectionName: keyof PublicSiteThemeOptions['layoutSections']): string {
 		if (sectionName === 'mainBackgroundClass') {
 			return themeOptions?.layoutSections?.mainBackgroundClass || 'bg-base-200/50';
@@ -124,32 +141,11 @@
 			: 'bg-base-100 text-base-content';
 	}
 
-	// Fonction pour obtenir la classe de fond DaisyUI
-	function getBgClassForBlock(color: string | undefined | null): string {
-		if (!color) return 'bg-transparent'; // Défaut si pas de couleur
-		const colorMap: Record<string, string> = {
-			primary: 'bg-primary text-primary-content',
-			secondary: 'bg-secondary text-secondary-content',
-			accent: 'bg-accent text-accent-content',
-			info: 'bg-info text-info-content',
-			success: 'bg-success text-success-content',
-			warning: 'bg-warning text-warning-content',
-			error: 'bg-error text-error-content',
-			neutral: 'bg-neutral text-neutral-content',
-			outline: 'border border-current', // Cas spécifique pour 'outline'
-			// Ajouter d'autres couleurs ou styles si nécessaire
-			'base-100': 'bg-base-100 text-base-content',
-			'base-200': 'bg-base-200 text-base-content',
-			'base-300': 'bg-base-300 text-base-content'
-		};
-		return colorMap[color] || 'bg-base-100'; // Fallback si la couleur n'est pas mappée
-	}
-
 	$inspect(layoutSitePages, 'layoutSitePages brut du store'); // 👉 DEBUG: Voir les données brutes
 </script>
 
 {#snippet pageBlock(page: SitePagesResponse)}
-	<div class="card mb-4 shadow-sm {getBgClassForBlock(page.bg_color)}">
+	<div class="card mb-4 shadow-sm {page.componentConfig?.bgColor}">
 		<div class="card-body">
 			{#if page.title}
 				<h3 class="card-title">{page.title}</h3>
@@ -194,13 +190,14 @@
 
 			<!-- Contenu principal (incluant header, top, main, right, footer) -->
 			<div class="drawer-content flex flex-col {getSectionClasses('mainBackgroundClass')}">
-				<label
+				<!-- <label
 					for="left-sidebar-drawer"
 					aria-label="Ouvrir menu"
-					class="btn btn-square btn-ghost fixed top-2 left-2 z-[51] lg:hidden"
+					class="btn-square btn-ghost bg-neutral/20 fixed top-4 left-4 z-[51] cursor-pointer rounded lg:hidden {themeOptions
+						.layoutSections.header.textClass} "
 				>
 					<Menu />
-				</label>
+				</label> -->
 
 				<!-- Header Section -->
 				<header class="w-full shadow-sm">
@@ -213,8 +210,12 @@
 							'header'
 						)}"
 					>
-						<NavBarHeader config={configNavBarHeader} />
-						<!-- Possible d'ajouter ici un séparateur visuel ou une ombre si non sticky -->
+						<NavBarHeader
+							siteName={spaceInfo.name}
+							config={configNavBarHeader}
+							{toggleThemeMode}
+							{toggleSidebar}
+						/>
 					</div>
 				{/if}
 
@@ -265,22 +266,33 @@
 			</div>
 
 			<!-- Sidebar gauche (Drawer) -->
-			<div class="drawer-side z-40">
-				<!-- Overlay pour fermer en cliquant à côté -->
-				<label for="left-sidebar-drawer" aria-label="Fermer menu" class="drawer-overlay"></label>
+			{$inspect('navlink', primaryNavLinks)}
+			{#if pagesBySection.leftSide.length > 0 || (primaryNavLinks && primaryNavLinks.length > 0)}
+				<div class="drawer-side z-40">
+					<!-- Overlay pour fermer en cliquant à côté -->
+					<label for="left-sidebar-drawer" aria-label="Fermer menu" class="drawer-overlay"></label>
 
-				<!-- Contenu de la sidebar -->
-				<aside
-					class="min-h-full w-72 p-4 shadow-lg {getSectionClasses('leftSidebar')}"
-					role="navigation"
-				>
-					{#if pagesBySection.leftSide.length > 0}
+					<!-- Contenu de la sidebar -->
+					<aside
+						class="min-h-full w-72 p-4 pt-28 shadow-lg lg:pt-24 {getSectionClasses('leftSidebar')}"
+						role="navigation"
+					>
+						{#if primaryNavLinks && primaryNavLinks.length > 0}
+							<div class="bg-base-100/10 rounded-xl">
+								<ul class="menu menu-lg px-0">
+									<!-- menu-sm pour un padding réduit -->
+									{#each primaryNavLinks as link, index (index)}
+										<li><a href={link.url}>{link.title}</a></li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
 						{#each pagesBySection.leftSide as page (page.id)}
 							{@render pageBlock(page)}
 						{/each}
-					{/if}
-				</aside>
-			</div>
+					</aside>
+				</div>
+			{/if}
 		</div>
 
 		<!--  FIX: apparait brievement au chargement -->

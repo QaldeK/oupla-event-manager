@@ -19,9 +19,9 @@
 
 	import { AlertCircle, GripVertical, Pencil, Trash2 } from 'lucide-svelte';
 	import { draggable, droppable, type DragDropState } from '@thisux/sveltednd';
-	import { fade } from 'svelte/transition';
+	import { fade, slide } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
-	import { Palette, Sun, Moon } from 'lucide-svelte';
+	import { Palette, Sun, Moon, X } from 'lucide-svelte';
 
 	import ConfigModal from './components/ConfigModal.svelte';
 	import NavBarHeaderConfig from './components/NavBarHeaderConfig.svelte';
@@ -47,11 +47,17 @@
 	let navbarConfigModalOpen = $state(false);
 
 	let theme = $state<PublicSiteThemeOptions>(getDefaultThemeOptions());
+	let initialTheme = $state<PublicSiteThemeOptions | null>(null);
+
+	let haveUnsavedChanges = $derived(JSON.stringify(theme) !== JSON.stringify(initialTheme));
+
 	let optionsRecordId = $state<string | null>(null);
 	let spaceId = $state<string | null>(null);
 	let previewMode = $state<'light' | 'dark'>('light');
 
 	let pages = $derived.by(() => getPages());
+
+	let navLinks = $derived(theme.components.primaryNavLinks);
 
 	const daisyThemes = {
 		light: [
@@ -171,6 +177,10 @@
 		categories: ['Atelier', 'Culture']
 	};
 
+	let navLinkTitle = $state('');
+	let navLinkUrl = $state('');
+	let navSelectedPage = $state<'selectPage' | '' | string>('selectPage');
+
 	// Charger les options existantes au montage
 	onMount(async () => {
 		spaceId = await getCurrentAdminSpaceId();
@@ -201,6 +211,10 @@
 				layoutSections: {
 					...getDefaultThemeOptions().layoutSections,
 					...(loadedTheme?.layoutSections ?? {})
+				},
+				components: {
+					...getDefaultThemeOptions().components,
+					...(loadedTheme?.components ?? {})
 				}
 			};
 
@@ -211,6 +225,7 @@
 			if (!theme.daisyThemeDark) {
 				theme.daisyThemeDark = theme.daisyTheme || 'dark';
 			}
+			initialTheme = JSON.parse(JSON.stringify(theme));
 		} catch (e: any) {
 			if (e.status === 404) {
 				console.log(`Aucune option d'apparence existante trouvée pour l'espace ${spaceId}.`);
@@ -220,7 +235,10 @@
 				console.error("Erreur lors du chargement des options d'apparence:", e);
 				showAlert(`Erreur chargement: ${e.message}`, 'error');
 				theme = getDefaultThemeOptions();
+				initialTheme = JSON.parse(JSON.stringify(theme));
 			}
+		} finally {
+			isLoading = false;
 		}
 	});
 
@@ -229,15 +247,6 @@
 		const unsubscribe = subscribeToPagesUpdates(() => {});
 		// Nettoyage à la destruction du composant
 		return unsubscribe;
-	});
-
-	$effect(() => {
-		// Ce $effect s'exécute lorsque `pages` change.
-		// Si isLoading est true ET que pages est devenu un tableau (même vide),
-		// cela signifie que le chargement initial depuis le store est terminé.
-		if (isLoading && Array.isArray(pages)) {
-			isLoading = false;
-		}
 	});
 
 	// Structure pour stocker les pages groupées par type
@@ -303,6 +312,8 @@
 		console.log('Grouped pages:', groups);
 		return groups;
 	});
+
+	// --- Fonctions ---
 
 	async function handleCreatePage() {
 		if (!newPageTitle.trim()) {
@@ -533,7 +544,7 @@
 				optionsRecordId = savedRecord.id;
 			}
 
-			theme = savedRecord.publicSiteTheme as PublicSiteThemeOptions;
+			// theme = savedRecord.publicSiteTheme as PublicSiteThemeOptions;
 			showAlert('Apparence sauvegardée avec succès !', 'success');
 		} catch (e: any) {
 			console.error("Erreur lors de la sauvegarde de l'apparence:", e);
@@ -580,791 +591,977 @@
 		}
 	}
 
+	function addNavLink() {
+		// Référence directe à theme.components.primaryNavLinks
+		const navLinks = theme.components.primaryNavLinks || [];
+
+		// Si une page est sélectionnée
+		if (navSelectedPage && navSelectedPage !== 'selectPage') {
+			const page = groupedPages.page.find((p) => p.id === navSelectedPage); // Utiliser groupedPages.page
+			if (page) {
+				// Utilisation de l'assignation directe car 'theme' est $state
+				theme.components.primaryNavLinks = [
+					...navLinks,
+					{
+						title: page.title || `Page ${page.id.substring(0, 5)}...`, // Titre par défaut plus clair
+						url: `/${page.id}` // URL relative à la racine du site public (supposant que c'est le slug)
+						// TODO: Confirmer la structure de l'URL publique des pages
+					}
+				];
+				navSelectedPage = 'selectPage'; // Réinitialiser la sélection
+			} else {
+				showAlert('Page sélectionnée introuvable.', 'error');
+			}
+		}
+		// Sinon utiliser le titre et l'URL personnalisés
+		else if (navLinkTitle.trim()) {
+			theme.components.primaryNavLinks = [
+				...navLinks,
+				{
+					title: navLinkTitle,
+					url: navLinkUrl || '#' // URL par défaut si vide
+				}
+			];
+			navLinkTitle = '';
+			navLinkUrl = '';
+		} else {
+			showAlert(
+				'Veuillez sélectionner une page ou entrer un titre de lien personnalisé.',
+				'warning'
+			);
+		}
+	}
+
+	// Supprimer un lien de la barre de navigation
+	function removeNavLink(index: number) {
+		if (theme.components.primaryNavLinks) {
+			theme.components.primaryNavLinks = theme.components.primaryNavLinks.filter(
+				(_, i) => i !== index
+			);
+		}
+	}
+
 	function formatDate(dateString: string) {
 		return format(new Date(dateString), 'dd MMMM yyyy à HH:mm', { locale: fr });
 	}
 </script>
 
-{#snippet daisy_theme(daisy_theme: string, themeCategory: 'light' | 'dark')}
-	{@const isCurrentThemeForCategory =
-		themeCategory === 'light'
-			? theme.daisyThemeLight === daisy_theme
-			: theme.daisyThemeDark === daisy_theme}
-	{@const isSelectedCategory = theme.defaultMode === themeCategory}
-	{@const isActiveTheme = isCurrentThemeForCategory && isSelectedCategory}
+{$inspect('themeLoaded', { theme })}
+{$inspect('initialTheme', { initialTheme })}
 
-	<div
-		class="border-base-content/20 hover:border-base-content/40 overflow-hidden rounded-lg border outline-2 outline-offset-2 outline-transparent
-        {isCurrentThemeForCategory ? 'ring-4 ring-sky-500 ring-offset-2' : ''}
-        {isActiveTheme ? 'ring-4 ring-sky-500 ring-offset-2' : ''}"
-		data-act-class="outline-base-content!"
-		data-set-theme={daisy_theme}
-	>
-		<button
-			class="bg-base-100 text-base-content w-full cursor-pointer font-sans"
-			data-theme={daisy_theme}
-			onclick={() => {
-				if (themeCategory === 'light') {
-					theme.daisyThemeLight = daisy_theme;
-					if (theme.defaultMode === 'light') {
-						theme.daisyTheme = daisy_theme;
+{#if !isLoading}
+	{#snippet daisy_theme(daisy_theme: string, themeCategory: 'light' | 'dark')}
+		{@const isCurrentThemeForCategory =
+			themeCategory === 'light'
+				? theme.daisyThemeLight === daisy_theme
+				: theme.daisyThemeDark === daisy_theme}
+		{@const isSelectedCategory = theme.defaultMode === themeCategory}
+		{@const isActiveTheme = isCurrentThemeForCategory && isSelectedCategory}
+
+		<div
+			class="border-base-content/20 hover:border-base-content/40 overflow-hidden rounded-lg border outline-2 outline-offset-2 outline-transparent
+            {isCurrentThemeForCategory ? 'ring-4 ring-sky-500 ring-offset-2' : ''}
+            {isActiveTheme ? 'ring-4 ring-sky-500 ring-offset-2' : ''}"
+			data-act-class="outline-base-content!"
+			data-set-theme={daisy_theme}
+		>
+			<button
+				class="bg-base-100 text-base-content w-full cursor-pointer font-sans"
+				data-theme={daisy_theme}
+				onclick={() => {
+					if (themeCategory === 'light') {
+						theme.daisyThemeLight = daisy_theme;
+						if (theme.defaultMode === 'light') {
+							theme.daisyTheme = daisy_theme;
+						}
+					} else {
+						theme.daisyThemeDark = daisy_theme;
+						if (theme.defaultMode === 'dark') {
+							theme.daisyTheme = daisy_theme;
+						}
 					}
-				} else {
-					theme.daisyThemeDark = daisy_theme;
-					if (theme.defaultMode === 'dark') {
-						theme.daisyTheme = daisy_theme;
-					}
+				}}
+				type="button"
+			>
+				<div class="grid grid-cols-5 grid-rows-3">
+					<div class="bg-base-200 col-start-1 row-span-2 row-start-1"></div>
+					<div class="bg-base-300 col-start-1 row-start-3"></div>
+					<div
+						class="bg-base-100 col-span-4 col-start-2 row-span-3 row-start-1 flex flex-col gap-1 p-2"
+					>
+						<div class="flex items-center gap-1 font-bold">
+							{#if themeCategory === 'light'}
+								<Sun class="h-3 w-3" />
+							{:else}
+								<Moon class="h-3 w-3" />
+							{/if}
+							{daisy_theme}
+						</div>
+						<div class="flex flex-wrap gap-1">
+							<div
+								class="bg-primary flex aspect-square w-5 items-center justify-center rounded lg:w-6"
+							>
+								<div class="text-primary-content text-sm font-bold">A</div>
+							</div>
+							<div
+								class="bg-secondary flex aspect-square w-5 items-center justify-center rounded lg:w-6"
+							>
+								<div class="text-secondary-content text-sm font-bold">A</div>
+							</div>
+							<div
+								class="bg-accent flex aspect-square w-5 items-center justify-center rounded lg:w-6"
+							>
+								<div class="text-accent-content text-sm font-bold">A</div>
+							</div>
+							<div
+								class="bg-neutral flex aspect-square w-5 items-center justify-center rounded lg:w-6"
+							>
+								<div class="text-neutral-content text-sm font-bold">A</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</button>
+		</div>
+	{/snippet}
+
+	{#snippet blockSection(sectionType: SitePagesSectionOptions, sectionLabel: string)}
+		{@const sectionKey = getSectionConfigKey(sectionType)}
+		{@const isHeader = sectionType === SitePagesSectionOptions.header}
+
+		<div
+			style:background-color={undefined}
+			class="card border shadow-md transition-all duration-200 {theme.layoutSections[sectionKey]
+				?.bgClass || 'bg-base-200'}"
+			use:droppable={{
+				container: sectionType,
+				callbacks: { onDrop: handleSectionDrop },
+				disabled: isHeader,
+				attributes: {
+					dragOverClass: 'ring-2 ring-primary/50 bg-primary/5'
 				}
 			}}
-			type="button"
 		>
-			<div class="grid grid-cols-5 grid-rows-3">
-				<div class="bg-base-200 col-start-1 row-span-2 row-start-1"></div>
-				<div class="bg-base-300 col-start-1 row-start-3"></div>
-				<div
-					class="bg-base-100 col-span-4 col-start-2 row-span-3 row-start-1 flex flex-col gap-1 p-2"
-				>
-					<div class="flex items-center gap-1 font-bold">
-						{#if themeCategory === 'light'}
-							<Sun class="h-3 w-3" />
-						{:else}
-							<Moon class="h-3 w-3" />
-						{/if}
-						{daisy_theme}
-					</div>
-					<div class="flex flex-wrap gap-1">
-						<div
-							class="bg-primary flex aspect-square w-5 items-center justify-center rounded lg:w-6"
-						>
-							<div class="text-primary-content text-sm font-bold">A</div>
-						</div>
-						<div
-							class="bg-secondary flex aspect-square w-5 items-center justify-center rounded lg:w-6"
-						>
-							<div class="text-secondary-content text-sm font-bold">A</div>
-						</div>
-						<div
-							class="bg-accent flex aspect-square w-5 items-center justify-center rounded lg:w-6"
-						>
-							<div class="text-accent-content text-sm font-bold">A</div>
-						</div>
-						<div
-							class="bg-neutral flex aspect-square w-5 items-center justify-center rounded lg:w-6"
-						>
-							<div class="text-neutral-content text-sm font-bold">A</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</button>
-	</div>
-{/snippet}
-
-{#snippet blockSection(sectionType: SitePagesSectionOptions, sectionLabel: string)}
-	{@const sectionKey = getSectionConfigKey(sectionType)}
-	{@const isHeader = sectionType === SitePagesSectionOptions.header}
-
-	<div
-		style:background-color={undefined}
-		class="card border shadow-md transition-all duration-200 {theme.layoutSections[sectionKey]
-			?.bgClass || 'bg-base-200'}"
-		use:droppable={{
-			container: sectionType,
-			callbacks: { onDrop: handleSectionDrop },
-			disabled: isHeader,
-			attributes: {
-				dragOverClass: 'ring-2 ring-primary/50 bg-primary/5'
-			}
-		}}
-	>
-		<div class="card-body p-4">
-			<div class="mb-2 flex items-center justify-between">
-				<div
-					class="font-medium {theme.layoutSections[sectionKey]?.textClass || 'text-base-content'}"
-				>
-					{sectionLabel}
-				</div>
-
-				<button
-					class="btn btn-primary btn-square"
-					onclick={() => (currentConfigSection = sectionType)}
-					title="Configurer l'apparence"
-				>
-					<Palette size={16} />
-				</button>
-			</div>
-			<div class="flex flex-col gap-y-1">
-				<!-- Ajouter un bouton pour configurer le NavBarHeader si c'est la section header -->
-				{#if isHeader}
+			<div class="card-body p-4">
+				<div class="mb-2 flex items-center justify-between">
 					<div
-						class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 shadow-sm"
+						class="font-medium {theme.layoutSections[sectionKey]?.textClass || 'text-base-content'}"
 					>
-						<div>Barre de navigation</div>
-						<div>
-							<button
-								class="btn btn-outline btn-sm"
-								onclick={() => (navbarConfigModalOpen = true)}
-								title="Configurer la barre de navigation"
-							>
-								Configurer
-							</button>
-						</div>
-						<div class="form-control">
-							<label class="label cursor-pointer gap-2 py-0">
-								<span class="label-text text-xs">Activer</span>
-								<input
-									type="checkbox"
-									class="toggle toggle-sm toggle-primary"
-									bind:checked={theme.components.navbarHeader.enabled}
-								/>
-							</label>
-						</div>
+						{sectionLabel}
 					</div>
+
+					<button
+						class="btn btn-primary btn-square"
+						onclick={() => (currentConfigSection = sectionType)}
+						title="Configurer l'apparence"
+					>
+						<Palette size={16} />
+					</button>
+				</div>
+				<div class="flex flex-col gap-y-1">
+					<!-- Ajouter un bouton pour configurer le NavBarHeader si c'est la section header -->
+					{#if isHeader}
+						<div
+							class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 shadow-sm {theme
+								.layoutSections[sectionKey]?.textClass || 'text-base-content'}"
+						>
+							<div>Barre de navigation</div>
+							<div>
+								<button
+									class="btn btn-outline btn-sm"
+									onclick={() => (navbarConfigModalOpen = true)}
+									title="Configurer la barre de navigation"
+								>
+									Configurer
+								</button>
+							</div>
+							<div class="">
+								<label class="label cursor-pointer gap-4">
+									<span class="label-text text-xs">Activer</span>
+									<input
+										type="checkbox"
+										class="toggle toggle-sm toggle-primary"
+										bind:checked={theme.components.navbarHeader.enabled}
+									/>
+								</label>
+							</div>
+						</div>
+					{/if}
+				</div>
+				{#if !isHeader}
+					{#if isLoading}
+						<div class="flex justify-center py-4">
+							<span class="loading loading-spinner loading-sm"></span>
+						</div>
+					{:else}
+						{#if groupedPages[sectionType]?.length > 0}
+							<div class="mb-4 flex flex-col gap-y-1">
+								{#each groupedPages[sectionType] as block (block.id)}
+									<div
+										class="bg-base-100 svelte-dnd-touch-feedback hover:ring-secondary/30 mb-2 flex flex-wrap items-center justify-between rounded-lg border p-2 shadow-sm transition-all duration-200 hover:shadow-md hover:ring-2"
+										use:draggable={{
+											container: sectionType,
+											dragData: block,
+											disabled: isUpdatingOrder,
+											attributes: {
+												draggingClass: 'opacity-50 ring-2 ring-primary shadow-lg'
+											}
+										}}
+										use:droppable={{
+											container: sectionType,
+											callbacks: {
+												onDrop: (state) =>
+													handleItemDrop(state as DragDropState<SitePagesResponse>, block)
+											},
+											attributes: {
+												dragOverClass: 'outline bg-warnig outline-2 outline-offset-2 outline-accent'
+											}
+										}}
+										animate:flip={{ duration: 200 }}
+										in:fade={{ duration: 150 }}
+										out:fade={{ duration: 150 }}
+									>
+										<span class="flex flex-grow items-center gap-2 pr-2">
+											<!-- Icône de drag handle -->
+											<GripVertical
+												class="text-base-content/30 group-hover:text-base-content/70 cursor-grab transition-colors"
+												size={24}
+											/>
+											<span class="flex-1 truncate" title={block.title}>{block.title}</span>
+										</span>
+										<div class="flex items-center">
+											<button
+												class="btn btn-ghost text-error btn-square"
+												onclick={() => deletePage(block.id)}
+												><Trash2 size={16} />
+											</button>
+											<button
+												class="btn btn-ghost btn-square btn-sm"
+												onclick={() => (currentConfigBlock = block.id)}
+											>
+												<Pencil size={16} />
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+
+						<button
+							class="btn btn-primary w-full"
+							onclick={() => handleCreateBlock(sectionType)}
+							disabled={isCreating}
+						>
+							{#if isCreating}
+								<span class="loading loading-spinner loading-xs"></span> Création...
+							{:else}
+								Ajouter du contenu
+							{/if}
+						</button>
+					{/if}
 				{/if}
 			</div>
-			{#if !isHeader}
-				{#if isLoading}
-					<div class="flex justify-center py-4">
-						<span class="loading loading-spinner loading-sm"></span>
+		</div>
+	{/snippet}
+	<div transition:fade>
+		<div class="container mx-auto px-4 py-8" data-theme={getCurrentTheme()}>
+			<h1 class="mb-6 text-3xl font-bold">Configuration du site public</h1>
+
+			<!-- --- Section de configuration du thème général --- -->
+			<fieldset class="border-base-content/20 mb-4 mb-12 rounded-lg border px-4 py-8">
+				<legend class="text-fluid-lg px-2 font-medium">Thème du site</legend>
+				<div class="flex flex-wrap items-center justify-between">
+					<!-- Bouton pour basculer entre aperçu light/dark -->
+					<div class="mb-4 flex items-center gap-2">
+						<span class="text-sm">Aperçu:</span>
+						<div class="join rounded-md border">
+							<button
+								class="join-item btn btn-sm ${previewMode === 'light' ? 'btn-active' : ''}"
+								onclick={() => (previewMode = 'light')}
+							>
+								<Sun size={16} />
+							</button>
+							<button
+								class="join-item btn btn-sm ${previewMode === 'dark' ? 'btn-active' : ''}"
+								onclick={() => (previewMode = 'dark')}
+							>
+								<Moon size={16} />
+							</button>
+						</div>
 					</div>
-				{:else}
-					{#if groupedPages[sectionType]?.length > 0}
-						<div class="mb-4 flex flex-col gap-y-1">
-							{#each groupedPages[sectionType] as block (block.id)}
-								<div
-									class="bg-base-100 svelte-dnd-touch-feedback hover:ring-secondary/30 mb-2 flex flex-wrap items-center justify-between rounded-lg border p-2 shadow-sm transition-all duration-200 hover:shadow-md hover:ring-2"
-									use:draggable={{
-										container: sectionType,
-										dragData: block,
-										disabled: isUpdatingOrder,
-										attributes: {
-											draggingClass: 'opacity-50 ring-2 ring-primary shadow-lg'
-										}
-									}}
-									use:droppable={{
-										container: sectionType,
-										callbacks: {
-											onDrop: (state) =>
-												handleItemDrop(state as DragDropState<SitePagesResponse>, block)
-										},
-										attributes: {
-											dragOverClass: 'outline bg-warnig outline-2 outline-offset-2 outline-accent'
-										}
-									}}
-									animate:flip={{ duration: 200 }}
-									in:fade={{ duration: 150 }}
-									out:fade={{ duration: 150 }}
-								>
-									<span class="flex flex-grow items-center gap-2 pr-2">
-										<!-- Icône de drag handle -->
-										<GripVertical
-											class="text-base-content/30 group-hover:text-base-content/70 cursor-grab transition-colors"
-											size={24}
-										/>
-										<span class="flex-1 truncate" title={block.title}>{block.title}</span>
+				</div>
+
+				<div class="grid grid-cols-1 justify-items-center md:grid-cols-2">
+					<div class="  bg-base-100 relative grid-cols-3 gap-6 rounded-lg border">
+						<!-- Thème clair actuel -->
+						<div class="p-4">
+							<div class="mb-2 flex items-center text-sm font-medium">
+								<Sun size={16} class="mr-2" />
+								Thème clair: {theme.daisyThemeLight}
+							</div>
+							{@render daisy_theme(theme.daisyThemeLight, 'light')}
+						</div>
+
+						<!-- Thème sombre actuel -->
+						<div class="p-4">
+							<div class="mb-2 flex items-center text-sm font-medium">
+								<Moon size={16} class="mr-2" />
+								Thème sombre: {theme.daisyThemeDark}
+							</div>
+							{@render daisy_theme(theme.daisyThemeDark, 'dark')}
+						</div>
+						<div class="bg-base-100/50 inset-0 flex items-end justify-end p-4">
+							<button class="btn btn-primary" onclick={() => (themeModalOpen = true)}>
+								Changer de thème
+							</button>
+						</div>
+					</div>
+
+					<!-- Mode par défaut -->
+					<div class="flex flex-col gap-6">
+						<div>
+							<div class="mb-2 font-medium">Mode par défaut</div>
+							<div class="flex gap-4">
+								<label class="label cursor-pointer gap-2">
+									<input
+										type="radio"
+										name="defaultMode"
+										class="radio radio-primary"
+										value="light"
+										checked={theme.defaultMode === 'light'}
+										onclick={() => (theme.defaultMode = 'light')}
+									/>
+									<span class="label-text flex items-center gap-1">
+										<Sun size={16} /> Clair
 									</span>
-									<div class="flex items-center">
-										<button
-											class="btn btn-ghost text-error btn-square"
-											onclick={() => deletePage(block.id)}
-											><Trash2 size={16} />
-										</button>
-										<button
-											class="btn btn-ghost btn-square btn-sm"
-											onclick={() => (currentConfigBlock = block.id)}
-										>
-											<Pencil size={16} />
-										</button>
-									</div>
+								</label>
+								<label class="label cursor-pointer gap-2">
+									<input
+										type="radio"
+										name="defaultMode"
+										class="radio radio-primary"
+										value="dark"
+										checked={theme.defaultMode === 'dark'}
+										onclick={() => (theme.defaultMode = 'dark')}
+									/>
+									<span class="label-text flex items-center gap-1">
+										<Moon size={16} /> Sombre
+									</span>
+								</label>
+							</div>
+						</div>
+						<!-- Fond principal -->
+						<div class="">
+							<ColorSelect
+								id="main-bg-class"
+								options={getBackgroundOptionsForSection('main')}
+								label="Fond général"
+								bind:value={theme.layoutSections.mainBackgroundClass}
+							/>
+						</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<!-- --- Section de création de blocs --- -->
+			<section class="mb-12">
+				<fieldset class="border-base-content/20 mb-4 rounded-lg border px-4 py-8">
+					<legend class="text-fluid-lg px-2 font-medium">Organisation des sections</legend>
+
+					<!--
+                Layout Grid pour les écrans larges (lg et plus)
+                - Header et Footer prennent toute la largeur (col-span-3)
+                - Left et Right Sidebars dans leurs colonnes respectives
+                Layout Colonne simple pour les écrans petits (par défaut)
+            -->
+					<div
+						class="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr_280px] lg:grid-rows-[auto_1fr_auto]"
+					>
+						<!-- Header -->
+						<div class="lg:col-span-3">
+							{@render blockSection(SitePagesSectionOptions.header, 'Header')}
+						</div>
+
+						<!-- Left Sidebar -->
+						<div class="lg:row-start-2">
+							{@render blockSection(SitePagesSectionOptions.leftSide, 'Sidebar Gauche')}
+						</div>
+
+						<!-- Zone centrale (peut contenir d'autres éléments ou rester vide) -->
+						<div
+							class="border-base-content/30 rounded border border-dashed p-4 text-center lg:col-start-2 lg:row-start-2"
+						>
+							<p class="text-base-content/60">Zone de contenu principal (non gérée ici)</p>
+							<p class="text-base-content/50 text-sm">
+								Utilisez cette zone pour prévisualiser la structure ou ajouter d'autres contrôles.
+							</p>
+						</div>
+
+						<!-- Right Sidebar -->
+						<div class="lg:col-start-3 lg:row-start-2">
+							{@render blockSection(SitePagesSectionOptions.rightSide, 'Sidebar Droite')}
+						</div>
+
+						<!-- Footer -->
+						<div class="lg:col-span-3 lg:row-start-3">
+							{@render blockSection(SitePagesSectionOptions.footer, 'Footer')}
+						</div>
+					</div>
+				</fieldset>
+			</section>
+
+			<!-- --- Configuration du menu Navlink -->
+			<fieldset
+				class="rounded-box border-base-300 mt-2 mb-4 rounded border p-4 shadow-sm"
+				transition:slide
+			>
+				<legend class="text-fluid-lg n px-2 font-medium"> Liens du menu principal </legend>
+				<p class="text-base-content/60 mb-4 px-2 text-xs">
+					Ces liens apparaissent dans la barre sur grand écran et dans le menu latéral sur petit
+					écran.
+				</p>
+				<!-- Liste des liens existants -->
+				<div class="mb-4 overflow-x-auto">
+					{#if navLinks.length === 0}
+						<p class="text-base-content/60 py-2 text-center">Aucun lien configuré</p>
+					{:else}
+						<div class="space-y-2">
+							{#each navLinks as link, index ('navLink' + index)}
+								<div class="bg-base-100 flex items-center justify-between rounded p-2">
+									<span class="flex-1 pr-2 italic">{link.title}</span>
+									<span class="text-base-content/50 mr-2 text-xs">({link.url})</span>
+									<button
+										class="btn btn-ghost btn-sm text-error"
+										onclick={() => removeNavLink(index)}
+									>
+										<X size={16} />
+									</button>
 								</div>
 							{/each}
 						</div>
 					{/if}
-
-					<button
-						class="btn btn-primary w-full"
-						onclick={() => handleCreateBlock(sectionType)}
-						disabled={isCreating}
-					>
-						{#if isCreating}
-							<span class="loading loading-spinner loading-xs"></span> Création...
-						{:else}
-							Ajouter du contenu
-						{/if}
-					</button>
-				{/if}
-			{/if}
-		</div>
-	</div>
-{/snippet}
-
-<div class="container mx-auto px-4 py-8" data-theme={getCurrentTheme()}>
-	<h1 class="mb-6 text-3xl font-bold">Gestion des Blocs du Site</h1>
-
-	<!-- --- Section de configuration du thème général --- -->
-	<div class="bg-base-200 mb-8 rounded-lg p-6 shadow-md">
-		<div class="flex flex-wrap items-center justify-between">
-			<h2 class="mb-4 text-xl font-semibold">Thème du site</h2>
-
-			<!-- Bouton pour basculer entre aperçu light/dark -->
-			<div class="mb-4 flex items-center gap-2">
-				<span class="text-sm">Aperçu:</span>
-				<div class="join rounded-md border">
-					<button
-						class="join-item btn btn-sm ${previewMode === 'light' ? 'btn-active' : ''}"
-						onclick={() => (previewMode = 'light')}
-					>
-						<Sun size={16} />
-					</button>
-					<button
-						class="join-item btn btn-sm ${previewMode === 'dark' ? 'btn-active' : ''}"
-						onclick={() => (previewMode = 'dark')}
-					>
-						<Moon size={16} />
-					</button>
 				</div>
-			</div>
-		</div>
 
-		<div class="grid grid-cols-1 justify-items-center md:grid-cols-2">
-			<div class="  bg-base-100 relative grid-cols-3 gap-6 rounded-lg border">
-				<!-- Thème clair actuel -->
-				<div class="p-4">
-					<div class="mb-2 flex items-center text-sm font-medium">
-						<Sun size={16} class="mr-2" />
-						Thème clair: {theme.daisyThemeLight}
+				<!-- Ajouter un lien -->
+				<div class="card bg-base-200 mb-4 p-4">
+					<div class="mb-4 flex flex-wrap items-center justify-between">
+						<div class="font-medium">Ajouter un lien</div>
+						<div class="tabs tabs-boxed">
+							<button
+								class="tab {navSelectedPage === '' ? 'tab-active' : ''}"
+								onclick={() => (navSelectedPage = '')}>Personnalisé</button
+							>
+							<button
+								class="tab {navSelectedPage !== '' ? 'tab-active' : ''}"
+								onclick={() => {
+									navLinkTitle = '';
+									navLinkUrl = '';
+									if (navSelectedPage === '') navSelectedPage = 'selectPage';
+								}}>Page existante</button
+							>
+						</div>
 					</div>
-					{@render daisy_theme(theme.daisyThemeLight, 'light')}
-				</div>
 
-				<!-- Thème sombre actuel -->
-				<div class="p-4">
-					<div class="mb-2 flex items-center text-sm font-medium">
-						<Moon size={16} class="mr-2" />
-						Thème sombre: {theme.daisyThemeDark}
-					</div>
-					{@render daisy_theme(theme.daisyThemeDark, 'dark')}
-				</div>
-				<div class="bg-base-100/50 inset-0 flex items-end justify-end p-4">
-					<button class="btn btn-primary" onclick={() => (themeModalOpen = true)}>
-						Changer de thème
-					</button>
-				</div>
-			</div>
-
-			<!-- Mode par défaut -->
-			<div class="flex flex-col gap-6">
-				<div>
-					<div class="mb-2 font-medium">Mode par défaut</div>
-					<div class="flex gap-4">
-						<label class="label cursor-pointer gap-2">
-							<input
-								type="radio"
-								name="defaultMode"
-								class="radio radio-primary"
-								value="light"
-								checked={theme.defaultMode === 'light'}
-								onclick={() => (theme.defaultMode = 'light')}
-							/>
-							<span class="label-text flex items-center gap-1">
-								<Sun size={16} /> Clair
-							</span>
-						</label>
-						<label class="label cursor-pointer gap-2">
-							<input
-								type="radio"
-								name="defaultMode"
-								class="radio radio-primary"
-								value="dark"
-								checked={theme.defaultMode === 'dark'}
-								onclick={() => (theme.defaultMode = 'dark')}
-							/>
-							<span class="label-text flex items-center gap-1">
-								<Moon size={16} /> Sombre
-							</span>
-						</label>
-					</div>
-				</div>
-				<!-- Fond principal -->
-				<div class="">
-					<ColorSelect
-						id="main-bg-class"
-						options={getBackgroundOptionsForSection('main')}
-						label="Fond général"
-						bind:value={theme.layoutSections.mainBackgroundClass}
-					/>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<div class="divider my-8"></div>
-
-	<!-- --- Section de création de blocs --- -->
-	<section class="mb-12">
-		<h2 class="mb-4 text-2xl font-semibold">Layout</h2>
-
-		<!--
-            Layout Grid pour les écrans larges (lg et plus)
-            - Header et Footer prennent toute la largeur (col-span-3)
-            - Left et Right Sidebars dans leurs colonnes respectives
-            Layout Colonne simple pour les écrans petits (par défaut)
-        -->
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr_280px] lg:grid-rows-[auto_1fr_auto]">
-			<!-- Header -->
-			<div class="lg:col-span-3">
-				{@render blockSection(SitePagesSectionOptions.header, 'Header')}
-			</div>
-
-			<!-- Left Sidebar -->
-			<div class="lg:row-start-2">
-				{@render blockSection(SitePagesSectionOptions.leftSide, 'Sidebar Gauche')}
-			</div>
-
-			<!-- Zone centrale (peut contenir d'autres éléments ou rester vide) -->
-			<div
-				class="border-base-content/30 rounded border border-dashed p-4 text-center lg:col-start-2 lg:row-start-2"
-			>
-				<p class="text-base-content/60">Zone de contenu principal (non gérée ici)</p>
-				<p class="text-base-content/50 text-sm">
-					Utilisez cette zone pour prévisualiser la structure ou ajouter d'autres contrôles.
-				</p>
-			</div>
-
-			<!-- Right Sidebar -->
-			<div class="lg:col-start-3 lg:row-start-2">
-				{@render blockSection(SitePagesSectionOptions.rightSide, 'Sidebar Droite')}
-			</div>
-
-			<!-- Footer -->
-			<div class="lg:col-span-3 lg:row-start-3">
-				{@render blockSection(SitePagesSectionOptions.footer, 'Footer')}
-			</div>
-		</div>
-	</section>
-
-	<div class="divider my-12"></div>
-
-	<!-- --- Section Configuration de carte d'événement --- -->
-	<div class="bg-base-200 mb-8 rounded-lg p-6 shadow-md">
-		<h2 class="text-xl font-semibold">Configuration d'une carte événement</h2>
-		<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-			<!-- Position Image -->
-			<div class="form-control w-full">
-				<label class="label" for="image-pos">
-					<span class="label-text font-medium">Position de l'image</span>
-				</label>
-				<div class="flex gap-4">
-					<label class="label cursor-pointer gap-2">
-						<input
-							id="image-pos"
-							type="radio"
-							name="imagePosition"
-							class="radio radio-primary"
-							value="left"
-							bind:group={theme.eventCard.imagePosition}
-						/>
-						<span class="label-text">Image à Gauche</span>
-					</label>
-					<label class="label cursor-pointer gap-2">
-						<input
-							type="radio"
-							name="imagePosition"
-							class="radio radio-primary"
-							value="top"
-							bind:group={theme.eventCard.imagePosition}
-						/>
-						<span class="label-text">Image en Haut</span>
-					</label>
-				</div>
-			</div>
-
-			<!-- Couleur de fond -->
-			<ColorSelect
-				id="bg-color"
-				bind:value={theme.eventCard.bgClass}
-				options={getBackgroundOptionsForSection('eventCard')}
-				label="Couleur de fond"
-			/>
-
-			<!-- Ombre -->
-			<div class="form-control w-full">
-				<label class="label" for="shadow">
-					<span class="label-text font-medium">Ombre</span>
-				</label>
-				<select
-					id="shadow"
-					class="select select-bordered w-full"
-					bind:value={theme.eventCard.shadowClass}
-				>
-					{#each shadowOptions as option (option.value)}
-						<option value={option.value}>{option.label}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Arrondi -->
-			<div class="form-control w-full">
-				<label class="label" for="rounded">
-					<span class="label-text font-medium">Arrondi</span>
-				</label>
-				<select
-					id="rounded"
-					class="select select-bordered w-full"
-					bind:value={theme.eventCard.roundedClass}
-				>
-					{#each roundedOptions as option (option.value)}
-						<option value={option.value}>{option.label}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Largeur Carte -->
-			<div class="form-control w-full">
-				<label class="label" for="card-width">
-					<span class="label-text font-medium">Largeur (Classe Tailwind)</span>
-				</label>
-				<input
-					type="text"
-					id="card-width"
-					class="input input-bordered w-full"
-					placeholder="w-full"
-					bind:value={theme.eventCard.widthClass}
-				/>
-				<label class="label">
-					<span class="label-text-alt">Ex: w-full, max-w-4xl mx-auto</span>
-				</label>
-			</div>
-
-			<!-- Lignes Troncature -->
-			<div class="form-control w-full">
-				<label class="label" for="truncate-lines">
-					<span class="label-text font-medium">Lignes avant troncature (description)</span>
-				</label>
-				<input
-					type="number"
-					id="truncate-lines"
-					min="1"
-					max="20"
-					class="input input-bordered w-full"
-					bind:value={theme.eventCard.truncateLines}
-				/>
-			</div>
-
-			<!-- Taille du titre -->
-			<div class="form-control w-full">
-				<label class="label" for="title-size">
-					<span class="label-text font-medium">Taille du titre</span>
-				</label>
-				<select
-					id="title-size"
-					class="select select-bordered w-full"
-					bind:value={theme.eventCard.titleSizeClass}
-				>
-					{#each fluidTextSizes as size (size.value)}
-						<option value={size.value}>{size.label}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Taille de la date -->
-			<div class="form-control w-full">
-				<label class="label" for="date-size">
-					<span class="label-text font-medium">Taille de la date</span>
-				</label>
-				<select
-					id="date-size"
-					class="select select-bordered w-full"
-					bind:value={theme.eventCard.dateSizeClass}
-				>
-					{#each fluidTextSizes as size (size.value)}
-						<option value={size.value}>{size.label}</option>
-					{/each}
-				</select>
-			</div>
-
-			<!-- Taille des catégories -->
-			<div class="form-control w-full">
-				<label class="label" for="category-size">
-					<span class="label-text font-medium">Taille des catégories</span>
-				</label>
-				<select
-					id="category-size"
-					class="select select-bordered w-full"
-					bind:value={theme.eventCard.categorySizeClass}
-				>
-					{#each fluidTextSizes as size (size.value)}
-						<option value={size.value}>{size.label}</option>
-					{/each}
-				</select>
-			</div>
-		</div>
-		<div class="divider"></div>
-
-		<div class="mb-4 flex items-center justify-between">
-			<h2 class="text-xl font-semibold">Aperçu d'une carte événement</h2>
-		</div>
-		<div class="{theme.layoutSections.mainBackgroundClass} m rounded-lg p-8">
-			<PublicEventCard
-				event={sampleEvent}
-				spaceName="example-space"
-				cardOptions={theme.eventCard}
-				eventImageUrl="https://placehold.co/600x400?text=Exemple+Image"
-			/>
-		</div>
-	</div>
-
-	{#if error}
-		<div role="alert" class="alert alert-error mb-6">
-			<AlertCircle class="h-6 w-6" />
-			<span>{error}</span>
-		</div>
-	{/if}
-
-	<div class="divider my-12"></div>
-
-	<!-- --- Liste des pages générales --- -->
-	<section>
-		<h2 class="mb-6 text-2xl font-semibold">Pages</h2>
-		{#if isLoading}
-			<div class="flex justify-center py-12">
-				<span class="loading loading-dots loading-lg"></span>
-			</div>
-		{:else if groupedPages['page'].length === 0}
-			<p class="text-base-content/70 text-center">Aucune page générale trouvée.</p>
-		{:else}
-			<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{#each groupedPages['page'] as page (page.id)}
-					{#key page.updated}
-						<!-- Re-render l'élément si 'updated' change -->
-						<a
-							href={`/dashboard/site_pages/${page.id}`}
-							class="card bg-base-100 shadow-md transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-xl"
-						>
-							<div class="card-body">
-								<h3 class="card-title truncate text-xl" title={page.title}>{page.title}</h3>
-								{#if page.section}
-									<div class="mt-1">
-										<!-- Ajout d'index pour la clé dans chaque -->
-										<span class="badge badge-outline badge-sm mr-1">{page.section}</span>
-									</div>
-								{/if}
-								<p class="text-base-content/60 mt-2 text-xs">
-									Créé le {formatDate(page.created as string)}
-								</p>
-								<p class="text-base-content/60 text-xs">
-									Dernière modification: {formatDate(page.updated as string)}
-								</p>
-								<div class="card-actions mt-4 justify-end">
-									<button class="btn btn-sm btn-outline">Ouvrir</button>
-								</div>
+					<div class="flex items-end gap-4">
+						{#if navSelectedPage !== ''}
+							<!-- Sélection d'une page existante -->
+							<div class="form-control flex-1">
+								<label class="label" for="pagesSelect">
+									<span class="label-text">Sélectionner une page générale</span>
+								</label>
+								<select
+									id="pagesSelect"
+									class="select select-bordered w-full"
+									bind:value={navSelectedPage}
+								>
+									<option value="selectPage" disabled>Choisir une page...</option>
+									<!-- 👉 Utiliser groupedPages.page ici -->
+									{#each groupedPages.page as page (page.id)}
+										<option value={page.id}
+											>{page.title || `Page sans titre (${page.id.substring(0, 5)})`}</option
+										>
+									{/each}
+								</select>
 							</div>
-						</a>
-					{/key}
-				{/each}
-			</div>
-		{/if}
-	</section>
-
-	<!-- Ajouter un nouveau bouton de création sous la liste existante -->
-	<div class="card bg-base-200 mx-auto mt-8 mb-8 max-w-lg p-4 shadow-md">
-		<div class="card-body p-4">
-			<h2 class="card-title mb-2 text-xl">Créer une nouvelle page générale</h2>
-			<div class="flex flex-col gap-2 sm:flex-row">
-				<input
-					type="text"
-					class="input input-bordered w-full"
-					placeholder="Titre de la nouvelle page"
-					bind:value={newPageTitle}
-					onkeydown={(e) => e.key === 'Enter' && handleCreatePage()}
-					disabled={isCreating}
-				/>
-				<button
-					class="btn btn-primary sm:w-auto"
-					onclick={() => handleCreatePage()}
-					disabled={isCreating || !newPageTitle.trim()}
-				>
-					{#if isCreating}
-						<span class="loading loading-spinner loading-xs"></span> Création...
-					{:else}
-						Créer
-					{/if}
-				</button>
-			</div>
-		</div>
-	</div>
-	<!-- Bouton Sauvegarder -->
-	<div class="mt-4 flex justify-end">
-		<button class="btn btn-primary" onclick={saveTheme}> Enregistrer les modifications </button>
-	</div>
-</div>
-
-<!-- Modals -->
-{#if themeModalOpen}
-	<ConfigModal title="Sélection des thèmes" onClose={() => (themeModalOpen = false)}>
-		<!-- Thèmes clairs -->
-		<h3 class="mb-2 flex items-center gap-2 font-medium">
-			<Sun size={18} />
-			Thèmes clairs
-		</h3>
-		<div class="rounded-box mb-6 grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
-			{#each daisyThemes.light as themeItem (themeItem)}
-				{@render daisy_theme(themeItem, 'light')}
-			{/each}
-		</div>
-
-		<!-- Thèmes sombres -->
-		<h3 class="mb-2 flex items-center gap-2 font-medium">
-			<Moon size={18} />
-			Thèmes sombres
-		</h3>
-		<div class="rounded-box grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
-			{#each daisyThemes.dark as themeItem (themeItem)}
-				{@render daisy_theme(themeItem, 'dark')}
-			{/each}
-		</div>
-
-		<div slot="actions">
-			<button
-				class="btn btn-primary"
-				onclick={() => {
-					saveTheme();
-					themeModalOpen = false;
-				}}
-			>
-				Enregistrer
-			</button>
-		</div>
-	</ConfigModal>
-{/if}
-
-{#if currentConfigSection}
-	<ConfigModal
-		title={`Configuration de la section ${
-			currentConfigSection === SitePagesSectionOptions.header
-				? 'Entête'
-				: currentConfigSection === SitePagesSectionOptions.leftSide
-					? 'Sidebar Gauche'
-					: currentConfigSection === SitePagesSectionOptions.rightSide
-						? 'Sidebar Droite'
-						: 'Pied de page'
-		}`}
-		onClose={closeConfigModal}
-	>
-		<div data-theme={getCurrentTheme()}>
-			<fieldset class="border-base-content/20 mb-4 rounded border p-4">
-				<legend class="px-2 font-medium">Apparence</legend>
-
-				<!-- Classe Fond (bg) -->
-				<div class="mb-8">
-					<label class="text-base-content mb-2 font-medium">Couleur de fond</label>
-					<div
-						class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
-					>
-						{#each getBackgroundOptionsForSection(currentConfigSection) as option (option)}
-							{@const sectionKey = getSectionConfigKey(
-								currentConfigSection as SitePagesSectionOptions
-							)}
-							{@const isActive = theme.layoutSections[sectionKey]?.bgClass === option.value}
-							{@const textClass =
-								theme.layoutSections[sectionKey]?.textClass || 'text-base-content'}
-
-							<button
-								type="button"
-								class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
-									? 'ring-primary border-primary ring-2'
-									: 'border-base-300'}"
-								onclick={() => {
-									if (theme.layoutSections[sectionKey]) {
-										theme.layoutSections[sectionKey].bgClass = option.value;
-									}
-								}}
-							>
-								<div
-									class="flex h-10 w-full items-center justify-center rounded {option.value} {textClass}"
-									title={option.label}
-								>
-									<span class="text-xs font-bold">Abc</span>
-								</div>
-								<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<!-- Classe Texte (text) -->
-				<div>
-					<label class="text-base-content mb-2 font-medium">Couleur de texte</label>
-					<div
-						class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
-					>
-						{#each getTextOptionsForSection(currentConfigSection) as option (option)}
-							{@const sectionKey = getSectionConfigKey(
-								currentConfigSection as SitePagesSectionOptions
-							)}
-							{@const isActive = theme.layoutSections[sectionKey]?.textClass === option.value}
-							{@const bgClass = theme.layoutSections[sectionKey]?.bgClass || 'bg-base-100'}
-
-							<button
-								type="button"
-								class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
-									? 'ring-primary border-primary ring-2'
-									: 'border-base-300'}"
-								onclick={() => {
-									if (theme.layoutSections[sectionKey]) {
-										theme.layoutSections[sectionKey].textClass = option.value;
-									}
-								}}
-							>
-								<div
-									class="flex h-10 w-full items-center justify-center rounded {bgClass} {option.value}"
-									title={option.label}
-								>
-									<span class="text-xs font-bold">Abc</span>
-								</div>
-								<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
-							</button>
-						{/each}
+						{:else}
+							<!-- Lien personnalisé -->
+							<div class="form-control flex-1">
+								<label class="label" for="customNavLinkTitle">
+									<span class="label-text">Titre du lien</span>
+								</label>
+								<input
+									id="customNavLinkTitle"
+									type="text"
+									class="input input-bordered"
+									bind:value={navLinkTitle}
+									placeholder="Titre du lien"
+								/>
+							</div>
+							<div class="form-control flex-1">
+								<label class="label" for="customNavLinkUrl">
+									<span class="label-text">URL</span>
+								</label>
+								<input
+									id="customNavLinkUrl"
+									type="text"
+									class="input input-bordered"
+									bind:value={navLinkUrl}
+									placeholder="/contact ou https://..."
+								/>
+							</div>
+						{/if}
+						<button class="btn btn-primary btn-sm" onclick={addNavLink}>Ajouter</button>
+						<!-- btn-sm -->
 					</div>
 				</div>
 			</fieldset>
-		</div>
 
-		<div slot="actions">
-			<button
-				class="btn btn-primary"
-				onclick={() => {
+			<!-- --- Section Configuration de carte d'événement --- -->
+			<fieldset class="border-base-content/20 mb-12 rounded-lg border px-4 py-8">
+				<legend class="text-fluid-lg px-2 font-medium">Configuration d'une carte événement</legend>
+				<div class="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+					<!-- Position Image -->
+					<div class="form-control w-full">
+						<label class="label" for="image-pos">
+							<span class="label-text font-medium">Position de l'image</span>
+						</label>
+						<div class="flex gap-4">
+							<label class="label cursor-pointer gap-2">
+								<input
+									id="image-pos"
+									type="radio"
+									name="imagePosition"
+									class="radio radio-primary"
+									value="left"
+									bind:group={theme.eventCard.imagePosition}
+								/>
+								<span class="label-text">Image à Gauche</span>
+							</label>
+							<label class="label cursor-pointer gap-2">
+								<input
+									type="radio"
+									name="imagePosition"
+									class="radio radio-primary"
+									value="top"
+									bind:group={theme.eventCard.imagePosition}
+								/>
+								<span class="label-text">Image en Haut</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Couleur de fond -->
+					<ColorSelect
+						id="bg-color"
+						bind:value={theme.eventCard.bgClass}
+						options={getBackgroundOptionsForSection('eventCard')}
+						label="Couleur de fond"
+					/>
+
+					<!-- Ombre -->
+					<div class="form-control w-full">
+						<label class="label" for="shadow">
+							<span class="label-text font-medium">Ombre</span>
+						</label>
+						<select
+							id="shadow"
+							class="select select-bordered w-full"
+							bind:value={theme.eventCard.shadowClass}
+						>
+							{#each shadowOptions as option (option.value)}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+
+					<!-- Arrondi -->
+					<div class="form-control w-full">
+						<label class="label" for="rounded">
+							<span class="label-text font-medium">Arrondi</span>
+						</label>
+						<select
+							id="rounded"
+							class="select select-bordered w-full"
+							bind:value={theme.eventCard.roundedClass}
+						>
+							{#each roundedOptions as option (option.value)}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
+					</div>
+
+					<!-- Largeur Carte -->
+					<div class="form-control w-full">
+						<label class="label" for="card-width">
+							<span class="label-text font-medium">Largeur (Classe Tailwind)</span>
+						</label>
+						<input
+							type="text"
+							id="card-width"
+							class="input input-bordered w-full"
+							placeholder="w-full"
+							bind:value={theme.eventCard.widthClass}
+						/>
+						<label class="label" for="card-width">
+							<span class="label-text-alt">Ex: w-full, max-w-4xl mx-auto</span>
+						</label>
+					</div>
+
+					<!-- Lignes Troncature -->
+					<div class="form-control w-full">
+						<label class="label" for="truncate-lines">
+							<span class="label-text font-medium">Lignes avant troncature (description)</span>
+						</label>
+						<input
+							type="number"
+							id="truncate-lines"
+							min="1"
+							max="20"
+							class="input input-bordered w-full"
+							bind:value={theme.eventCard.truncateLines}
+						/>
+					</div>
+
+					<!-- Taille du titre -->
+					<div class="form-control w-full">
+						<label class="label" for="title-size">
+							<span class="label-text font-medium">Taille du titre</span>
+						</label>
+						<select
+							id="title-size"
+							class="select select-bordered w-full"
+							bind:value={theme.eventCard.titleSizeClass}
+						>
+							{#each fluidTextSizes as size (size.value)}
+								<option value={size.value}>{size.label}</option>
+							{/each}
+						</select>
+					</div>
+
+					<!-- Taille de la date -->
+					<div class="form-control w-full">
+						<label class="label" for="date-size">
+							<span class="label-text font-medium">Taille de la date</span>
+						</label>
+						<select
+							id="date-size"
+							class="select select-bordered w-full"
+							bind:value={theme.eventCard.dateSizeClass}
+						>
+							{#each fluidTextSizes as size (size.value)}
+								<option value={size.value}>{size.label}</option>
+							{/each}
+						</select>
+					</div>
+
+					<!-- Taille des catégories -->
+					<div class="form-control w-full">
+						<label class="label" for="category-size">
+							<span class="label-text font-medium">Taille des catégories</span>
+						</label>
+						<select
+							id="category-size"
+							class="select select-bordered w-full"
+							bind:value={theme.eventCard.categorySizeClass}
+						>
+							{#each fluidTextSizes as size (size.value)}
+								<option value={size.value}>{size.label}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+				<div class="divider mt-12">
+					<div class="text-fluid-lg font-semibold">Aperçu d'une carte événement</div>
+				</div>
+
+				<div class="mb-4 flex items-center justify-between"></div>
+				<div class="{theme.layoutSections.mainBackgroundClass}  rounded-lg p-8">
+					<PublicEventCard
+						event={sampleEvent}
+						spaceName="example-space"
+						cardOptions={theme.eventCard}
+						eventImageUrl="https://placehold.co/600x400?text=Exemple+Image"
+					/>
+				</div>
+			</fieldset>
+
+			{#if error}
+				<div role="alert" class="alert alert-error mb-6">
+					<AlertCircle class="h-6 w-6" />
+					<span>{error}</span>
+				</div>
+			{/if}
+
+			<div class="divider my-12"></div>
+
+			<!-- --- Liste des pages générales --- -->
+			<section>
+				<h2 class="mb-6 text-2xl font-semibold">Pages</h2>
+				{#if isLoading}
+					<div class="flex justify-center py-12">
+						<span class="loading loading-dots loading-lg"></span>
+					</div>
+				{:else if groupedPages['page'].length === 0}
+					<p class="text-base-content/70 text-center">Aucune page générale trouvée.</p>
+				{:else}
+					<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						{#each groupedPages['page'] as page (page.id)}
+							{#key page.updated}
+								<!-- Re-render l'élément si 'updated' change -->
+								<a
+									href={`/dashboard/site_pages/${page.id}`}
+									class="card bg-base-100 shadow-md transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-xl"
+								>
+									<div class="card-body">
+										<h3 class="card-title truncate text-xl" title={page.title}>{page.title}</h3>
+										{#if page.section}
+											<div class="mt-1">
+												<!-- Ajout d'index pour la clé dans chaque -->
+												<span class="badge badge-outline badge-sm mr-1">{page.section}</span>
+											</div>
+										{/if}
+										<p class="text-base-content/60 mt-2 text-xs">
+											Créé le {formatDate(page.created as string)}
+										</p>
+										<p class="text-base-content/60 text-xs">
+											Dernière modification: {formatDate(page.updated as string)}
+										</p>
+										<div class="card-actions mt-4 justify-end">
+											<button class="btn btn-sm btn-outline">Ouvrir</button>
+										</div>
+									</div>
+								</a>
+							{/key}
+						{/each}
+					</div>
+				{/if}
+			</section>
+
+			<!-- Ajouter un nouveau bouton de création sous la liste existante -->
+			<div class="card bg-base-200 mx-auto mt-8 mb-8 max-w-lg p-4 shadow-md">
+				<div class="card-body p-4">
+					<h2 class="card-title mb-2 text-xl">Créer une nouvelle page générale</h2>
+					<div class="flex flex-col gap-2 sm:flex-row">
+						<input
+							type="text"
+							class="input input-bordered w-full"
+							placeholder="Titre de la nouvelle page"
+							bind:value={newPageTitle}
+							onkeydown={(e) => e.key === 'Enter' && handleCreatePage()}
+							disabled={isCreating}
+						/>
+						<button
+							class="btn btn-primary sm:w-auto"
+							onclick={() => handleCreatePage()}
+							disabled={isCreating || !newPageTitle.trim()}
+						>
+							{#if isCreating}
+								<span class="loading loading-spinner loading-xs"></span> Création...
+							{:else}
+								Créer
+							{/if}
+						</button>
+					</div>
+				</div>
+			</div>
+			<!-- Bouton Sauvegarder -->
+			{#if haveUnsavedChanges}
+				<div
+					transition:slide={{ duration: 300, axis: 'y' }}
+					class="bg-base-300/70 fixed bottom-0 left-0 flex w-full justify-end gap-4 px-4 py-2 shadow-lg"
+				>
+					<button
+						type="button"
+						onclick={() => (theme = initialTheme)}
+						class="rounded bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
+					>
+						Annuler
+					</button>
+					<button
+						type="button"
+						onclick={saveTheme}
+						class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+					>
+						Enregistrer
+					</button>
+				</div>
+			{/if}
+		</div>
+		<!-- Modals -->
+		{#if themeModalOpen}
+			<ConfigModal title="Sélection des thèmes" onClose={() => (themeModalOpen = false)}>
+				<!-- Thèmes clairs -->
+				<h3 class="mb-2 flex items-center gap-2 font-medium">
+					<Sun size={18} />
+					Thèmes clairs
+				</h3>
+				<div class="rounded-box mb-6 grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
+					{#each daisyThemes.light as themeItem (themeItem)}
+						{@render daisy_theme(themeItem, 'light')}
+					{/each}
+				</div>
+
+				<!-- Thèmes sombres -->
+				<h3 class="mb-2 flex items-center gap-2 font-medium">
+					<Moon size={18} />
+					Thèmes sombres
+				</h3>
+				<div class="rounded-box grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
+					{#each daisyThemes.dark as themeItem (themeItem)}
+						{@render daisy_theme(themeItem, 'dark')}
+					{/each}
+				</div>
+
+				<div slot="actions">
+					<button
+						class="btn btn-primary"
+						onclick={() => {
+							saveTheme();
+							themeModalOpen = false;
+						}}
+					>
+						Enregistrer
+					</button>
+				</div>
+			</ConfigModal>
+		{/if}
+
+		{#if currentConfigSection}
+			<ConfigModal
+				title={`Configuration de la section ${
+					currentConfigSection === SitePagesSectionOptions.header
+						? 'Entête'
+						: currentConfigSection === SitePagesSectionOptions.leftSide
+							? 'Sidebar Gauche'
+							: currentConfigSection === SitePagesSectionOptions.rightSide
+								? 'Sidebar Droite'
+								: 'Pied de page'
+				}`}
+				onClose={closeConfigModal}
+			>
+				<div data-theme={getCurrentTheme()}>
+					<fieldset class="border-base-content/20 mb-4 rounded border p-4">
+						<legend class="px-2 font-medium">Apparence</legend>
+
+						<!-- Classe Fond (bg) -->
+						<div class="mb-8">
+							<div class="text-base-content mb-2 font-medium">Couleur de fond</div>
+							<div
+								class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
+							>
+								{#each getBackgroundOptionsForSection(currentConfigSection) as option (option)}
+									{@const sectionKey = getSectionConfigKey(
+										currentConfigSection as SitePagesSectionOptions
+									)}
+									{@const isActive = theme.layoutSections[sectionKey]?.bgClass === option.value}
+									{@const textClass =
+										theme.layoutSections[sectionKey]?.textClass || 'text-base-content'}
+
+									<button
+										type="button"
+										class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
+											? 'ring-primary border-primary ring-2'
+											: 'border-base-300'}"
+										onclick={() => {
+											if (theme.layoutSections[sectionKey]) {
+												theme.layoutSections[sectionKey].bgClass = option.value;
+											}
+										}}
+									>
+										<div
+											class="flex h-10 w-full items-center justify-center rounded {option.value} {textClass}"
+											title={option.label}
+										>
+											<span class="text-xs font-bold">Abc</span>
+										</div>
+										<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
+									</button>
+								{/each}
+							</div>
+						</div>
+
+						<!-- Classe Texte (text) -->
+						<div>
+							<div class="text-base-content mb-2 font-medium">Couleur de texte</div>
+							<div
+								class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
+							>
+								{#each getTextOptionsForSection(currentConfigSection) as option (option)}
+									{@const sectionKey = getSectionConfigKey(
+										currentConfigSection as SitePagesSectionOptions
+									)}
+									{@const isActive = theme.layoutSections[sectionKey]?.textClass === option.value}
+									{@const bgClass = theme.layoutSections[sectionKey]?.bgClass || 'bg-base-100'}
+
+									<button
+										type="button"
+										class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
+											? 'ring-primary border-primary ring-2'
+											: 'border-base-300'}"
+										onclick={() => {
+											if (theme.layoutSections[sectionKey]) {
+												theme.layoutSections[sectionKey].textClass = option.value;
+											}
+										}}
+									>
+										<div
+											class="flex h-10 w-full items-center justify-center rounded {bgClass} {option.value}"
+											title={option.label}
+										>
+											<span class="text-xs font-bold">Abc</span>
+										</div>
+										<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
+									</button>
+								{/each}
+							</div>
+						</div>
+					</fieldset>
+				</div>
+
+				<div slot="actions">
+					<button
+						class="btn btn-primary"
+						onclick={() => {
+							saveTheme();
+							closeConfigModal();
+						}}
+					>
+						Enregistrer
+					</button>
+				</div>
+			</ConfigModal>
+		{/if}
+
+		{#if currentConfigBlock}
+			<Modal>
+				<PageBlockEditor
+					docId={currentConfigBlock}
+					onClose={() => {
+						closeConfigModal();
+					}}
+				/>
+			</Modal>
+		{/if}
+
+		{#if navbarConfigModalOpen}
+			<ConfigModal
+				title="Configuration de la headerBar"
+				onClose={() => {
 					saveTheme();
-					closeConfigModal();
+					navbarConfigModalOpen = false;
 				}}
 			>
-				Enregistrer
-			</button>
-		</div>
-	</ConfigModal>
-{/if}
-
-{#if currentConfigBlock}
-	<Modal>
-		<PageBlockEditor
-			docId={currentConfigBlock}
-			onSaveAndClose={() => {
-				closeConfigModal();
-			}}
-		/>
-	</Modal>
-{/if}
-
-{#if navbarConfigModalOpen}
-	<Modal>
-		<NavBarHeaderConfig
-			{theme}
-			pages={groupedPages['page']}
-			onClose={() => {
-				navbarConfigModalOpen = false;
-			}}
-		/>
-	</Modal>
+				<NavBarHeaderConfig
+					bind:navbarHeaderConfig={theme.components.navbarHeader}
+					pages={groupedPages['page']}
+				/>
+			</ConfigModal>
+		{/if}
+	</div>
+{:else}
+	<div class="flex justify-center py-12">
+		<span class="loading loading-dots loading-lg">chargement</span>
+	</div>
 {/if}
 
 <style>
