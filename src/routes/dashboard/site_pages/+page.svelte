@@ -5,11 +5,13 @@
 		createPad,
 		deletePad
 	} from '$lib/shared/sitePageStore.svelte';
+
+	import type { PublicEventInfo } from '$lib/shared/publicStore.svelte';
+
 	import { showAlert, modalState } from '$lib/shared/states.svelte';
 
 	import { pb } from '$lib/pocketbase.svelte';
-	import type { SitePagesResponse } from '$lib/types/pocketbase.ts';
-	import { SitePagesSectionOptions } from '$lib/types/pocketbase.js';
+	import { SitePagesSectionOptions, type SitePagesResponse } from '$lib/types/pocketbase';
 
 	import { modifyRecord } from '$lib/pocketbase.svelte';
 
@@ -17,11 +19,10 @@
 	import { fr } from 'date-fns/locale';
 	import { goto } from '$app/navigation';
 
-	import { AlertCircle, GripVertical, Pencil, Trash2 } from 'lucide-svelte';
+	import { AlertCircle, GripVertical, Pencil, Trash2, Palette, Sun, Moon, X } from 'lucide-svelte';
 	import { draggable, droppable, type DragDropState } from '@thisux/sveltednd';
 	import { fade, slide } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
-	import { Palette, Sun, Moon, X } from 'lucide-svelte';
 
 	import ConfigModal from './components/ConfigModal.svelte';
 	import NavBarHeaderConfig from './components/NavBarHeaderConfig.svelte';
@@ -41,7 +42,7 @@
 	let isUpdatingOrder = $state(false);
 	let error = $state<string | null>(null);
 
-	let currentConfigSection = $state<string | null>(null);
+	let currentConfigSection = $state<SitePagesSectionOptions | null>(null);
 	let currentConfigBlock = $state<string | null>(null);
 	let themeModalOpen = $state(false);
 	let navbarConfigModalOpen = $state(false);
@@ -49,7 +50,9 @@
 	let theme = $state<PublicSiteThemeOptions>(getDefaultThemeOptions());
 	let initialTheme = $state<PublicSiteThemeOptions | null>(null);
 
-	let haveUnsavedChanges = $derived(JSON.stringify(theme) !== JSON.stringify(initialTheme));
+	let haveUnsavedChanges = $derived(
+		initialTheme ? JSON.stringify(theme) !== JSON.stringify(initialTheme) : false
+	);
 
 	let optionsRecordId = $state<string | null>(null);
 	let spaceId = $state<string | null>(null);
@@ -58,6 +61,10 @@
 	let pages = $derived.by(() => getPages());
 
 	let navLinks = $derived(theme.components.primaryNavLinks);
+
+	let navLinkTitle = $state('');
+	let navLinkUrl = $state('');
+	let navSelectedPage = $state<'selectPage' | '' | string>('selectPage');
 
 	const daisyThemes = {
 		light: [
@@ -103,6 +110,7 @@
 		{ value: 'bg-base-200', label: 'Fond secondaire', color: 'base-200' },
 		{ value: 'bg-base-300', label: 'Fond tertiaire', color: 'base-300' },
 		{ value: 'bg-neutral', label: 'Neutre', color: 'neutral' },
+		// { value: 'bg-gray-800', label: 'Gray-dark', color: 'gray-800' },
 		{ value: 'bg-primary', label: 'Primaire', color: 'primary' },
 		{ value: 'bg-secondary', label: 'Secondaire', color: 'secondary' },
 		{ value: 'bg-primary/5', label: 'Primaire (5%)', color: 'primary' },
@@ -157,7 +165,7 @@
 	];
 
 	// Exemple de donnée pour la carte événement
-	const sampleEvent = {
+	const sampleEvent: Partial<PublicEventInfo> = {
 		id: 'example-id',
 		event_title: 'Soirée découverte - Exemple de carte',
 		desc_public: `<p>Ceci est un exemple de description d'événement qui peut être formaté en HTML.
@@ -176,10 +184,6 @@
 		canceled: false,
 		categories: ['Atelier', 'Culture']
 	};
-
-	let navLinkTitle = $state('');
-	let navLinkUrl = $state('');
-	let navSelectedPage = $state<'selectPage' | '' | string>('selectPage');
 
 	// Charger les options existantes au montage
 	onMount(async () => {
@@ -226,14 +230,18 @@
 				theme.daisyThemeDark = theme.daisyTheme || 'dark';
 			}
 			initialTheme = JSON.parse(JSON.stringify(theme));
-		} catch (e: any) {
-			if (e.status === 404) {
+		} catch (e: unknown) {
+			if (typeof e === 'object' && e !== null && 'status' in e && e.status === 404) {
 				console.log(`Aucune option d'apparence existante trouvée pour l'espace ${spaceId}.`);
 				theme = getDefaultThemeOptions(); // Utiliser les valeurs par défaut
 				optionsRecordId = null;
+				initialTheme = JSON.parse(JSON.stringify(theme));
 			} else {
 				console.error("Erreur lors du chargement des options d'apparence:", e);
-				showAlert(`Erreur chargement: ${e.message}`, 'error');
+				showAlert(
+					`Erreur chargement: ${typeof e === 'object' && e !== null && 'message' in e && e.message}`,
+					'error'
+				);
 				theme = getDefaultThemeOptions();
 				initialTheme = JSON.parse(JSON.stringify(theme));
 			}
@@ -257,7 +265,6 @@
 		[SitePagesSectionOptions.rightSide]: SitePagesResponse[];
 		[SitePagesSectionOptions.footer]: SitePagesResponse[];
 		[SitePagesSectionOptions.page]: SitePagesResponse[];
-		other: SitePagesResponse[];
 	};
 
 	// Groupement des pages par type
@@ -268,17 +275,14 @@
 			[SitePagesSectionOptions.leftSide]: [],
 			[SitePagesSectionOptions.rightSide]: [],
 			[SitePagesSectionOptions.footer]: [],
-			[SitePagesSectionOptions.page]: [],
-			other: []
+			[SitePagesSectionOptions.page]: []
 		};
 
 		pages.forEach((page: SitePagesResponse) => {
 			const pageSection = page.section;
 
-			// 👉 Utilisation de SitePagesSectionOptions pour vérifier si la section est valide
 			if (pageSection && Object.values(SitePagesSectionOptions).includes(pageSection)) {
-				// 👉 Vérification plus stricte de la section
-				groups[pageSection as Exclude<keyof GroupedPages, 'other'>].push(page);
+				groups[pageSection as Exclude<keyof GroupedPages, 'page'>].push(page);
 			} else if (pageSection === SitePagesSectionOptions.page) {
 				groups[SitePagesSectionOptions.page].push(page);
 			} else {
@@ -291,13 +295,9 @@
 
 		// Trier chaque groupe par la position (pos)
 		for (const key in groups) {
-			// 👉 Vérification que la clé appartient bien aux types attendus
-			if (
-				key !== 'other' &&
-				Object.values(SitePagesSectionOptions).includes(key as SitePagesSectionOptions)
-			) {
+			// Vérification que la clé appartient bien aux types attendus
+			if (Object.values(SitePagesSectionOptions).includes(key as SitePagesSectionOptions)) {
 				const groupKey = key as Exclude<keyof GroupedPages, 'other'>;
-				// 👉 Tri plus robuste, gérant les pos undefined/null
 				groups[groupKey].sort((a, b) => {
 					const posA = typeof a.pos === 'number' ? a.pos : Infinity;
 					const posB = typeof b.pos === 'number' ? b.pos : Infinity;
@@ -338,13 +338,15 @@
 		}
 	}
 
-	async function handleCreateBlock(blockSection: SitePagesSectionOptions) {
+	async function handleCreateBlock(blockSection: Partial<SitePagesSectionOptions>) {
 		isCreating = true;
+
 		try {
 			const title = `bloc_${Date.now()}`;
 			// --- Calcul de la prochaine position ---
+
 			const itemsInSection = groupedPages[blockSection] || [];
-			const maxPos = itemsInSection.reduce((max, item) => {
+			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
 				const currentPos = typeof item.pos === 'number' ? item.pos : -1;
 				return Math.max(max, currentPos);
 			}, -1); // Base -1 pour que la première position soit 0
@@ -393,21 +395,20 @@
 		};
 	};
 
-	// 👉 Fonction pour gérer le drop d'une section
-	async function handleSectionDrop(state: DragDropState<any>) {
+	// Fonction pour gérer le drop d'une section
+	async function handleSectionDrop(state: DragDropState<SitePagesResponse>) {
 		const { draggedItem, sourceContainer, targetContainer } = state;
 
 		// Vérifie si la cible est valide et différente de la source
 		if (!targetContainer || sourceContainer === targetContainer) return;
 
-		const oldSection = sourceContainer as SitePagesSectionOptions;
-		const newSection = targetContainer as SitePagesSectionOptions;
+		const newSectionKey = targetContainer as SitePagesSectionOptions;
 
 		isUpdatingOrder = true; // Indiquer une opération en cours
 
 		// --- Calcul de la prochaine position dans la *nouvelle* section ---
-		const itemsInNewSection = groupedPages[newSection] || [];
-		const maxPos = itemsInNewSection.reduce((max, item) => {
+		const itemsInNewSection = groupedPages[newSectionKey] || [];
+		const maxPos = itemsInNewSection.reduce((max: number, item: SitePagesResponse) => {
 			const currentPos = typeof item.pos === 'number' ? item.pos : -1;
 			return Math.max(max, currentPos);
 		}, -1);
@@ -520,7 +521,7 @@
 				.collection('spaceMembers')
 				.getFirstListItem(`user = "${user.id}" && role = "admin"`);
 			return memberRecord?.space || null;
-		} catch (e) {
+		} catch {
 			console.warn("L'utilisateur admin n'est associé à aucun espace via spaceMembers.");
 			return null;
 		}
@@ -543,12 +544,16 @@
 				savedRecord = await pb.collection('spaces_options').create(dataToSave);
 				optionsRecordId = savedRecord.id;
 			}
-
+			// Mettre à jour initialTheme après une sauvegarde réussie
+			initialTheme = theme;
 			// theme = savedRecord.publicSiteTheme as PublicSiteThemeOptions;
 			showAlert('Apparence sauvegardée avec succès !', 'success');
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error("Erreur lors de la sauvegarde de l'apparence:", e);
-			showAlert(`Erreur sauvegarde: ${e.message}`, 'error');
+			showAlert(
+				`Erreur sauvegarde: ${typeof e === 'object' && e !== null && 'message' in e && e.message}`,
+				'error'
+			);
 		}
 	}
 
@@ -566,17 +571,15 @@
 	// --- fonctions utilitaires ---
 
 	// Fonction pour obtenir les options de couleur pour une section
-	function getBackgroundOptionsForSection(section: string) {
+	function getBackgroundOptionsForSection() {
 		return allBackgroundColors;
 	}
 
-	function getTextOptionsForSection(section: string) {
+	function getTextOptionsForSection() {
 		return allTextColors;
 	}
 
-	function getSectionConfigKey(
-		section: SitePagesSectionOptions
-	): keyof typeof theme.layoutSections {
+	function getSectionConfigKey(section: SitePagesSectionOptions) {
 		switch (section) {
 			case SitePagesSectionOptions.header:
 				return 'header';
@@ -586,8 +589,8 @@
 				return 'rightSidebar';
 			case SitePagesSectionOptions.footer:
 				return 'footer';
-			default:
-				return 'header'; // Fallback
+			case SitePagesSectionOptions.top:
+				return 'top'; // Ex: 'top' n'a pas de config dédiée dans layoutSections
 		}
 	}
 
@@ -625,10 +628,7 @@
 			navLinkTitle = '';
 			navLinkUrl = '';
 		} else {
-			showAlert(
-				'Veuillez sélectionner une page ou entrer un titre de lien personnalisé.',
-				'warning'
-			);
+			showAlert('Veuillez sélectionner une page ou entrer un titre de lien personnalisé.', 'error');
 		}
 	}
 
@@ -726,13 +726,15 @@
 	{/snippet}
 
 	{#snippet blockSection(sectionType: SitePagesSectionOptions, sectionLabel: string)}
-		{@const sectionKey = getSectionConfigKey(sectionType)}
+		{@const sectionConfigKey = getSectionConfigKey(sectionType)}
+
+		{@const sectionStyle = sectionConfigKey && theme.layoutSections[sectionConfigKey]}
 		{@const isHeader = sectionType === SitePagesSectionOptions.header}
 
 		<div
 			style:background-color={undefined}
-			class="card border shadow-md transition-all duration-200 {theme.layoutSections[sectionKey]
-				?.bgClass || 'bg-base-200'}"
+			class="card border shadow-md transition-all duration-200 {sectionStyle?.bgClass ||
+				'bg-base-200'}"
 			use:droppable={{
 				container: sectionType,
 				callbacks: { onDrop: handleSectionDrop },
@@ -744,9 +746,7 @@
 		>
 			<div class="card-body p-4">
 				<div class="mb-2 flex items-center justify-between">
-					<div
-						class="font-medium {theme.layoutSections[sectionKey]?.textClass || 'text-base-content'}"
-					>
+					<div class="font-medium {sectionStyle?.textClass || 'text-base-content'}">
 						{sectionLabel}
 					</div>
 
@@ -762,8 +762,8 @@
 					<!-- Ajouter un bouton pour configurer le NavBarHeader si c'est la section header -->
 					{#if isHeader}
 						<div
-							class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 shadow-sm {theme
-								.layoutSections[sectionKey]?.textClass || 'text-base-content'}"
+							class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2 shadow-sm {sectionStyle?.textClass ||
+								'text-base-content'}"
 						>
 							<div>Barre de navigation</div>
 							<div>
@@ -868,7 +868,7 @@
 			<h1 class="mb-6 text-3xl font-bold">Configuration du site public</h1>
 
 			<!-- --- Section de configuration du thème général --- -->
-			<fieldset class="border-base-content/20 mb-4 mb-12 rounded-lg border px-4 py-8">
+			<fieldset class="border-base-content/20 mb-12 rounded-lg border px-4 py-8">
 				<legend class="text-fluid-lg px-2 font-medium">Thème du site</legend>
 				<div class="flex flex-wrap items-center justify-between">
 					<!-- Bouton pour basculer entre aperçu light/dark -->
@@ -954,7 +954,7 @@
 						<div class="">
 							<ColorSelect
 								id="main-bg-class"
-								options={getBackgroundOptionsForSection('main')}
+								options={getBackgroundOptionsForSection()}
 								label="Fond général"
 								bind:value={theme.layoutSections.mainBackgroundClass}
 							/>
@@ -1154,7 +1154,7 @@
 					<ColorSelect
 						id="bg-color"
 						bind:value={theme.eventCard.bgClass}
-						options={getBackgroundOptionsForSection('eventCard')}
+						options={getBackgroundOptionsForSection()}
 						label="Couleur de fond"
 					/>
 
@@ -1276,6 +1276,7 @@
 
 				<div class="mb-4 flex items-center justify-between"></div>
 				<div class="{theme.layoutSections.mainBackgroundClass}  rounded-lg p-8">
+					<!-- FIXIT image exemple -->
 					<PublicEventCard
 						event={sampleEvent}
 						spaceName="example-space"
@@ -1372,7 +1373,13 @@
 				>
 					<button
 						type="button"
-						onclick={() => (theme = initialTheme)}
+						onclick={() => {
+							if (initialTheme) {
+								theme = initialTheme; // Utiliser deep clone pour restaurer ? JSON.parse(JSON.stringify(initialTheme)
+							} else {
+								theme = getDefaultThemeOptions();
+							}
+						}}
 						class="rounded bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
 					>
 						Annuler
@@ -1427,6 +1434,9 @@
 		{/if}
 
 		{#if currentConfigSection}
+			{@const configSectionKey = getSectionConfigKey(currentConfigSection)}
+			{@const sectionStyle = configSectionKey && theme.layoutSections[configSectionKey]}
+
 			<ConfigModal
 				title={`Configuration de la section ${
 					currentConfigSection === SitePagesSectionOptions.header
@@ -1449,13 +1459,9 @@
 							<div
 								class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
 							>
-								{#each getBackgroundOptionsForSection(currentConfigSection) as option (option)}
-									{@const sectionKey = getSectionConfigKey(
-										currentConfigSection as SitePagesSectionOptions
-									)}
-									{@const isActive = theme.layoutSections[sectionKey]?.bgClass === option.value}
-									{@const textClass =
-										theme.layoutSections[sectionKey]?.textClass || 'text-base-content'}
+								{#each getBackgroundOptionsForSection() as option (option.value)}
+									{@const isActive = sectionStyle?.bgClass === option.value}
+									{@const textClass = sectionStyle?.textClass || 'text-base-content'}
 
 									<button
 										type="button"
@@ -1463,8 +1469,8 @@
 											? 'ring-primary border-primary ring-2'
 											: 'border-base-300'}"
 										onclick={() => {
-											if (theme.layoutSections[sectionKey]) {
-												theme.layoutSections[sectionKey].bgClass = option.value;
+											if (configSectionKey) {
+												theme.layoutSections[configSectionKey].bgClass = option.value;
 											}
 										}}
 									>
@@ -1486,12 +1492,9 @@
 							<div
 								class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
 							>
-								{#each getTextOptionsForSection(currentConfigSection) as option (option)}
-									{@const sectionKey = getSectionConfigKey(
-										currentConfigSection as SitePagesSectionOptions
-									)}
-									{@const isActive = theme.layoutSections[sectionKey]?.textClass === option.value}
-									{@const bgClass = theme.layoutSections[sectionKey]?.bgClass || 'bg-base-100'}
+								{#each getTextOptionsForSection() as option (option)}
+									{@const isActive = sectionStyle?.textClass === option.value}
+									{@const bgClass = sectionStyle?.textClass || 'bg-base-100'}
 
 									<button
 										type="button"
@@ -1499,8 +1502,8 @@
 											? 'ring-primary border-primary ring-2'
 											: 'border-base-300'}"
 										onclick={() => {
-											if (theme.layoutSections[sectionKey]) {
-												theme.layoutSections[sectionKey].textClass = option.value;
+											if (configSectionKey) {
+												theme.layoutSections[configSectionKey].textClass = option.value;
 											}
 										}}
 									>
@@ -1551,10 +1554,7 @@
 					navbarConfigModalOpen = false;
 				}}
 			>
-				<NavBarHeaderConfig
-					bind:navbarHeaderConfig={theme.components.navbarHeader}
-					pages={groupedPages['page']}
-				/>
+				<NavBarHeaderConfig bind:navbarHeaderConfig={theme.components.navbarHeader} />
 			</ConfigModal>
 		{/if}
 	</div>
