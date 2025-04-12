@@ -494,7 +494,7 @@
 
 					<!-- Content -->
 					<main
-						class="mt-2 flex-1 overflow-y-auto p-4 transition-all duration-300
+						class="mt-2 flex-1 overflow-y-auto p-2 transition-all duration-300 md:p-4
 					{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-72' : ''}
 					{sidebarState.isOpen && sidebarState.isCompact ? 'ml-20' : ''}"
 					>

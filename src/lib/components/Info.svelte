@@ -70,7 +70,7 @@
 
 <div class={cn(infoVariants({ variant }), className)}>
 	{#if Icon}
-		<div class={cn('absolute top-0 left-0 p-3', getIconColor())}>
+		<div class="align-top {cn('', getIconColor())}">
 			{#if variant === 'warning'}
 				<AlertTriangle size={24} />
 			{:else if variant === 'danger'}
@@ -81,7 +81,7 @@
 				<Info size={24} />
 			{/if}
 		</div>
-		<div class="w-full ps-10">
+		<div class="w-full">
 			{@render children()}
 		</div>
 	{:else}
