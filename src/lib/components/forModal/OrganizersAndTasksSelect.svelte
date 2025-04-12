@@ -133,8 +133,8 @@
 			email: organizer.email
 		};
 		// Trouver les objets TaskType correspondant aux noms des tâches de l'organisateur
-		selectedTasks = tasks.filter(task => organizer.tasks.includes(task.name));
-		
+		selectedTasks = tasks.filter((task) => organizer.tasks.includes(task.name));
+
 		const modal = document.getElementById(modalId) as HTMLDialogElement;
 		modal?.showModal();
 	}
@@ -142,7 +142,7 @@
 	// saveOrganizer fonctionne maintenant pour ajouter et mettre à jour des organisateurs
 </script>
 
-<div transition:fade class="flex flex-col space-y-3 ">
+<div transition:fade class="flex flex-col space-y-3">
 	<!-- Section des organisateurs inscrits -->
 	<div class="">
 		{#if organizers?.length}

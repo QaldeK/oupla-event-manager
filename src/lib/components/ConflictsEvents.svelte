@@ -9,9 +9,10 @@
 	} from '$lib/components/ui/card';
 	import { type EventConflict, eventsStore } from '$lib/shared/eventsStore.svelte';
 	import { lisibleDate } from '$lib/utils';
+	import Info from './Info.svelte';
 
 	// Propriétés optionnelles
-	let { showEmptyMessage } = $props();
+	let { showEmptyMessage = 'false' } = $props();
 
 	// État local
 	let overlappingGroups = $state<Map<string, EventConflict[][]>>(new Map());
@@ -43,28 +44,32 @@
 	$inspect(overlappingGroups);
 </script>
 
-<div class="conflicts-container">
-	<h2 class="mb-4 text-xl font-semibold">Evénements en conflits</h2>
-
-	{#if hasConflicts}
-		{#each [...overlappingGroups.entries()] as [date, conflictGroups]}
+{#if hasConflicts}
+	<fieldset class="fieldset border-error mb-8 rounded-lg border px-4 py-8 shadow-md">
+		<legend class="fieldset-legend text-fluid-lg px-2">Evénements en conflits</legend>
+		<Info variant="warning">
+			<span class="text-fluid-xs"
+				>Plusieurs événements se déroulent ou sont prévue en même temps à la même date.</span
+			>
+		</Info>
+		{#each [...overlappingGroups.entries()] as [date, conflictGroups], index (index)}
 			<div class="mb-2">
-				{#each conflictGroups as conflicts}
-					<Card class="mb-4">
-						<CardContent class="p-4 pt-2">
+				{#each conflictGroups as conflicts, index (index)}
+					<div class="card">
+						<div class="p-2">
 							<div class="ps-1 pb-1 text-lg font-semibold capitalize">{lisibleDate(date)}</div>
 							<div class="space-y-2">
-								{#each conflicts as conflict}
+								{#each conflicts as conflict, index (index)}
 									<div class="bg-muted/30 rounded-md border p-2">
 										<div class="flex items-center justify-between gap-2">
 											<div class="flex flex-wrap items-baseline gap-2 align-bottom">
-												<span class="font-semibold">{conflict.event_title} • </span>
+												<span class="text-fluid-sm font-semibold">{conflict.event_title} • </span>
 												<span class="text-fluid-sm font-medium whitespace-nowrap">
 													{conflict.time_start} - {conflict.time_end} •
 												</span>
 												{#if conflict.rooms.length}
 													<div class="flex flex-wrap gap-2">
-														{#each conflict.rooms as room}
+														{#each conflict.rooms as room, index (index)}
 															<span
 																class="text-fluid-sm {conflicts.some(
 																	(c) => c !== conflict && c.rooms.includes(room)
@@ -92,20 +97,16 @@
 									</div>
 								{/each}
 							</div>
-						</CardContent>
-					</Card>
+						</div>
+					</div>
+					{#if index < conflictGroups.length - 1}
+						<div class="divider"></div>
+					{/if}
 				{/each}
 			</div>
 		{/each}
-	{:else if showEmptyMessage}
-		<div class="text-muted-foreground py-8 text-center">
-			<p>Aucun conflit d'événements détecté.</p>
-		</div>
-	{/if}
-</div>
+	</fieldset>
+{/if}
 
 <style>
-	.conflicts-container {
-		width: 100%;
-	}
 </style>
