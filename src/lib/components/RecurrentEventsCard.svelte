@@ -3,12 +3,10 @@
 	import type { EventType } from '$lib/types/event';
 	import type { UserType } from '$lib/types/types';
 	import { handleTaskSubscription, lisibleDate, tooltip } from '$lib/utils';
+	import { userDb } from '$lib/shared/userDb.svelte';
 
-	import { getContext } from 'svelte';
+	import { CalendarCheck, PencilLine } from 'lucide-svelte';
 
-	import { PencilLine } from 'lucide-svelte';
-
-	
 	type RecurrenceType = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY_BY_DATE' | 'MONTHLY_BY_DAY';
 
 	interface ValidMaster extends EventType {
@@ -32,7 +30,7 @@
 		onConfirm: (id: string) => Promise<void>;
 	}>();
 
-	let currentUser: UserType = getContext('currentUser');
+	let currentUser: UserType | null = $derived(userDb.current);
 
 	const formatRecurrence = (recurrence: NonNullable<EventType['recurrence']>): string => {
 		const recurrenceTypes: Record<RecurrenceType, string> = {
@@ -47,7 +45,8 @@
 		);
 	};
 
-	const subscribeUserToOccurence = (occurrence) => {
+	const subscribeUserToOccurence = (occurrence: ValidOccurrence) => {
+		if (!currentUser) return;
 		handleTaskSubscription({
 			task: master.tasks[0],
 			currentUser,
@@ -58,7 +57,8 @@
 					data: {
 						title: options.title,
 						message: options.message,
-						onConfirm: options.onConfirm
+						onConfirm: options.onConfirm,
+						variant: 'warning'
 					}
 				};
 			}
@@ -66,18 +66,16 @@
 	};
 </script>
 
-<div
-	class="overflow-hidden rounded-lg border bg-base-100 shadow-md"
->
-	<div class="space-y-4 p-4">
+<div class="bg-base-100 border-base-300 overflow-hidden rounded-lg border shadow-md">
+	<div class="space-y-4 p-2 md:p-4">
 		<!-- En-tête -->
 		<div class="border-b pb-2">
-			<h2 class=" text-fluid-xl font-bold ">
+			<h2 class=" text-fluid-xl font-bold">
 				{master.event_title}
 			</h2>
-			<div class="text-fluid-sm mt-1  ">
+			<div class="text-fluid-sm mt-1">
 				{formatRecurrence(master.recurrence)}
-				<span class="text-fluid-sm block ">
+				<span class="text-fluid-sm block">
 					Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
 				</span>
 			</div>
@@ -85,82 +83,82 @@
 
 		<!-- Prochaines occurrences -->
 		<div>
-			<h3 class="mb-2 font-medium  ">
-				Prochaines dates ({occurrences.length || 0})
-			</h3>
-			{#each (occurrences || []).slice(0, 5) as occurrence}
-				{@const isUserSubscribedToTask = (task: string) => {
-					return occurrence.organizers.some(
-						(org) => org.id === currentUser.id && org.tasks.includes(task)
-					);
-				}}
-				<div
-					class="flex flex-col border-b p-2 "
-				>
-					<div class="flex items-baseline justify-between">
-						<span class="font-medium">
-							{lisibleDate(new Date(occurrence.date_event))}
-						</span>
-						<div class="flex items-center gap-4">
-							{#if !occurrence.isConfirmed}
-								<div use:tooltip={{ content: "Confirmer que l'évenément à lieu" }}>
+			<div class="text-fluid-lg mb-2 font-semibold">
+				Prochaines dates (5/{occurrences.length || 0})
+			</div>
+			<div class="grid grid-cols-1 divide-y">
+				{#each (occurrences || []).slice(0, 5) as occurrence (occurrence.id)}
+					{@const isUserSubscribedToTask = (task: string) => {
+						return occurrence.organizers.some((org) => org.id === currentUser?.id);
+					}}
+					<div
+						class="flex flex-col px-1 py-2 md:px-2 {occurrence.isConfirmed
+							? ' border-l-success/30  border-l-3'
+							: ''}"
+					>
+						<div class="flex flex-wrap items-baseline justify-between gap-y-2">
+							<span class="font-medium">
+								{lisibleDate(new Date(occurrence.date_event))}
+							</span>
+							<div class="flex items-center gap-4">
+								{#if !occurrence.isConfirmed}
+									<div use:tooltip={{ content: "Confirmer que l'évenément à lieu" }}>
+										<button
+											onclick={() => onConfirm(occurrence.id)}
+											class="  btn btn-square btn-sm {occurrence.organizers.length > 0
+												? 'btn-success btn-soft'
+												: 'btn-ghost'}"
+										>
+											<CalendarCheck />
+										</button>
+									</div>
+								{:else if occurrence.isConfirmed && !occurrence.canceled}
+									<span class="text-fluid-xs text-nowrap text-green-600">✓ Confirmé</span>
+								{:else}
+									<span class="text-fluid-xs text-nowrap text-red-600">✗ Annulé</span>
+								{/if}
+								<div use:tooltip={{ content: 'modifier cette occurrence' }} class="">
 									<button
-										onclick={() => onConfirm(occurrence.id)}
-										class="  btn btn-compact {occurrence.organizers.length > 0 
-											? 'btn-success btn-outline' 
-											: 'btn-ghost'}"
+										onclick={() => {
+											eventState.is = occurrence;
+											modalState.event = true;
+										}}
+										class="btn btn-square btn-soft btn-sm"
 									>
-										+ Confirmez
+										<PencilLine />
 									</button>
 								</div>
-							{:else if occurrence.isConfirmed && !occurrence.canceled}
-								<span class="text-fluid-sm text-nowrap text-green-600">✓ Confirmé</span>
-							{:else}
-								<span class="text-fluid-sm text-nowrap text-red-600">✗ Annulé</span>
-							{/if}
-							<div use:tooltip={{ content: 'modifier cette occurrence' }} class="">
-								<button
-									onclick={() => {
-										eventState.is = occurrence;
-										modalState.event = true;
-									}}
-									class="btn btn-soft btn-square btn-sm"
-								>
-									<PencilLine class="h-4 w-4" />
-								</button>
 							</div>
 						</div>
-					</div>
-					<div class="flex flex-wrap items-center gap-x-2">
-						{#each occurrence.organizers as organizer}
-							<div
-								class="font-semibold badge badge-accent badge-soft "
-							>
-								{organizer.username}
-							</div>
-						{/each}
+						<div class="flex flex-wrap items-center gap-4">
+							{#if occurrence.organizers.length > 0}
+								<div class="flex flex-wrap gap-2">
+									{#each occurrence.organizers as organizer (organizer.id)}
+										<div class="badge badge-accent badge-soft font-semibold">
+											{organizer.username}
+										</div>
+									{/each}
+								</div>
+							{/if}
 
-						<button
-							onclick={() => subscribeUserToOccurence(occurrence)}
-							class="btn btn-link "
-						>
-							{isUserSubscribedToTask(occurrence.tasks[0])
-								? 'Se désinscrire'
-								: "S'inscrire"}
-						</button>
+							<button
+								onclick={() => subscribeUserToOccurence(occurrence)}
+								class=" btn btn-accent btn-sm btn-compact btn-soft"
+							>
+								{isUserSubscribedToTask(occurrence.tasks[0]) ? 'Se désinscrire' : "S'inscrire"}
+							</button>
+						</div>
 					</div>
-				</div>
-			{:else}
-				<div class="text-fluid-sm ">Aucune date programmée</div>
-			{/each}
+				{:else}
+					<div class="text-fluid-sm">Aucune date programmée</div>
+				{/each}
+			</div>
 		</div>
 
 		<!-- Équipe récurrente -->
-		<div class="border-t border-gray-100 pt-4 border-gray-700">
+		<div class="bg-base-300 border-t pt-4">
 			<div class="mb-2 flex items-center justify-between">
-				<h3 class="text-fluid-sm font-medium  ">
-					Équipe organisatrice
-				</h3>
+				<h3 class="text-fluid-sm font-medium">Équipe organisatrice</h3>
 				<button
 					onclick={() => {
 						if (isOrganizersModal) {
@@ -176,11 +174,9 @@
 
 			{#if master.recurrenceTeam?.length}
 				<div class="flex flex-wrap gap-2">
-					{#each master.recurrenceTeam as member}
+					{#each master.recurrenceTeam as member (member.id)}
 						{#if member && typeof member === 'object' && 'username' in member}
-							<div
-								class="text-fluid-sm rounded-full bg-gray-100 px-3 py-1  bg-gray-700 "
-							>
+							<div class="text-fluid-sm bg-base-300 rounded-full px-3 py-1">
 								{member.username}
 							</div>
 						{/if}
@@ -191,10 +187,7 @@
 			{/if}
 		</div>
 	</div>
-	<div
-		id="footer-card"
-		class="flex flex-wrap justify-end gap-x-4 border-t  px-2 py-1 text-right "
-	>
+	<div id="footer-card" class="flex flex-wrap justify-end gap-x-4 border-t px-2 py-1 text-right">
 		<button
 			onclick={() => {
 				if (modalState.event) {
@@ -202,8 +195,9 @@
 					modalState.event = true;
 				}
 			}}
-			class="btn btn-secondary btn-compact"
+			class="btn"
 		>
+			<PencilLine class="mr-2" />
 			Modifier toutes les occurences
 		</button>
 	</div>

@@ -4,21 +4,22 @@
 
 	interface Props {
 		siteName: string;
+		url: string;
 		config: NavbarHeaderType;
 		toggleThemeMode: () => void;
 		toggleSidebar: () => void;
 	}
 
-	let { siteName, config, toggleThemeMode, toggleSidebar }: Props = $props();
+	let { siteName, url, config, toggleThemeMode, toggleSidebar }: Props = $props();
 	let menuButtonClass = $derived(
 		`cursor-pointer mx-4 btn-ghost btn-square lg:hidden ${config.linkClass?.join(' ')}`
 	);
 </script>
 
-<div class=" {config.isFixed ? ' sticky top-0 z-50' : ''}">
+<div class="flex flex-col {config.isFixed ? ' sticky top-0 z-50' : ''}">
 	<div
-		class="navbar shadow-b
-		{config.size} {config.bgClass}"
+		class="navbar
+		{config.size}"
 	>
 		<div class="navbar-start">
 			<button
@@ -31,15 +32,15 @@
 				<!-- Optionnel: on pourrait changer l'icône si la sidebar est ouverte, ex: import { X } from 'lucide-svelte'; -->
 				<!-- {#if isSidebarOpen} <X /> {:else} <Menu /> {/if} -->
 			</button>
-			<span class="ps-4 {config.titleClass.join(' ')}">
+			<a href="/{url}" class="ps-4 {config.titleClass.join(' ')}">
 				{siteName}
-			</span>
+			</a>
 		</div>
 
 		<div class="navbar-center lg:navbar-start"></div>
 
 		<div class="navbar-end me-4">
-			<label class="swap swap-rotate {config.linkClass}">
+			<label class="swap swap-rotate {config.linkClass?.join(' ')}">
 				<!-- this hidden checkbox controls the state -->
 				<input type="checkbox" onclick={toggleThemeMode} aria-label="Changer le thème" />
 
