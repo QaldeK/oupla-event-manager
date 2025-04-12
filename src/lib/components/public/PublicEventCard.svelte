@@ -1,20 +1,18 @@
 <script lang="ts">
-	import { Clock, Calendar, Euro, Users, AlertTriangle, ChevronRight } from 'lucide-svelte';
-	import type { PublicEventInfo, PublicSiteThemeOptions } from '$lib/shared/publicStore.svelte'; // Assurez-vous que ce chemin est correct
+	import { Clock, Euro, Users, AlertTriangle, ChevronRight } from 'lucide-svelte';
+	import type { PublicEventInfo } from '$lib/shared/publicStore.svelte';
+	import type { PublicSiteThemeOptions } from '$lib/types/theme.d';
 
 	interface Props {
 		event: PublicEventInfo;
-		spaceName: string;
 		cardOptions: PublicSiteThemeOptions['eventCard'];
 		eventImageUrl: string | null;
 	}
-	let { event, spaceName, cardOptions, eventImageUrl }: Props = $props();
+	let { event, cardOptions, eventImageUrl }: Props = $props();
 
 	let imagePosition = $derived(cardOptions.imagePosition);
 	let cardWidthClass = $derived(cardOptions.widthClass);
 	let truncateLines = $derived(cardOptions.truncateLines);
-
-	let fromColor = $derived(`from-${cardOptions.bgColor} `);
 
 	// --- États pour la troncature de la description ---
 	let isExpanded = $state(false);

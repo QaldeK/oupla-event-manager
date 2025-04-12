@@ -7,8 +7,6 @@
 	import { fade, slide } from 'svelte/transition';
 	import ButtonGroupSelect from './ButtonGroupSelect.svelte';
 
-	
-
 	let {
 		organizersPossibles = [],
 		hasMultipleTasks = false,
@@ -53,13 +51,13 @@
 	});
 
 	function handleOrganizer(user: UserType) {
-		const isExistingOrganizer = organizers.some(org => org.id === user.id);
+		const isExistingOrganizer = organizers.some((org) => org.id === user.id);
 
 		if (!hasMultipleTasks) {
 			// Cas simple : une seule tâche possible
 			if (isExistingOrganizer) {
 				// Si l'utilisateur existe déjà, on le supprime
-				organizers = organizers.filter(org => org.id !== user.id);
+				organizers = organizers.filter((org) => org.id !== user.id);
 			} else {
 				// Sinon on l'ajoute avec la tâche unique
 				organizers = [
@@ -81,9 +79,11 @@
 			};
 			// Si l'utilisateur existe déjà, charger ses tâches
 			selectedTasks = isExistingOrganizer
-				? tasks.filter(task => organizers.find(org => org.id === user.id)?.tasks.includes(task.name))
+				? tasks.filter((task) =>
+						organizers.find((org) => org.id === user.id)?.tasks.includes(task.name)
+					)
 				: [];
-			
+
 			const modal = document.getElementById(modalId) as HTMLDialogElement;
 			modal?.showModal();
 		}
@@ -92,12 +92,12 @@
 	function saveOrganizer() {
 		if (!selectedOrganizer) return;
 
-		const index = organizers.findIndex(org => org.id === selectedOrganizer.id);
+		const index = organizers.findIndex((org) => org.id === selectedOrganizer.id);
 		const updatedOrganizer = {
 			email: selectedOrganizer.email || '',
 			id: selectedOrganizer.id,
 			username: selectedOrganizer.username,
-			tasks: selectedTasks.map(task => task.name)
+			tasks: selectedTasks.map((task) => task.name)
 		};
 
 		if (index !== -1) {
@@ -117,8 +117,6 @@
 	function removeOrganizer(organizer: OrganizerType) {
 		organizers = organizers.filter((org) => org.id !== organizer.id);
 	}
-
-
 
 	// invite users
 	let selectedUsersToInvite = $state<UserType[]>([]);
@@ -148,53 +146,51 @@
 		{#if organizers?.length}
 			Organisateur·ices inscrit·es :
 		{:else}
-			<span class="italic text-base-content/60">Aucun·e organisateur·ice inscrit·e pour le moment...</span>
+			<span class="text-base-content/60 italic"
+				>Aucun·e organisateur·ice inscrit·e pour le moment...</span
+			>
 		{/if}
 	</div>
 
 	<div class="flex flex-wrap gap-3">
 		{#each organizers as organizer (organizer.id)}
-			<div class={{'tooltip' : hasMultipleTasks}} data-tip={hasMultipleTasks ? organizer.tasks : "" }>
+			<div class={{ tooltip: hasMultipleTasks }} data-tip={hasMultipleTasks ? organizer.tasks : ''}>
 				<button
-					type=button
+					type="button"
 					transition:slide
-					class="btn gap-2 flex justify-between"
+					class="btn flex justify-between gap-2"
 					onclick={() => handleOrganizer(organizer)}
 				>
 					<span class="font-semibold">{organizer.username}</span>
 					<div class="ps-1">
 						{#if hasMultipleTasks}
-							<ListTodo class="w-5 text-success" />
+							<ListTodo class="text-success w-5" />
 						{:else}
-								<UserMinus class="w-5 text-error"/>
+							<UserMinus class="text-error w-5" />
 						{/if}
 					</div>
-					</button>
+				</button>
 			</div>
 		{/each}
 	</div>
 
-
-
 	<!-- Section des utilisateurs disponibles -->
 	{#if availableUsers.length}
-		<div class="p-2">
-			Ajoutez les personnes participants à l'organisation de cet événement :
-		</div>
+		<div class="p-2">Ajoutez les personnes participants à l'organisation de cet événement :</div>
 		<div class="flex w-full flex-wrap items-center gap-2">
 			{#each availableUsers as user (user)}
-			<div transition:slide>
-				<button
-					class={cn(
-						'btn  btn-compact btn-dash',
-						organizers?.some((org) => org.id === user.id) && 'border-4 border-green-500 font-bold'
-					)}
-					onclick={() => handleOrganizer(user)}
-				>
-					<UserPlus size={16} />
-					<span>{user.username}</span>
-				</button>
-			</div>
+				<div transition:slide>
+					<button
+						class={cn(
+							'btn  btn-compact btn-dash',
+							organizers?.some((org) => org.id === user.id) && 'border-4 border-green-500 font-bold'
+						)}
+						onclick={() => handleOrganizer(user)}
+					>
+						<UserPlus size={16} />
+						<span>{user.username}</span>
+					</button>
+				</div>
 			{/each}
 		</div>
 	{/if}
@@ -207,43 +203,35 @@
 	</button>
 </div>
 
+<!-- Modal de sélection des rôles -->
+<dialog id={modalId} class="modal">
+	<div class="modal-box">
+		<h3 class="mb-4 text-lg font-bold">
+			Gestion des mandats pour {selectedOrganizer?.username}
+		</h3>
 
+		<TaskSelect taskOptions={tasks} bind:selectedTasks />
 
-	<!-- Modal de sélection des rôles -->
-	<dialog id={modalId} class="modal">
-		<div class="modal-box">
-			<h3 class="text-lg font-bold mb-4">
-				Gestion des mandats pour {selectedOrganizer?.username}
-			</h3>
-			
-			<TaskSelect taskOptions={tasks} bind:selectedTasks />
-			
-			<div class="modal-action">
-				<form method="dialog" class="flex gap-2">
-					<button 
-						type="button"
-						class="btn btn-error" 
-						onclick={() => {
-							removeOrganizer(selectedOrganizer);
-							const modal = document.getElementById(modalId) as HTMLDialogElement;
-							modal?.close();
-						}}
-					>
-						<UserMinus />
-						Désinscrire
-					</button>
-					<button class="btn">Annuler</button>
-					<button 
-						type="button" 
-						class="btn btn-primary" 
-						onclick={saveOrganizer}
-					>
-						Enregistrer
-					</button>
-				</form>
-			</div>
+		<div class="modal-action">
+			<form method="dialog" class="flex gap-2">
+				<button
+					type="button"
+					class="btn btn-error"
+					onclick={() => {
+						removeOrganizer(selectedOrganizer);
+						const modal = document.getElementById(modalId) as HTMLDialogElement;
+						modal?.close();
+					}}
+				>
+					<UserMinus />
+					Désinscrire
+				</button>
+				<button class="btn">Annuler</button>
+				<button type="button" class="btn btn-primary" onclick={saveOrganizer}> Enregistrer </button>
+			</form>
 		</div>
-	</dialog>
+	</div>
+</dialog>
 {#if usersOfSpace.length}
 	<dialog id="invite_modal" class="modal" class:modal-open={showInviteModal}>
 		<div class="modal-box">

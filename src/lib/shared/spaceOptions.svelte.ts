@@ -231,8 +231,6 @@ class SpaceOptionsDB {
 	}
 
 	// ::: méthode pour accéder uniquement aux catégories (page semi-public proposition notamment)
-	
-
 
 	async getPublicSpaceInfo(spaceId: string): Promise<PublicSpaceInfo | null> {
 		try {

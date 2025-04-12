@@ -14,7 +14,7 @@
 				notifyNoOrganizer: false,
 				notifyNoOrganizerDays: 5,
 				notifyNotConfirmed: false,
-				notifyNotConfirmedDays: 3,
+				notifyNotConfirmedDays: 3
 			};
 		}
 	});

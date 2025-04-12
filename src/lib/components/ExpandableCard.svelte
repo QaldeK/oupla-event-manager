@@ -18,7 +18,7 @@
 </script>
 
 <div
-	class="overflow-hidden bg-gray-100 rounded-lg shadow-md"
+	class="overflow-hidden rounded-lg bg-gray-100 shadow-md"
 	onclick={textOverflows ? toggleExpand : null}
 	onkeydown={(event) => {
 		if (event.key === 'Enter' && textOverflows) {
@@ -32,7 +32,7 @@
 		<div class="font-semibold text-gray-800">{title}</div>
 		{#if textOverflows}
 			<svg
-				class="w-5 h-5 text-gray-500 transition-transform duration-200 {isExpanded
+				class="h-5 w-5 text-gray-500 transition-transform duration-200 {isExpanded
 					? 'rotate-180'
 					: ''}"
 				xmlns="http://www.w3.org/2000/svg"
@@ -53,7 +53,7 @@
 	>
 		<!-- <p>{text}</p> -->
 		{#if isExpanded}
-			<p class="text-gray-700 whitespace-pre-line" in:fade>
+			<p class="whitespace-pre-line text-gray-700" in:fade>
 				{text}
 			</p>
 		{:else}

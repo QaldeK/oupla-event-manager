@@ -14,8 +14,6 @@
 
 	import { CalendarCheck, PlusCircle, Trash2 } from 'lucide-svelte';
 
-
-
 	// ::: props
 	let { localErrors = {}, eventData = $bindable<EventType | null>(null) } = $props<{
 		localErrors: Record<string, string[] | undefined>;
@@ -106,8 +104,6 @@
 	const removeDateProposedType = (index: number) => {
 		eventData.dates_proposed = eventData.dates_proposed.filter((_, i) => i !== index);
 	};
-
-
 
 	function isExternalProposal(date: DateProposedType): boolean {
 		if (!eventData?.external_proposal?.proposals) return false;
@@ -214,7 +210,7 @@
 				onValidate={validateDate}
 			/>
 		{/each}
-		
+
 		{#if oldDatesProposed.length > 0}
 			<div class="text-fluid-sm p-2 text-gray-500 italic">
 				Des dates déjà passées ont été proposées précédemment, et ont été automatiquement supprimées

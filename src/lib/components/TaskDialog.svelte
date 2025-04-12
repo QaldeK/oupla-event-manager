@@ -2,7 +2,7 @@
 	import { modalState } from '$lib/shared/states.svelte';
 	import type { TaskConfig } from '$lib/types/spaceOptions';
 
-	let modalId = "task_dialog";
+	let modalId = 'task_dialog';
 
 	// pseudo props
 	let username: string = $state(modalState.tasks.data.username);
@@ -31,10 +31,10 @@
 		modalState.tasks.isOpen = false;
 	};
 
-	$effect(() => { 
+	$effect(() => {
 		if (modalState.tasks.isOpen) {
 			const modal = document.getElementById(modalId) as HTMLDialogElement;
-			modal?.showModal(); 
+			modal?.showModal();
 		}
 	});
 </script>

@@ -8,14 +8,15 @@ Pour que l'éditeur collaboratif fonctionne correctement, vous devez créer les 
 
 Créez une collection avec les champs suivants:
 
-| Nom du champ | Type    | Requis | Description                                         |
-|--------------|---------|--------|-----------------------------------------------------|
-| title        | text    | Oui    | Titre du pad affiché dans la liste                  |
-| content      | file    | Non    | État sérialisé du document Yjs (un seul fichier)    |
-| created_by   | relation| Oui    | Relation vers la collection 'users'                 |
-| space        | relation| Oui    | Relation vers la collection 'spaces'                |
+| Nom du champ | Type     | Requis | Description                                      |
+| ------------ | -------- | ------ | ------------------------------------------------ |
+| title        | text     | Oui    | Titre du pad affiché dans la liste               |
+| content      | file     | Non    | État sérialisé du document Yjs (un seul fichier) |
+| created_by   | relation | Oui    | Relation vers la collection 'users'              |
+| space        | relation | Oui    | Relation vers la collection 'spaces'             |
 
 Règles d'accès recommandées:
+
 - **Authentification**: Autoriser l'accès aux utilisateurs authentifiés uniquement
 - **Création**: Utilisateurs authentifiés
 - **Lecture**: Membres de l'espace (via règles personnalisées)
@@ -26,13 +27,14 @@ Règles d'accès recommandées:
 
 Créez une collection avec les champs suivants:
 
-| Nom du champ | Type    | Requis | Description                                             |
-|--------------|---------|--------|---------------------------------------------------------|
-| pad          | relation| Oui    | Relation vers la collection 'pads'                      |
-| updateData   | file    | Oui    | Données binaires de mise à jour Yjs (un seul fichier)   |
-| clientId     | text    | Oui    | ID du client Yjs ayant généré la mise à jour            |
+| Nom du champ | Type     | Requis | Description                                           |
+| ------------ | -------- | ------ | ----------------------------------------------------- |
+| pad          | relation | Oui    | Relation vers la collection 'pads'                    |
+| updateData   | file     | Oui    | Données binaires de mise à jour Yjs (un seul fichier) |
+| clientId     | text     | Oui    | ID du client Yjs ayant généré la mise à jour          |
 
 Règles d'accès recommandées:
+
 - **Authentification**: Autoriser l'accès aux utilisateurs authentifiés uniquement
 - **Création**: Membres de l'espace du pad lié
 - **Lecture**: Membres de l'espace du pad lié

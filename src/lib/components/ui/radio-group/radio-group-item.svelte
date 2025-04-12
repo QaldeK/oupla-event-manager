@@ -19,9 +19,9 @@
 	{...restProps}
 >
 	{#snippet children({ checked })}
-		<div class="flex justify-center items-center">
+		<div class="flex items-center justify-center">
 			{#if checked}
-				<Circle class="text-current fill-current size-2.5" />
+				<Circle class="size-2.5 fill-current text-current" />
 			{/if}
 		</div>
 	{/snippet}

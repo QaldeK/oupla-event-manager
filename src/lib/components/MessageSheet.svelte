@@ -12,7 +12,7 @@
 				<MessageThread eventId={messageSheet.currentEventId} />
 			{/if}
 
-			<Sheet.Close class="absolute right-4 top-4">
+			<Sheet.Close class="absolute top-4 right-4">
 				<span class="sr-only">Fermer</span>
 			</Sheet.Close>
 		</Sheet.Content>

@@ -120,13 +120,13 @@
 		margin-bottom: 0.1rem;
 	}
 
-  .btn-compact {
-    --btn-scale: 0.75; /* Facteur de réduction de 20% */
-    height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
-    min-height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
-    padding-top: calc(0.25rem * var(--btn-scale)) !important;
-    padding-bottom: calc(0.25rem * var(--btn-scale)) !important;
-  }
+	.btn-compact {
+		--btn-scale: 0.75; /* Facteur de réduction de 20% */
+		height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
+		min-height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
+		padding-top: calc(0.25rem * var(--btn-scale)) !important;
+		padding-bottom: calc(0.25rem * var(--btn-scale)) !important;
+	}
 }
 @layer utilities {
 	.text-fluid-xs {

@@ -6,7 +6,7 @@
 	import { getContext } from 'svelte';
 
 	let currentUser = getContext<CurrentUser>('currentUser');
-	let isAdmin = () =>  currentUser.role === 'admin';
+	let isAdmin = () => currentUser.role === 'admin';
 
 	let {
 		organizers = $bindable(),
