@@ -12,6 +12,7 @@
 	import type { SitePagesResponse } from '$lib/types/pocketbase';
 	import type { PublicSiteThemeOptions } from '$lib/types/theme';
 	import type { NavbarHeaderType } from '$lib/types/theme.d';
+	import { slugify } from '$lib/utils';
 
 	let { children } = $props();
 
@@ -211,6 +212,7 @@
 						)}"
 					>
 						<NavBarHeader
+							url={slugify(spaceInfo.name)}
 							siteName={spaceInfo.name}
 							config={configNavBarHeader}
 							{toggleThemeMode}
