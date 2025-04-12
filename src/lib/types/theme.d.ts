@@ -21,21 +21,20 @@ export interface PublicSiteThemeOptions {
 		rightSidebar: { bgClass: string; textClass: string };
 		footer: { bgClass: string; textClass: string };
 		mainBackgroundClass: string;
+		top: { bgClass: string; textClass: string };
 	};
 	components: {
 		navbarHeader: NavbarHeaderType;
 		// sideMenu: SideMenuType;
 		primaryNavLinks: { title: string; url: string }[];
 
-		[key: string]: any;
+		[key: string]: unknown;
 	};
 }
 
 export interface NavbarHeaderType {
 	enabled: boolean;
 	pos: number;
-	// section: string;
-	// hasMenu: boolean;
 	isFixed: boolean;
 	size: string;
 	titleClass: string[];
@@ -75,7 +74,8 @@ export function getDefaultThemeOptions(): PublicSiteThemeOptions {
 			leftSidebar: { bgClass: 'bg-base-100', textClass: 'text-base-content' },
 			rightSidebar: { bgClass: 'bg-base-100', textClass: 'text-base-content' },
 			footer: { bgClass: 'bg-base-300', textClass: 'text-base-content' },
-			mainBackgroundClass: 'bg-base-200/50'
+			mainBackgroundClass: 'bg-base-200/50',
+			top: { bgClass: 'bg-base-100', textClass: 'text-base-content' }
 		},
 		components: {
 			navbarHeader: {
@@ -94,8 +94,8 @@ export function getDefaultThemeOptions(): PublicSiteThemeOptions {
 					url: `about`
 				},
 
-				{ title: 'Nous trouver', url: '/find-us' },
-				{ title: 'Proposer un événement', url: `propose-event` }
+				{ title: 'Nous trouver', url: 'find-us' },
+				{ title: 'Proposer un événement', url: `proposition` }
 			]
 			// sideMenu: {
 			// 	enabled: false,
