@@ -46,7 +46,15 @@ const BaseRecurrenceSchema = z
 					.optional()
 			)
 			.min(1, "L'équipe récurrente doit avoir au moins un membre"),
-		tasks: z.array(TaskSchema),
+		tasks: z
+			.array(
+				z.object({
+					name: z.string(),
+					description: z.string(),
+					type: z.string() // FIX: Accepter n'importe quelle string pour le type
+				})
+			)
+			.min(1, 'Au moins une tâche est requise'),
 		autoConfirm: z.boolean(),
 		autoConfirmMin: z.number(),
 		notifyNoOrganizer: z.boolean(),
@@ -180,7 +188,15 @@ const BaseEventFormSchema = z.object({
 	// Arrays avec validations
 	categories: z.array(z.string()).min(1, 'Sélectionnez au moins une catégorie'),
 	rooms: z.array(z.string()).min(1, 'Sélectionnez au moins une salle'),
-	tasks: z.array(TaskSchema).min(1, 'Au moins une tâche est requise'),
+	tasks: z
+		.array(
+			z.object({
+				name: z.string(),
+				description: z.string(),
+				type: z.string() // FIX:  Temporairement on accepte n'importe quelle string
+			})
+		)
+		.min(1, 'Au moins une tâche est requise'),
 
 	// Descriptions
 	description: z.string().nullable().optional(),
@@ -287,7 +303,16 @@ export const SaveRecurrentMasterSchema = BaseEventFormSchema.extend({
 	organizers: z.array(OrganizerSchema).optional(),
 	dateStart: z.string().optional(),
 	dateEnd: z.string().optional(),
-	date_event: z.string().optional()
+	date_event: z.string().optional(),
+	tasks: z
+		.array(
+			z.object({
+				name: z.string(),
+				description: z.string(),
+				type: z.string() // Accepter n'importe quelle string pour le type
+			})
+		)
+		.min(1, 'Au moins une tâche est requise')
 });
 
 // schéma spécifique pour la page de proposition
