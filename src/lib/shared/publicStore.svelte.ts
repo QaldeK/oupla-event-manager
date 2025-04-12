@@ -1,18 +1,16 @@
 import { pb } from '$lib/pocketbase.svelte';
 import type {
 	SitePagesResponse,
-	SitePagesSectionOptions,
 	SpacesOptionsResponse,
-	EventsResponse,
 	SpacesResponse
 } from '$lib/types/pocketbase';
-import type { RecordModel } from 'pocketbase';
 import { getDefaultThemeOptions, type PublicSiteThemeOptions } from '$lib/types/theme.d';
 
 // Type d'informations publiques sur un espace
 export interface PublicSpaceInfo {
 	id: string;
 	name: string;
+	url: string;
 	description: string;
 	categories: string[];
 	rooms: string[];
@@ -144,8 +142,8 @@ async function loadPublicData(spaceName: string): Promise<void> {
 			//     spaceInfo.rooms = fetchedSpaceOptions.rooms;
 			//     spaceInfo.public_site = fetchedSpaceOptions.public_site;
 			// }
-		} catch (e: any) {
-			if (e.status === 404) {
+		} catch (e: unknown) {
+			if (typeof e === 'object' && e !== null && 'status' in e && e.status === 404) {
 				console.warn(`[PublicStore] Options not found for space ${spaceId}. Using default theme.`);
 				themeOptions = getDefaultThemeOptions(); // Assurer les défauts si options non trouvées
 			} else {

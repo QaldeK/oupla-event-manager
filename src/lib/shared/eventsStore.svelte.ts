@@ -1,8 +1,9 @@
 import { SyncStore } from '$lib/shared/syncState.svelte';
-import type { EventsRecord, EventsResponse } from '$lib/types/pocketbase.ts';
-import type { DateProposedType, OrganizerType, RecurrenceType } from '$lib/schemas/event.schema';
+import type { EventsRecord, UsersResponse } from '$lib/types/pocketbase.ts';
+import type { OrganizerType } from '$lib/schemas/event.schema';
 import { Collections } from '$lib/types/pocketbase';
 import { format, parse } from 'date-fns';
+import type { StoreConfig } from '$lib/types/syncState.types';
 
 // Ajouter ces types au début du fichier
 export interface EventConflict {
@@ -123,7 +124,6 @@ class EventsStore {
 				initPromise: null,
 				mode: null
 			};
-
 		} catch (error) {
 			console.error('Erreur lors de la destruction du store:', error);
 			// Forcer la réinitialisation même en cas d'erreur
@@ -210,7 +210,7 @@ class EventsStore {
 	getEventsByDateTime = $derived.by<Map<string, EventConflictInfo[]>>(() => {
 		const eventsByDateMap = new Map<string, EventConflictInfo[]>();
 
-		// horaire par defaut inséré ensuite si non renseigné 
+		// horaire par defaut inséré ensuite si non renseigné
 		const getDefaultTimes = (isStart: boolean) => {
 			return isStart ? '00:00' : '23:59';
 		};
@@ -225,12 +225,20 @@ class EventsStore {
 				// Si on a une date mais pas d'horaire, on utilise les horaires par défaut
 				const hasDate = event.date_event || dateStart;
 				const hasTime = event.time_start && event.time_end;
-				
-				const timeStart = hasDate && !hasTime ? getDefaultTimes(true) : 
-					(dateStart ? format(new Date(dateStart), 'HH:mm') : event.time_start);
-				
-				const timeEnd = hasDate && !hasTime ? getDefaultTimes(false) : 
-					(dateEnd ? format(new Date(dateEnd), 'HH:mm') : event.time_end);
+
+				const timeStart =
+					hasDate && !hasTime
+						? getDefaultTimes(true)
+						: dateStart
+							? format(new Date(dateStart), 'HH:mm')
+							: event.time_start;
+
+				const timeEnd =
+					hasDate && !hasTime
+						? getDefaultTimes(false)
+						: dateEnd
+							? format(new Date(dateEnd), 'HH:mm')
+							: event.time_end;
 
 				return {
 					id: event.id,
