@@ -29,12 +29,14 @@
 	$inspect('occurrencesMap', occurrencesMap);
 </script>
 
-<div class="flex flex-col gap-4 p-4">
+<div class="2xl:grid-cols-auto grid grid-cols-1 gap-x-8 gap-y-12 md:p-4 lg:grid-cols-2">
 	{#each masters as master (master.id)}
-		<RecurrentEventsCard
-			{master}
-			occurrences={occurrencesByMaster.get(master.id) || []}
-			onConfirm={(id) => handleConfirm(id)}
-		/>
+		<div class="grow">
+			<RecurrentEventsCard
+				{master}
+				occurrences={occurrencesByMaster.get(master.id) || []}
+				onConfirm={(id) => handleConfirm(id)}
+			/>
+		</div>
 	{/each}
 </div>
