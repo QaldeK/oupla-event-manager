@@ -11,7 +11,7 @@ import { cubicOut } from 'svelte/easing';
 import type { TransitionConfig } from 'svelte/transition';
 
 import { updateEvent } from './pocketbase.svelte';
-import type { OrganizerType } from './schemas/event.schema';
+import type { EventType, OrganizerType } from './schemas/event.schema';
 import type { UserType } from './types/types';
 
 export function cn(...inputs: ClassValue[]) {
@@ -74,7 +74,7 @@ export const createDateFromString = (dateStr: string, timeStr: string): Date => 
 	return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes));
 };
 
-export const addTime = (initial, durationToAdd = 10) => {
+export const addTime = (initial: string, durationToAdd = 10) => {
 	if (initial) {
 		const calculated = format(
 			addMinutes(parse(initial, 'kk:mm', new Date()), durationToAdd),
@@ -86,28 +86,28 @@ export const addTime = (initial, durationToAdd = 10) => {
 	}
 };
 
-export const lisibleDate = (date) => {
-	return format(date, 'EEEE d MMMM', { locale: fr });
+export const lisibleDate = (date: Date | string) => {
+	return format(new Date(date), 'EEEE d MMMM', { locale: fr });
 };
-export const lisibleTime = (date) => {
-	return format(date, 'kk:mm', { locale: fr });
-};
-
-export const formatDatePb = (date) => {
-	return format(date, 'yyyy-MM-dd');
+export const lisibleTime = (date: Date | string) => {
+	return format(new Date(date), 'kk:mm', { locale: fr });
 };
 
-export const formatTimePb = (date) => {
-	return format(date, 'HH:mm');
+export const formatDatePb = (date: Date | string) => {
+	return format(new Date(date), 'yyyy-MM-dd');
+};
+
+export const formatTimePb = (date: Date | string) => {
+	return format(new Date(date), 'HH:mm');
 };
 
 // ::: Other
 
-export const tooltip = (node, options) => {
+export const tooltip = (node: HTMLElement, options: any) => {
 	const instance = tippy(node, options);
 
 	return {
-		update(newOptions) {
+		update(newOptions: any) {
 			instance.setProps(newOptions);
 		},
 		destroy() {
@@ -122,12 +122,9 @@ export const tooltip = (node, options) => {
 // Warn : insert class 'click-inside' on the child element if you want to exclude it (exemple: for multi-select component)
 export function clickOutside(node: HTMLElement, callback: () => void) {
 	function handleClick(event: MouseEvent) {
-		if (
-			node &&
-			!node.contains(event.target as Node) &&
-			!event.target.closest('.click-inside') &&
-			callback
-		) {
+		const target = event.target as Node;
+		const htmlTarget = event.target as HTMLElement;
+		if (node && !node.contains(target) && !htmlTarget?.closest?.('.click-inside') && callback) {
 			callback();
 		}
 	}
@@ -205,19 +202,20 @@ interface TaskSubscriptionParams {
 	task: string;
 	currentUser: UserType;
 	event: EventType;
-	onShowConfirmModal: (options: {
-		title: string;
-		message: string;
-		onConfirm: () => void;
-	}) => void;
+	onShowConfirmModal: (options: { title: string; message: string; onConfirm: () => void }) => void;
 }
 
 // Vérifie si toutes les tâches d'un événement sont assignées à au moins un organisateur
 export const areAllTasksAssigned = (tasks: string[], organizers: OrganizerType[]): boolean => {
-	return tasks.every(task => organizers.some(org => org.tasks.includes(task)));
+	return tasks.every((task) => organizers.some((org) => org.tasks.includes(task)));
 };
 
-export const handleTaskSubscription = async ({ task, currentUser, event, onShowConfirmModal }: TaskSubscriptionParams) => {
+export const handleTaskSubscription = async ({
+	task,
+	currentUser,
+	event,
+	onShowConfirmModal
+}: TaskSubscriptionParams) => {
 	// Copie des organisateurs actuels
 	const currentOrganizers = Array.isArray(event.organizers) ? [...event.organizers] : [];
 	const isUserSubscribed = currentOrganizers.some(
@@ -250,20 +248,23 @@ export const handleTaskSubscription = async ({ task, currentUser, event, onShowC
 				return org;
 			});
 		} else {
-			updatedOrganizers = [...currentOrganizers, {
-				id: currentUser.id,
-				username: currentUser.username,
-				email: currentUser.email,
-				tasks: [task],
-				role: currentUser.role
-			}];
+			updatedOrganizers = [
+				...currentOrganizers,
+				{
+					id: currentUser.id,
+					username: currentUser.username,
+					email: currentUser.email,
+					tasks: [task]
+				}
+			];
 		}
 	}
 
 	// Vérification pour l'auto-confirmation
 	let shouldAutoConfirm = false;
 	if (event.recurrence?.autoConfirm) {
-		shouldAutoConfirm = areAllTasksAssigned(event.tasks, updatedOrganizers) && 
+		shouldAutoConfirm =
+			areAllTasksAssigned(event.tasks, updatedOrganizers) &&
 			updatedOrganizers.length >= event.recurrence.autoConfirmMin;
 	}
 
@@ -323,4 +324,19 @@ export const convertMaybehereToOrganizer = (org: OrganizerSchemaDatesProposed) =
 
 export const filterAndConvertOrganizers = (organizers: OrganizerSchemaDatesProposed[]) => {
 	return organizers.filter((org) => org.maybehere === 'oui').map(convertMaybehereToOrganizer);
+};
+
+/**
+ * Formate une chaîne en slug URL-friendly
+ * @param str - La chaîne à convertir
+ * @returns La chaîne formatée en slug
+ */
+export const slugify = (str: string): string => {
+	return str
+		.normalize('NFD') // Décompose les caractères accentués
+		.replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+		.toLowerCase() // Convertit en minuscules
+		.trim() // Supprime les espaces début/fin
+		.replace(/[^a-z0-9]+/g, '-') // Remplace les caractères non alphanumériques par des tirets
+		.replace(/^-+|-+$/g, ''); // Supprime les tirets en début/fin
 };
