@@ -1,7 +1,7 @@
 export * from './message';
 export * from './pocketbase';
 export * from './spaceOptions';
-export * from "$lib/schemas/event.schema"
+export * from '$lib/schemas/event.schema';
 
 export interface UserType {
 	id: string;
