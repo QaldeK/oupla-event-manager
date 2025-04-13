@@ -36,8 +36,7 @@
 <div class="flex w-full flex-wrap items-center gap-2">
 	{#each options as option (option)}
 		<button
-			class="btn btn-sm btn-outline text-base font-medium {isSelected(option) &&
-				'border-primary bg-primary/10 border-4 font-bold'}"
+			class="btn btn-compact {isSelected(option) ? 'btn-accent' : ' btn-dash '}"
 			onclick={() => toggleItem(option)}
 		>
 			{#if optionsLabel}

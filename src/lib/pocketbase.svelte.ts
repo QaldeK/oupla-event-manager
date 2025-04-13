@@ -262,9 +262,10 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 		masterUpdateData.dateStart = null;
 		masterUpdateData.dateEnd = null;
 
-		if (masterUpdateData.recurrence) {
-			masterUpdateData.recurrence.tasks = masterEvent.tasks; // Synchronise les tâches dans l'objet recurrence du master
-		}
+		// A faire directement dans le composant pour le check ZOD
+		// if (masterUpdateData.recurrence) {
+		// 	masterUpdateData.recurrence.tasks = masterEvent.tasks; // Synchronise les tâches dans l'objet recurrence du master
+		// }
 
 		await pb.collection('events').update(masterId, masterUpdateData);
 
@@ -637,5 +638,31 @@ export async function checkAndCleanLock(
 	} catch (error) {
 		console.error(`[Client] Error checking/cleaning lock for document ${recordId}:`, error);
 		return null;
+	}
+}
+
+// XXX ? Dans $lib/types/notifications.ts ?
+export interface NotificationPayload {
+	eventId: string;
+	notificationType: 'organizerLeft'; // Peut être étendu
+	leavingUserId: string;
+	leavingUsername: string;
+	taskName?: string; // Nom de la tâche quittée
+	// Ajoutez d'autres champs si nécessaire pour d'autres types de notifs
+}
+
+export async function sendNotification(payload: NotificationPayload): Promise<void> {
+	try {
+		await pb.send('/api/send_notification', {
+			method: 'POST',
+			body: JSON.stringify(payload),
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	} catch (error) {
+		console.error('Failed to send notification:', error);
+		// Gérer l'erreur comme vous le souhaitez (ex: Sentry, toast user)
+		throw error; // Propager l'erreur si nécessaire
 	}
 }

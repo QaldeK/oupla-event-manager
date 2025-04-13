@@ -4,8 +4,47 @@
 
 import { getNewEvent } from '$lib/schemas/event.schema';
 import { getSpace } from '$lib/shared/spaceOptions.svelte';
+import { type TaskType } from '$lib/schemas/event.schema';
 
-export const modalState = $state({
+export interface ConfirmModalData {
+	title: string;
+	message: string;
+	variant?: 'warning' | 'info' | 'danger';
+
+	showCheckbox?: {
+		label: string;
+		checked: boolean;
+	};
+	showCancelEventButton?: {
+		label: string;
+		onCancelEvent: () => void | Promise<void>;
+	};
+
+	onConfirm: ((notifyOthers?: boolean) => void | Promise<void>) | null;
+}
+
+export interface ModalStateType {
+	dateSondage: boolean;
+	organizers: boolean;
+	event: boolean;
+	report: boolean;
+	inviteUser: boolean;
+	tasks: {
+		isOpen: boolean;
+		data: {
+			username: string;
+			tasks: TaskType[];
+			selectedTasks: string[];
+			onSubmit: ((selectedTaskNames: string[]) => void) | null;
+		};
+	};
+	confirm: {
+		isOpen: boolean;
+		data: ConfirmModalData;
+	};
+}
+
+export const modalState = $state<ModalStateType>({
 	dateSondage: false,
 	organizers: false,
 	event: false,
@@ -15,9 +54,9 @@ export const modalState = $state({
 		isOpen: false,
 		data: {
 			username: '',
-			tasks: [] as string[],
+			tasks: [] as TaskType[],
 			selectedTasks: [] as string[],
-			onSubmit: null as ((tasks: string[]) => void) | null
+			onSubmit: null as ((selectedTaskNames: string[]) => void) | null
 		}
 	},
 	confirm: {
@@ -26,22 +65,24 @@ export const modalState = $state({
 			title: '',
 			message: '',
 			variant: 'info',
-			onConfirm: null as (() => void) | null
+			onConfirm: null as ((notifyOthers?: boolean) => void) | null
 		}
 	}
 });
 
 export const openTaskModal = (params: {
 	username: string;
-	tasks: string[];
+	tasks: TaskType[];
 	selectedTasks: string[];
-	onSubmit: (tasks: string[]) => void; //  Add onSubmit here, making it required
+	onSubmit: (selectedTaskNames: string[]) => void; //  Add onSubmit here, making it required
 }) => {
 	modalState.tasks = {
 		isOpen: true,
 		data: {
-			...params, // Spread existing params
-			onSubmit: params.onSubmit // Explicitly pass onSubmit
+			username: params.username,
+			tasks: $state.snapshot(params.tasks), // Copie non réactive des options de tâches
+			selectedTasks: params.selectedTasks, // Les noms des tâches sélectionnées
+			onSubmit: params.onSubmit
 		}
 	};
 };

@@ -1,31 +1,34 @@
 <script lang="ts">
-	import type { TaskConfig } from '$lib/types/spaceOptions';
+	import type { TaskType } from '$lib/types/spaceOptions';
 	import { Plus } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 
 	let {
 		taskOptions = [],
-		selectedTasks = $bindable([]),
+		selectedTaskNames = $bindable([]),
 		hasAddInput = false,
 		onadd = undefined
 	} = $props<{
-		taskOptions: TaskConfig[];
-		selectedTasks: TaskConfig[];
+		taskOptions: TaskType[];
+		selectedTaskNames: string[];
 		hasAddInput?: boolean;
 		onadd?: (newTask: string) => void;
 	}>();
 
 	let newTaskName = $state('');
 
-	const isSelected = (task: TaskConfig) => {
-		return selectedTasks.some((t) => t.name === task.name);
+	const isSelected = (taskName: string) => {
+		if (!selectedTaskNames) selectedTaskNames = [];
+		return selectedTaskNames.includes(taskName);
 	};
 
-	const toggleTask = (task: TaskConfig) => {
-		if (isSelected(task)) {
-			selectedTasks = selectedTasks.filter((t) => t.name !== task.name);
+	const toggleTask = (taskName: string) => {
+		// S'assurer que le tableau est initialisé
+		if (!selectedTaskNames) selectedTaskNames = [];
+		if (isSelected(taskName)) {
+			selectedTaskNames = selectedTaskNames.filter((name) => name !== taskName);
 		} else {
-			selectedTasks = [...selectedTasks, task];
+			selectedTaskNames = [...selectedTaskNames, taskName];
 		}
 	};
 
@@ -49,9 +52,9 @@
 			<button
 				type="button"
 				class="btn btn-compact"
-				class:btn-accent={isSelected(task)}
-				class:btn-dash={!isSelected(task)}
-				onclick={() => toggleTask(task)}
+				class:btn-accent={isSelected(task.name)}
+				class:btn-dash={!isSelected(task.name)}
+				onclick={() => toggleTask(task.name)}
 			>
 				{task.name}
 			</button>

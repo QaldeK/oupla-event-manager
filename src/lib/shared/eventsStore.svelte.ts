@@ -8,7 +8,7 @@ import type { StoreConfig } from '$lib/types/syncState.types';
 import { updateEvent, sendNotification } from '$lib/pocketbase.svelte';
 import type { UserType } from '$lib/types/types';
 
-import {modalState, openTaskModal } from '$lib/shared/states.svelte';
+import { modalState, openTaskModal } from '$lib/shared/states.svelte';
 import { getSpace } from './spaceOptions.svelte';
 import { filterAndConvertOrganizers } from '$lib/utils.js';
 // Ajouter ces types au début du fichier
@@ -546,147 +546,229 @@ class EventsStore {
 		return tasks.every((taskName) => organizers.some((org) => org.tasks?.includes(taskName)));
 	};
 
-	// 👉 Nouvelle méthode pour gérer l'inscription/désinscription aux tâches
-	async manageTaskSubscription(event: EventType, currentUser: UserType, taskName?: string) {
-		if (!event || !currentUser || !Array.isArray(event.tasks)) {
+	// méthode pour gérer l'inscription/désinscription aux tâches
+	async manageTaskSubscription(
+		event: EventType,
+		currentUser: UserType,
+		taskName?: string // Paramètre optionnel pour une tâche spécifique
+	) {
+		if (!event || !currentUser || !event.tasks.length) {
 			console.error('Données invalides pour manageTaskSubscription');
 			return;
 		}
 
-		// const availableTaskNames: string[] = event.tasks.map((task) => task.name);
+		// Copie sécurisée des organisateurs en créant un nouvel objet pour chacun
 		const currentOrganizers: OrganizerType[] = Array.isArray(event.organizers)
-			? [...event.organizers]
+			? event.organizers.map((org) => ({
+					id: org.id,
+					username: org.username,
+					tasks: [...org.tasks]
+				}))
 			: [];
 		const userIndex = currentOrganizers.findIndex((org) => org.id === currentUser.id);
-		const userOrganizer = userIndex !== -1 ? currentOrganizers[userIndex] : null;
+		let userOrganizer = userIndex !== -1 ? currentOrganizers[userIndex] : null;
 		const userTasks = userOrganizer?.tasks ?? [];
 
-		// --- Cas 1 : Une seule tâche disponible ---
-		if (availableTaskNames.length === 1) {
-			const taskName = availableTaskNames[0];
+		// --- Cas spécifique : Inscription/Désinscription à une tâche connue ---
+		if (taskName) {
+			console.log('taskName:', taskName);
 			let updatedOrganizers: OrganizerType[];
+			const isSubscribedToTask = userTasks.includes(taskName);
 
-			if (userTasks.includes(taskName)) {
-				// Désinscription
+			if (isSubscribedToTask) {
+				// ---> Désinscription de la tâche spécifique <---
 				const newUserTasks = userTasks.filter((t) => t !== taskName);
-				if (newUserTasks.length === 0 && userIndex !== -1) {
-					// Si l'utilisateur n'a plus de tâches, le retirer complètement
-					updatedOrganizers = currentOrganizers.filter((org) => org.id !== currentUser.id);
-				} else if (userIndex !== -1) {
-					// Mettre à jour les tâches de l'utilisateur existant
-					updatedOrganizers = currentOrganizers.map((org) =>
-						org.id === currentUser.id ? { ...org, tasks: newUserTasks } : org
+
+				// --- Logique de confirmation si événement confirmé ---
+				if (event.isConfirmed) {
+					const remainingOrganizersForEvent = currentOrganizers.filter(
+						(org) => org.id !== currentUser.id || newUserTasks.length > 0 // Vérifie si l'utilisateur a d'autres tâches OU s'il y a d'autres organisateurs
 					);
+					const isLastOrganizer = remainingOrganizersForEvent.length === 0;
+
+					// Ouvrir le modal de confirmation
+					modalState.confirm = {
+						isOpen: true,
+						data: {
+							title: 'Confirmer la désinscription',
+							message: isLastOrganizer
+								? `Vous êtes le/la dernier·e organisateur·ice pour cet événement (${taskName}). Si l'événement doit avoir lieu bientôt, songez a l'annuler. Êtes-vous sûr·e ?`
+								: `L'événement "${event.event_title}" est confirmé. Êtes-vous sûr·e de vouloir vous désinscrire de la tâche "${taskName}" ?`,
+							variant: isLastOrganizer ? 'danger' : 'warning',
+							// 👉 Ajout des options pour le modal
+							showCheckbox: {
+								label: 'Prévenir les autres organisateur·ices ',
+								checked: true // Pré-coché par défaut
+							},
+							// 👉 Proposer l'annulation seulement si c'est le dernier organisateur
+							...(isLastOrganizer && {
+								showCancelEventButton: {
+									label: "Annuler l'événement",
+									onCancelEvent: async () => {
+										try {
+											await updateEvent(event.id, { canceled: true });
+											modalState.confirm.isOpen = false; // Fermer le modal
+											// TODO : notification de succès d'annulation
+										} catch (err) {
+											console.error("Erreur lors de l'annulation de l'événement:", err);
+											// Optionnel : notification d'erreur
+										}
+									}
+								}
+							}),
+							// 👉 onConfirm reçoit maintenant l'état de la checkbox
+							onConfirm: async (notifyOthers: boolean) => {
+								let finalOrganizers: OrganizerType[];
+								if (newUserTasks.length === 0 && userIndex !== -1) {
+									// Retirer complètement l'utilisateur s'il n'a plus de tâches
+									finalOrganizers = currentOrganizers.filter((org) => org.id !== currentUser.id);
+								} else if (userIndex !== -1) {
+									// Mettre à jour les tâches de l'utilisateur
+									finalOrganizers = currentOrganizers.map((org) =>
+										org.id === currentUser.id ? { ...org, tasks: newUserTasks } : org
+									);
+								} else {
+									finalOrganizers = currentOrganizers; // Ne devrait pas arriver
+								}
+
+								// Mettre à jour l'événement SANS auto-confirmer
+								await this.#updateEventOrganizers(event, finalOrganizers, true); // true pour skipAutoConfirm
+
+								// Envoyer la notification si demandé et s'il y a d'autres orgas ou admins à notifier
+								if (notifyOthers) {
+									try {
+										await sendNotification({
+											eventId: event.id,
+											notificationType: 'organizerLeft',
+											leavingUserId: currentUser.id,
+											leavingUsername: currentUser.username,
+											taskName: taskName // Ajouter le nom de la tâche
+										});
+									} catch (err) {
+										console.error("Erreur lors de l'envoi de la notification:", err);
+										// Optionnel: Afficher une erreur à l'utilisateur
+									}
+								}
+							}
+						}
+					};
+					return; // Arrêter ici, l'action se fera via le modal
 				} else {
-					// Ne devrait pas arriver si userTasks incluait taskName, mais sécurité
-					updatedOrganizers = currentOrganizers;
+					// Désinscription normale (événement non confirmé)
+					if (newUserTasks.length === 0 && userIndex !== -1) {
+						updatedOrganizers = currentOrganizers.filter((org) => org.id !== currentUser.id);
+					} else if (userIndex !== -1) {
+						updatedOrganizers = currentOrganizers.map((org) =>
+							org.id === currentUser.id ? { ...org, tasks: newUserTasks } : org
+						);
+					} else {
+						updatedOrganizers = currentOrganizers;
+					}
+					await this.#updateEventOrganizers(event, updatedOrganizers);
 				}
 			} else {
-				// Inscription
+				// ---> Inscription à la tâche spécifique <---
 				const newUserTasks = [...userTasks, taskName];
 				if (userIndex !== -1) {
-					// Mettre à jour l'utilisateur existant
 					updatedOrganizers = currentOrganizers.map((org) =>
 						org.id === currentUser.id ? { ...org, tasks: newUserTasks } : org
 					);
 				} else {
-					// Ajouter le nouvel utilisateur comme organisateur
 					updatedOrganizers = [
 						...currentOrganizers,
 						{
 							id: currentUser.id,
 							username: currentUser.username,
-							tasks: [taskName] // Directement la tâche unique
+							tasks: [taskName] // Ajouter la tâche spécifique
 						}
 					];
 				}
+				await this.#updateEventOrganizers(event, updatedOrganizers);
 			}
-			// Mise à jour de l'événement
-			await this.#updateEventOrganizers(event, updatedOrganizers);
 		}
-		// --- Cas 2 : Plusieurs tâches disponibles ---
-		else if (availableTaskNames.length > 1) {
-			// Récupérer les configurations complètes des tâches disponibles pour le dialogue
-			const availableTaskConfigs = getSpace.tasks.filter((taskConfig) =>
-				availableTaskNames.includes(taskConfig.name)
-			);
+		// --- Cas existant : Pas de tâche spécifique fournie (gestion via modal ou tâche unique) ---
+		else {
+			const availableTaskNames: string[] = event.tasks.map((task) => task.name);
 
-			// Ouvrir le dialogue modal
-			openTaskModal({
-				username: currentUser.username,
-				tasks: availableTaskConfigs, // Passer les TaskConfig[]
-				selectedTasks: userTasks, // Passer les noms des tâches déjà sélectionnées (string[])
-				onSubmit: async (selectedTaskNames: string[]) => {
-					// Callback après la fermeture du dialogue
-					let updatedOrganizers: OrganizerType[];
+			// --- Cas 1 : Une seule tâche disponible ---
+			if (event.tasks.length === 1) {
+				// Appeler la logique spécifique avec le nom de la tâche unique
+				await this.manageTaskSubscription(event, currentUser, event.tasks[0].name);
+			}
+			// --- Cas 2 : Plusieurs tâches disponibles ---
+			else if (availableTaskNames.length > 1) {
+				const availableTaskConfigs = getSpace.tasks.filter((taskConfig) =>
+					availableTaskNames.includes(taskConfig.name)
+				);
 
-					if (selectedTaskNames.length > 0) {
-						// Si des tâches sont sélectionnées
-						if (userIndex !== -1) {
-							// Mettre à jour l'utilisateur existant
-							updatedOrganizers = currentOrganizers.map((org) =>
-								org.id === currentUser.id ? { ...org, tasks: selectedTaskNames } : org
-							);
+				openTaskModal({
+					username: currentUser.username,
+					tasks: availableTaskConfigs,
+					selectedTasks: userTasks,
+					onSubmit: async (selectedTaskNames: string[]) => {
+						let updatedOrganizersViaModal: OrganizerType[];
+						if (selectedTaskNames.length > 0) {
+							if (userIndex !== -1) {
+								updatedOrganizersViaModal = currentOrganizers.map((org) =>
+									org.id === currentUser.id ? { ...org, tasks: selectedTaskNames } : org
+								);
+							} else {
+								updatedOrganizersViaModal = [
+									...currentOrganizers,
+									{
+										id: currentUser.id,
+										username: currentUser.username,
+										tasks: selectedTaskNames
+									}
+								];
+							}
 						} else {
-							// Ajouter le nouvel utilisateur
-							updatedOrganizers = [
-								...currentOrganizers,
-								{
-									id: currentUser.id,
-									username: currentUser.username,
-									tasks: selectedTaskNames
-								}
-							];
+							if (userIndex !== -1) {
+								updatedOrganizersViaModal = currentOrganizers.filter(
+									(org) => org.id !== currentUser.id
+								);
+							} else {
+								updatedOrganizersViaModal = currentOrganizers;
+							}
 						}
-					} else {
-						// Si aucune tâche n'est sélectionnée (désinscription de tout)
-						if (userIndex !== -1) {
-							// Retirer l'utilisateur
-							updatedOrganizers = currentOrganizers.filter((org) => org.id !== currentUser.id);
-						} else {
-							// L'utilisateur n'était pas là et n'a rien sélectionné, on ne change rien
-							updatedOrganizers = currentOrganizers;
-						}
+						await this.#updateEventOrganizers(event, updatedOrganizersViaModal);
 					}
-					// Mise à jour de l'événement
-					await this.#updateEventOrganizers(event, updatedOrganizers);
-				}
-			});
-		} else {
-			// Cas 3: Aucune tâche définie pour cet événement (ne rien faire ou logger une erreur?)
-			console.warn(`Aucune tâche définie pour l'événement ${event.id}`);
+				});
+			} else {
+				console.warn(`Aucune tâche définie pour l'événement ${event.id}`);
+			}
 		}
 	}
 
-	// 👉 Méthode privée pour centraliser la mise à jour et la vérification autoConfirm
-	async #updateEventOrganizers(event: EventType, updatedOrganizers: OrganizerType[]) {
+	async #updateEventOrganizers(
+		event: EventType,
+		updatedOrganizers: OrganizerType[],
+		skipAutoConfirm: boolean = false // Nouveau paramètre
+	) {
 		try {
-			// Filtrer les organisateurs sans tâches (au cas où, même si géré avant)
 			const finalOrganizers = updatedOrganizers.filter((org) => org.tasks && org.tasks.length > 0);
 
-			// Vérification pour l'auto-confirmation
 			let shouldAutoConfirm = false;
-			if (event.recurrence?.autoConfirm && Array.isArray(event.tasks)) {
+			// 👉 Vérification pour l'auto-confirmation seulement si skipAutoConfirm est false
+			if (!skipAutoConfirm && event.recurrence?.autoConfirm && Array.isArray(event.tasks)) {
 				shouldAutoConfirm =
 					this.#areAllTasksAssigned(
 						event.tasks.map((task) => task.name),
 						finalOrganizers
-					) && finalOrganizers.length >= (event.recurrence.autoConfirmMin ?? 1); // Utiliser 1 par défaut si non défini
+					) && finalOrganizers.length >= (event.recurrence.autoConfirmMin ?? 1);
 			}
 
-			// Préparer les données à mettre à jour
 			const updateData: Partial<EventType> = {
 				organizers: finalOrganizers
 			};
+			// 👉 Confirmer seulement si shouldAutoConfirm est vrai ET l'événement n'est pas déjà confirmé
 			if (shouldAutoConfirm && !event.isConfirmed) {
 				updateData.isConfirmed = true;
 			}
 
 			await updateEvent(event.id, updateData);
-			// Optionnel: Afficher une notification de succès
 		} catch (error) {
 			console.error('Erreur lors de la mise à jour des organisateurs :', error);
-			// Optionnel: Afficher une notification d'erreur
 		}
 	}
 

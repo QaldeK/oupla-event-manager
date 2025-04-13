@@ -19,8 +19,8 @@
 		organizers: OrganizerType[];
 	}>();
 
-	let selectedOrganizer = $state<UserType | null>(null);
-	let selectedTasks = $state<TaskType[]>([]);
+	let selectedOrganizer = $state<OrganizerType | UserType | null>(null);
+	let selectedTaskNames = $state<string[]>([]);
 	let modalId = 'tasks_select_modal';
 
 	let defaultTask = $derived.by(() => {
@@ -50,20 +50,25 @@
 		return usersToInvite;
 	});
 
-	function handleOrganizer(user: UserType) {
+	// FIXIT: créer un type Member, cohérent avec spaceOptions.members ?
+	function handleOrganizer(user: OrganizerType | UserType) {
 		const isExistingOrganizer = organizers.some((org) => org.id === user.id);
+		const organizerData = isExistingOrganizer ? organizers.find((org) => org.id === user.id) : null;
 
 		if (!hasMultipleTasks) {
 			// Cas simple : une seule tâche possible
+			// S'assurer que uniqTask est bien défini
+			if (!uniqTask && tasks.length > 0) {
+				uniqTask = tasks.find((t) => t.type === 'default')?.name || tasks[0].name;
+			}
+			// Si l'utilisateur existe déjà, on le supprime
 			if (isExistingOrganizer) {
-				// Si l'utilisateur existe déjà, on le supprime
 				organizers = organizers.filter((org) => org.id !== user.id);
 			} else {
 				// Sinon on l'ajoute avec la tâche unique
 				organizers = [
 					...organizers,
 					{
-						email: user.email || '',
 						id: user.id,
 						username: user.username,
 						tasks: [uniqTask]
@@ -74,15 +79,10 @@
 			// Cas avec plusieurs tâches : ouvrir le modal
 			selectedOrganizer = {
 				id: user.id,
-				username: user.username,
-				email: user.email || ''
+				username: user.username
 			};
 			// Si l'utilisateur existe déjà, charger ses tâches
-			selectedTasks = isExistingOrganizer
-				? tasks.filter((task) =>
-						organizers.find((org) => org.id === user.id)?.tasks.includes(task.name)
-					)
-				: [];
+			selectedTaskNames = organizerData?.tasks ?? [];
 
 			const modal = document.getElementById(modalId) as HTMLDialogElement;
 			modal?.showModal();
@@ -94,27 +94,36 @@
 
 		const index = organizers.findIndex((org) => org.id === selectedOrganizer.id);
 		const updatedOrganizer = {
-			email: selectedOrganizer.email || '',
 			id: selectedOrganizer.id,
 			username: selectedOrganizer.username,
-			tasks: selectedTasks.map((task) => task.name)
+			tasks: selectedTaskNames
 		};
 
+		let newOrganizers = [...organizers];
 		if (index !== -1) {
-			// Mise à jour d'un organisateur existant
-			organizers[index] = updatedOrganizer;
-		} else {
-			// Ajout d'un nouvel organisateur
-			organizers = [...organizers, updatedOrganizer];
+			if (updatedOrganizer.tasks.length === 0) {
+				// Si plus de tâches, supprimer l'organisateur
+				newOrganizers.splice(index, 1);
+			} else {
+				// Mise à jour
+				newOrganizers[index] = updatedOrganizer;
+			}
+		} else if (updatedOrganizer.tasks.length > 0) {
+			// Ajout (seulement s'il y a des tâches)
+			newOrganizers.push(updatedOrganizer);
 		}
+		organizers = newOrganizers; // Réaffectation pour déclencher la réactivité
 
-		const modal = document.getElementById(modalId) as HTMLDialogElement;
-		modal?.close();
-		selectedOrganizer = null;
-		selectedTasks = [];
+		closeTaskModal();
 	}
 
-	function removeOrganizer(organizer: OrganizerType) {
+	function closeModalAndRemoveOrganizer() {
+		if (!selectedOrganizer) return;
+		removeOrganizer(selectedOrganizer); // Appeler la fonction de suppression existante
+		closeTaskModal();
+	}
+
+	function removeOrganizer(organizer: OrganizerType | UserType) {
 		organizers = organizers.filter((org) => org.id !== organizer.id);
 	}
 
@@ -123,21 +132,24 @@
 	let showInviteModal = $state(false);
 	const inviteUsers = () => {};
 
+	function closeTaskModal() {
+		const modal = document.getElementById(modalId) as HTMLDialogElement;
+		modal?.close();
+		selectedOrganizer = null;
+		selectedTaskNames = []; // Réinitialiser
+	}
+
 	// Fonction pour éditer les tâches d'un organisateur existant
-	function editOrganizerTasks(organizer: OrganizerType) {
+	function openEditTasksModal(organizer: OrganizerType) {
 		selectedOrganizer = {
 			id: organizer.id,
-			username: organizer.username,
-			email: organizer.email
+			username: organizer.username
 		};
 		// Trouver les objets TaskType correspondant aux noms des tâches de l'organisateur
-		selectedTasks = tasks.filter((task) => organizer.tasks.includes(task.name));
-
+		selectedTaskNames = organizer.tasks;
 		const modal = document.getElementById(modalId) as HTMLDialogElement;
 		modal?.showModal();
 	}
-
-	// saveOrganizer fonctionne maintenant pour ajouter et mettre à jour des organisateurs
 </script>
 
 <div transition:fade class="flex flex-col space-y-3">
@@ -154,7 +166,10 @@
 
 	<div class="flex flex-wrap gap-3">
 		{#each organizers as organizer (organizer.id)}
-			<div class={{ tooltip: hasMultipleTasks }} data-tip={hasMultipleTasks ? organizer.tasks : ''}>
+			<div
+				class={{ tooltip: hasMultipleTasks }}
+				data-tip={hasMultipleTasks ? organizer.tasks.join(', ') : ''}
+			>
 				<button
 					type="button"
 					transition:slide
@@ -210,25 +225,15 @@
 			Gestion des mandats pour {selectedOrganizer?.username}
 		</h3>
 
-		<TaskSelect taskOptions={tasks} bind:selectedTasks />
+		<TaskSelect taskOptions={tasks} bind:selectedTaskNames />
 
 		<div class="modal-action">
-			<form method="dialog" class="flex gap-2">
-				<button
-					type="button"
-					class="btn btn-error"
-					onclick={() => {
-						removeOrganizer(selectedOrganizer);
-						const modal = document.getElementById(modalId) as HTMLDialogElement;
-						modal?.close();
-					}}
-				>
-					<UserMinus />
-					Désinscrire
-				</button>
-				<button class="btn">Annuler</button>
-				<button type="button" class="btn btn-primary" onclick={saveOrganizer}> Enregistrer </button>
-			</form>
+			<button type="button" class="btn btn-error" onclick={closeModalAndRemoveOrganizer}>
+				<UserMinus />
+				Désinscrire
+			</button>
+			<button onclick={closeTaskModal} class="btn">Annuler</button>
+			<button type="button" class="btn btn-primary" onclick={saveOrganizer}> Enregistrer </button>
 		</div>
 	</div>
 </dialog>
