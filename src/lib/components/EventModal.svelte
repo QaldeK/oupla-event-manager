@@ -325,6 +325,13 @@
 				}
 			};
 
+			if (
+				eventMode === 'EDIT_RECURRENT_ALL' ||
+				(eventMode === 'NEW_RECURRENT' && eventData.recurrence)
+			) {
+				eventData.recurrence.tasks = eventData.tasks;
+			}
+
 			const validationResult = validateEvent(eventData, schema());
 
 			if (!validationResult.success && validationResult.errors) {
@@ -567,9 +574,10 @@
 					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
 				{/if}
 			</Frame>
+			<!-- Cas 2 : Si MasterEvent d'un événement récurrent -->
 		{:else}
 			<Frame title="Organisateur·ices">
-				<p class="mb-2">
+				<p class="text-fluid-sm mb-4">
 					Ajoutez les personnes qui participent à organiser ces événements récurrents (celles et
 					ceux qui pourront s'inscrire sur l'organisation des occurrences de chaque événement)
 				</p>
@@ -579,7 +587,7 @@
 					optionsLabel="username"
 				/>
 				<button
-					class="text-fluid-sm p-2 text-blue-700 hover:text-blue-600 hover:underline"
+					class="btn btn-link"
 					onclick={() => {
 						if (eventData.recurrence) {
 							eventData.recurrence.recurrenceTeam = organizersPossibles;
@@ -603,7 +611,7 @@
 						}
 					}}
 				>
-					> ajoutez tout le monde
+					→ ajoutez tout le monde
 				</button>
 				{#if errors.organizers}
 					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
