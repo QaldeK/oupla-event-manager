@@ -3,13 +3,9 @@
 	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
 	import type { EventType } from '$lib/types/event';
 	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from '$lib/utils';
-	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
 	import { updateEvent } from '$lib/pocketbase.svelte';
 	import type { DateProposedType } from '$lib/schemas/event.schema';
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import { eventState, modalState } from '$lib/shared/states.svelte';
-
-	import { Moon } from 'lucide-svelte';
 
 	let eventData = $state<EventType>({ ...eventState.is });
 

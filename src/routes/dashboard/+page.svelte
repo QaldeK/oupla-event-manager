@@ -70,7 +70,7 @@
 	{:else}
 		<div>
 			<h1 class="mb-6 text-2xl font-semibold">Tableau de bord</h1>
-			<div class="flex flex-col gap-8 xl:w-3/5">
+			<div class="flex flex-col gap-8">
 				<ConflictsEvents />
 
 				{#if userEvents.length > 0}

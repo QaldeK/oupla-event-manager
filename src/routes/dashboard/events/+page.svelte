@@ -65,7 +65,7 @@
 
 <div>
 	<h1 class="mb-4 text-2xl">{eventsPageTitle}</h1>
-	<div class="flex flex-col gap-6 xl:w-3/5">
+	<div class="flex flex-col gap-6">
 		{#each filteredEvents as currentEvent (currentEvent.id)}
 			<EventCard {currentEvent} />
 		{/each}
