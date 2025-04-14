@@ -40,7 +40,7 @@
 
 	import { slide } from 'svelte/transition';
 
-	import { Save, X } from 'lucide-svelte';
+	import { Save, UserPlus, X } from 'lucide-svelte';
 	import TimeReservation from './forModal/TimeReservation.svelte';
 
 	const closeModal = () => {
@@ -52,7 +52,8 @@
 	let eventData = $state<EventType>({ ...(eventState.is as EventType) });
 	let rooms: string[] = getSpace.rooms;
 	let categories: string[] = getSpace.categories;
-	let organizersPossibles = $state(getOrganizersPossibles());
+	let spaceMembers = $derived(getOrganizersPossibles());
+	let organizersPossibles = $state(spaceMembers);
 	let showAddTaskForm = $state(false);
 
 	type EventMode =
@@ -191,9 +192,6 @@
 				new Set([...(eventData.recurrence?.recurrenceTeam || []), ...(eventData.organizers || [])])
 			);
 		} else if (eventMode === 'EDIT_RECURRENT_ALL') {
-			// Créer un Map pour éliminer les doublons basé sur l'ID
-
-			// Ajouter/écraser avec les organisateurs existants
 			(eventData.organizers || []).forEach((user) => {
 				organizersPossibles = (user.id, user);
 			});
@@ -597,6 +595,7 @@
 					options={organizersPossibles}
 					bind:selectedItems={eventData.recurrence.recurrenceTeam}
 					optionsLabel="username"
+					Icon={UserPlus}
 				/>
 				<button
 					class="btn btn-outline btn-primary btn-compact mt-4"
