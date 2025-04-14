@@ -64,8 +64,8 @@
 
 <Modal>
 	<div class="">
-		<h3 class="text-fluid-lg font-bold">{title}</h3>
-		<div class="py-4">
+		<h3 class="text-fluid-lg font-bold not-sm:text-center">{title}</h3>
+		<div class="p-4">
 			<div class="flex items-start gap-4">
 				<div class={`flex-shrink-0 self-center ${getIconColor()}`}>
 					{#if variant === 'warning'}
@@ -86,7 +86,7 @@
 			<!-- 👉 Affichage conditionnel de la checkbox -->
 			{#if checkboxConfig}
 				<div class="mt-4">
-					<label class="flex cursor-pointer items-center">
+					<label class="flex cursor-pointer items-center justify-end">
 						<input type="checkbox" bind:checked={notifyOthers} class="checkbox checkbox-sm" />
 						<span class="label-text ml-2">{checkboxConfig.label}</span>
 					</label>

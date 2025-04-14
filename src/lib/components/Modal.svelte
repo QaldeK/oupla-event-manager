@@ -26,7 +26,7 @@
 	transition:fade={{ duration: 150 }}
 >
 	<div
-		class="bg-base-100 relative mx-auto max-h-dvh w-full max-w-6xl overflow-y-auto rounded-xl p-2 shadow-lg md:max-h-[calc(100dvh-2rem)] md:p-6"
+		class="bg-base-100 relative max-h-dvh w-full max-w-6xl overflow-y-auto rounded-xl p-2 shadow-lg sm:mx-auto md:mx-4 md:max-h-[calc(100dvh-2rem)] md:p-6"
 	>
 		{@render children?.()}
 	</div>
