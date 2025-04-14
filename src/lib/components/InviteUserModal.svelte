@@ -3,6 +3,7 @@
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import { modalState } from '$lib/shared/states.svelte';
 	import { showAlert } from '$lib/shared/states.svelte';
+	import { fade } from 'svelte/transition';
 
 	// États réactifs avec $state
 	let email = $state('qk-oupla@gmx.com');
@@ -78,7 +79,10 @@
 	}
 </script>
 
-<div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+<div
+	transition:fade={{ duration: 150 }}
+	class=" fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+>
 	<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
 		<h2 class="mb-4 text-xl font-bold">Inviter un utilisateur</h2>
 
@@ -126,19 +130,11 @@
 			{/if}
 
 			<div class="flex justify-end space-x-3 pt-4">
-				<button
-					type="button"
-					class="text-fluid-sm rounded-md bg-gray-200 px-4 py-2 font-medium text-gray-700 hover:bg-gray-300"
-					onclick={() => (modalState.inviteUser = false)}
-				>
-					Fermer
+				<button type="button" class="btn" onclick={() => (modalState.inviteUser = false)}>
+					Annuler
 				</button>
 				{#if !invitationLink}
-					<button
-						type="submit"
-						class="text-fluid-sm rounded-md bg-blue-500 px-4 py-2 font-medium text-white hover:bg-blue-600 disabled:opacity-50"
-						disabled={isLoading}
-					>
+					<button type="submit" class="btn btn-primary" disabled={isLoading}>
 						{isLoading ? 'Création...' : "Créer l'invitation"}
 					</button>
 				{/if}

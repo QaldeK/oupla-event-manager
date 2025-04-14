@@ -474,10 +474,10 @@
 							<!-- Section du bas -->
 							<ul class="menu menu-lg rounded-box bg-base-100 mt-4">
 								<li>
-									<a href="/" onclick={() => (modalState.inviteUser = true)}>
+									<button onclick={() => (modalState.inviteUser = true)}>
 										<UserPlus size={24} />
 										<span class:hidden={sidebarState.isCompact}>Inviter</span>
-									</a>
+									</button>
 								</li>
 								<li>
 									<a
