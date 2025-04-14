@@ -5,8 +5,7 @@
 	import GroupCheckBox from '$lib/components/GroupCheckBox.svelte';
 	import Info from '$lib/components/Info.svelte';
 	import AutoConfirmSettings from '$lib/components/forModal/AutoConfirmSettings.svelte';
-	import TaskSelect from '$lib/components/forModal/TaskSelect.svelte';
-
+	import AddTaskForm from '$lib/components/forModal/AddTaskForm.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Quill from '$lib/components/Quill.svelte';
 	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
@@ -53,8 +52,8 @@
 	let eventData = $state<EventType>({ ...(eventState.is as EventType) });
 	let rooms: string[] = getSpace.rooms;
 	let categories: string[] = getSpace.categories;
-	let isAlertDialogOpen = $state<boolean>(false);
 	let organizersPossibles = $state(getOrganizersPossibles());
+	let showAddTaskForm = $state(false);
 
 	type EventMode =
 		| 'NEW_SINGLE' // Création événement unique
@@ -132,29 +131,27 @@
 	// ::: tasks & organizers
 
 	let tasksPossibles = $derived.by<TaskType[]>(() => {
-		// Récupérer les tâches de base selon le mode
-		const baseTasks = () => {
-			switch (eventMode) {
-				case 'NEW_SINGLE':
-				case 'NEW_RECURRENT':
-					return getSpace.tasks || [];
-				case 'EDIT_SINGLE':
-				case 'EDIT_RECURRENT_ALL':
-					return [...(getSpace.tasks || []), ...eventData.tasks];
-				case 'EDIT_RECURRENT_ONE':
-					return [...(eventData.recurrence?.tasks || []), ...eventData.tasks];
-				default:
-					return getSpace.tasks;
+		let potentialTasks: TaskType[] = [];
+
+		potentialTasks = [...(getSpace.tasks || [])];
+
+		potentialTasks = [...potentialTasks, ...(eventData.tasks || [])];
+
+		// 3. Pour l'édition d'une occurrence, ajouter aussi les tâches de la récurrence parente
+		if (eventMode === 'EDIT_RECURRENT_ONE' && eventData.recurrence?.tasks) {
+			potentialTasks = [...potentialTasks, ...eventData.recurrence.tasks];
+		}
+
+		// 4. Éliminer les doublons en se basant sur le nom
+		const uniqueTasksMap = new Map<string, TaskType>();
+		potentialTasks.forEach((task) => {
+			// Vérifier si la tâche et son nom existent avant d'ajouter à la map
+			if (task?.name && !uniqueTasksMap.has(task.name)) {
+				uniqueTasksMap.set(task.name, task);
 			}
-		};
+		});
 
-		// Fusionner toutes les tâches
-		const allTasks = baseTasks();
-
-		// Éliminer les doublons en se basant sur le nom
-		return allTasks.filter(
-			(task, index, self) => index === self.findIndex((t) => t.name === task.name)
-		) as TaskType[];
+		return Array.from(uniqueTasksMap.values());
 	});
 
 	let tasksLabel = $derived.by(() => {
@@ -205,22 +202,23 @@
 
 	// ::: functions utilities
 
-	function addCustomTask(newTaskName: string) {
-		if (newTaskName === '' || !eventData.tasks) return;
+	//  gérer l'ajout depuis AddTaskForm
+	function handleAddTask(newTask: TaskType) {
+		if (!eventData.tasks) {
+			eventData.tasks = []; // Initialise si undefined
+		}
 
-		// Vérifier si la tâche existe déjà dans le tableau
-		const taskExists = eventData.tasks.some((task) => task.name === newTaskName);
+		// Vérifier si une tâche avec le même nom existe déjà
+		const taskExists = eventData.tasks.some((task) => task.name === newTask.name);
 
 		if (!taskExists) {
-			// Créer un nouvel objet TaskType
-			const newTask: TaskType = {
-				name: newTaskName,
-				description: 'Tâche personnalisée',
-				type: 'none'
-			};
-
-			// Ajouter l'objet TaskType
-			eventData.tasks = [...(eventData.tasks || []), newTask];
+			// Ajouter la nouvelle tâche construite par AddTaskForm
+			eventData.tasks = [...eventData.tasks, newTask];
+			showAddTaskForm = false; // Masquer le formulaire après l'ajout
+			showAlert(`Tâche "${newTask.name}" ajoutée.`, 'success', 1500);
+		} else {
+			// Afficher une alerte si la tâche existe déjà (géré dans AddTaskForm mais double sécurité)
+			showAlert(`Une tâche nommée "${newTask.name}" existe déjà.`, 'error');
 		}
 	}
 
@@ -539,26 +537,40 @@
 			<div class="mb-2 block font-medium">
 				{tasksLabel}
 			</div>
-			<TaskSelect
-				taskOptions={tasksPossibles}
-				bind:selectedTasks={eventData.tasks}
-				hasAddInput={true}
-				onadd={addCustomTask}
+			<ButtonGroupSelect
+				options={tasksPossibles}
+				bind:selectedItems={eventData.tasks}
+				optionsLabel="name"
 			/>
-			<button
-				class="link link-primary ms-4"
-				onclick={() => {
-					// Ajouter toutes les tâches de l'espace
-					const allTasks = [...(eventData.tasks || []), ...getSpace.tasks];
 
-					// Éliminer les doublons par nom
-					eventData.tasks = allTasks.filter(
-						(task, index, self) => index === self.findIndex((t) => t.name === task.name)
-					);
-				}}
-			>
-				> ajoutez tous les rôles
-			</button>
+			<div class="mt-4 flex flex-wrap gap-4">
+				{#if !showAddTaskForm}
+					<button
+						class="btn btn-outline btn-primary btn-compact"
+						onclick={() => (showAddTaskForm = true)}
+					>
+						+ Ajouter une tâche personnalisée
+					</button>
+				{:else}
+					<!-- 👉 Affiche le formulaire d'ajout de tâche -->
+					<AddTaskForm onAddTask={handleAddTask} onCancel={() => (showAddTaskForm = false)} />
+				{/if}
+
+				<button
+					class="btn btn-outline btn-primary btn-compact"
+					onclick={() => {
+						// Ajouter toutes les tâches de l'espace
+						const allTasks = [...(eventData.tasks || []), ...getSpace.tasks];
+
+						// Éliminer les doublons par nom
+						eventData.tasks = allTasks.filter(
+							(task, index, self) => index === self.findIndex((t) => t.name === task.name)
+						);
+					}}
+				>
+					ajoutez tous les rôles
+				</button>
+			</div>
 		</Frame>
 
 		{#if eventMode !== 'NEW_RECURRENT' && eventMode !== 'EDIT_RECURRENT_ALL'}
@@ -587,27 +599,10 @@
 					optionsLabel="username"
 				/>
 				<button
-					class="btn btn-link"
+					class="btn btn-outline btn-primary btn-compact mt-4"
 					onclick={() => {
 						if (eventData.recurrence) {
 							eventData.recurrence.recurrenceTeam = organizersPossibles;
-						} else {
-							// Si recurrence n'existe pas encore, l'initialiser
-							eventData.recurrence = {
-								firstDate: '',
-								lastDate: '',
-								recurrenceDates: [],
-								recurrenceType: '',
-								monthlyByDayOccurrences: [],
-								recurrenceTeam: organizersPossibles,
-								tasks: [],
-								autoConfirm: false,
-								autoConfirmMin: 1,
-								notifyNoOrganizer: false,
-								notifyNoOrganizerDays: 1,
-								notifyNotConfirmed: false,
-								notifyNotConfirmedDays: 1
-							};
 						}
 					}}
 				>

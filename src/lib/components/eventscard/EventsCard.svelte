@@ -296,7 +296,7 @@
 						{#if hasRooms}
 							<div class="text-base-content/70 font-medium">
 								<span class="text-fluid-sm">salle·s :</span>
-								{#each currentEvent.rooms as room, index (index)}
+								{#each currentEvent.rooms as room, index (room)}
 									{#if room && room.trim() !== ''}
 										<span class="text-md text-base-content">
 											{room}{index <
@@ -572,7 +572,7 @@
 									<!-- tasks card -->
 									{#if currentEvent.tasks && currentEvent.tasks.length > 1}
 										<div class="sm:grid sm:grid-cols-3 sm:justify-around sm:gap-4 sm:p-4">
-											{#each currentEvent.tasks as task (task.name)}
+											{#each currentEvent.tasks as task, index (index)}
 												{@const organizersForTask = currentEvent.organizers.filter((org) =>
 													org.tasks.includes(task.name)
 												)}
@@ -651,7 +651,7 @@
 								<div class=" text-base-content/70 p-2">
 									<p class="text-fluid-xs">
 										Mandats à se répartir pour la gestion de l'événement : <span class="italic">
-											{#each currentEvent.tasks as task, index (index)}
+											{#each currentEvent.tasks as task, index (task.id)}
 												{task.name}{index < currentEvent.tasks.length - 1 ? ', ' : ''}
 											{/each}
 										</span>

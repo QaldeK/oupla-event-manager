@@ -3,12 +3,10 @@
 		selectedItems = $bindable(),
 		options = $bindable(),
 		optionsLabel = '',
-		hasAddInput = false,
-		defaultOption = '',
-		onadd = () => {}
+		defaultOption = ''
 	} = $props();
 
-	const isSelected = (option: any) => {
+	const isSelected = (option) => {
 		if (!selectedItems) return false;
 		if (optionsLabel) {
 			return selectedItems.some((item) => item[optionsLabel] === option[optionsLabel]);
@@ -34,7 +32,7 @@
 </script>
 
 <div class="flex w-full flex-wrap items-center gap-2">
-	{#each options as option (option)}
+	{#each options as option, index (index)}
 		<button
 			class="btn btn-compact {isSelected(option) ? 'btn-accent' : ' btn-dash '}"
 			onclick={() => toggleItem(option)}
@@ -47,18 +45,3 @@
 		</button>
 	{/each}
 </div>
-
-{#if hasAddInput}
-	<div class="join mt-4">
-		<input id="inputId" type="text" placeholder="Ajouter un rôle" class="input join-item w-64" />
-		<button
-			onclick={() => {
-				onadd(inputId.value);
-				inputId.value = '';
-			}}
-			class="join-item btn btn-primary"
-		>
-			Ajouter
-		</button>
-	</div>
-{/if}

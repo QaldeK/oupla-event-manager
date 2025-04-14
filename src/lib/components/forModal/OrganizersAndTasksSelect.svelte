@@ -1,5 +1,4 @@
 <script lang="ts">
-	import TaskSelect from '$lib/components/forModal/TaskSelect.svelte';
 	import { getSpace } from '$lib/shared/spaceOptions.svelte';
 	import type { UserType, OrganizerType, TaskType } from '$lib/types/types';
 	import { cn } from '$lib/utils';
@@ -20,7 +19,7 @@
 	}>();
 
 	let selectedOrganizer = $state<OrganizerType | UserType | null>(null);
-	let selectedTaskNames = $state<string[]>([]);
+	let selectedTasks = $state<TaskType[]>([]);
 	let modalId = 'tasks_select_modal';
 
 	let defaultTask = $derived.by(() => {
@@ -82,7 +81,7 @@
 				username: user.username
 			};
 			// Si l'utilisateur existe déjà, charger ses tâches
-			selectedTaskNames = organizerData?.tasks ?? [];
+			selectedTasks = tasks.filter((task) => organizerData?.tasks?.includes(task.name));
 
 			const modal = document.getElementById(modalId) as HTMLDialogElement;
 			modal?.showModal();
@@ -93,22 +92,24 @@
 		if (!selectedOrganizer) return;
 
 		const index = organizers.findIndex((org) => org.id === selectedOrganizer.id);
+		const taskNamesToSave = selectedTasks.map((task) => task.name);
+
 		const updatedOrganizer = {
 			id: selectedOrganizer.id,
 			username: selectedOrganizer.username,
-			tasks: selectedTaskNames
+			tasks: taskNamesToSave
 		};
 
 		let newOrganizers = [...organizers];
 		if (index !== -1) {
-			if (updatedOrganizer.tasks.length === 0) {
+			if (taskNamesToSave.length === 0) {
 				// Si plus de tâches, supprimer l'organisateur
 				newOrganizers.splice(index, 1);
 			} else {
 				// Mise à jour
 				newOrganizers[index] = updatedOrganizer;
 			}
-		} else if (updatedOrganizer.tasks.length > 0) {
+		} else if (taskNamesToSave.length > 0) {
 			// Ajout (seulement s'il y a des tâches)
 			newOrganizers.push(updatedOrganizer);
 		}
@@ -136,19 +137,7 @@
 		const modal = document.getElementById(modalId) as HTMLDialogElement;
 		modal?.close();
 		selectedOrganizer = null;
-		selectedTaskNames = []; // Réinitialiser
-	}
-
-	// Fonction pour éditer les tâches d'un organisateur existant
-	function openEditTasksModal(organizer: OrganizerType) {
-		selectedOrganizer = {
-			id: organizer.id,
-			username: organizer.username
-		};
-		// Trouver les objets TaskType correspondant aux noms des tâches de l'organisateur
-		selectedTaskNames = organizer.tasks;
-		const modal = document.getElementById(modalId) as HTMLDialogElement;
-		modal?.showModal();
+		selectedTasks = [];
 	}
 </script>
 
@@ -225,10 +214,14 @@
 			Gestion des mandats pour {selectedOrganizer?.username}
 		</h3>
 
-		<TaskSelect taskOptions={tasks} bind:selectedTaskNames />
+		<ButtonGroupSelect options={tasks} bind:selectedItems={selectedTasks} optionsLabel="name" />
 
 		<div class="modal-action">
-			<button type="button" class="btn btn-error" onclick={closeModalAndRemoveOrganizer}>
+			<button
+				type="button"
+				class="btn btn-error {selectedTasks.length === 0 && 'hidden'}"
+				onclick={closeModalAndRemoveOrganizer}
+			>
 				<UserMinus />
 				Désinscrire
 			</button>

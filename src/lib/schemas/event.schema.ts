@@ -147,6 +147,7 @@ export type ProposalType = z.infer<typeof ProposalSchema>;
 export type ExternalProposalType = z.infer<typeof ExternalProposalSchema>;
 export type TaskType = z.infer<typeof TaskSchema>;
 
+export type TasktypeType = z.infer<typeof TaskSchema.shape.type>;
 // === SCHÉMA DE FORMULAIRE PRINCIPAL ===
 // Ce schéma définit les contraintes de validation pour l'interface utilisateur
 const BaseEventFormSchema = z.object({
