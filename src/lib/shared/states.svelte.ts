@@ -65,7 +65,7 @@ export const modalState = $state<ModalStateType>({
 			title: '',
 			message: '',
 			variant: 'info',
-			onConfirm: null as ((notifyOthers?: boolean) => void) | null
+			onConfirm: null as ((notifyOthers?: boolean, customMessage?: string) => void) | null
 		}
 	}
 });

@@ -210,6 +210,7 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 					...eventData.recurrence,
 					tasks: eventData.tasks
 				},
+				organizers: [], // XXX : les organisateurs des occurrences sont vide par default, et ne correspondent pas a la recurrenceTeam
 				dateStart,
 				dateEnd
 			};
@@ -302,6 +303,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			.map((date) => ({
 				...baseOccurrenceData,
 				date_event: date,
+				organizers: [],
 				dateStart: createDateFromString(date, masterEvent.time_start).toISOString(),
 				dateEnd: createDateFromString(date, masterEvent.time_end).toISOString()
 			}));
@@ -642,27 +644,45 @@ export async function checkAndCleanLock(
 }
 
 // XXX ? Dans $lib/types/notifications.ts ?
-export interface NotificationPayload {
-	eventId: string;
-	notificationType: 'organizerLeft'; // Peut être étendu
-	leavingUserId: string;
-	leavingUsername: string;
-	taskName?: string; // Nom de la tâche quittée
-	// Ajoutez d'autres champs si nécessaire pour d'autres types de notifs
+export interface GenericEmailPayload {
+	subject: string;
+	htmlContent: string;
+	textContent?: string; // Optionnel
+	recipients?: string[]; // Emails explicites
+	recipientGroups?: ('otherOrganizers' | 'recurrenceTeam' | 'spaceAdmins' | 'systemAdmins')[]; // Mots-clés
+	fallbackRecipientGroups?: (
+		| 'otherOrganizers'
+		| 'recurrenceTeam'
+		| 'spaceAdmins'
+		| 'systemAdmins'
+	)[];
+	context?: {
+		eventId?: string;
+		spaceId?: string;
+		excludeUserId?: string;
+		// Autres données contextuelles si nécessaire
+	};
 }
 
-export async function sendNotification(payload: NotificationPayload): Promise<void> {
+export async function sendGenericEmail(payload: GenericEmailPayload): Promise<void> {
 	try {
-		await pb.send('/api/send_notification', {
+		console.log('Payload being sent to /api/send_email:', JSON.stringify(payload, null, 2));
+		// Appel de la nouvelle route backend
+		await pb.send('/api/send_email', {
 			method: 'POST',
-			body: JSON.stringify(payload),
+			body: payload,
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
-	} catch (error) {
-		console.error('Failed to send notification:', error);
-		// Gérer l'erreur comme vous le souhaitez (ex: Sentry, toast user)
-		throw error; // Propager l'erreur si nécessaire
+		console.log('Generic email request sent successfully.');
+	} catch (error: any) {
+		console.error('Failed to send generic email:', error);
+		// Afficher plus de détails si disponibles
+		if (error?.response) {
+			console.error('PocketBase error response:', error.response);
+		}
+		// Gérer l'erreur (Sentry, toast, etc.)
+		throw error; // Propager
 	}
 }
