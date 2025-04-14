@@ -1,21 +1,12 @@
 <script lang="ts">
 	// import { Icon } from 'lucide-svelte';
-	import type { Component } from 'svelte';
-
-	interface Props {
-		selectedItems?: any[];
-		options?: any[];
-		optionsLabel?: string;
-		defaultOption?: any;
-		Icon?: Component;
-	}
 
 	let {
 		selectedItems = $bindable(),
-		options = $bindable(),
+		options,
 		optionsLabel = '',
 		defaultOption = '',
-		Icon
+		Icon = null
 	} = $props();
 
 	const isSelected = (option) => {
