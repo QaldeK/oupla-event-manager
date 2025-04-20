@@ -46,7 +46,7 @@
 </script>
 
 <div class="p-4">
-	<div class="flex flex-wrap gap-3">
+	<div class="flex flex-wrap gap-4">
 		{#each benevolesList as benevole (benevole)}
 			<div
 				class="flex items-center justify-between rounded-lg border border-gray-200 bg-white shadow-sm"
@@ -56,7 +56,7 @@
 					<GroupRadioButton
 						value={organizers.find((org) => org.id === benevole.id)?.maybehere || ''}
 						onChange={(newValue) => handleMaybehereChange(benevole, newValue)}
-						size="icon_sm"
+						size="btn-sm"
 					/>
 				</div>
 			</div>

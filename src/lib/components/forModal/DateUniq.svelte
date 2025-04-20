@@ -11,17 +11,18 @@
 	import DatePicker from './DatePicker.svelte';
 	import TimeReservation from './TimeReservation.svelte';
 
-	let { localErrors, eventData = $bindable<EventType>({} as EventType) } = $props();
-
-	let dateTimeStart = $derived.by(() => {
-		if (!eventData.date_event || !eventData.time_start) return null;
-		return eventData.date_event.replace(/-/g, '') + eventData.time_start.replace(/:/g, '');
-	});
-
-	let dateTimeEnd = $derived.by(() => {
-		if (!eventData.date_event || !eventData.time_end) return null;
-		return eventData.date_event.replace(/-/g, '') + eventData.time_end.replace(/:/g, '');
-	});
+	interface Props {
+		localErrors: unknown;
+		eventData: EventType;
+		startDateObject: Date | null;
+		endDateObject: Date | null;
+	}
+	let {
+		localErrors,
+		eventData = $bindable<EventType>({} as EventType),
+		startDateObject,
+		endDateObject
+	}: Props = $props();
 
 	// Fonction de transition vers le mode sondage
 	function switchToSondage() {
@@ -29,9 +30,8 @@
 		eventData.date_event = '';
 		if (eventData.dates_proposed?.length === 0) {
 			// Initialiser avec la date actuelle si disponible
-			const currentDate = eventData.date_event;
-			if (currentDate && eventData.time_start && eventData.time_end) {
-				addDateProposal(currentDate, eventData.time_start, eventData.time_end);
+			if (eventData.date_event && eventData.time_start && eventData.time_end) {
+				addDateProposal(eventData.date_event, eventData.time_start, eventData.time_end);
 			}
 		}
 	}
@@ -88,7 +88,7 @@
 				label="Date de l'événement"
 			/>
 
-			{#if localErrors.date_event}
+			{#if localErrors && localErrors.date_event}
 				<p class="text-fluid-sm p-2 text-red-500 italic">{localErrors.date_event}</p>
 			{/if}
 		</div>
@@ -123,11 +123,11 @@
 	{/if}
 
 	<TimeReservation {localErrors} bind:eventData />
-	{#if eventData.date_event && dateTimeStart && dateTimeEnd}
+	{#if startDateObject && endDateObject}
 		<ConflictAlert
 			eventId={eventData.id}
-			{dateTimeStart}
-			{dateTimeEnd}
+			startDate={startDateObject}
+			endDate={endDateObject}
 			rooms={eventData.rooms || []}
 		/>
 	{/if}

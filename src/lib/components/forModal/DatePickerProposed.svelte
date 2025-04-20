@@ -1,22 +1,20 @@
 <script lang="ts">
-	import ConflictAlert from '$lib/components/ConflictAlert.svelte';
 	import Info from '$lib/components/Info.svelte';
 	import TimePickRange from '$lib/components/TimePickRange.svelte';
 	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
-	import OrganizersSelect from '$lib/components/forModal/OrganizersSelect.svelte';
 	import ProposedDateCard from './ProposedDateCard.svelte';
-	import type { EventType, OrganizerType } from '$lib/types/event';
-	import { addTime, formatDatePb, formatTimePb, lisibleDate, lisibleTime } from '$lib/utils';
+	import type { EventType } from '$lib/types/event';
+	import { addTime, lisibleDate } from '$lib/utils';
 	import { eventState } from '$lib/shared/states.svelte';
 	import type { DateProposedType } from '$lib/schemas/event.schema';
 
 	import { fade } from 'svelte/transition';
 
-	import { CalendarCheck, PlusCircle, Trash2 } from 'lucide-svelte';
+	import { CalendarCheck, PlusCircle } from 'lucide-svelte';
 
 	// ::: props
-	let { localErrors = {}, eventData = $bindable<EventType | null>(null) } = $props<{
-		localErrors: Record<string, string[] | undefined>;
+	let { localErrors = {}, eventData } = $props<{
+		localErrors?: Record<string, string[] | undefined>;
 		eventData: EventType | null;
 	}>();
 
@@ -45,6 +43,8 @@
 	// ::: $effects
 
 	$effect(() => {
+		if (!eventId || !eventData.dates_proposed) return;
+
 		const today = new Date();
 		oldDatesProposed = eventData.dates_proposed.filter((date) => new Date(date.dateStart) < today);
 		datesFutureProposed = eventData.dates_proposed

@@ -60,16 +60,33 @@
 			</div>
 
 			<!-- Organisateurs et tâches -->
-			<div class="mt-2 flex flex-wrap items-center gap-2">
+			<div class="my-2 flex flex-wrap items-center gap-2">
 				{#if currentUserTasks.length > 0}
 					<div class="text-fluid-sm">Vos taches:</div>
 					{#each currentUserTasks as taskName (taskName)}
-						<div class="badge badge-accent badge-soft font-semibold">
+						<div class="badge badge-primary badge-soft font-semibold">
 							{taskName}
 						</div>
 					{/each}
 				{:else if isCurrentUserSubscribed()}
 					<div class="badge badge-warning badge-soft font-semibold">Aucune tâche assignée</div>
+				{/if}
+			</div>
+			<div>
+				{#if event.organizers.length > 1}
+					<span>Avec:</span>
+					{#each event.organizers as organizer (organizer.id)}
+						<div
+							class="badge badge-soft badge-accent me-2 font-semibold {organizer.username ===
+								currentUser.username && 'hidden'}"
+						>
+							{organizer.username}
+						</div>
+					{/each}
+				{:else}
+					<span class="text-fluid-sm text-base-content/80"
+						>pas d'autre organisateur·ice pour le moment</span
+					>
 				{/if}
 			</div>
 		</div>

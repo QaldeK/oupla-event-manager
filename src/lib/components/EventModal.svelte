@@ -36,25 +36,12 @@
 		modalState,
 		showAlert
 	} from '$lib/shared/states.svelte';
-	import { createDateFromString, lisibleDate } from '$lib/utils';
+	import { createDateFromString, lisibleDate, isValidDate } from '$lib/utils';
 
 	import { slide } from 'svelte/transition';
 
 	import { Save, UserPlus, X } from 'lucide-svelte';
 	import TimeReservation from './forModal/TimeReservation.svelte';
-
-	const closeModal = () => {
-		modalState.event = false;
-		eventState.is = { ...getNewEvent() };
-	};
-
-	// ::: Data et Etat réactif
-	let eventData = $state<EventType>({ ...(eventState.is as EventType) });
-	let rooms: string[] = getSpace.rooms;
-	let categories: string[] = getSpace.categories;
-	let spaceMembers = $derived(getOrganizersPossibles());
-	let organizersPossibles = $state(spaceMembers);
-	let showAddTaskForm = $state(false);
 
 	type EventMode =
 		| 'NEW_SINGLE' // Création événement unique
@@ -88,6 +75,48 @@
 		return 'DATE';
 	});
 
+	// ::: Data et Etat réactif
+	let eventData = $state<EventType>({ ...(eventState.is as EventType) });
+	let rooms: string[] = getSpace.rooms;
+	let categories: string[] = getSpace.categories;
+	let spaceMembers = $derived(getOrganizersPossibles());
+	let showAddTaskForm = $state(false);
+
+	let organizersPossibles = $derived.by(() => {
+		// Commencez avec les membres de l'espace par défaut
+		let possible = [...spaceMembers];
+
+		if (eventMode === 'EDIT_RECURRENT_ONE') {
+			const combined = [
+				...(eventData.recurrence?.recurrenceTeam || []),
+				...(eventData.organizers || [])
+			];
+
+			const uniqueMap = new Map(combined.map((org) => [org.id, org]));
+			return Array.from(uniqueMap.values());
+		} else if (eventMode === 'EDIT_RECURRENT_ALL') {
+			// Ajoutez les organisateurs déjà sur le master event
+
+			possible = [
+				...possible,
+				...(eventData.organizers || []),
+				...(eventData.recurrence?.recurrenceTeam || [])
+			];
+
+			// Éliminer les doublons basés sur l'ID
+			const uniqueOrganizers = new Map();
+			possible.forEach((user) => {
+				if (user?.id && !uniqueOrganizers.has(user.id)) {
+					uniqueOrganizers.set(user.id, user);
+				}
+			});
+			return Array.from(uniqueOrganizers.values());
+		}
+
+		// Pour NEW_SINGLE, NEW_RECURRENT, EDIT_SINGLE, ce sont juste les spaceMembers
+		return spaceMembers;
+	});
+
 	const modalTitle = $derived.by(() => {
 		switch (eventMode) {
 			case 'NEW_SINGLE':
@@ -113,21 +142,8 @@
 
 	let hasExternalPreference = $derived.by(() => !!eventData.external_proposal?.period_preference);
 
-	// ::: $effect
-
-	$effect(() => {
-		if (eventData.date_event && eventData.time_start && eventData.time_end) {
-			const startDate = createDateFromString(eventData.date_event, eventData.time_start);
-			const endDate = createDateFromString(eventData.date_event, eventData.time_end);
-
-			eventData.dateStart = startDate.toISOString();
-			eventData.dateEnd = endDate.toISOString();
-		} else {
-			// Reset les dates si une des valeurs manque
-			eventData.dateStart = '';
-			eventData.dateEnd = '';
-		}
-	});
+	let startDateObject = $state<Date | null>(null);
+	let endDateObject = $state<Date | null>(null);
 
 	// ::: tasks & organizers
 
@@ -168,6 +184,39 @@
 		}
 	});
 
+	// ::: $effect
+
+	$effect(() => {
+		if (eventData.date_event && eventData.time_start && eventData.time_end) {
+			try {
+				const startDate = createDateFromString(eventData.date_event, eventData.time_start);
+				const endDate = createDateFromString(eventData.date_event, eventData.time_end);
+				if (isValidDate(startDate) && isValidDate(endDate)) {
+					eventData.dateStart = startDate.toISOString();
+					eventData.dateEnd = endDate.toISOString();
+					startDateObject = startDate;
+					endDateObject = endDate;
+				} else {
+					eventData.dateStart = '';
+					eventData.dateEnd = '';
+					startDateObject = null;
+					endDateObject = null;
+				}
+			} catch (e) {
+				console.error('Error creating date strings:', e);
+				eventData.dateStart = '';
+				eventData.dateEnd = '';
+				startDateObject = null;
+				endDateObject = null;
+			}
+		} else {
+			eventData.dateStart = '';
+			eventData.dateEnd = '';
+			startDateObject = null;
+			endDateObject = null;
+		}
+	});
+
 	$effect.pre(() => {
 		if (eventData.isRecurrent && !eventData.id && !eventData.recurrence) {
 			eventData.recurrence = getDefaultRecurrence();
@@ -183,18 +232,6 @@
 		// Si defaultTask existe et tasks est vide ou undefined, initialiser avec defaultTask
 		if (defaultTask && (!eventData.tasks || eventData.tasks.length === 0)) {
 			eventData.tasks = [defaultTask];
-		}
-	});
-
-	$effect(() => {
-		if (eventMode === 'EDIT_RECURRENT_ONE') {
-			organizersPossibles = Array.from(
-				new Set([...(eventData.recurrence?.recurrenceTeam || []), ...(eventData.organizers || [])])
-			);
-		} else if (eventMode === 'EDIT_RECURRENT_ALL') {
-			(eventData.organizers || []).forEach((user) => {
-				organizersPossibles = (user.id, user);
-			});
 		}
 	});
 
@@ -382,6 +419,11 @@
 			showAlert("Erreur lors de l'enregistrement de l'événement.", 'error');
 		}
 	};
+
+	const closeModal = () => {
+		modalState.event = false;
+		eventState.is = { ...getNewEvent() };
+	};
 </script>
 
 <!-- {$inspect('eventData', eventData)} -->
@@ -521,7 +563,7 @@
 								</Info>
 							{/if}
 
-							<DateUniq bind:eventData localErrors={errors} />
+							<DateUniq bind:eventData {startDateObject} {endDateObject} localErrors={errors} />
 						</div>
 					{/if}
 				</div>

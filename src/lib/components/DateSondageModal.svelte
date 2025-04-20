@@ -85,25 +85,20 @@
 </script>
 
 <Modal>
-	<h1 class="mb-4 text-2xl">
-		Sondage disponibilité - <span class="font-bold">{eventData?.event_title}</span>
-	</h1>
+	<div class="min-h-124">
+		<h1 class="mb-4 text-2xl">
+			Sondage disponibilité - <span class="font-bold">{eventData?.event_title}</span>
+		</h1>
 
-	<div class="py-4">
-		<DatePickerProposed bind:eventData />
+		<div class="py-4">
+			<DatePickerProposed {eventData} />
+		</div>
 	</div>
 
 	<div class="mt-4 flex flex-wrap justify-end gap-x-4 gap-y-2">
-		<button
-			type="button"
-			class="block w-full rounded bg-red-500 px-4 py-2 font-bold text-white hover:bg-red-700 md:w-fit"
-			onclick={closeModal}>Fermer sans enregistrer</button
+		<button type="button" class="btn btn-ghost" onclick={closeModal}>Fermer sans enregistrer</button
 		>
 
-		<button
-			class="block w-full rounded bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700 md:w-fit"
-			type="button"
-			onclick={handleSubmit}>Enregistrer</button
-		>
+		<button class="btn btn-primary" type="button" onclick={handleSubmit}>Enregistrer</button>
 	</div>
 </Modal>

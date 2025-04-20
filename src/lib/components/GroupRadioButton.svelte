@@ -67,7 +67,7 @@
 		</button>
 	</div>
 
-	{#if value}
+	<!-- {#if value}
 		<div use:tooltip={{ content: 'Supprimer ma réponse' }}>
 			<button
 				onclick={() => {
@@ -80,5 +80,5 @@
 				<Minus class="h-4 w-4" />
 			</button>
 		</div>
-	{/if}
+	{/if} -->
 </div>

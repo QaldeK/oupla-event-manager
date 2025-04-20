@@ -3,6 +3,13 @@ import type { EventsRecord, UsersResponse } from '$lib/types/pocketbase.ts';
 import type { EventType, OrganizerType, TaskType } from '$lib/schemas/event.schema';
 import { Collections } from '$lib/types/pocketbase';
 import { format, parse } from 'date-fns';
+import {
+	findConflictsForEvent,
+	findOverlappingGroupsOnDate,
+	buildEventTimeInfoMap,
+	type EventTimeInfo, // Importe le type si besoin
+	type Conflict // Importe le type si besoin
+} from '$lib/utils/eventConflicts';
 import type { StoreConfig } from '$lib/types/syncState.types';
 
 import { updateEvent, sendGenericEmail, type GenericEmailPayload } from '$lib/pocketbase.svelte';
@@ -325,6 +332,12 @@ class EventsStore {
 		return eventsByDateMap;
 	});
 
+	eventTimeInfoMap = $derived.by<Map<string, EventTimeInfo[]>>(() => {
+		// Assure-toi que allEvents contient bien les champs nécessaires
+		// (id, title, rooms, organizers, isConfirmed, dateStart, dateEnd, date_event, time_start, time_end, dates_proposed)
+		return buildEventTimeInfoMap(this.allEvents);
+	});
+
 	get isInitialized(): boolean {
 		return this.#store.isInitialized;
 	}
@@ -454,83 +467,6 @@ class EventsStore {
 
 		return overlappingByDate;
 	});
-
-	findConflicts(
-		eventId: string | undefined,
-		dateTimeStart: string,
-		dateTimeEnd: string,
-		rooms: string[]
-	) {
-		if (!dateTimeStart || !dateTimeEnd) return [];
-
-		const dateStr = dateTimeStart.substring(0, 8);
-		const formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-		const eventsOnDate = this.getEventsByDateTime.get(formattedDate) || [];
-
-		const startTime = this.timeUtils.parseDateTime(dateTimeStart, 'yyyyMMddHHmm');
-		const endTime = this.timeUtils.parseDateTime(dateTimeEnd, 'yyyyMMddHHmm');
-
-		return this.findOverlappingEvents(startTime, endTime, eventsOnDate, {
-			excludeEventId: eventId,
-			checkCloseEvents: true,
-			rooms
-		});
-	}
-
-	private formatConflict(
-		event: EventConflictInfo,
-		rooms: string[],
-		startTime: number,
-		endTime: number
-	): Conflict {
-		const hasSameRoom = this.hasSameRoomCheck(rooms, event.rooms);
-
-		// Déterminer le type de conflit
-		let conflictType: Conflict['conflictType'] = event.conflictType;
-
-		// Si ce n'est pas un sondage, vérifier si c'est un conflit direct ou proche
-		if (event.conflictType !== 'sondage') {
-			const eventStartTime = event.dateStart
-				? new Date(event.dateStart).getTime()
-				: this.parseTimeToDate(event.time_start, new Date()).getTime();
-			const eventEndTime = event.dateEnd
-				? new Date(event.dateEnd).getTime()
-				: this.parseTimeToDate(event.time_end, new Date()).getTime();
-
-			const isDirectConflict = this.timeUtils.checkTimeOverlap(
-				startTime,
-				endTime,
-				eventStartTime,
-				eventEndTime
-			);
-
-			if (!isDirectConflict) {
-				// Ajouter le préfixe 'close-' pour les événements proches
-				conflictType = event.conflictType === 'confirmed' ? 'close-confirmed' : 'close-unconfirmed';
-			}
-		}
-
-		return {
-			id: event.id,
-			event_title: event.event_title,
-			time_start: event.dateStart ? format(new Date(event.dateStart), 'HH:mm') : event.time_start,
-			time_end: event.dateEnd ? format(new Date(event.dateEnd), 'HH:mm') : event.time_end,
-			rooms: event.rooms,
-			conflictType,
-			hasSameRoom
-		};
-	}
-
-	private checkDateOverlap(start1: number, end1: number, start2: number, end2: number): boolean {
-		return start1 < end2 && end1 > start2;
-	}
-
-	private hasSameRoomCheck(rooms1: string[], rooms2: string[]): boolean {
-		const event1Rooms = new Set(rooms1 || []);
-		const event2Rooms = new Set(rooms2 || []);
-		if (event1Rooms.size === 0 || event2Rooms.size === 0) return false;
-		return [...event1Rooms].some((room) => event2Rooms.has(room));
-	}
 
 	private parseTimeToDate(timeString: string, baseDate: Date): Date {
 		{

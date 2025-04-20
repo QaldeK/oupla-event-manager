@@ -74,6 +74,10 @@ export const createDateFromString = (dateStr: string, timeStr: string): Date => 
 	return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes));
 };
 
+export function isValidDate(d: any): d is Date {
+	return d instanceof Date && !isNaN(d.getTime());
+}
+
 export const addTime = (initial: string, durationToAdd = 10) => {
 	if (initial) {
 		const calculated = format(
@@ -82,14 +86,16 @@ export const addTime = (initial: string, durationToAdd = 10) => {
 		);
 		return calculated;
 	} else {
-		return;
+		return '';
 	}
 };
 
-export const lisibleDate = (date: Date | string) => {
+export const lisibleDate = (date: Date | string | undefined) => {
+	if (!date) return '';
 	return format(new Date(date), 'EEEE d MMMM', { locale: fr });
 };
-export const lisibleTime = (date: Date | string) => {
+export const lisibleTime = (date: Date | string | undefined) => {
+	if (!date) return '';
 	return format(new Date(date), 'kk:mm', { locale: fr });
 };
 

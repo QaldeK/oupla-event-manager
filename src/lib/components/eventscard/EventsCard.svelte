@@ -345,9 +345,9 @@
 
 					<!-- ::: Organizers Card -->
 
-					<div id="organizers_card" class="divide-y border md:rounded-lg">
+					<div id="organizers_card" class="bg-base-200 border md:rounded-lg">
 						<div
-							class="text-fluid-sm bg-base-200 flex w-full items-center justify-between p-1 font-semibold md:rounded-t-lg"
+							class="text-fluid-sm flex w-full items-center justify-between p-1 font-semibold md:rounded-t-lg"
 						>
 							<div class="text-base-content px-2">
 								{organizersLabel}
@@ -389,7 +389,7 @@
 							</div>
 						</div>
 						<div>
-							<div class="flex flex-col rounded-b-lg bg-white {hasSondage ? 'mb-4 p-2' : ''} ">
+							<div class=" flex flex-col rounded-b-lg {hasSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
 								{#if hasSondage}
 									<div class=" text-base-content items-baseline gap-2 p-2">
@@ -408,7 +408,7 @@
 											{/if}
 										</button>
 									</div>
-									<div class="flex flex-col divide-y">
+									<div class="flex flex-col divide-y sm:space-y-2">
 										{#each datesFutureProposed as data (data.dateStart)}
 											{@const oui = data.organizers.filter((org) => org.maybehere === 'oui').length}
 											{@const peutetre = data.organizers.filter(
@@ -424,7 +424,7 @@
 												{showSondageDetails ? 'mb-4 ' : 'border'}
 												-->
 											<div
-												class="transition:fade rounded-e border bg-white py-2 sm:shadow-md
+												class="transition:fade border bg-white p-2 sm:rounded-lg sm:shadow-sm
 													"
 											>
 												<div class=" flex items-center justify-between gap-y-2 not-sm:flex-wrap">
@@ -503,7 +503,7 @@
 												<!--:::__ Section expandable pour les détails des votes -->
 												{#if showSondageDetails}
 													<div transition:fade={{ duration: 150 }} class="mt-2 px-1">
-														<div class="bg-base-200 rounded-md p-2">
+														<div class="bg-base-100 rounded-md p-2">
 															{#if data.organizers.length === 0}
 																<p class="text-fluid-sm text-base-content/70">
 																	Aucune réponse pour le moment
@@ -577,7 +577,7 @@
 													org.tasks.includes(task.name)
 												)}
 												<div
-													class="text-fluid-sm border border-gray-300 font-semibold shadow-xs sm:rounded-lg"
+													class="text-fluid-sm border bg-white font-semibold shadow-xs sm:rounded-lg"
 												>
 													<div
 														class="text-base-content mb-2 flex justify-items-center rounded-t-lg px-4 py-1 text-center {currentEvent.organizers.some(

@@ -1,25 +1,67 @@
 <script lang="ts">
+	import { findConflictsForEvent, type Conflict } from '$lib/utils/eventConflicts';
 	import { eventsStore } from '$lib/shared/eventsStore.svelte';
+	import { isValidDate } from '$lib/utils';
 	import { format } from 'date-fns';
 	import { fr } from 'date-fns/locale';
 
-	let { eventId, dateTimeStart, dateTimeEnd, rooms } = $props<{
+	let { eventId, startDate, endDate, rooms } = $props<{
 		eventId?: string;
-		dateTimeStart: string; // Format: YYYYMMDDHHmm
-		dateTimeEnd: string; // Format: YYYYMMDDHHmm
+		startDate: Date | null;
+		endDate: Date | null;
 		rooms: string[];
 	}>();
 
 	let isExpanded = $state(false);
 
-	const conflicts = $derived(eventsStore.findConflicts(eventId, dateTimeStart, dateTimeEnd, rooms));
+	const conflicts = $derived.by<Conflict[]>(() => {
+		// 1. Vérifier que les dates d'entrée sont des objets Date valides
+		if (
+			!startDate ||
+			!endDate ||
+			!isValidDate(startDate) ||
+			!isValidDate(endDate) ||
+			!eventsStore.isInitialized
+		) {
+			return [];
+		}
+
+		// 3. Obtenir la clé de date (YYYY-MM-DD) pour la map (utilise l'objet Date reçu)
+		let dateKey: string;
+		try {
+			dateKey = format(startDate, 'yyyy-MM-dd');
+		} catch {
+			console.error('ConflictAlert: Error formatting dateKey from startDate', { startDate });
+			return [];
+		}
+
+		// 4. Récupérer les EventTimeInfo pour cette date depuis le store
+		const eventsOnDate = eventsStore.eventTimeInfoMap.get(dateKey) || [];
+
+		// 5. Appeler le service de détection de conflits (utilise les objets Date directement)
+		try {
+			return findConflictsForEvent(
+				startDate, // Objet Date direct
+				endDate, // Objet Date direct
+				rooms,
+				eventsOnDate,
+				{
+					excludeEventId: eventId,
+					includeCloseEvents: true
+				}
+			);
+		} catch (error) {
+			console.error('ConflictAlert: Error calling findConflictsForEvent', error);
+			return [];
+		}
+	});
 
 	// Filtrer les conflits réels (directs ou avec même salle)
 	const realConflicts = $derived(
 		conflicts.filter(
 			(conflict) =>
 				// Conflits directs
-				conflict.conflictType === 'confirmed'
+				conflict.conflictType === 'confirmed' && conflict.hasSameRoom
 		)
 	);
 
@@ -28,17 +70,18 @@
 		type: realConflicts[0]?.conflictType
 	});
 
-	const formatDate = (dateTimeStr: number | string) => {
-		const str = dateTimeStr.toString();
-		const date = new Date(
-			parseInt(str.substring(0, 4)),
-			parseInt(str.substring(4, 6)) - 1,
-			parseInt(str.substring(6, 8))
-		);
-		return format(date, 'EEE d MMMM', { locale: fr });
+	const formatDateForDisplay = (dateObj: Date | null) => {
+		if (dateObj && isValidDate(dateObj)) {
+			try {
+				return format(dateObj, 'EEE d MMMM', { locale: fr });
+			} catch {
+				return 'date invalide';
+			}
+		}
+		return 'date inconnue'; // Fallback
 	};
 
-	const dateOfConflict = formatDate(dateTimeStart);
+	const dateOfConflict = formatDateForDisplay(startDate);
 
 	const getConflictColor = (conflictType: string) => {
 		switch (conflictType) {
@@ -101,29 +144,29 @@
 				<div class="text-fluid-sm text-gray-600 italic">
 					D'autres événements sont prévus le {dateOfConflict}...
 				</div>
-				<div class="flex items-center text-orange-600 hover:text-orange-800">
-					{#if !isExpanded}
-						{#if conflicts.length > realConflicts.length}
+				{#if conflicts.length > realConflicts.length}
+					<div class="flex items-center text-orange-600 hover:text-orange-800">
+						{#if !isExpanded}
 							+ {conflicts.length - realConflicts.length} conflits potentiels...
+						{:else}
+							réduire
 						{/if}
-					{:else}
-						réduire
-					{/if}
-					<svg
-						class={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M19 9l-7 7-7-7"
-						/>
-					</svg>
-				</div>
+						<svg
+							class={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M19 9l-7 7-7-7"
+							/>
+						</svg>
+					</div>
+				{/if}
 			</div>
 
 			{#if !isExpanded && hasRealConflict.value}
