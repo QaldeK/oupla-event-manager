@@ -1,82 +1,86 @@
 <script lang="ts">
-	import { debounce } from '$lib/actions/debounce';
-	import Checkbox from '$lib/components/Checkbox.svelte';
-	import Frame from '$lib/components/Frame.svelte';
-	import GroupCheckBox from '$lib/components/GroupCheckBox.svelte';
-	import Info from '$lib/components/Info.svelte';
-	import AutoConfirmSettings from '$lib/components/forModal/AutoConfirmSettings.svelte';
-	import AddTaskForm from '$lib/components/forModal/AddTaskForm.svelte';
-	import Modal from '$lib/components/Modal.svelte';
-	import Quill from '$lib/components/Quill.svelte';
-	import ButtonGroupSelect from '$lib/components/forModal/ButtonGroupSelect.svelte';
-	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
-	import DateUniq from '$lib/components/forModal/DateUniq.svelte';
-	import OrganizersAndTasksSelect from '$lib/components/forModal/OrganizersAndTasksSelect.svelte';
-	import RecurrentTab from '$lib/components/forModal/RecurrentTab.svelte';
-	import Textarea from '$lib/components/ui-custom/textarea/textarea.svelte';
+	import { debounce } from "$lib/actions/debounce";
+	import Checkbox from "$lib/components/Checkbox.svelte";
+	import Frame from "$lib/components/Frame.svelte";
+	import GroupCheckBox from "$lib/components/GroupCheckBox.svelte";
+	import Info from "$lib/components/Info.svelte";
+	import AutoConfirmSettings from "$lib/components/forModal/AutoConfirmSettings.svelte";
+	import AddTaskForm from "$lib/components/forModal/AddTaskForm.svelte";
+	import Modal from "$lib/components/Modal.svelte";
+	import Quill from "$lib/components/Quill.svelte";
+	import ButtonGroupSelect from "$lib/components/forModal/ButtonGroupSelect.svelte";
+	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
+	import DateUniq from "$lib/components/forModal/DateUniq.svelte";
+	import OrganizersAndTasksSelect from "$lib/components/forModal/OrganizersAndTasksSelect.svelte";
+	import RecurrentTab from "$lib/components/forModal/RecurrentTab.svelte";
+	import Textarea from "$lib/components/ui-custom/textarea/textarea.svelte";
 	import {
 		createEvent,
 		createRecurrentEvent,
 		updateAllOccurrences,
 		updateEvent
-	} from '$lib/pocketbase.svelte';
+	} from "$lib/pocketbase.svelte";
 	import {
 		ValidationSchemaType,
 		getNewEvent,
 		getDefaultRecurrence,
 		validateEvent,
-		type EventType,
 		type TaskType,
-		type RequiredRecurrenceType
-	} from '$lib/schemas/event.schema';
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
+		type RequiredRecurrenceType,
+		type EventType
+	} from "$lib/schemas/event.schema";
+	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import {
 		eventState,
 		getOrganizersPossibles,
 		modalState,
 		showAlert
-	} from '$lib/shared/states.svelte';
-	import { createDateFromString, lisibleDate, isValidDate } from '$lib/utils';
+	} from "$lib/shared/states.svelte";
+	import { createDateFromString, lisibleDate, isValidDate } from "$lib/utils";
 
-	import { slide } from 'svelte/transition';
+	import { slide } from "svelte/transition";
 
-	import { Save, UserPlus, X } from 'lucide-svelte';
-	import TimeReservation from './forModal/TimeReservation.svelte';
+	import { Save, UserPlus, X } from "lucide-svelte";
+	import TimeReservation from "./forModal/TimeReservation.svelte";
 
 	type EventMode =
-		| 'NEW_SINGLE' // Création événement unique
-		| 'NEW_RECURRENT' // Création événement récurrent
-		| 'EDIT_SINGLE' // Modification événement unique
-		| 'EDIT_RECURRENT_ONE' // Modification occurrence unique
-		| 'EDIT_RECURRENT_ALL'; // Modification toutes occurrences
+		| "NEW_SINGLE" // Création événement unique
+		| "NEW_RECURRENT" // Création événement récurrent
+		| "EDIT_SINGLE" // Modification événement unique
+		| "EDIT_RECURRENT_ONE" // Modification occurrence unique
+		| "EDIT_RECURRENT_ALL"; // Modification toutes occurrences
 
+	let isAlertDialogOpen = $state<boolean>(false);
 	let eventMode: EventMode = $derived.by(() => {
 		if (!eventData.id) {
-			return eventData.isRecurrent ? 'NEW_RECURRENT' : 'NEW_SINGLE';
+			return eventData.isRecurrent ? "NEW_RECURRENT" : "NEW_SINGLE";
 		}
 
 		if (eventData.id && eventData.isRecurrent) {
-			return eventData.isMasterRecurrent ? 'EDIT_RECURRENT_ALL' : 'EDIT_RECURRENT_ONE';
+			return eventData.isMasterRecurrent ? "EDIT_RECURRENT_ALL" : "EDIT_RECURRENT_ONE";
 		}
 
-		return 'EDIT_SINGLE';
+		return "EDIT_SINGLE";
 	});
 
+	let errors = $state<Record<string, string[] | undefined>>({});
+	let formattedErrors = $state<any>({});
+
 	// :::_ Event Mode & dynamics props
-	type DisplayMode = 'DATE' | 'SONDAGE' | 'RECURRENT';
+	type DisplayMode = "DATE" | "SONDAGE" | "RECURRENT";
 
 	let displayMode = $derived.by((): DisplayMode => {
-		if (eventMode === 'NEW_RECURRENT' || eventMode === 'EDIT_RECURRENT_ALL') {
-			return 'RECURRENT';
+		if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
+			return "RECURRENT";
 		}
 		if (eventData.isSondage) {
-			return 'SONDAGE';
+			return "SONDAGE";
 		}
-		return 'DATE';
+		return "DATE";
 	});
 
 	// ::: Data et Etat réactif
-	let eventData = $state<EventType>({ ...(eventState.is as EventType) });
+	let eventData = $state<EventType>({ ...eventState.is });
 	let rooms: string[] = getSpace.rooms;
 	let categories: string[] = getSpace.categories;
 	let spaceMembers = $derived(getOrganizersPossibles());
@@ -86,15 +90,20 @@
 		// Commencez avec les membres de l'espace par défaut
 		let possible = [...spaceMembers];
 
-		if (eventMode === 'EDIT_RECURRENT_ONE') {
+		if (eventMode === "EDIT_RECURRENT_ONE") {
 			const combined = [
-				...(eventData.recurrence?.recurrenceTeam || []),
-				...(eventData.organizers || [])
+				...(eventData.recurrence?.recurrenceTeam ?? []),
+				...(eventData?.organizers ?? [])
 			];
 
-			const uniqueMap = new Map(combined.map((org) => [org.id, org]));
+			const uniqueMap = new Map();
+			combined.filter(Boolean).forEach((org) => {
+				if (org && org.id) {
+					uniqueMap.set(org.id, org);
+				}
+			});
 			return Array.from(uniqueMap.values());
-		} else if (eventMode === 'EDIT_RECURRENT_ALL') {
+		} else if (eventMode === "EDIT_RECURRENT_ALL") {
 			// Ajoutez les organisateurs déjà sur le master event
 
 			possible = [
@@ -119,25 +128,25 @@
 
 	const modalTitle = $derived.by(() => {
 		switch (eventMode) {
-			case 'NEW_SINGLE':
-				return 'Créer un nouvel événement';
-			case 'NEW_RECURRENT':
-				return 'Créer un événement récurrent';
-			case 'EDIT_SINGLE':
+			case "NEW_SINGLE":
+				return "Créer un nouvel événement";
+			case "NEW_RECURRENT":
+				return "Créer un événement récurrent";
+			case "EDIT_SINGLE":
 				return "Modifier l'événement";
-			case 'EDIT_RECURRENT_ONE':
+			case "EDIT_RECURRENT_ONE":
 				return "Modifier l'occurrence de l'événement";
-			case 'EDIT_RECURRENT_ALL':
+			case "EDIT_RECURRENT_ALL":
 				return "Modifier l'ensemble des occurences";
 		}
 	});
 
 	let dateAndHoursTitle = $derived.by(() => {
-		if (displayMode === 'RECURRENT') {
-			return 'Dates et horaires - Configuration de la récurrence';
-		} else if (displayMode === 'DATE') {
+		if (displayMode === "RECURRENT") {
+			return "Dates et horaires - Configuration de la récurrence";
+		} else if (displayMode === "DATE") {
 			return "Date et horaire de l'événement";
-		} else if (displayMode === 'SONDAGE') return 'Dates proposées - Sondage';
+		} else if (displayMode === "SONDAGE") return "Dates proposées - Sondage";
 	});
 
 	let hasExternalPreference = $derived.by(() => !!eventData.external_proposal?.period_preference);
@@ -147,20 +156,20 @@
 
 	// ::: tasks & organizers
 
-	let tasksPossibles = $derived.by<TaskType[]>(() => {
-		let potentialTasks: TaskType[] = [];
+	let tasksPossibles = $derived.by(() => {
+		let potentialTasks: any[] = [];
 
 		potentialTasks = [...(getSpace.tasks || [])];
 
 		potentialTasks = [...potentialTasks, ...(eventData.tasks || [])];
 
 		// 3. Pour l'édition d'une occurrence, ajouter aussi les tâches de la récurrence parente
-		if (eventMode === 'EDIT_RECURRENT_ONE' && eventData.recurrence?.tasks) {
-			potentialTasks = [...potentialTasks, ...eventData.recurrence.tasks];
+		if (eventMode === "EDIT_RECURRENT_ONE" && eventData.recurrence?.tasks) {
+			potentialTasks = [...potentialTasks, ...(eventData.recurrence.tasks || [])];
 		}
 
 		// 4. Éliminer les doublons en se basant sur le nom
-		const uniqueTasksMap = new Map<string, TaskType>();
+		const uniqueTasksMap = new Map<string, any>();
 		potentialTasks.forEach((task) => {
 			// Vérifier si la tâche et son nom existent avant d'ajouter à la map
 			if (task?.name && !uniqueTasksMap.has(task.name)) {
@@ -168,23 +177,31 @@
 			}
 		});
 
-		return Array.from(uniqueTasksMap.values());
+		return Array.from(uniqueTasksMap.values()) as any[];
 	});
 
 	let tasksLabel = $derived.by(() => {
 		switch (eventMode) {
-			case 'NEW_SINGLE':
-			case 'EDIT_SINGLE':
-				return 'Définisser les mandats à réaliser pour cet événement';
-			case 'NEW_RECURRENT':
-			case 'EDIT_RECURRENT_ALL':
-				return 'Définir les mandats à réaliser pour chaque occurrence de cet événement';
-			case 'EDIT_RECURRENT_ONE':
-				return 'Modifier les mandats à realiser pour cette occurrence spécifique';
+			case "NEW_SINGLE":
+			case "EDIT_SINGLE":
+				return "Définisser les mandats à réaliser pour cet événement";
+			case "NEW_RECURRENT":
+			case "EDIT_RECURRENT_ALL":
+				return "Définir les mandats à réaliser pour chaque occurrence de cet événement";
+			case "EDIT_RECURRENT_ONE":
+				return "Modifier les mandats à realiser pour cette occurrence spécifique";
 		}
 	});
 
 	// ::: $effect
+
+	$effect.pre(() => {
+		if (eventData.isRecurrent && !eventData.id && !eventData.recurrence) {
+			eventData.recurrence = getDefaultRecurrence();
+		} else if (!eventData.isRecurrent && !eventData.id) {
+			eventData.recurrence = null;
+		}
+	});
 
 	$effect(() => {
 		if (eventData.date_event && eventData.time_start && eventData.time_end) {
@@ -197,31 +214,23 @@
 					startDateObject = startDate;
 					endDateObject = endDate;
 				} else {
-					eventData.dateStart = '';
-					eventData.dateEnd = '';
+					eventData.dateStart = "";
+					eventData.dateEnd = "";
 					startDateObject = null;
 					endDateObject = null;
 				}
 			} catch (e) {
-				console.error('Error creating date strings:', e);
-				eventData.dateStart = '';
-				eventData.dateEnd = '';
+				console.error("Error creating date strings:", e);
+				eventData.dateStart = "";
+				eventData.dateEnd = "";
 				startDateObject = null;
 				endDateObject = null;
 			}
 		} else {
-			eventData.dateStart = '';
-			eventData.dateEnd = '';
+			eventData.dateStart = "";
+			eventData.dateEnd = "";
 			startDateObject = null;
 			endDateObject = null;
-		}
-	});
-
-	$effect.pre(() => {
-		if (eventData.isRecurrent && !eventData.id && !eventData.recurrence) {
-			eventData.recurrence = getDefaultRecurrence();
-		} else if (!eventData.isRecurrent && !eventData.id) {
-			eventData.recurrence = undefined;
 		}
 	});
 
@@ -250,10 +259,10 @@
 			// Ajouter la nouvelle tâche construite par AddTaskForm
 			eventData.tasks = [...eventData.tasks, newTask];
 			showAddTaskForm = false; // Masquer le formulaire après l'ajout
-			showAlert(`Tâche "${newTask.name}" ajoutée.`, 'success', 1500);
+			showAlert(`Tâche "${newTask.name}" ajoutée.`, "success");
 		} else {
 			// Afficher une alerte si la tâche existe déjà (géré dans AddTaskForm mais double sécurité)
-			showAlert(`Une tâche nommée "${newTask.name}" existe déjà.`, 'error');
+			showAlert(`Une tâche nommée "${newTask.name}" existe déjà.`, "error");
 		}
 	}
 
@@ -282,9 +291,9 @@
 
 		// Conversion des propositions en format DateProposed
 		const newDatesProposed = selectedProposals.map((proposal) => {
-			const [year, month, day] = proposal.date_event.split('-');
-			const [hourStart, minuteStart] = proposal.time_start.split(':');
-			const [hourEnd, minuteEnd] = proposal.time_end.split(':');
+			const [year, month, day] = proposal.date_event.split("-");
+			const [hourStart, minuteStart] = proposal.time_start.split(":");
+			const [hourEnd, minuteEnd] = proposal.time_end.split(":");
 
 			const dateStart = new Date(`${year}-${month}-${day}T${hourStart}:${minuteStart}`);
 			const dateEnd = new Date(`${year}-${month}-${day}T${hourEnd}:${minuteEnd}`);
@@ -307,81 +316,72 @@
 
 	// ::: Form Validation and Submission
 
+	function validateCurrentEvent(schemaType: ValidationSchemaType): boolean {
+		// Préparation des données pour la validation (ex: tâches de récurrence)
+		if (
+			(eventMode === "EDIT_RECURRENT_ALL" || eventMode === "NEW_RECURRENT") &&
+			eventData.recurrence
+		) {
+			eventData.recurrence.tasks = eventData.tasks || [];
+		}
+
+		const validationResult = validateEvent(eventData, schemaType);
+
+		if (!validationResult.success && validationResult.errors) {
+			errors = validationResult.errors.flatten().fieldErrors;
+			formattedErrors = validationResult.errors.format(); // Utiliser format() pour une structure plus riche si nécessaire
+			showAlert("Erreur dans les données. Veuillez vérifier les champs.", "error");
+			return false;
+		}
+
+		// Réinitialiser les erreurs si la validation réussit
+		errors = {};
+		formattedErrors = {};
+		return true;
+	}
+
 	const confirmSubmit = async () => {
 		isAlertDialogOpen = false;
 		await submitForm();
 	};
 
-	let errors = $state<Record<string, string[] | undefined>>({});
-	let formattedErrors = $state<Record<string, any>>({});
-
 	const handleConfirm = async () => {
-		try {
-			const validationResult = validateEvent(eventData, ValidationSchemaType.PUBLISH);
-			console.log(validationResult);
-			if (!validationResult.success && validationResult.errors) {
-				errors = validationResult.errors.flatten().fieldErrors;
-				formattedErrors = validationResult.errors.format();
-				showAlert(
-					"L'événement ne peut être confirmé : vérifiez les champs mal renseignés.",
-					'error'
-				);
-				return;
-			}
-
-			eventData.isConfirmed = true;
-
-			await submitForm();
-		} catch (err) {
-			console.error('Erreur de validation :', err);
-			showAlert("Erreur lors de la confirmation de l'événement.", 'error');
+		if (!validateCurrentEvent(ValidationSchemaType.PUBLISH)) {
+			showAlert("L'événement ne peut être confirmé : vérifiez les champs mal renseignés.", "error");
+			return;
 		}
+
+		eventData.isConfirmed = true;
+		await submitForm();
 	};
 
 	const handleSave = async () => {
-		try {
-			const schema = () => {
-				// Si l'événement est confirmé, on utilise toujours PublishEventSchema
-				if (eventData.isConfirmed) {
-					return ValidationSchemaType.PUBLISH;
-				}
-
-				// Sinon, on suit la logique normale
-				switch (eventMode) {
-					case 'NEW_SINGLE':
-					case 'EDIT_SINGLE':
-					case 'EDIT_RECURRENT_ONE':
-						return ValidationSchemaType.SAVE;
-					case 'EDIT_RECURRENT_ALL':
-					case 'NEW_RECURRENT':
-						return ValidationSchemaType.SAVE_RECURRENT_MASTER;
-				}
-			};
-
-			if (
-				eventMode === 'EDIT_RECURRENT_ALL' ||
-				(eventMode === 'NEW_RECURRENT' && eventData.recurrence)
-			) {
-				eventData.recurrence.tasks = eventData.tasks;
+		const schemaType = (() => {
+			if (eventData.isConfirmed) return ValidationSchemaType.PUBLISH;
+			switch (eventMode) {
+				case "NEW_SINGLE":
+				case "EDIT_SINGLE":
+				case "EDIT_RECURRENT_ONE":
+					return ValidationSchemaType.SAVE;
+				case "EDIT_RECURRENT_ALL":
+				case "NEW_RECURRENT":
+					return ValidationSchemaType.SAVE_RECURRENT_MASTER;
+				default:
+					return ValidationSchemaType.DEFAULT; // Fallback
 			}
+		})();
 
-			const validationResult = validateEvent(eventData, schema());
+		if (!validateCurrentEvent(schemaType)) {
+			return; // La validation a échoué, message déjà affiché
+		}
 
-			if (!validationResult.success && validationResult.errors) {
-				errors = validationResult.errors.flatten().fieldErrors;
-				formattedErrors = validationResult.errors.format();
-
-				showAlert("Erreur dans les données de l'événement. Veuillez vérifier les champs.", 'error');
-				return;
-			}
-			if (eventMode === 'EDIT_RECURRENT_ALL') {
-				isAlertDialogOpen = true;
-			}
-
+		// Si c'est une modification globale, ouvrir la modale de confirmation
+		if (eventMode === "EDIT_RECURRENT_ALL") {
+			isAlertDialogOpen = true;
+			// Le submitForm sera appelé via confirmSubmit après confirmation dans la modale
+		} else {
+			// Sinon, soumettre directement
 			await submitForm();
-		} catch (err) {
-			console.error('Erreur lors de la sauvegarde :', err);
-			showAlert("Erreur lors de la sauvegarde de l'événement.", 'error');
 		}
 	};
 
@@ -396,39 +396,42 @@
 			}
 
 			switch (eventMode) {
-				case 'NEW_SINGLE':
+				case "NEW_SINGLE":
 					await createEvent(eventData);
 					break;
 
-				case 'NEW_RECURRENT': {
+				case "NEW_RECURRENT": {
 					await createRecurrentEvent(eventData);
 					break;
 				}
-				case 'EDIT_SINGLE':
-				case 'EDIT_RECURRENT_ONE':
+				case "EDIT_SINGLE":
+				case "EDIT_RECURRENT_ONE":
 					await updateEvent(eventData.id, eventData);
 					break;
 
-				case 'EDIT_RECURRENT_ALL':
+				case "EDIT_RECURRENT_ALL":
 					await updateAllOccurrences(eventData);
 					break;
 			}
 			closeModal();
 		} catch (error) {
 			console.error(error);
-			showAlert("Erreur lors de l'enregistrement de l'événement.", 'error');
+			showAlert("Erreur lors de l'enregistrement de l'événement.", "error");
 		}
 	};
 
 	const closeModal = () => {
 		modalState.event = false;
 		eventState.is = { ...getNewEvent() };
+		errors = {};
+		formattedErrors = {};
+		isAlertDialogOpen = false;
 	};
 </script>
 
 <!-- {$inspect('eventData', eventData)} -->
-{$inspect('eventMode', eventMode)}
-{$inspect('eventData', eventData)}
+{$inspect("eventMode", eventMode)}
+{$inspect("eventData", eventData)}
 <!-- {$inspect('organizersPossibles', organizersPossibles)} -->
 <!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
 <!-- {$inspect('eOrg', eventData.organizers)} -->
@@ -480,7 +483,7 @@
 					/>
 				</div>
 				<div class="">
-					{#if eventMode === 'NEW_SINGLE' || eventMode === 'NEW_RECURRENT'}
+					{#if eventMode === "NEW_SINGLE" || eventMode === "NEW_RECURRENT"}
 						<Checkbox
 							bind:checked={eventData.isRecurrent}
 							id="recurrent"
@@ -498,9 +501,7 @@
 			{#if hasExternalPreference}
 				<Info variant="warning">
 					<p class="italic">
-						Cet événement à été proposé par: {eventData.expand?.created_by.username ||
-							'utilisateur inconnu'}
-						({eventData.expand?.created_by?.email || 'email inconnu'}), depuis le site publique
+						Cet événement à été proposé par un utilisateur depuis le site publique
 					</p>
 					<div class=" text-fluid-sm p-2">
 						Période indiquée comme possible pour l'intervenant·e:
@@ -519,21 +520,21 @@
 				class_frame="md:p-8"
 			>
 				<div class="space-y-4">
-					{#if displayMode === 'RECURRENT'}
+					{#if displayMode === "RECURRENT"}
 						<div>
 							<RecurrentTab
 								bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
-								localErrors={formattedErrors.recurrence}
+								localErrors={formattedErrors?.recurrence}
 							/>
 						</div>
 						<div>
 							<TimeReservation localErrors={errors} bind:eventData />
 						</div>
-					{:else if displayMode === 'SONDAGE'}
+					{:else if displayMode === "SONDAGE"}
 						<div>
 							{@render ExternalProposalPref()}
 
-							<DatePickerProposed bind:eventData localErrors={errors} />
+							<DatePickerProposed {eventData} localErrors={errors} />
 						</div>
 					{:else}
 						<div>
@@ -613,7 +614,7 @@
 			</div>
 		</Frame>
 
-		{#if eventMode !== 'NEW_RECURRENT' && eventMode !== 'EDIT_RECURRENT_ALL'}
+		{#if eventMode !== "NEW_RECURRENT" && eventMode !== "EDIT_RECURRENT_ALL"}
 			<Frame title="Organisateur·ices">
 				<OrganizersAndTasksSelect
 					{organizersPossibles}
@@ -633,22 +634,24 @@
 					Ajoutez les personnes qui participent à organiser ces événements récurrents (celles et
 					ceux qui pourront s'inscrire sur l'organisation des occurrences de chaque événement)
 				</p>
-				<ButtonGroupSelect
-					options={organizersPossibles}
-					bind:selectedItems={eventData.recurrence.recurrenceTeam}
-					optionsLabel="username"
-					Icon={UserPlus}
-				/>
-				<button
-					class="btn btn-outline btn-primary btn-compact mt-4"
-					onclick={() => {
-						if (eventData.recurrence) {
-							eventData.recurrence.recurrenceTeam = organizersPossibles;
-						}
-					}}
-				>
-					→ ajoutez tout le monde
-				</button>
+				{#if eventData.recurrence}
+					<ButtonGroupSelect
+						options={organizersPossibles}
+						bind:selectedItems={eventData.recurrence.recurrenceTeam}
+						optionsLabel="username"
+						Icon={UserPlus}
+					/>
+					<button
+						class="btn btn-outline btn-primary btn-compact mt-4"
+						onclick={() => {
+							if (eventData.recurrence) {
+								eventData.recurrence.recurrenceTeam = organizersPossibles;
+							}
+						}}
+					>
+						→ ajoutez tout le monde
+					</button>
+				{/if}
 				{#if errors.organizers}
 					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
 				{/if}
@@ -774,7 +777,7 @@
 				</p>
 			</Info>
 			<div>
-				<Quill bind:dataContent={eventData.desc_public} />
+				<Quill bind:html={eventData.desc_public} />
 			</div>
 			{#if errors.desc_public}<p class="text-fluid-sm p-2 text-red-500 italic">
 					{errors.desc_public[0]}
@@ -801,11 +804,13 @@
 	</form>
 
 	<!-- AlertDialog pour la confirmation de modification de toutes les occurrences -->
-	<dialog id="confirm_recurrence_modal" class="modal">
+	<dialog id="confirm_recurrence_modal" class="modal" open={isAlertDialogOpen}>
 		<div class="modal-box">
 			<h3 class="text-lg font-bold">Modifier toutes les occurrences ?</h3>
 			<p class="py-4">
-				Êtes-vous sûr de vouloir modifier toutes les occurrences de cet événement récurrent ?
+				<!-- TODO : préciser les implications→ donnée écrasées/préserver des occurrences + suppréssions des occurrences hors dates -->
+				Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous
+				sûr de vouloir continuer ?
 			</p>
 			<div class="modal-action">
 				<form method="dialog">
