@@ -18,7 +18,8 @@
 		ChevronUp,
 		ThumbsDown,
 		ThumbsUp,
-		UserCheck
+		UserCheck,
+		Currency
 	} from "lucide-svelte";
 	import { CalendarPlus, UserPlus } from "lucide-svelte";
 
@@ -43,8 +44,6 @@
 
 	// ::: reactive variables
 	let showSondageDetails = $state(false);
-
-	const hasSondage = $derived(!currentEvent.date_event && currentEvent.dates_proposed?.length);
 
 	const hasNoPropositions = $derived(
 		!currentEvent.date_event && currentEvent.dates_proposed?.length === 0
@@ -75,7 +74,7 @@
 	);
 
 	let organizersLabel = $derived.by(() => {
-		if (hasSondage) return "Organisateur•ices - Sondage disponibilité";
+		if (currentEvent.isSondage) return "Organisateur•ices - Sondage disponibilité";
 		else if (hasNoPropositions) return "Pas de dates proposées";
 		return "Organisateur•ices";
 	});
@@ -354,7 +353,7 @@
 							</div>
 							<!--::: Top - Cas 1: aucune date de proposé, ni sondage -->
 							<div class="me-1">
-								{#if hasSondage && hasAuth}
+								{#if currentEvent.isSondage && hasAuth}
 									<button
 										onclick={() => openModal("sondage", currentEvent)}
 										class="btn btn-link btn-compact"
@@ -389,9 +388,9 @@
 							</div>
 						</div>
 						<div>
-							<div class=" flex flex-col rounded-b-lg {hasSondage ? 'mb-4 p-2' : ''} ">
+							<div class=" flex flex-col rounded-b-lg {currentEvent.isSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
-								{#if hasSondage}
+								{#if currentEvent.isSondage}
 									<div class=" text-base-content items-baseline gap-2 p-2">
 										<!-- <p class="ml-auto text-fluid-sm">Serez vous disponibles à ces dates ?</p> -->
 
@@ -557,7 +556,7 @@
 											</div>
 										{/each}
 									</div>
-									{#if hasSondage && oldDatesProposed.length > 0}
+									{#if currentEvent.isSondage && oldDatesProposed.length > 0}
 										<div class="text-fluid-xs text-base-content/70 p-2 italic">
 											Des dates déjà passées ont été proposées précédemment, et ont été
 											automatiquement supprimées ( {#each oldDatesProposed as date (currentEvent.id + "-old-" + date.dateStart)}
@@ -656,7 +655,7 @@
 											{/each}
 										</span>
 									</p>
-									{#if hasSondage}
+									{#if currentEvent.isSondage}
 										<p class="text-fluid-xs">
 											Le sondage de disponibilité ne concerne que la présence
 										</p>

@@ -1,85 +1,100 @@
 <script lang="ts">
-	import Modal from '$lib/components/Modal.svelte';
-	import DatePickerProposed from '$lib/components/forModal/DatePickerProposed.svelte';
-	import type { EventType } from '$lib/types/event';
-	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from '$lib/utils';
-	import { updateEvent } from '$lib/pocketbase.svelte';
-	import type { DateProposedType } from '$lib/schemas/event.schema';
-	import { eventState, modalState } from '$lib/shared/states.svelte';
+	import Modal from "$lib/components/Modal.svelte";
+	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
+	import type { EventType, DateProposedType, OrganizerType } from "$lib/types/types";
+	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
+	import { updateEvent } from "$lib/pocketbase.svelte";
+	import { eventState, modalState } from "$lib/shared/states.svelte";
 
 	let eventData = $state<EventType>({ ...eventState.is });
-
-	let datesProposed = $derived(eventData.dates_proposed);
-	let organizers = $derived(eventData.organizers || []);
-	let open = $state(modalState.dateSondage);
 	let dateAccepted: DateProposedType | null = $state(null);
 
 	const closeModal = () => {
 		modalState.dateSondage = false;
 	};
 
+	// ::: Event Handlers from DatePickerProposed :::
+	function handleUpdateDatesProposed(dates: DateProposedType[]) {
+		eventData.dates_proposed = dates;
+		// Si une date acceptée est retirée, on la désélectionne
+		if (dateAccepted && !dates.some((d) => d.dateStart === dateAccepted?.dateStart)) {
+			dateAccepted = null;
+		}
+	}
+
+	function handleUpdateIsSondage(isSondage: boolean) {
+		eventData.isSondage = isSondage;
+	}
+
 	async function handleSubmit() {
-		if (!eventData) return;
+		if (!eventData?.id) return;
 		try {
-			if (!eventData.date_event) {
-				if (dateAccepted) {
-					const hasConfirmedOrganizers = dateAccepted.organizers.some(
-						(org) => org.maybehere === 'oui'
-					);
+			let dataToUpdate: Partial<EventType> = {};
 
-					if (!hasConfirmedOrganizers) {
-						modalState.confirm = {
-							isOpen: true,
-							data: {
-								title: 'Attention',
-								message:
-									"Aucun·e organisateur·ice n'a confirmé sa présence pour cette date. Voulez-vous vraiment la valider ?",
-								variant: 'danger',
-								onConfirm: async () => {
-									const updatedEvent = {
-										...eventData,
-										date_event: formatDatePb(dateAccepted.dateStart),
-										time_start: formatTimePb(dateAccepted.dateStart),
-										time_end: formatTimePb(dateAccepted.dateEnd),
-										organizers: filterAndConvertOrganizers(dateAccepted.organizers),
-										dateStart: dateAccepted.dateStart,
-										dateEnd: dateAccepted.dateEnd
-									};
-									await updateEvent(eventData.id, updatedEvent);
-									closeModal();
-								}
+			// Cas 1: Une date a été validée dans ce modal
+			if (dateAccepted) {
+				// 👉 On filtre les organisateurs 'oui' pour la date acceptée
+				const confirmedOrganizers = filterAndConvertOrganizers(dateAccepted.organizers ?? []);
+
+				// Vérifier si au moins un organisateur est confirmé 'oui'
+				if (confirmedOrganizers.length === 0) {
+					// Afficher la confirmation
+					modalState.confirm = {
+						isOpen: true,
+						data: {
+							title: "Attention",
+							message:
+								"Aucun·e organisateur·ice n'a confirmé ('oui') sa présence pour cette date. Voulez-vous vraiment la valider ?",
+							variant: "warning", // 👉 Utiliser warning plutôt que danger peut-être ?
+							onConfirm: async () => {
+								// Confirmer sans organisateurs 'oui'
+								dataToUpdate = {
+									date_event: formatDatePb(dateAccepted.dateStart),
+									time_start: formatTimePb(dateAccepted.dateStart),
+									time_end: formatTimePb(dateAccepted.dateEnd),
+									organizers: confirmedOrganizers, // Sera vide ou seulement les 'maybehere' convertis
+									dateStart: dateAccepted.dateStart, // Garder la date ISO complète
+									dateEnd: dateAccepted.dateEnd, // Garder la date ISO complète
+									isSondage: false, // Le sondage est terminé
+									dates_proposed: [] // Vider les propositions
+								};
+								await updateEvent(eventData.id!, dataToUpdate);
+								closeModal();
 							}
-						};
-						return;
-					}
-
-					const updatedEvent = {
-						...eventData,
+						}
+					};
+					return; // Sortir car on attend la confirmation
+				} else {
+					// Assez d'organisateurs, on prépare la mise à jour
+					dataToUpdate = {
 						date_event: formatDatePb(dateAccepted.dateStart),
 						time_start: formatTimePb(dateAccepted.dateStart),
 						time_end: formatTimePb(dateAccepted.dateEnd),
-						organizers: filterAndConvertOrganizers(dateAccepted.organizers),
+						organizers: confirmedOrganizers,
 						dateStart: dateAccepted.dateStart,
-						dateEnd: dateAccepted.dateEnd
+						dateEnd: dateAccepted.dateEnd,
+						isSondage: false,
+						dates_proposed: []
 					};
-					await updateEvent(eventData.id, updatedEvent);
-				} else {
-					const updatedEvent = {
-						...eventData,
-						dates_proposed: datesProposed
-					};
-					await updateEvent(eventData.id, updatedEvent);
 				}
-			} else {
-				const updatedEvent = {
-					...eventData,
-					organizers: organizers
+			}
+			// Cas 2: Pas de date validée, on sauvegarde juste les dates proposées actuelles
+			else {
+				dataToUpdate = {
+					dates_proposed: eventData.dates_proposed,
+					isSondage: eventData.isSondage // Sauvegarder si l'utilisateur a cliqué "annuler ce sondage"
+					// Ne pas toucher aux organisateurs principaux ici
 				};
-				await updateEvent(eventData.id, updatedEvent);
+			}
+
+			// Appeler PocketBase seulement si des données sont à mettre à jour
+			if (Object.keys(dataToUpdate).length > 0) {
+				await updateEvent(eventData.id, dataToUpdate);
 			}
 			closeModal();
 		} catch (error) {
-			console.error(error);
+			console.error("Erreur lors de la sauvegarde du sondage :", error);
+			// TODO: Afficher une alerte à l'utilisateur
 		}
 	}
 </script>
@@ -91,7 +106,11 @@
 		</h1>
 
 		<div class="py-4">
-			<DatePickerProposed {eventData} />
+			<DatePickerProposed
+				{eventData}
+				onUpdateDatesProposed={handleUpdateDatesProposed}
+				onUpdateIsSondage={handleUpdateIsSondage}
+			/>
 		</div>
 	</div>
 

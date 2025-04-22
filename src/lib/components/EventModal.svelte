@@ -314,6 +314,16 @@
 		eventData.isSondage = true;
 	}
 
+	// Fonction pour mettre à jour les organisateurs d'une date spécifique
+	function handleUpdateOrganizers(dateIndex: number, newOrganizers: OrganizerType[]) {
+		if (eventData.dates_proposed) {
+			eventData.dates_proposed[dateIndex] = {
+				...eventData.dates_proposed[dateIndex],
+				organizers: newOrganizers
+			};
+		}
+	}
+
 	// ::: Form Validation and Submission
 
 	function validateCurrentEvent(schemaType: ValidationSchemaType): boolean {
@@ -534,7 +544,18 @@
 						<div>
 							{@render ExternalProposalPref()}
 
-							<DatePickerProposed {eventData} localErrors={errors} />
+							<DatePickerProposed
+								{eventData}
+								onUpdateDatesProposed={(dates) => {
+									eventData.dates_proposed = dates;
+								}}
+								onUpdateIsSondage={(isSondage) => {
+									eventData.isSondage = isSondage;
+								}}
+								localErrors={formattedErrors?.dates_proposed?._errors
+									? { dates_proposed: formattedErrors.dates_proposed._errors }
+									: null}
+							/>
 						</div>
 					{:else}
 						<div>
