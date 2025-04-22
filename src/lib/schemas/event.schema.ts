@@ -2,17 +2,18 @@ import type { EventsRecord } from '$lib/types/pocketbase';
 import { z } from 'zod';
 
 // Base schemas
-export const OrganizerSchema = z.object({
-	id: z.string(),
-	username: z.string(),
-	tasks: z.array(z.string()),
-	maybehere: z.string().nullable().optional()
-});
-
+//
 export const TaskSchema = z.object({
 	name: z.string(),
 	description: z.string(),
 	type: z.enum(['default', 'beforeEvent', 'afterEvent', 'onEvent', 'none'])
+});
+
+export const OrganizerSchema = z.object({
+	id: z.string(),
+	username: z.string(),
+	tasks:  z.array(z.string()).optional(),
+	maybehere: z.string().nullable().optional()
 });
 
 // Définir d'abord un RecurrenceSchema de base
@@ -41,20 +42,11 @@ const BaseRecurrenceSchema = z
 					.object({
 						username: z.string().min(1, "Le nom d'utilisateur est requis"),
 						id: z.string().min(1, "L'ID est requis"),
-						tasks: z.array(z.string().optional())
 					})
-					.optional()
+					
 			)
 			.min(1, "L'équipe récurrente doit avoir au moins un membre"),
-		tasks: z
-			.array(
-				z.object({
-					name: z.string(),
-					description: z.string(),
-					type: z.string() // FIX: Accepter n'importe quelle string pour le type
-				})
-			)
-			.min(1, 'Au moins une tâche est requise'),
+		tasks: z.array(TaskSchema).min(1, 'Au moins une tâche est requise'),
 		autoConfirm: z.boolean(),
 		autoConfirmMin: z.number(),
 		notifyNoOrganizer: z.boolean(),
@@ -76,7 +68,11 @@ const BaseRecurrenceSchema = z
 	);
 
 // Ensuite, créer des variantes selon les besoins
-export const RecurrenceSchema = z.union([BaseRecurrenceSchema, z.null(), z.undefined()]);
+export const RecurrenceSchema = z.union([
+    BaseRecurrenceSchema,
+    z.null(),
+    z.undefined()
+]);
 
 export const RequiredRecurrenceSchema = BaseRecurrenceSchema;
 
@@ -194,7 +190,7 @@ const BaseEventFormSchema = z.object({
 			z.object({
 				name: z.string(),
 				description: z.string(),
-				type: z.string() // FIX:  Temporairement on accepte n'importe quelle string
+				type: z.enum(['default', 'beforeEvent', 'afterEvent', 'onEvent', 'none'])
 			})
 		)
 		.min(1, 'Au moins une tâche est requise'),
@@ -255,7 +251,7 @@ export type SyncEventRecord = Omit<EventsRecord, 'expand'> & {
 	categories: string[];
 	dates_proposed: DateProposedType[];
 	organizers: OrganizerType[];
-	recurrence?: RecurrenceType;
+	recurrence: RecurrenceType | [];
 	rooms: string[];
 	tasks: TaskType[];
 	external_proposal: ExternalProposalType;

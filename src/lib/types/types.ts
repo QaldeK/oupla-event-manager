@@ -29,6 +29,10 @@ export type {
 } from '$lib/schemas/event.schema';
 
 export type {
+	EventConflict // Le type complet d'un conflit d'événement
+} from '$lib/shared/eventsStore.svelte';
+
+export type {
 	ConfirmModalData, // Données pour le modal de confirmation
 	ModalStateType // État global des modals
 } from '$lib/shared/states.svelte';
@@ -38,7 +42,7 @@ export type {
 	PublicEventInfo // Infos des événements publics
 } from '$lib/shared/publicStore.svelte';
 
-// export * from './pocketbase';
+export * from './pocketbase';
 // export * from '$lib/schemas/event.schema';
 
 export interface UserType {
