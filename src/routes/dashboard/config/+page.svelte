@@ -1,8 +1,8 @@
 <script lang="ts">
-	import Modal from '$lib/components/Modal.svelte';
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
-	import { showAlert } from '$lib/shared/states.svelte';
-	import { slide } from 'svelte/transition';
+	import Modal from "$lib/components/Modal.svelte";
+	import { getSpace } from "$lib/shared";
+	import { showAlert } from "$lib/shared/states.svelte";
+	import { slide } from "svelte/transition";
 
 	let initialConfig = JSON.parse(JSON.stringify(getSpace.config));
 	let spaceConfig = $state({ ...getSpace.config });
@@ -11,24 +11,24 @@
 
 	let showModalConfirm = $state(false);
 	let defaultTaskIndex = $state(
-		spaceConfig.tasks.findIndex((task) => task.type === 'default') || 0
+		spaceConfig.tasks.findIndex((task) => task.type === "default") || 0
 	);
 
 	// 👉 Références aux conteneurs des listes pour gérer le focus
 	let roomsContainer: HTMLDivElement | undefined = $state();
 	let categoriesContainer: HTMLDivElement | undefined = $state();
 
-	const handleModalResponse = (response: 'leave' | 'save') => {
+	const handleModalResponse = (response: "leave" | "save") => {
 		// Fermer la modal
 		showModalConfirm = false;
 
 		switch (response) {
-			case 'leave':
+			case "leave":
 				// Restaurer la configuration originale
 				spaceConfig = spaceConfig;
 				break;
 
-			case 'save':
+			case "save":
 				// Enregistrer les modifications
 				handleSubmit();
 				break;
@@ -39,7 +39,7 @@
 	};
 
 	function addOption(array: string[]) {
-		array.push('');
+		array.push("");
 	}
 
 	function removeOption(array: string[], index: number) {
@@ -50,9 +50,9 @@
 		spaceConfig.tasks = [
 			...spaceConfig.tasks,
 			{
-				name: '',
-				description: '',
-				type: 'default'
+				name: "",
+				description: "",
+				type: "default"
 			}
 		];
 	}
@@ -78,43 +78,43 @@
 			defaultTaskIndex >= 0 &&
 			defaultTaskIndex < spaceConfig.tasks.length
 		) {
-			spaceConfig.tasks[defaultTaskIndex].type = 'none';
+			spaceConfig.tasks[defaultTaskIndex].type = "none";
 		}
 
-		spaceConfig.tasks[index].type = 'default';
+		spaceConfig.tasks[index].type = "default";
 		defaultTaskIndex = index;
 	}
 
 	async function handleSubmit() {
 		try {
-			console.log('Submitting config:', $state.snapshot(spaceConfig));
+			console.log("Submitting config:", $state.snapshot(spaceConfig));
 			await getSpace.updateConfig($state.snapshot(spaceConfig));
 
 			// Mettre à jour la référence initiale après succès
 			initialConfig = JSON.parse(JSON.stringify(spaceConfig));
 
-			showAlert('Configuration mise à jour', 'success');
+			showAlert("Configuration mise à jour", "success");
 		} catch (error) {
-			console.error('Erreur lors de la mise à jour :', error);
-			showAlert('Erreur lors de la mise à jour', 'error');
+			console.error("Erreur lors de la mise à jour :", error);
+			showAlert("Erreur lors de la mise à jour", "error");
 		}
 	}
 
 	function resetChanges() {
 		spaceConfig = JSON.parse(JSON.stringify(initialConfig));
-		defaultTaskIndex = spaceConfig.tasks.findIndex((task) => task.type === 'default') || 0;
+		defaultTaskIndex = spaceConfig.tasks.findIndex((task) => task.type === "default") || 0;
 	}
 </script>
 
 <!-- {$inspect('targetUrl', $state.snapshot(targetUrl))} -->
-{$inspect('hasUnsavedChanges', $state.snapshot(hasUnsavedChanges))}
+{$inspect("hasUnsavedChanges", $state.snapshot(hasUnsavedChanges))}
 <!-- {$inspect('showModalConfirm', $state.snapshot(showModalConfirm))} -->
 <!-- {$inspect('confirmResponse', $state.snapshot(confirmResponse))} -->
 <!-- {$inspect('spaceConfig from config page', $state.snapshot(spaceConfig))} -->
-{$inspect('spaceConfig ', $state.snapshot(spaceConfig))}
+{$inspect("spaceConfig ", $state.snapshot(spaceConfig))}
 
 <div class="container mx-auto p-4">
-	<h1 class="mb-6 text-2xl font-bold">Paramètres de l'espace {spaceConfig.space.name}</h1>
+	<h1 class="mb-6 text-2xl font-bold">Paramètres de l'espace {spaceConfig?.space?.name}</h1>
 
 	<form
 		onsubmit={(e) => {
@@ -223,14 +223,16 @@
 								</label>
 							</div>
 
-							<!-- Type de tâche (doable/none) -->
+							<!-- Type de tâche (beforeEvent/none) -->
 							<div class="min-w-[120px]">
 								<select
 									bind:value={spaceConfig.tasks[i].type}
 									disabled={i === defaultTaskIndex}
 									class="select select-sm w-full {i === defaultTaskIndex ? 'hidden' : ''}"
 								>
-									<option value="doable">Réalisable</option>
+									<option value="beforeEvent">En amont de l'événement</option>
+									<option value="onEvent">Pendant l'événement</option>
+									<option value="afterEvent">Après l'événement</option>
 									<option value="none">Aucun</option>
 								</select>
 							</div>
@@ -240,7 +242,7 @@
 								onclick={() => setDefaultTask(i)}
 								class="btn btn-sm {i === defaultTaskIndex ? 'btn-success' : 'btn'}"
 							>
-								{i === defaultTaskIndex ? 'Par défaut ✓' : 'Définir par défaut'}
+								{i === defaultTaskIndex ? "Par défaut ✓" : "Définir par défaut"}
 							</button>
 
 							<!-- Bouton de suppression -->
@@ -285,7 +287,7 @@
 		<!-- Boutons d'action -->
 		{#if hasUnsavedChanges}
 			<div
-				transition:slide={{ duration: 300, axis: 'y' }}
+				transition:slide={{ duration: 300, axis: "y" }}
 				class="bg-base-300/70 shadow-t-lg fixed bottom-0 left-0 flex w-full justify-end gap-4 px-4 py-2"
 			>
 				<button
@@ -308,8 +310,8 @@
 		<h2>Modifications non enregistrées</h2>
 		<p>Vous avez des modifications non enregistrées. Que souhaitez-vous faire ?</p>
 		<div class="mx-1 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600">
-			<button onclick={() => handleModalResponse('leave')}>Quitter sans enregistrer</button>
-			<button onclick={() => handleModalResponse('save')}>Enregistrer</button>
+			<button onclick={() => handleModalResponse("leave")}>Quitter sans enregistrer</button>
+			<button onclick={() => handleModalResponse("save")}>Enregistrer</button>
 		</div>
 	</Modal>
 {/if}

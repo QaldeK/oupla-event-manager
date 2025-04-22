@@ -22,7 +22,7 @@
 
 	interface RecurrentTabProps {
 		recurrence: RequiredRecurrenceType;
-		localErrors: Record<string, any>;
+		localErrors: string | undefined;
 	}
 
 	let { recurrence = $bindable<RequiredRecurrenceType>(), localErrors }: RecurrentTabProps =

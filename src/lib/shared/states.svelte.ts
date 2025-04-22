@@ -144,6 +144,7 @@ export const messageSheet = $state({
 
 import { userDb } from '$lib/shared/userDb.svelte';
 
+// FIXIT recurrenceTeam
 export const hasAuthorizations = (params: {
 	isRecurrent?: boolean;
 	recurrenceTeam?: string[];

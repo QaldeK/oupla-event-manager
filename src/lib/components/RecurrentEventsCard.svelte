@@ -6,7 +6,7 @@
 	import { lisibleDate, tooltip } from '$lib/utils';
 	import { userDb } from '$lib/shared/userDb.svelte';
 
-	import { CalendarCheck, PencilLine, UserCheck, UserPlus } from 'lucide-svelte';
+	import { CalendarCheck, Pencil, PencilLine, UserCheck, UserPlus } from 'lucide-svelte';
 
 	type RecurrenceType = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY_BY_DATE' | 'MONTHLY_BY_DAY';
 
@@ -116,7 +116,7 @@
 											disabled={!Array.isArray(occurrence.organizers) ||
 												occurrence.organizers.length === 0}
 										>
-											<CalendarCheck size={18} />
+											<CalendarCheck />
 										</button>
 									</div>
 								{/if}
@@ -128,7 +128,7 @@
 										}}
 										class="btn btn-square btn-soft btn-sm"
 									>
-										<PencilLine />
+										<Pencil />
 									</button>
 								</div>
 							</div>
