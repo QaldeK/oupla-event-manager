@@ -1,23 +1,23 @@
-import { SyncStore } from '$lib/shared/syncState.svelte';
-import type { EventsRecord, UsersResponse } from '$lib/types/pocketbase.ts';
-import type { EventType, OrganizerType, TaskType } from '$lib/schemas/event.schema';
-import { Collections } from '$lib/types/pocketbase';
-import { format, parse } from 'date-fns';
+import { SyncStore } from "$lib/shared/syncState.svelte";
+import type { EventsRecord, UsersResponse } from "$lib/types/pocketbase.ts";
+import type { EventType, OrganizerType, TaskType } from "$lib/schemas/event.schema";
+import { Collections } from "$lib/types/pocketbase";
+import { format, parse } from "date-fns";
 import {
 	findConflictsForEvent,
 	findOverlappingGroupsOnDate,
 	buildEventTimeInfoMap,
 	type EventTimeInfo, // Importe le type si besoin
 	type Conflict // Importe le type si besoin
-} from '$lib/utils/eventConflicts';
-import type { StoreConfig } from '$lib/types/syncState.types';
+} from "$lib/utils/eventConflicts";
+import type { StoreConfig } from "$lib/types/syncState.types";
 
-import { updateEvent, sendGenericEmail, type GenericEmailPayload } from '$lib/pocketbase.svelte';
-import type { UserType } from '$lib/types/types';
+import { updateEvent, sendGenericEmail, type GenericEmailPayload } from "$lib/pocketbase.svelte";
+import type { UserType } from "$lib/types/types";
 
-import { modalState, openTaskModal } from '$lib/shared/states.svelte';
-import { getSpace } from './spaceOptions.svelte';
-import { filterAndConvertOrganizers } from '$lib/utils.js';
+import { modalState, openTaskModal } from "$lib/shared/states.svelte";
+import { getSpace } from "./spaceOptions.svelte";
+import { filterAndConvertOrganizers } from "$lib/utils.js";
 // Ajouter ces types au début du fichier
 export interface EventConflict {
 	id: string;
@@ -25,7 +25,7 @@ export interface EventConflict {
 	time_start: string;
 	time_end: string;
 	rooms: string[];
-	conflictType: 'confirmed' | 'unconfirmed' | 'sondage' | 'close-confirmed' | 'close-unconfirmed';
+	conflictType: "confirmed" | "unconfirmed" | "sondage" | "close-confirmed" | "close-unconfirmed";
 	hasSameRoom: boolean;
 	date_event: string;
 	isConfirmed: boolean;
@@ -33,9 +33,9 @@ export interface EventConflict {
 	sourceEventId?: string; // Propriété temporaire pour la déduplication
 }
 
-type ConflictType = 'confirmed' | 'unconfirmed' | 'sondage';
+type ConflictType = "confirmed" | "unconfirmed" | "sondage";
 
-interface EventConflictInfo {
+export interface EventConflictInfo {
 	id: string;
 	event_title: string;
 	organizers: OrganizerType[];
@@ -52,8 +52,8 @@ export interface ConflictMap {
 	confirmed: EventConflict[];
 	unconfirmed: EventConflict[];
 	sondage: EventConflict[];
-	'close-confirmed': EventConflict[];
-	'close-unconfirmed': EventConflict[];
+	"close-confirmed": EventConflict[];
+	"close-unconfirmed": EventConflict[];
 }
 
 // Type helper qui combine EventsRecord et StoreRecord
@@ -74,30 +74,30 @@ class EventsStore {
 		isInitialized: false,
 		error: null as Error | null,
 		initPromise: null as Promise<void> | null,
-		mode: null as 'internal' | 'external' | null
+		mode: null as "internal" | "external" | null
 	});
 
 	async init({ spaceId, mode }: StoreConfig) {
 		if (this.#store.initPromise) return this.#store.initPromise;
 
 		this.#store.initPromise = (async () => {
-			const dbName = 'eventsStore'; //= mode === 'external' ? 'events-public' : 'events-dashboard';
+			const dbName = "eventsStore"; //= mode === 'external' ? 'events-public' : 'events-dashboard';
 
-			const filter = `space = '${spaceId}' && (date_event = "" || date_event >= '${new Date().toISOString().split('T')[0]}')`;
+			const filter = `space = '${spaceId}' && (date_event = "" || date_event >= '${new Date().toISOString().split("T")[0]}')`;
 
 			const syncStore = new SyncStore<SyncEventRecord>({
-				name: 'eventsStore',
+				name: "eventsStore",
 				version: 1,
 				dbName,
 				sync: {
-					mode: 'realtime',
+					mode: "realtime",
 					filter,
-					sort: 'date_event',
-					expand: 'created_by'
+					sort: "date_event",
+					expand: "created_by"
 				},
 				cache: {
-					maxRecords: mode === 'external' ? 200 : 500,
-					strategy: 'lru'
+					maxRecords: mode === "external" ? 200 : 500,
+					strategy: "lru"
 				}
 			});
 
@@ -112,12 +112,12 @@ class EventsStore {
 
 	async forceRefresh(): Promise<void> {
 		if (!this.#store.syncStore) {
-			throw new Error('Store not initialized');
+			throw new Error("Store not initialized");
 		}
 		try {
 			await this.#store.syncStore.forceRefresh();
 		} catch (error) {
-			console.error('Erreur lors du refresh forcé:', error);
+			console.error("Erreur lors du refresh forcé:", error);
 			throw error;
 		}
 	}
@@ -138,7 +138,7 @@ class EventsStore {
 				mode: null
 			};
 		} catch (error) {
-			console.error('Erreur lors de la destruction du store:', error);
+			console.error("Erreur lors de la destruction du store:", error);
 			// Forcer la réinitialisation même en cas d'erreur
 			this.#store.isInitialized = false;
 			this.#store.syncStore = null;
@@ -225,7 +225,7 @@ class EventsStore {
 
 		// horaire par defaut inséré ensuite si non renseigné
 		const getDefaultTimes = (isStart: boolean) => {
-			return isStart ? '00:00' : '23:59';
+			return isStart ? "00:00" : "23:59";
 		};
 
 		for (const event of this.allEvents) {
@@ -243,14 +243,14 @@ class EventsStore {
 					hasDate && !hasTime
 						? getDefaultTimes(true)
 						: dateStart
-							? format(new Date(dateStart), 'HH:mm')
+							? format(new Date(dateStart), "HH:mm")
 							: event.time_start;
 
 				const timeEnd =
 					hasDate && !hasTime
 						? getDefaultTimes(false)
 						: dateEnd
-							? format(new Date(dateEnd), 'HH:mm')
+							? format(new Date(dateEnd), "HH:mm")
 							: event.time_end;
 
 				return {
@@ -258,7 +258,7 @@ class EventsStore {
 					event_title: event.event_title,
 					organizers: event.organizers,
 					rooms: event.rooms,
-					conflictType: event.isConfirmed ? 'confirmed' : 'unconfirmed',
+					conflictType: event.isConfirmed ? "confirmed" : "unconfirmed",
 					date_event: event.date_event,
 					dateStart: dateStart || event.dateStart,
 					dateEnd: dateEnd || event.dateEnd,
@@ -276,9 +276,9 @@ class EventsStore {
 					if (event.date_event) return event.date_event;
 
 					// Pour les dates ISO ou standard
-					return dateString.split('T')[0].split(' ')[0];
+					return dateString.split("T")[0].split(" ")[0];
 				} catch (error) {
-					console.error('Error processing date:', dateString, error);
+					console.error("Error processing date:", dateString, error);
 					return null;
 				}
 			};
@@ -322,7 +322,7 @@ class EventsStore {
 							proposedDate.dateStart,
 							proposedDate.dateEnd
 						);
-						sondageEventInfo.conflictType = 'sondage';
+						sondageEventInfo.conflictType = "sondage";
 						addEventToDate(proposedDate.dateStart, sondageEventInfo);
 					}
 				}
@@ -349,7 +349,7 @@ class EventsStore {
 	// ::: Utilitaires partagés
 	private timeUtils = {
 		parseTimeToMinutes: (time: string): number => {
-			const [hours, minutes] = time.split(':').map(Number);
+			const [hours, minutes] = time.split(":").map(Number);
 			return hours * 60 + minutes;
 		},
 
@@ -470,7 +470,7 @@ class EventsStore {
 
 	private parseTimeToDate(timeString: string, baseDate: Date): Date {
 		{
-			const [hours, minutes] = timeString.split(':').map(Number);
+			const [hours, minutes] = timeString.split(":").map(Number);
 			const date = new Date(baseDate);
 			date.setHours(hours, minutes, 0, 0);
 			return date;
@@ -561,11 +561,11 @@ class EventsStore {
 		modalState.confirm = {
 			isOpen: true,
 			data: {
-				title: 'Confirmer la désinscription',
+				title: "Confirmer la désinscription",
 				message: isLastOrganizer
 					? `Vous êtes le/la dernier·e organisateur·ice pour cet événement (${taskName}). Si l'événement doit avoir lieu bientôt, songez à l'annuler. Veuillez confirmer votre désinscription.`
 					: `L'événement "${event.event_title}" est confirmé. Êtes-vous sûr·e de vouloir vous désinscrire de la tâche "${taskName}" ?`,
-				variant: isLastOrganizer ? 'danger' : 'warning',
+				variant: isLastOrganizer ? "danger" : "warning",
 				showCheckbox: {
 					label: "Prévenir les autres organisateur·ices de l'événement",
 					checked: true // Pré-coché par défaut
@@ -649,8 +649,8 @@ class EventsStore {
 				const subject = `[Oupla] Désinscription d'un·e organisateur·ice : ${event.event_title}`;
 				// Formatage simple, on pourrait utiliser une fonction formatDate depuis utils.js si partagée
 				const eventDateStr = event.date_event
-					? new Date(event.date_event).toLocaleDateString('fr-FR')
-					: 'date inconnue';
+					? new Date(event.date_event).toLocaleDateString("fr-FR")
+					: "date inconnue";
 				let htmlBody = `
                     <p>Bonjour,</p>
                     <p>L'utilisateur·ice <b>${currentUser.username}</b> s'est désinscrit·e de la tâche "<b>${taskName}</b>" pour l'événement "<b>${event.event_title}</b>" prévu le ${eventDateStr}.</p>
@@ -658,13 +658,13 @@ class EventsStore {
                 `;
 
 				// Ajouter le message personnalisé s'il existe
-				if (customMessage && customMessage.trim() !== '') {
+				if (customMessage && customMessage.trim() !== "") {
 					// Échapper le HTML potentiel pour la sécurité
-					const escapedCustomMessage = customMessage.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+					const escapedCustomMessage = customMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 					htmlBody = `
                         <p><b>Message de ${currentUser.username} :</b></p>
                         <blockquote style="padding-left: 1em; border-left: 3px solid #ccc; margin-left: 0.5em; font-style: italic;">
-                            ${escapedCustomMessage.replace(/\n/g, '<br>')}
+                            ${escapedCustomMessage.replace(/\n/g, "<br>")}
                         </blockquote>
                         <p style="margin-top: 1em;">---</p>
                         ${htmlBody}
@@ -674,15 +674,15 @@ class EventsStore {
 				htmlBody += `<p style="margin-top: 1.5em;">Cordialement,<br>L'équipe Oupla</p>`;
 
 				// 2. Définir la stratégie de destinataires basée sur isRecurrent
-				let recipientGroups: GenericEmailPayload['recipientGroups'] = [];
-				let fallbackRecipientGroups: GenericEmailPayload['fallbackRecipientGroups'] = [
-					'spaceAdmins'
+				let recipientGroups: GenericEmailPayload["recipientGroups"] = [];
+				let fallbackRecipientGroups: GenericEmailPayload["fallbackRecipientGroups"] = [
+					"spaceAdmins"
 				]; // Fallback commun
 
 				if (event.isRecurrent) {
-					recipientGroups = ['recurrenceTeam']; // Cible l'équipe de récurrence
+					recipientGroups = ["recurrenceTeam"]; // Cible l'équipe de récurrence
 				} else {
-					recipientGroups = ['otherOrganizers']; // Cible les autres organisateurs directs
+					recipientGroups = ["otherOrganizers"]; // Cible les autres organisateurs directs
 				}
 
 				const payload: GenericEmailPayload = {
@@ -697,13 +697,13 @@ class EventsStore {
 				};
 
 				// 3. Appeler la fonction d'envoi générique
-				console.log('Preparing email payload with context:', {
+				console.log("Preparing email payload with context:", {
 					eventId: event.id,
 					excludeUserId: currentUser.id
 				});
 				await sendGenericEmail(payload);
 			} catch (err) {
-				console.error('Erreur lors de la préparation/envoi de la notification:', err);
+				console.error("Erreur lors de la préparation/envoi de la notification:", err);
 				// Optionnel: Afficher une erreur à l'utilisateur que la notification n'a pas pu être envoyée
 			}
 		}
@@ -766,7 +766,7 @@ class EventsStore {
 							if (event.isConfirmed && hadTasksBefore) {
 								// Ouvrir le modal de confirmation pour la désinscription complète
 								// On utilise la première tâche qu'il avait comme "raison" pour le message, ou une note générique
-								const pseudoTaskName = currentOrganizers[userIndex].tasks[0] || 'ses tâches';
+								const pseudoTaskName = currentOrganizers[userIndex].tasks[0] || "ses tâches";
 								this._openConfirmationModal(
 									event,
 									currentUser,
@@ -806,7 +806,7 @@ class EventsStore {
 		// Vérifications initiales
 		if (!event || !currentUser) {
 			console.error(
-				'Données invalides pour manageTaskSubscription: événement ou utilisateur manquant.'
+				"Données invalides pour manageTaskSubscription: événement ou utilisateur manquant."
 			);
 			return;
 		}
@@ -879,7 +879,7 @@ class EventsStore {
 
 			await updateEvent(event.id, updateData);
 		} catch (error) {
-			console.error('Erreur lors de la mise à jour des organisateurs :', error);
+			console.error("Erreur lors de la mise à jour des organisateurs :", error);
 		}
 	}
 
