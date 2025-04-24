@@ -1,15 +1,15 @@
 <script lang="ts">
-	import ConflictAlert from '$lib/components/ConflictAlert.svelte';
-	import Info from '$lib/components/Info.svelte';
-	import { type EventType } from '$lib/types/event';
-	import { lisibleDate } from '$lib/utils';
-	import { modifyRecord } from '$lib/pocketbase.svelte';
-	import { modalState } from '$lib/shared/states.svelte';
-	import 'flatpickr/dist/flatpickr.min.css';
-	import 'tippy.js/dist/tippy.css';
+	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
+	import Info from "$lib/components/Info.svelte";
+	import { type EventType } from "$lib/types/event";
+	import { lisibleDate } from "$lib/utils";
+	import { modifyRecord } from "$lib/pocketbase.svelte";
+	import { modalState } from "$lib/shared/states.svelte";
+	import "flatpickr/dist/flatpickr.min.css";
+	import "tippy.js/dist/tippy.css";
 
-	import DatePicker from './DatePicker.svelte';
-	import TimeReservation from './TimeReservation.svelte';
+	import DatePicker from "./DatePicker.svelte";
+	import TimeReservation from "./TimeReservation.svelte";
 
 	interface Props {
 		localErrors: unknown;
@@ -27,7 +27,7 @@
 	// Fonction de transition vers le mode sondage
 	function switchToSondage() {
 		eventData.isSondage = true;
-		eventData.date_event = '';
+		eventData.date_event = "";
 		if (eventData.dates_proposed?.length === 0) {
 			// Initialiser avec la date actuelle si disponible
 			if (eventData.date_event && eventData.time_start && eventData.time_end) {
@@ -37,11 +37,11 @@
 	}
 
 	const resetDate = (): void => {
-		eventData.date_event = '';
-		eventData.time_start = '';
-		eventData.time_end = '';
-		eventData.start_event = '';
-		eventData.start_public = '';
+		eventData.date_event = "";
+		eventData.time_start = "";
+		eventData.time_end = "";
+		eventData.start_event = "";
+		eventData.start_public = "";
 		eventData.organizers = [];
 	};
 
@@ -49,12 +49,12 @@
 		modalState.confirm = {
 			isOpen: true,
 			data: {
-				variant: 'danger',
+				variant: "danger",
 				title: "Annuler l'événement",
 				message:
 					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
 				onConfirm: () => {
-					modifyRecord('events', eventData.id, { canceled: true });
+					modifyRecord("events", eventData.id, { canceled: true });
 					modalState.event = false;
 				}
 			}
@@ -81,8 +81,11 @@
 		</Info>
 		<div class="lg:w-1/2">
 			<DatePicker
-				bind:value={eventData.date_event}
+				initialValue={eventData.date_event}
 				eventId={eventData.id}
+				onChange={(value) => {
+					if (value) eventData.date_event = value as string;
+				}}
 				onResetDate={resetDate}
 				resetButton={true}
 				label="Date de l'événement"

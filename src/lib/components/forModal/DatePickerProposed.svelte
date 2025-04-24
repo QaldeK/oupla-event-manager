@@ -243,7 +243,6 @@
 
 	// État du modal
 	let isOrganizerModalOpen = $state(false);
-	let currentDateIndex = $state<number | null>(null);
 
 	function openOrganizerModal(index: number) {
 		// 👉 Trouver l'index réel dans le tableau eventData.dates_proposed
@@ -291,6 +290,18 @@
 				return Math.abs(proposalDateTime - dateProposedTime) < 1000;
 			});
 		});
+	}
+
+	function handleDatePickerChange(newValue: string | string[]) {
+		console.log("DatePicker proposed new value:", newValue);
+		// Assurer que c'est toujours un tableau car on est en mode multiple ici
+		if (Array.isArray(newValue)) {
+			selectedDate = newValue;
+		} else {
+			// Gérer le cas où on recevrait une string (ne devrait pas arriver en mode multiple avec confirmDate)
+			console.warn("Received non-array value in multiple mode from DatePicker:", newValue);
+			selectedDate = newValue ? [newValue] : []; // Convertir en tableau ou vider
+		}
 	}
 </script>
 
@@ -384,7 +395,7 @@
 			{/if}
 		</p>
 	</Info>
-	{#if eventData?.external_proposal?.proposals?.length > 0 && hasUnproposedDates()}
+	{#if (eventData?.external_proposal?.proposals?.length ?? 0) > 0 && hasUnproposedDates()}
 		<div>
 			<Info variant="warning">
 				<p class="text-fluid-sm">
@@ -406,10 +417,12 @@
 
 	<div class="mb-6 flex flex-wrap items-center gap-x-10 gap-y-2">
 		<DatePicker
-			bind:value={selectedDate}
+			initialValue={selectedDate}
+			onChange={handleDatePickerChange}
 			{eventId}
 			mode="multiple"
 			placeholder="Selectionnez une ou plusieurs dates"
+			label="Choisissez les dates à proposer"
 		/>
 		<div class="flex flex-col gap-y-1">
 			<span class="text-fluid-sm"> Heures de réservation du lieu </span>

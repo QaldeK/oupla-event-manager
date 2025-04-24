@@ -2,10 +2,10 @@
 	/* TODO :
 		- basculer a réccurant lorsque qu'explicitement demander (pas par les tabs mais boutons)
 	*/
-	import DatePicker from '$lib/components/forModal/DatePicker.svelte';
-	import MultiSelect from './MultiSelect.svelte';
+	import DatePicker from "$lib/components/forModal/DatePicker.svelte";
+	import MultiSelect from "./MultiSelect.svelte";
 
-	import type { RequiredRecurrenceType } from '$lib/types/types';
+	import type { RequiredRecurrenceType } from "$lib/types/types";
 	import {
 		addDays,
 		addMonths,
@@ -17,8 +17,8 @@
 		isBefore,
 		parse,
 		startOfMonth
-	} from 'date-fns';
-	import { fr } from 'date-fns/locale';
+	} from "date-fns";
+	import { fr } from "date-fns/locale";
 
 	interface RecurrentTabProps {
 		recurrence: RequiredRecurrenceType;
@@ -36,10 +36,10 @@
 	}
 
 	const recurrenceChoice: RecurrenceChoice = {
-		WEEKLY: 'WEEKLY',
-		BIWEEKLY: 'BIWEEKLY',
-		MONTHLY_BY_DATE: 'MONTHLY_BY_DATE',
-		MONTHLY_BY_DAY: 'MONTHLY_BY_DAY'
+		WEEKLY: "WEEKLY",
+		BIWEEKLY: "BIWEEKLY",
+		MONTHLY_BY_DATE: "MONTHLY_BY_DATE",
+		MONTHLY_BY_DAY: "MONTHLY_BY_DAY"
 	};
 
 	// let recurrenceType = $state<typeof RecurrenceType>(RecurrenceType.NONE);
@@ -48,7 +48,7 @@
 	let selectedOccurrences = $state([] as number[]);
 
 	$effect(() => {
-		if (recurrence?.recurrenceType !== (recurrenceChoice.MONTHLY_BY_DAY || '')) {
+		if (recurrence?.recurrenceType !== (recurrenceChoice.MONTHLY_BY_DAY || "")) {
 			// Reset both values when not in MONTHLY_BY_DAY mode
 			selectedOccurrences = [];
 			recurrence.monthlyByDayOccurrences = [];
@@ -63,7 +63,7 @@
 			}
 			// Sinon, on initialise avec la première date
 			else if (recurrence.firstDate) {
-				const firstDay = parse(recurrence.firstDate, 'yyyy-MM-dd', new Date());
+				const firstDay = parse(recurrence.firstDate, "yyyy-MM-dd", new Date());
 				const initialOccurrence = [getOccurrenceInMonth(firstDay)];
 				selectedOccurrences = initialOccurrence;
 				recurrence.monthlyByDayOccurrences = initialOccurrence;
@@ -128,30 +128,30 @@
 		options: { dayOfWeek?: number; occurrences?: number[] } = {}
 	): string[] {
 		if (!startDate || !lastDate || !recurrenceType) {
-			console.error('Missing required parameters for generateRecurringDates');
+			console.error("Missing required parameters for generateRecurringDates");
 			return [];
 		}
-		const start = parse(startDate, 'yyyy-MM-dd', new Date());
-		const end = parse(lastDate, 'yyyy-MM-dd', new Date());
+		const start = parse(startDate, "yyyy-MM-dd", new Date());
+		const end = parse(lastDate, "yyyy-MM-dd", new Date());
 		const dates = [];
 		let current = start;
 
 		while (!isAfter(current, end)) {
-			dates.push(format(current, 'yyyy-MM-dd'));
+			dates.push(format(current, "yyyy-MM-dd"));
 			switch (recurrenceType) {
-				case 'WEEKLY':
+				case "WEEKLY":
 					current = addWeeks(current, 1);
 					break;
 
-				case 'BIWEEKLY':
+				case "BIWEEKLY":
 					current = addWeeks(current, 2);
 					break;
 
-				case 'MONTHLY_BY_DATE':
+				case "MONTHLY_BY_DATE":
 					current = addMonths(current, 1);
 					break;
 
-				case 'MONTHLY_BY_DAY':
+				case "MONTHLY_BY_DAY":
 					const dayOfWeek = options.dayOfWeek ?? getDay(start);
 					const defaultOccurrence = [getOccurrenceInMonth(start)];
 					const occurrences = options.occurrences ?? defaultOccurrence;
@@ -169,7 +169,7 @@
 
 							// On vérifie si la date est dans l'intervalle [startDate, lastDate]
 							if (!isAfter(dateForOccurrence, end) && !isBefore(dateForOccurrence, start)) {
-								const formattedDate = format(dateForOccurrence, 'yyyy-MM-dd');
+								const formattedDate = format(dateForOccurrence, "yyyy-MM-dd");
 								if (!dates.includes(formattedDate)) {
 									dates.push(formattedDate);
 								}
@@ -179,7 +179,7 @@
 					}
 					return dates;
 				default:
-					throw new Error('Type de récurrence non supporté');
+					throw new Error("Type de récurrence non supporté");
 			}
 		}
 
@@ -189,24 +189,24 @@
 	function getOccurrenceLabel(value: number) {
 		switch (value) {
 			case 1:
-				return '1er';
+				return "1er";
 			case 2:
-				return '2eme';
+				return "2eme";
 			case 3:
-				return '3eme';
+				return "3eme";
 			case 4:
-				return '4eme';
+				return "4eme";
 			case 5:
-				return 'Dernier';
+				return "Dernier";
 			default:
-				return '';
+				return "";
 		}
 	}
 
 	// :::  label of occurrences
 	let labelOfOcurrence = $derived.by(() => {
 		if (!selectedOccurrences?.length || !recurrence?.firstDate) {
-			return '';
+			return "";
 		}
 
 		if (selectedOccurrences.length === 1) {
@@ -214,17 +214,17 @@
 		}
 
 		const ordinals = selectedOccurrences.map((occurrence) => getOccurrenceLabel(occurrence));
-		const weekday = format(parse(recurrence.firstDate, 'yyyy-MM-dd', new Date()), 'EEEE', {
+		const weekday = format(parse(recurrence.firstDate, "yyyy-MM-dd", new Date()), "EEEE", {
 			locale: fr
 		});
-		return `Les ${ordinals.join(', ')} ${weekday}s du mois`;
+		return `Les ${ordinals.join(", ")} ${weekday}s du mois`;
 	});
 
 	function getFormattedLabel(occurrence: number, date: string) {
-		if (!occurrence || !date) return '';
+		if (!occurrence || !date) return "";
 		return `${getOccurrenceLabel(occurrence)} ${format(
-			parse(date, 'yyyy-MM-dd', new Date()),
-			'EEEE',
+			parse(date, "yyyy-MM-dd", new Date()),
+			"EEEE",
 			{ locale: fr }
 		)}`;
 	}
@@ -249,7 +249,7 @@
 			recurrence.recurrenceType === recurrenceChoice.MONTHLY_BY_DAY &&
 			selectedOccurrences?.length === 0
 		) {
-			const firstDay = parse(recurrence.firstDate, 'yyyy-MM-dd', new Date());
+			const firstDay = parse(recurrence.firstDate, "yyyy-MM-dd", new Date());
 			selectedOccurrences = [getOccurrenceInMonth(firstDay)];
 		}
 
@@ -277,8 +277,8 @@
 	$effect(() => {
 		let firstDate = recurrence.firstDate;
 		if (firstDate) {
-			let defaultLastDate = addMonths(parse(firstDate, 'yyyy-MM-dd', new Date()), 4);
-			let defaultLastDateFormated = format(defaultLastDate, 'yyyy-MM-dd');
+			let defaultLastDate = addMonths(parse(firstDate, "yyyy-MM-dd", new Date()), 4);
+			let defaultLastDateFormated = format(defaultLastDate, "yyyy-MM-dd");
 			recurrence.lastDate = defaultLastDateFormated;
 		}
 	});
@@ -297,7 +297,11 @@
 	<div class="flex flex-wrap gap-x-6 gap-y-4">
 		<div class="min-w-fit">
 			<div class="min-w-54">
-				<DatePicker bind:value={recurrence.firstDate} label="	Première date" />
+				<DatePicker
+					initialValue={recurrence.firstDate}
+					onChange={(value) => (recurrence.firstDate = value)}
+					label="Première date"
+				/>
 			</div>
 			{#if localErrors?.firstDate?._errors?.length}
 				<p class="text-fluid-xs text-error italic">{localErrors.firstDate._errors[0]}</p>
@@ -306,7 +310,11 @@
 		<!-- Date de fin -->
 		<div class="min-w-fit">
 			<div class="min-w-54">
-				<DatePicker bind:value={recurrence.lastDate} label="Jusqu'au..." />
+				<DatePicker
+					initialValue={recurrence.lastDate}
+					onChange={(value) => (recurrence.lastDate = value)}
+					label="Jusqu'au..."
+				/>
 			</div>
 			{#if localErrors?.lastDate?._errors?.length}
 				<p class="text-fluid-xs text-error italic">{localErrors.lastDate._errors[0]}</p>
@@ -343,11 +351,11 @@
 			<MultiSelect
 				bind:selectedValues={selectedOccurrences}
 				options={[
-					{ value: 1, label: '1er' },
-					{ value: 2, label: '2eme' },
-					{ value: 3, label: '3eme' },
-					{ value: 4, label: '4eme' },
-					{ value: 5, label: 'Dernier' }
+					{ value: 1, label: "1er" },
+					{ value: 2, label: "2eme" },
+					{ value: 3, label: "3eme" },
+					{ value: 4, label: "4eme" },
+					{ value: 5, label: "Dernier" }
 				]}
 				placeholder="Tous les {labelOfOcurrence} du mois"
 			/>
@@ -367,7 +375,7 @@
 				<ul class="space-y-1">
 					{#each recurrence.recurrenceDates as date (date)}
 						<li class="text-fluid-sm text-gray-600">
-							{format(parse(date, 'yyyy-MM-dd', new Date()), 'EEEE d MMMM yyyy', { locale: fr })}
+							{format(parse(date, "yyyy-MM-dd", new Date()), "EEEE d MMMM yyyy", { locale: fr })}
 						</li>
 					{/each}
 				</ul>
