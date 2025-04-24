@@ -2,21 +2,21 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import { getSpace } from "$lib/shared";
 	import { showAlert } from "$lib/shared/states.svelte";
-	import { slide } from "svelte/transition";
+	import { fade, slide } from "svelte/transition";
+
+	import { X } from "lucide-svelte";
+	import type { TaskType } from "$lib/schemas/event.schema";
+	import { collab } from "@tiptap/pm/collab";
 
 	let initialConfig = JSON.parse(JSON.stringify(getSpace.config));
-	let spaceConfig = $state({ ...getSpace.config });
+	let spaceConfig = $state({ ...initialConfig });
 
 	let hasUnsavedChanges = $derived(JSON.stringify(spaceConfig) !== JSON.stringify(initialConfig));
 
 	let showModalConfirm = $state(false);
-	let defaultTaskIndex = $state(
-		spaceConfig.tasks.findIndex((task) => task.type === "default") || 0
-	);
+	let getDefaultTaskIndex = initialConfig.tasks.findIndex((task: TaskType) => task.isDefault) || 0;
 
-	// 👉 Références aux conteneurs des listes pour gérer le focus
-	let roomsContainer: HTMLDivElement | undefined = $state();
-	let categoriesContainer: HTMLDivElement | undefined = $state();
+	let defaultTaskIndex = $state(getDefaultTaskIndex);
 
 	const handleModalResponse = (response: "leave" | "save") => {
 		// Fermer la modal
@@ -52,7 +52,7 @@
 			{
 				name: "",
 				description: "",
-				type: "default"
+				type: "onEvent"
 			}
 		];
 	}
@@ -72,16 +72,19 @@
 	}
 
 	function setDefaultTask(index: number) {
-		// Définir la tâche comme "default" et réinitialiser l'ancienne
-		if (
-			defaultTaskIndex !== undefined &&
-			defaultTaskIndex >= 0 &&
-			defaultTaskIndex < spaceConfig.tasks.length
-		) {
-			spaceConfig.tasks[defaultTaskIndex].type = "none";
+		// Retirer le flag 'isDefault' de l'ancienne tâche par défaut (si elle existe)
+		if (index === defaultTaskIndex) {
+			return;
+		}
+		const oldDefaultIndex = spaceConfig.tasks.findIndex((task: TaskType) => task.isDefault);
+		if (oldDefaultIndex !== -1) {
+			spaceConfig.tasks[oldDefaultIndex].isDefault = false;
 		}
 
-		spaceConfig.tasks[index].type = "default";
+		// Mettre le flag 'isDefault' sur la nouvelle tâche
+		spaceConfig.tasks[index].isDefault = true;
+
+		// Mettre à jour l'index par défaut
 		defaultTaskIndex = index;
 	}
 
@@ -102,19 +105,19 @@
 
 	function resetChanges() {
 		spaceConfig = JSON.parse(JSON.stringify(initialConfig));
-		defaultTaskIndex = spaceConfig.tasks.findIndex((task) => task.type === "default") || 0;
+		defaultTaskIndex = spaceConfig.tasks.findIndex((task: TaskType) => task.isDefault) || 0;
 	}
 </script>
 
 <!-- {$inspect('targetUrl', $state.snapshot(targetUrl))} -->
-{$inspect("hasUnsavedChanges", $state.snapshot(hasUnsavedChanges))}
+<!-- {$inspect("hasUnsavedChanges", $state.snapshot(hasUnsavedChanges))} -->
 <!-- {$inspect('showModalConfirm', $state.snapshot(showModalConfirm))} -->
 <!-- {$inspect('confirmResponse', $state.snapshot(confirmResponse))} -->
 <!-- {$inspect('spaceConfig from config page', $state.snapshot(spaceConfig))} -->
-{$inspect("spaceConfig ", $state.snapshot(spaceConfig))}
+<!-- {$inspect("spaceConfig ", $state.snapshot(spaceConfig))} -->
 
-<div class="container mx-auto p-4">
-	<h1 class="mb-6 text-2xl font-bold">Paramètres de l'espace {spaceConfig?.space?.name}</h1>
+<div class=" container mx-auto p-4">
+	<h1 class="text-fluid-2xl mb-6 font-bold">Paramètres de l'espace {spaceConfig?.space?.name}</h1>
 
 	<form
 		onsubmit={(e) => {
@@ -123,124 +126,127 @@
 		}}
 		class="space-y-8"
 	>
-		<!-- Salles -->
-		<section class="rounded-lg bg-white p-6 shadow-sm">
-			<h2 class="mb-4 text-xl font-semibold">Salles</h2>
-			<div class="space-y-3">
-				{#each spaceConfig.rooms, i (i)}
-					<div class="flex items-center gap-2">
-						<input
-							type="text"
-							bind:value={spaceConfig.rooms[i]}
-							class="w-full rounded border px-3 py-2"
-							placeholder="Nom de la salle"
-						/>
-						<button
-							type="button"
-							onclick={() => {
-								removeOption(spaceConfig.rooms, i);
-							}}
-							class="rounded p-2 text-red-600 hover:bg-red-50"
-							aria-label="Supprimer la salle"
-						>
-							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width={2}
-									d="M6 18L18 6M6 6l12 12"
-								/>
-							</svg>
-						</button>
-					</div>
-				{/each}
+		<div class="flex flex-wrap justify-evenly gap-8">
+			<!-- Salles -->
+			<section
+				class="bg-base-100 flex flex-col items-center rounded-lg border p-2 shadow-sm sm:p-6"
+			>
+				<h2 class="text-fluid-xl mb-4 font-semibold">Salles</h2>
+				<div class=" mb-4 space-y-3">
+					{#each spaceConfig.rooms, i (i)}
+						<div class="flex items-center gap-2">
+							<input
+								type="text"
+								bind:value={spaceConfig.rooms[i]}
+								class="input w-full sm:min-w-60"
+								placeholder="Nom de la salle"
+							/>
+							<button
+								type="button"
+								onclick={() => {
+									removeOption(spaceConfig.rooms, i);
+								}}
+								class="btn btn-soft btn-square btn-error"
+								aria-label="Supprimer la salle"
+							>
+								<X />
+							</button>
+						</div>
+					{/each}
+				</div>
 				<button
 					type="button"
 					onclick={() => addOption(spaceConfig.rooms)}
-					class="btn btn-dash w-full"
+					class="btn btn-dash mt-auto w-full"
 				>
 					Ajouter une salle
 				</button>
-			</div>
-		</section>
+			</section>
 
-		<!-- Catégories -->
-		<section class="rounded-lg bg-white p-6 shadow-sm">
-			<h2 class="mb-4 text-xl font-semibold">Catégories</h2>
-			<div class="space-y-3">
-				{#each spaceConfig.categories, i (i)}
-					<div class="flex items-center gap-2">
-						<input
-							type="text"
-							bind:value={spaceConfig.categories[i]}
-							class="w-full rounded border px-3 py-2"
-							placeholder="Nom de la catégorie"
-						/>
-						<button
-							type="button"
-							onclick={() => removeOption(spaceConfig.categories, i)}
-							class="rounded p-2 text-red-600 hover:bg-red-50"
-							aria-label="Supprimer la catégorie"
-						>
-							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width={2}
-									d="M6 18L18 6M6 6l12 12"
-								/>
-							</svg>
-						</button>
-					</div>
-				{/each}
+			<!-- Catégories -->
+			<section
+				class="bg-base-100 flex flex-col items-center rounded-lg border p-2 shadow-sm sm:p-6"
+			>
+				<h2 class="text-fluid-xl mb-4 font-semibold">Catégories</h2>
+				<div class=" mb-4 space-y-3">
+					{#each spaceConfig.categories, i (i)}
+						<div class="flex items-center gap-2">
+							<input
+								type="text"
+								bind:value={spaceConfig.categories[i]}
+								class="input w-full sm:min-w-60"
+								placeholder="Nom de la catégorie"
+							/>
+							<button
+								type="button"
+								onclick={() => removeOption(spaceConfig.categories, i)}
+								class="btn btn-soft btn-square btn-error"
+								aria-label="Supprimer la catégorie"
+							>
+								<X />
+							</button>
+						</div>
+					{/each}
+				</div>
 				<button
 					type="button"
 					onclick={() => addOption(spaceConfig.categories)}
-					class="btn btn-dash w-full"
+					class="btn btn-dash mt-auto w-full justify-self-end"
 				>
 					Ajouter une catégorie
 				</button>
-			</div>
-		</section>
-
+			</section>
+		</div>
 		<!-- Rôles -->
-		<section class="rounded-lg bg-white p-6 shadow-sm">
-			<h2 class="mb-4 text-xl font-semibold">Rôles organisationnels (mandats)</h2>
+		<section class="rounded-lg border p-2 shadow-sm sm:p-6">
+			<h2 class="text-fluid-xl mb-4 font-semibold">Rôles organisationnels (mandats)</h2>
 
 			<div class="space-y-4 divide-y-2 divide-dashed">
 				{#each spaceConfig.tasks, i (i)}
-					<div class="p-4">
-						<div class="flex flex-wrap items-center gap-3">
+					<div class="sm:p-4" out:slide>
+						<div class="flex flex-wrap gap-4 not-sm:flex-col">
 							<!-- Nom de la tâche -->
-							<div class="flex-grow">
-								<label class="floating-label">
-									<input
-										type="text"
-										bind:value={spaceConfig.tasks[i].name}
-										class="input input-lg w-full"
-										placeholder="Nom de la tache"
-									/> <span>Nom de la tache</span>
-								</label>
-							</div>
+							<fieldset class="fieldset flex-grow">
+								<legend class="fieldset-legend"> Nom de la tache </legend>
+								<input
+									type="text"
+									id={`task-name-${i}`}
+									bind:value={spaceConfig.tasks[i].name}
+									class="input w-full"
+									placeholder="Nom de la tache"
+								/>
+							</fieldset>
 
 							<!-- Type de tâche (beforeEvent/none) -->
-							<div class="min-w-[120px]">
-								<select
-									bind:value={spaceConfig.tasks[i].type}
-									disabled={i === defaultTaskIndex}
-									class="select select-sm w-full {i === defaultTaskIndex ? 'hidden' : ''}"
-								>
+							<fieldset class="fieldset min-w-[120px]">
+								<legend class="fieldset-legend"> Doit être réalisé: </legend>
+								<select bind:value={spaceConfig.tasks[i].type} class="select w-full">
 									<option value="beforeEvent">En amont de l'événement</option>
-									<option value="onEvent">Pendant l'événement</option>
+									<option selected value="onEvent">Pendant l'événement</option>
 									<option value="afterEvent">Après l'événement</option>
-									<option value="none">Aucun</option>
+									<!-- <option value="none">Aucun</option> -->
 								</select>
-							</div>
-							<!-- Bouton "Par défaut" (radio) -->
+							</fieldset>
+						</div>
+
+						<!-- Description (en dessous) -->
+						<fieldset class="fieldset mt-4">
+							<legend class="input-label fieldset-legend"> Description de la tâche </legend>
+							<textarea
+								bind:value={spaceConfig.tasks[i].description}
+								id={`task-description-${i}`}
+								class="textarea w-full p-4"
+								placeholder="Description de la tâche"
+								rows="2"
+							></textarea>
+						</fieldset>
+						<!-- Bouton "Par défaut" (radio) -->
+						<div class="my-4 flex flex-wrap gap-4">
 							<button
 								type="button"
 								onclick={() => setDefaultTask(i)}
-								class="btn btn-sm {i === defaultTaskIndex ? 'btn-success' : 'btn'}"
+								class="btn btn-sm {i === defaultTaskIndex ? 'btn-success' : 'btn-outline'}"
+								aria-label="Définir comme tâche par défaut"
 							>
 								{i === defaultTaskIndex ? "Par défaut ✓" : "Définir par défaut"}
 							</button>
@@ -252,28 +258,9 @@
 								class="btn btn-sm btn-error btn-outline"
 								aria-label="Supprimer le rôle"
 							>
-								<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width={2}
-										d="M6 18L18 6M6 6l12 12"
-									/>
-								</svg>
+								<X />
+								Supprimer
 							</button>
-						</div>
-
-						<!-- Description (en dessous) -->
-						<div class="mt-4">
-							<label class="floating-label">
-								<textarea
-									bind:value={spaceConfig.tasks[i].description}
-									class="textarea w-full p-4"
-									placeholder="Description de la tâche"
-									rows="2"
-								></textarea>
-								<span>Description de la tâche</span>
-							</label>
 						</div>
 					</div>
 				{/each}
