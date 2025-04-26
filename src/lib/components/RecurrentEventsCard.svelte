@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { eventState, modalState } from '$lib/shared/states.svelte';
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import type { EventType, OrganizerType } from '$lib/schemas/event.schema';
-	import type { UserType } from '$lib/types/types';
-	import { lisibleDate, tooltip } from '$lib/utils';
-	import { userDb } from '$lib/shared/userDb.svelte';
+	import { eventState, modalState } from "$lib/shared/states.svelte";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import type { EventType, OrganizerType } from "$lib/schemas/event.schema";
+	import type { UserType } from "$lib/types/types";
+	import { lisibleDate, tooltip } from "$lib/utils";
+	import { userDb } from "$lib/shared/userDb.svelte";
 
-	import { CalendarCheck, Pencil, PencilLine, UserCheck, UserPlus } from 'lucide-svelte';
+	import { CalendarCheck, Pencil, PencilLine, UserCheck, UserPlus } from "lucide-svelte";
 
-	type RecurrenceType = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY_BY_DATE' | 'MONTHLY_BY_DAY';
+	type RecurrenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY_BY_DATE" | "MONTHLY_BY_DAY";
 
 	interface ValidMaster extends EventType {
 		id: string;
-		recurrence: NonNullable<EventType['recurrence']>;
+		recurrence: NonNullable<EventType["recurrence"]>;
 	}
 
 	interface ValidOccurrence extends EventType {
@@ -33,12 +33,12 @@
 
 	let currentUser: UserType | null = $derived(userDb.current);
 
-	const formatRecurrence = (recurrence: NonNullable<EventType['recurrence']>): string => {
+	const formatRecurrence = (recurrence: NonNullable<EventType["recurrence"]>): string => {
 		const recurrenceTypes: Record<RecurrenceType, string> = {
-			WEEKLY: 'Hebdomadaire',
-			BIWEEKLY: 'Bi-hebdomadaire',
-			MONTHLY_BY_DATE: 'Mensuel (date fixe)',
-			MONTHLY_BY_DAY: 'Mensuel (jour spécifique)'
+			WEEKLY: "Hebdomadaire",
+			BIWEEKLY: "Bi-hebdomadaire",
+			MONTHLY_BY_DATE: "Mensuel (date fixe)",
+			MONTHLY_BY_DAY: "Mensuel (jour spécifique)"
 		};
 
 		return (
@@ -58,14 +58,14 @@
 	};
 
 	const getSubscriptionButtonText = (occurrence: ValidOccurrence): string => {
-		if (!Array.isArray(occurrence.tasks)) return 'Erreur Tâches'; // Cas d'erreur
+		if (!Array.isArray(occurrence.tasks)) return "Erreur Tâches"; // Cas d'erreur
 
 		const subscribed = isUserSubscribed(occurrence);
 
 		if (occurrence.tasks.length <= 1) {
-			return subscribed ? 'Se désinscrire' : "S'inscrire";
+			return subscribed ? "Se désinscrire" : "S'inscrire";
 		} else {
-			return subscribed ? 'Gérer mes tâches' : "S'inscrire";
+			return subscribed ? "Gérer mes tâches" : "S'inscrire";
 		}
 	};
 </script>
@@ -77,11 +77,19 @@
 			<h2 class=" text-fluid-xl font-bold">
 				{master.event_title}
 			</h2>
-			<div class="text-fluid-sm mt-1">
-				{formatRecurrence(master.recurrence)}
-				<span class="text-fluid-sm block">
-					Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
-				</span>
+			<div class="flex flex-wrap justify-between gap-4">
+				<div class="text-fluid-base mt-1">
+					{formatRecurrence(master.recurrence)}
+					<span class="text-fluid-base block">
+						Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
+					</span>
+				</div>
+				<div>
+					<span class="text-fluid-base">Tâches:</span>
+					{#each master.tasks as task (master.id + task.name)}<span
+							class="badge badge-accent badge-soft">{task.name}</span
+						>{/each}
+				</div>
 			</div>
 		</div>
 
@@ -99,38 +107,50 @@
 								? 'border-l-error/30 border-l-3'
 								: ''}"
 					>
-						<div class="flex flex-wrap items-baseline justify-between gap-y-2">
+						<div class="flex flex-wrap items-center justify-between gap-y-2">
 							<span class="font-medium">
 								{lisibleDate(new Date(occurrence.date_event))}
 							</span>
-							<div class="flex items-center gap-4">
+							<div class="flex flex-wrap items-center gap-4">
 								{#if occurrence.canceled}
-									<span class="text-fluid-xs text-error text-nowrap">✗ Annulé</span>
+									<span class="text-fluid-sm text-error text-nowrap">✗ Annulé</span>
 								{:else if occurrence.isConfirmed}
-									<span class="text-fluid-xs text-success text-nowrap">✓ Confirmé</span>
+									<span class="text-fluid-sm text-success text-nowrap">✓ Confirmé</span>
 								{:else}
-									<div use:tooltip={{ content: "Confirmer que l'événement a lieu" }}>
-										<button
-											onclick={() => onConfirm(occurrence.id)}
-											class="btn btn-square btn-ghost btn-sm"
-											disabled={!Array.isArray(occurrence.organizers) ||
-												occurrence.organizers.length === 0}
-										>
-											<CalendarCheck />
-										</button>
-									</div>
-								{/if}
-								<div use:tooltip={{ content: 'modifier cette occurrence' }} class="">
+									<!-- Bouton d'inscription/gestion -->
 									<button
-										onclick={() => {
-											eventState.is = occurrence;
-											modalState.event = true;
-										}}
-										class="btn btn-square btn-soft btn-sm"
+										onclick={() => handleSubscriptionClick(occurrence)}
+										class=" btn btn-primary btn-sm btn-soft"
+										disabled={occurrence.canceled}
 									>
-										<Pencil />
+										{#if isUserSubscribed(occurrence)}
+											<UserCheck class="mr-1 h-4 w-4" />
+										{:else}
+											<UserPlus class="mr-1 h-4 w-4" />
+										{/if}
+										<span class="not-sm:hidden"> {getSubscriptionButtonText(occurrence)}</span>
 									</button>
-								</div>
+									<button
+										onclick={() => onConfirm(occurrence.id)}
+										class="btn btn-sm"
+										title="Confirmer que l'événement a lieu"
+										disabled={!Array.isArray(occurrence.organizers) ||
+											occurrence.organizers.length === 0}
+									>
+										<CalendarCheck />
+										<span class="not-sm:hidden">Confirmer</span>
+									</button>
+								{/if}
+								<button
+									onclick={() => {
+										eventState.is = occurrence;
+										modalState.event = true;
+									}}
+									class="btn btn-square btn-sm"
+									title="modifier cette occurrence"
+								>
+									<Pencil />
+								</button>
 							</div>
 						</div>
 						<!-- Affichage des organisateurs -->
@@ -139,30 +159,13 @@
 								{#each occurrence.organizers as organizer (organizer.id)}
 									<div
 										class="badge badge-accent badge-soft font-semibold"
-										use:tooltip={{
-											content: organizer.tasks?.join(', ') || 'Aucune tâche spécifiée'
-										}}
+										title={organizer.tasks?.join(", ") || "aucune taches spécifiées"}
 									>
 										{organizer.username}
 									</div>
 								{/each}
 							</div>
 						{/if}
-
-						<!-- Bouton d'inscription/gestion -->
-
-						<button
-							onclick={() => handleSubscriptionClick(occurrence)}
-							class=" btn btn-primary btn-sm btn-compact btn-soft md:btn-inline md:btn-wide"
-							disabled={occurrence.canceled}
-						>
-							{#if isUserSubscribed(occurrence)}
-								<UserCheck class="mr-1 h-4 w-4" />
-							{:else}
-								<UserPlus class="mr-1 h-4 w-4" />
-							{/if}
-							{getSubscriptionButtonText(occurrence)}
-						</button>
 					</div>
 				{:else}
 					<div class="text-fluid-sm">Aucune date programmée</div>
@@ -176,10 +179,8 @@
 				<h3 class="text-fluid-sm font-medium">Équipe organisatrice</h3>
 				<button
 					onclick={() => {
-						if (isOrganizersModal) {
-							isOrganizersModal.event = master;
-							isOrganizersModal.open = true;
-						}
+						isOrganizersModal.event = master;
+						isOrganizersModal.open = true;
 					}}
 					class="btn btn-soft btn-compact"
 				>
@@ -190,7 +191,7 @@
 			{#if master.recurrence.recurrenceTeam?.length}
 				<div class="flex flex-wrap gap-2">
 					{#each master.recurrence.recurrenceTeam as member (member.id)}
-						{#if member && typeof member === 'object' && 'username' in member}
+						{#if member && typeof member === "object" && "username" in member}
 							<div class=" badge">
 								{member.username}
 							</div>

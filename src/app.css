@@ -1,14 +1,14 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tw-animate-css";
 
 @plugin '@tailwindcss/typography';
 @plugin "daisyui";
 
 @plugin "daisyui/theme" {
-	name: 'corporate';
+	name: "corporate";
 	default: false;
 	prefersdark: false;
-	color-scheme: 'light';
+	color-scheme: "light";
 	--color-base-100: oklch(98% 0.003 247.858);
 	--color-base-200: oklch(96% 0.007 247.896);
 	--color-base-300: oklch(92% 0.013 255.508);
@@ -43,20 +43,59 @@
 
 @theme {
 	/* Tailles fluides pour les utilitaires */
-	--fluid-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
-	--fluid-sm: clamp(0.875rem, 0.8rem + 0.375vw, 1rem);
-	--fluid-base: clamp(1rem, 0.9375rem + 0.3125vw, 1.125rem);
-	--fluid-lg: clamp(1.125rem, 1.0625rem + 0.3125vw, 1.25rem);
-	--fluid-xl: clamp(1.25rem, 1.125rem + 0.625vw, 1.5rem);
-	--fluid-2xl: clamp(1.5rem, 1.325rem + 0.875vw, 2rem);
-	--fluid-3xl: clamp(1.875rem, 1.625rem + 1.25vw, 2.5rem);
-	--fluid-4xl: clamp(2.25rem, 1.925rem + 1.625vw, 3rem);
+	/* Tailles fluides pour les utilitaires */
+	--fluid-xs: clamp(0.75rem, 0.65rem + 0.25vw, 0.8125rem);
+	--fluid-sm: clamp(0.8125rem, 0.7rem + 0.375vw, 0.9375rem);
+	/* 👉 Base ajustée pour être autour de 14px (0.875rem) */
+	--fluid-base: clamp(0.875rem, 0.8rem + 0.25vw, 1rem);
+	--fluid-lg: clamp(1rem, 0.9rem + 0.3125vw, 1.125rem);
+	--fluid-xl: clamp(1.125rem, 1rem + 0.625vw, 1.375rem);
+	--fluid-2xl: clamp(1.375rem, 1.2rem + 0.875vw, 1.75rem);
+	--fluid-3xl: clamp(1.75rem, 1.5rem + 1.25vw, 2.25rem);
+	--fluid-4xl: clamp(2.125rem, 1.8rem + 1.625vw, 2.75rem);
 }
-/* :root {
-	.border {
-		border-color: oklch(0.936 0.032 17.717);
+
+@layer base {
+	/* .border {
+		border-color: var(--color-base-300);
+	} */
+	h1 {
+		font-size: var(--fluid-3xl);
+		font-weight: 700;
+		margin-bottom: 1.5rem;
 	}
-} */
+
+	h2 {
+		font-size: var(--fluid-2xl);
+		font-weight: 600;
+		margin-bottom: 1rem;
+	}
+
+	h3 {
+		font-size: var(--fluid-xl);
+		font-weight: 500;
+		margin-bottom: 0.75rem;
+	}
+
+	h4 {
+		font-size: var(--fluid-lg);
+		font-weight: 500;
+		margin-bottom: 0.5rem;
+	}
+
+	p {
+		font-size: var(--fluid-base);
+		margin-bottom: 0.1rem;
+	}
+
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: oklch(77% 0.041 260.031 / 40%); /* 40% de base-content */
+	}
+}
 
 @layer components {
 	.typography {
@@ -90,35 +129,6 @@
 			/* margin-bottom: 0.2rem; */
 		}
 	}
-	h1 {
-		font-size: var(--fluid-3xl);
-		font-weight: 700;
-		margin-bottom: 1.5rem;
-	}
-
-	h2 {
-		font-size: var(--fluid-2xl);
-		font-weight: 600;
-		margin-bottom: 1rem;
-	}
-
-	h3 {
-		font-size: var(--fluid-xl);
-		font-weight: 500;
-		margin-bottom: 0.75rem;
-	}
-
-	h4 {
-		font-size: var(--fluid-lg);
-		font-weight: 500;
-		margin-bottom: 0.5rem;
-	}
-
-	p {
-		font-size: var(--fluid-base);
-		/* font-weight: 400; */
-		margin-bottom: 0.1rem;
-	}
 
 	.btn-compact {
 		--btn-scale: 0.75; /* Facteur de réduction de 20% */
@@ -127,7 +137,22 @@
 		padding-top: calc(0.25rem * var(--btn-scale)) !important;
 		padding-bottom: calc(0.25rem * var(--btn-scale)) !important;
 	}
+
+	/* 👉 Suppression globale de l'outline et du box-shadow de focus pour les composants DaisyUI ciblés */
+	.input:focus,
+	.input:focus-within,
+	.textarea:focus,
+	.textarea:focus-within,
+	.select:focus,
+	.select:focus-within {
+		outline: none !important; /* Supprime l'outline */
+		box-shadow: none !important; /* Supprime le box-shadow (qui peut inclure le ring) */
+		/* Assurer que les variables de ring Tailwind sont aussi écrasées */
+		--tw-ring-offset-shadow: none !important;
+		--tw-ring-shadow: none !important;
+	}
 }
+
 @layer utilities {
 	.text-fluid-xs {
 		font-size: var(--fluid-xs);
@@ -160,13 +185,5 @@
 	.text-fluid-4xl {
 		font-size: var(--fluid-4xl);
 		line-height: 1.1;
-	}
-
-	*,
-	::after,
-	::before,
-	::backdrop,
-	::file-selector-button {
-		border-color: oklch(0.928 0.006 264.531);
 	}
 }

@@ -169,7 +169,7 @@
 		}
 
 		// 4. Éliminer les doublons en se basant sur le nom
-		const uniqueTasksMap = new Map<string, any>();
+		const uniqueTasksMap = new Map<string, TaskType>();
 		potentialTasks.forEach((task) => {
 			// Vérifier si la tâche et son nom existent avant d'ajouter à la map
 			if (task?.name && !uniqueTasksMap.has(task.name)) {
@@ -177,7 +177,36 @@
 			}
 		});
 
-		return Array.from(uniqueTasksMap.values()) as any[];
+		return Array.from(uniqueTasksMap.values());
+	});
+
+	type GroupedTasks = {
+		before: TaskType[];
+		on: TaskType[];
+		after: TaskType[];
+		other: TaskType[]; // Pour les tâches sans type ou avec un type inconnu
+	};
+
+	let groupedTasks = $derived.by(() => {
+		const groups: GroupedTasks = { before: [], on: [], after: [], other: [] };
+
+		tasksPossibles.forEach((task) => {
+			switch (task.type) {
+				case "beforeEvent":
+					groups.before.push(task);
+					break;
+				case "onEvent":
+					groups.on.push(task);
+					break;
+				case "afterEvent":
+					groups.after.push(task);
+					break;
+				default:
+					groups.other.push(task);
+					break;
+			}
+		});
+		return groups;
 	});
 
 	let tasksLabel = $derived.by(() => {
@@ -312,16 +341,6 @@
 
 		// Activation de l'onglet sondage
 		eventData.isSondage = true;
-	}
-
-	// Fonction pour mettre à jour les organisateurs d'une date spécifique
-	function handleUpdateOrganizers(dateIndex: number, newOrganizers: OrganizerType[]) {
-		if (eventData.dates_proposed) {
-			eventData.dates_proposed[dateIndex] = {
-				...eventData.dates_proposed[dateIndex],
-				organizers: newOrganizers
-			};
-		}
 	}
 
 	// ::: Form Validation and Submission
@@ -595,17 +614,40 @@
 		<!-- ::: ROle & Oragnizers -->
 		<!-- FIXIT : checker ce qui doit apparaitre, et utiliser des props $derived en fonction d'eventMode plutot que des #if -->
 
+		{#snippet groupedTasksSnippet(label: string, tasks: TaskType[])}
+			<div class=" space-y-2 rounded-xl p-3 shadow-sm">
+				<div class="text-base-content/70 text-fluid-sm italic">{label}</div>
+				<ButtonGroupSelect
+					options={tasks}
+					bind:selectedItems={eventData.tasks}
+					optionsLabel="name"
+				/>
+			</div>
+		{/snippet}
+
 		<Frame title="Rôles">
 			<div class="mb-2 block font-medium">
 				{tasksLabel}
 			</div>
-			<ButtonGroupSelect
-				options={tasksPossibles}
-				bind:selectedItems={eventData.tasks}
-				optionsLabel="name"
-			/>
 
-			<div class="mt-4 flex flex-wrap gap-4">
+			<div class="flex flex-wrap gap-x-6 gap-y-4">
+				{#if groupedTasks.before.length > 0}
+					{@render groupedTasksSnippet("Avant l'événement", groupedTasks.before)}
+				{/if}
+
+				{#if groupedTasks.on.length > 0}
+					{@render groupedTasksSnippet("Pendant l'événement", groupedTasks.on)}
+				{/if}
+
+				{#if groupedTasks.after.length > 0}
+					{@render groupedTasksSnippet("Après l'événement", groupedTasks.after)}
+				{/if}
+
+				{#if groupedTasks.other.length > 0}
+					{@render groupedTasksSnippet("Autres tâches", groupedTasks.other)}
+				{/if}
+			</div>
+			<div class="mt-8 flex flex-wrap gap-4">
 				{#if !showAddTaskForm}
 					<button
 						class="btn btn-outline btn-primary btn-compact"

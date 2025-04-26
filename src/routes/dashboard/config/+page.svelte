@@ -129,7 +129,7 @@
 		<div class="flex flex-wrap justify-evenly gap-8">
 			<!-- Salles -->
 			<section
-				class="bg-base-100 flex flex-col items-center rounded-lg border p-2 shadow-sm sm:p-6"
+				class="bg-base-100 border-base-300 flex flex-col items-center rounded-lg border p-2 shadow-sm sm:p-6"
 			>
 				<h2 class="text-fluid-xl mb-4 font-semibold">Salles</h2>
 				<div class=" mb-4 space-y-3">
@@ -165,7 +165,7 @@
 
 			<!-- Catégories -->
 			<section
-				class="bg-base-100 flex flex-col items-center rounded-lg border p-2 shadow-sm sm:p-6"
+				class="bg-base-100 border-base-300 flex flex-col items-center rounded-lg border p-2 shadow-sm sm:p-6"
 			>
 				<h2 class="text-fluid-xl mb-4 font-semibold">Catégories</h2>
 				<div class=" mb-4 space-y-3">
@@ -198,10 +198,10 @@
 			</section>
 		</div>
 		<!-- Rôles -->
-		<section class="rounded-lg border p-2 shadow-sm sm:p-6">
+		<section class="border-base-300 rounded-lg border p-2 shadow-sm sm:p-6">
 			<h2 class="text-fluid-xl mb-4 font-semibold">Rôles organisationnels (mandats)</h2>
 
-			<div class="space-y-4 divide-y-2 divide-dashed">
+			<div class=" space-y-4">
 				{#each spaceConfig.tasks, i (i)}
 					<div class="sm:p-4" out:slide>
 						<div class="flex flex-wrap gap-4 not-sm:flex-col">
@@ -263,6 +263,7 @@
 							</button>
 						</div>
 					</div>
+					<div class="divider"></div>
 				{/each}
 
 				<button type="button" onclick={addNewTask} class="btn btn-dash w-full">
