@@ -553,6 +553,7 @@
 						<div>
 							<RecurrentTab
 								bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
+								isExistingMaster={eventMode === "EDIT_RECURRENT_ALL"}
 								localErrors={formattedErrors?.recurrence}
 							/>
 						</div>

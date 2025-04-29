@@ -19,14 +19,19 @@
 		startOfMonth
 	} from "date-fns";
 	import { fr } from "date-fns/locale";
+	import { lisibleDate } from "$lib/utils";
 
 	interface RecurrentTabProps {
 		recurrence: RequiredRecurrenceType;
+		isExistingMaster: boolean;
 		localErrors: string | undefined;
 	}
 
-	let { recurrence = $bindable<RequiredRecurrenceType>(), localErrors }: RecurrentTabProps =
-		$props();
+	let {
+		recurrence = $bindable<RequiredRecurrenceType>(),
+		localErrors,
+		isExistingMaster = false
+	}: RecurrentTabProps = $props();
 
 	interface RecurrenceChoice {
 		WEEKLY: string;
@@ -294,17 +299,27 @@
 
 <div class="mt-4 space-y-10">
 	<!-- Date de début -->
-	<div class="flex flex-wrap gap-x-6 gap-y-4">
+	<div class="flex flex-wrap gap-x-8 gap-y-4">
 		<div class="min-w-fit">
-			<div class="min-w-54">
-				<DatePicker
-					initialValue={recurrence.firstDate}
-					onChange={(value) => (recurrence.firstDate = value)}
-					label="Première date"
-				/>
-			</div>
-			{#if localErrors?.firstDate?._errors?.length}
-				<p class="text-fluid-xs text-error italic">{localErrors.firstDate._errors[0]}</p>
+			{#if !isExistingMaster && (!recurrence.firstDate || isAfter(parse(recurrence.firstDate, "yyyy-MM-dd", new Date()), new Date()))}
+				<div class="min-w-54">
+					<DatePicker
+						initialValue={recurrence.firstDate}
+						onChange={(value) => (recurrence.firstDate = value)}
+						label="Première date"
+					/>
+				</div>
+				{#if localErrors?.firstDate?._errors?.length}
+					<p class="text-fluid-xs text-error italic">{localErrors.firstDate._errors[0]}</p>
+				{/if}
+			{:else}
+				<div class="flex flex-col gap-2">
+					<p class="text-fluid-sm">Première date</p>
+
+					<div class="badge badge-xl badge-soft font-medium">
+						{lisibleDate(recurrence.firstDate)}
+					</div>
+				</div>
 			{/if}
 		</div>
 		<!-- Date de fin -->

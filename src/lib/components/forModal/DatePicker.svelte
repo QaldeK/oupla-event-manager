@@ -13,7 +13,6 @@
 	import { type EventConflictInfo } from "$lib/types/types";
 
 	import { CalendarX2 } from "lucide-svelte";
-	import { undo } from "@tiptap/pm/history";
 
 	interface Props {
 		initialValue?: string | string[]; // Type pour single et multiple modes
@@ -30,7 +29,6 @@
 	let {
 		initialValue = $bindable(),
 		onChange = (newValue: string | string[]) => {},
-
 		onResetDate = () => {},
 		mode = "single", // 'single' or 'multiple'
 		resetButton = false,
@@ -48,36 +46,37 @@
 
 	let tippyInstances: TippyInstance[] = [];
 
-	$effect(() => {
-		const currentValue = initialValue; // Utiliser la prop
-		if (!fp || currentValue === undefined) return;
+	// $effect(() => {
+	// 	const currentValue = initialValue; // Utiliser la prop
+	// 	if (!fp || currentValue === undefined) return;
 
-		// Obtenir les dates actuellement sélectionnées DANS flatpickr (format Y-m-d)
-		const fpSelectedDatesStr = fp.selectedDates
-			.map((d) => fp!.formatDate(d, "Y-m-d"))
-			.sort()
-			.join(",");
+	// 	// Obtenir les dates actuellement sélectionnées DANS flatpickr (format Y-m-d)
+	// 	const fpSelectedDatesStr = fp.selectedDates
+	// 		.map((d) => fp!.formatDate(d, "Y-m-d"))
+	// 		.sort()
+	// 		.join(",");
 
-		// Formatter la valeur de la prop en chaîne comparable (format Y-m-d)
-		let propValueStr = "";
-		if (mode === "single" && typeof currentValue === "string") {
-			propValueStr = currentValue;
-		} else if (mode === "multiple" && Array.isArray(currentValue)) {
-			propValueStr = [...currentValue].sort().join(",");
-		}
+	// 	// Formatter la valeur de la prop en chaîne comparable (format Y-m-d)
+	// 	let propValueStr = "";
+	// 	if (mode === "single" && typeof currentValue === "string") {
+	// 		propValueStr = currentValue;
+	// 	} else if (mode === "multiple" && Array.isArray(currentValue)) {
+	// 		propValueStr = [...currentValue].sort().join(",");
+	// 	}
 
-		// Comparer et mettre à jour SEULEMENT si différent pour éviter les boucles
-		if (fpSelectedDatesStr !== propValueStr) {
-			console.log("Syncing prop value to flatpickr:", currentValue);
-			fp.setDate(currentValue ?? (mode === "multiple" ? [] : ""), false); // Mettre à jour sans déclencher onChange
-			fp.redraw();
-		}
-	});
+	// 	// Comparer et mettre à jour SEULEMENT si différent pour éviter les boucles
+	// 	if (fpSelectedDatesStr !== propValueStr) {
+	// 		console.log("Syncing prop value to flatpickr:", currentValue);
+	// 		fp.setDate(currentValue ?? (mode === "multiple" ? [] : ""), false); // Mettre à jour sans déclencher onChange
+	// 		fp.redraw();
+	// 	}
+	// });
 
 	$effect(() => {
 		if (!dateInput) return;
 
 		fp = flatpickr(dateInput, {
+			defaultDate: initialValue ? initialValue : mode === "multiple" ? [] : null,
 			dateFormat: "Y-m-d",
 			altInput: true,
 			altFormat: "l j F Y",
@@ -139,19 +138,13 @@
 			},
 			onMonthChange: (selectedDates, dateStr, instance) => {
 				setTimeout(() => {
-					instance.redraw(); // Important pour que onDayCreate soit appelé
 					setupTooltips(instance.calendarContainer);
-				}, 0);
+				}, 0); // setTimeout 0 pour s'assurer que le DOM est mis à jour
 			},
 			onReady: (selectedDates, dateStr, instance) => {
-				instance.redraw(); // Pour appliquer les classes initiales via onDayCreate
 				setupTooltips(instance.calendarContainer); // Appliquer Tippy initialement
 			}
 		});
-
-		// if (value) {
-		// 	fp.setDate(mode === "single" ? new Date(value) : value.map((v) => new Date(v)));
-		// }
 
 		return () => {
 			tippyInstances.forEach((instance) => instance.destroy());
@@ -173,7 +166,7 @@
 		tippyInstances.forEach((instance) => instance.destroy());
 		// Cibler les éléments avec l'attribut dans le conteneur du calendrier
 		tippyInstances = tippy(container.querySelectorAll("[data-tippy-content]"), {
-			zIndex: 1000000, // Garder un z-index élevé
+			zIndex: 1000000,
 			allowHTML: true,
 			// Autres options Tippy si nécessaire (placement, theme, etc.)
 			placement: "bottom",
