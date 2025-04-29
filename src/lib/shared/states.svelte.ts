@@ -2,14 +2,14 @@
 
 // export const eventsList = $state();
 
-import { getNewEvent } from '$lib/schemas/event.schema';
-import { getSpace } from '$lib/shared/spaceOptions.svelte';
-import { type TaskType } from '$lib/schemas/event.schema';
+import { getNewEvent } from "$lib/schemas/event.schema";
+import { getSpace } from "$lib/shared/spaceOptions.svelte";
+import { type TaskType } from "$lib/schemas/event.schema";
 
 export interface ConfirmModalData {
 	title: string;
 	message: string;
-	variant?: 'warning' | 'info' | 'danger';
+	variant?: "warning" | "info" | "danger";
 
 	showCheckbox?: {
 		label: string;
@@ -20,7 +20,16 @@ export interface ConfirmModalData {
 		onCancelEvent: () => void | Promise<void>;
 	};
 
-	onConfirm: ((notifyOthers?: boolean) => void | Promise<void>) | null;
+	onConfirm: ((notifyOthers?: boolean, customMessage?: string) => void | Promise<void>) | null;
+}
+// Interface pour TaskDialog (Gestion multiple)
+export interface TaskModalData {
+	username: string;
+	tasksAvailable: TaskType[];
+	selectedTaskNames: string[];
+	eventIsConfirmed: boolean; // Utile pour affichage informatif dans TaskDialog
+	eventId?: string;
+	onSubmit: ((result: string[]) => void | Promise<void>) | null;
 }
 
 export interface ModalStateType {
@@ -30,15 +39,12 @@ export interface ModalStateType {
 	report: boolean;
 	inviteUser: boolean;
 	tasks: {
+		// Pour TaskDialog (multiple)
 		isOpen: boolean;
-		data: {
-			username: string;
-			tasks: TaskType[];
-			selectedTasks: string[];
-			onSubmit: ((selectedTaskNames: string[]) => void) | null;
-		};
+		data: TaskModalData;
 	};
 	confirm: {
+		// Pour confirmation simple
 		isOpen: boolean;
 		data: ConfirmModalData;
 	};
@@ -53,35 +59,40 @@ export const modalState = $state<ModalStateType>({
 	tasks: {
 		isOpen: false,
 		data: {
-			username: '',
-			tasks: [] as TaskType[],
-			selectedTasks: [] as string[],
-			onSubmit: null as ((selectedTaskNames: string[]) => void) | null
+			username: "",
+			tasksAvailable: [],
+			selectedTaskNames: [],
+			eventIsConfirmed: false,
+			onSubmit: null
 		}
 	},
 	confirm: {
 		isOpen: false,
 		data: {
-			title: '',
-			message: '',
-			variant: 'info',
-			onConfirm: null as ((notifyOthers?: boolean, customMessage?: string) => void) | null
+			title: "",
+			message: "",
+			variant: "info",
+			onConfirm: null as ((notifyOthers?: boolean, customMessage?: string) => void) | null // XXX just "null" ?
 		}
 	}
 });
 
 export const openTaskModal = (params: {
 	username: string;
-	tasks: TaskType[];
-	selectedTasks: string[];
-	onSubmit: (selectedTaskNames: string[]) => void; //  Add onSubmit here, making it required
+	tasksAvailable: TaskType[];
+	selectedTaskNames: string[];
+	eventIsConfirmed: boolean;
+	eventId?: string;
+	onSubmit: (result: string[]) => void | Promise<void>;
 }) => {
 	modalState.tasks = {
 		isOpen: true,
 		data: {
 			username: params.username,
-			tasks: $state.snapshot(params.tasks), // Copie non réactive des options de tâches
-			selectedTasks: params.selectedTasks, // Les noms des tâches sélectionnées
+			tasksAvailable: $state.snapshot(params.tasksAvailable),
+			selectedTaskNames: params.selectedTaskNames,
+			eventIsConfirmed: params.eventIsConfirmed,
+			eventId: params.eventId,
 			onSubmit: params.onSubmit
 		}
 	};
@@ -109,18 +120,24 @@ export const getOrganizersPossibles = () => organizersPossibles;
 
 // ::: Alert Messages
 export const alert = $state({
-	message: '',
-	type: 'info' as 'info' | 'error' | 'success',
+	message: "",
+	type: "info" as "info" | "error" | "success",
 	visible: false
 });
 
-export function showAlert(message: string, type: 'info' | 'error' | 'success' = 'info') {
+export function showAlert(message: string, type: "info" | "error" | "success" = "info") {
 	alert.message = message;
 	alert.type = type;
 	alert.visible = true;
 
-	setTimeout(() => {
+	// Utiliser une variable pour l'ID du timeout pour pouvoir le nettoyer si un nouveau message arrive
+	let timeoutId: number | undefined;
+	if (timeoutId) {
+		clearTimeout(timeoutId);
+	}
+	timeoutId = window.setTimeout(() => {
 		alert.visible = false;
+		timeoutId = undefined;
 	}, 5000);
 }
 
@@ -128,9 +145,10 @@ export function showAlert(message: string, type: 'info' | 'error' | 'success' = 
 
 // État pour la taille d'écran
 export const displayState = $state({
-	isMobile: window.innerWidth < 640,
-	isMedium: window.innerWidth >= 640 && window.innerWidth < 1024,
-	isLarge: window.innerWidth >= 1024
+	isMobile: typeof window !== "undefined" ? window.innerWidth < 640 : false,
+	isMedium:
+		typeof window !== "undefined" ? window.innerWidth >= 640 && window.innerWidth < 1024 : false,
+	isLarge: typeof window !== "undefined" ? window.innerWidth >= 1024 : false
 });
 
 export const messageSheet = $state({
@@ -142,7 +160,7 @@ export const messageSheet = $state({
 	}
 });
 
-import { userDb } from '$lib/shared/userDb.svelte';
+import { userDb } from "$lib/shared/userDb.svelte";
 
 // FIXIT recurrenceTeam
 export const hasAuthorizations = (params: {
@@ -156,7 +174,7 @@ export const hasAuthorizations = (params: {
 	if (!currentUser) return false;
 
 	// Admin a toujours les droits
-	if (currentRole === 'admin') return true;
+	if (currentRole === "admin") return true;
 
 	// Vérifie si l'utilisateur fait partie de l'équipe récurrente
 	if (params.isRecurrent && params.recurrenceTeam?.includes(currentUser.id)) {
@@ -164,7 +182,7 @@ export const hasAuthorizations = (params: {
 	}
 
 	// Vérifie si l'utilisateur est le créateur et a le rôle "helpers"
-	if (currentRole === 'helpers' && params.createdBy === currentUser.id) {
+	if (currentRole === "helpers" && params.createdBy === currentUser.id) {
 		return true;
 	}
 

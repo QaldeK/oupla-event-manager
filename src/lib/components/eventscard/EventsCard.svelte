@@ -3,7 +3,7 @@
 	import GroupRadioButton from "$lib/components/GroupRadioButton.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import { filterAndConvertOrganizers, lisibleDate, lisibleTime } from "$lib/utils";
-	import { eventState, hasAuthorizations, modalState } from "$lib/shared/states.svelte";
+	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
 	import type { EventType, OrganizerType, SyncEventRecord } from "$lib/types/event";
 	import type { UserType } from "$lib/types/types";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
@@ -19,6 +19,8 @@
 		ThumbsDown,
 		ThumbsUp,
 		UserCheck,
+		Edit,
+		MessageSquare,
 		Currency
 	} from "lucide-svelte";
 	import { CalendarPlus, UserPlus } from "lucide-svelte";
@@ -26,17 +28,11 @@
 	import ButtonAction from "./ButtonAction.svelte";
 	import TopAlert from "./TopAlert.svelte";
 
+	// ::: context & props
 	interface Props {
 		currentEvent: EventType;
 	}
 
-	interface DatesProposed {
-		dateStart: string;
-		dateEnd: string;
-		organizers: OrganizerType[];
-	}
-
-	// ::: context & props
 	const { currentEvent }: Props = $props();
 
 	// FIXIT : don't use getContext
@@ -79,6 +75,12 @@
 		return "Organisateur•ices";
 	});
 
+	interface DatesProposed {
+		dateStart: string;
+		dateEnd: string;
+		organizers: OrganizerType[];
+	}
+
 	let oldDatesProposed: DatesProposed[] = $state([]);
 	let datesFutureProposed: DatesProposed[] = $state([]);
 
@@ -88,7 +90,7 @@
 		else return "bg-warning/20";
 	});
 
-	// effect
+	// --- effect ---
 
 	$effect(() => {
 		if (currentEvent.dates_proposed?.length) {
@@ -103,135 +105,156 @@
 		}
 	});
 
-	// functions
-
-	const handleTaskSubscription = () => {
-		if (!currentUser) return;
-		eventsStore.manageTaskSubscription(currentEvent, currentUser);
+	// --- functions ---
+	// Appelle requestTaskUpdate sans argument taskName pour ouvrir TaskDialog si plusieurs tâches
+	const handleGeneralTaskSubscription = () => {
+		if (!currentUser || currentEvent.canceled) return;
+		eventsStore.requestTaskUpdate({ event: currentEvent, user: currentUser });
 	};
 
-	const taskButtonState = $derived.by(() => {
+	// Appelle requestTaskUpdate AVEC taskName pour gérer l'inscription/désinscription spécifique
+	const handleSpecificTaskSubscription = (taskName: string) => {
+		if (!currentUser || currentEvent.canceled) return;
+		eventsStore.requestTaskUpdate({ event: currentEvent, user: currentUser, taskName: taskName });
+	};
+
+	// Calcule l'état du bouton général d'inscription/gestion
+	const generalTaskButtonState = $derived.by(() => {
 		if (
-			// ne devrait pas arriver ormis canceled,
 			!currentUser ||
 			currentEvent.canceled ||
 			!Array.isArray(currentEvent.tasks) ||
 			currentEvent.tasks.length === 0
 		) {
-			return { text: "Inscription Indisponible", disabled: true, isSubscribed: false };
+			return {
+				text: "Inscription Indisponible",
+				disabled: true,
+				isSubscribed: false,
+				variant: "disabled" as const
+			};
 		}
 
 		const isSubscribed = currentEvent.organizers?.some((org) => org.id === currentUser.id);
 
-		if (currentEvent.tasks.length > 1) {
-			return { text: isSubscribed ? "mes tâches" : "S'inscrire", disabled: false, isSubscribed };
-		} else {
-			// Cas avec 1 seule tâche
-			return {
-				text: isSubscribed ? "Se désinscrire" : "S'inscrire",
-				disabled: false,
-				isSubscribed
-			};
-		}
+		const btnText = isSubscribed ? "Se désinscrire" : "S'inscrire";
+		return {
+			text: btnText,
+			disabled: false,
+			isSubscribed,
+			variant: (isSubscribed ? "error" : "primary") as "error" | "primary"
+		};
 	});
 
 	const toggleAllDetails = () => {
 		showSondageDetails = !showSondageDetails;
 	};
 
-	const openModal = (type: "sondage" | "organizers" | "tasks", event: SyncEventRecord) => {
-		if (type === "sondage") {
-			eventState.is = event;
-			modalState.dateSondage = true;
-		} else if (type === "tasks") {
-			modalState.tasks = true;
-		} else {
-			modalState.organizers = true;
-		}
+	const openSondageModal = () => {
+		// if (!hasAuth) return; // Sécurité
+		eventState.is = { ...currentEvent }; // Passer une copie pour éviter modif directe
+		modalState.dateSondage = true;
 	};
 
 	const isUserSubscribedToTask = (task: string) => {
 		return currentEvent.organizers.some(
-			(org) => org.id === currentUser.id && org.tasks.includes(task)
+			(org) => org.id === currentUser.id && org.tasks?.includes(task)
 		);
 	};
 
-	const handleSondageSubscription = (date: string, maybehereValue: string) => {
-		const updatedDatesProposed = currentEvent.dates_proposed?.map((dateProposed) => {
-			if (dateProposed.dateStart === date) {
-				const isUserSubscribed = dateProposed.organizers.some((org) => org.id === currentUser.id);
-				let updatedOrganizers = [...dateProposed.organizers];
+	const handleSondageSubscription = (
+		dateStart: string,
+		maybehereValue: "oui" | "non" | "peut-être"
+	) => {
+		if (!currentUser) return;
 
-				if (isUserSubscribed) {
-					updatedOrganizers = updatedOrganizers.map((org) => {
-						if (org.id === currentUser.id) {
-							return { ...org, maybehere: maybehereValue };
-						}
-						return org;
-					});
+		const updatedDatesProposed = (currentEvent.dates_proposed || []).map((dateProposed) => {
+			if (dateProposed.dateStart === dateStart) {
+				let updatedOrganizers = [...dateProposed.organizers];
+				const userIndex = updatedOrganizers.findIndex((org) => org.id === currentUser.id);
+
+				if (userIndex !== -1) {
+					// Mise à jour si l'utilisateur existe
+					updatedOrganizers[userIndex] = {
+						...updatedOrganizers[userIndex],
+						maybehere: maybehereValue
+					};
+					// Optionnel: retirer si vote 'non' ? Ou garder pour historique? Ici on garde.
 				} else {
+					// Ajout si l'utilisateur n'existe pas
 					updatedOrganizers.push({
 						id: currentUser.id,
-						username: currentUser.username,
-						tasks: [], // FIXIT: Les tâches n'ont que la tache par defaut pendant le sondage
+						username: currentUser.username, // S'assurer que username est dispo
+						tasks: [], // Pas de tâches spécifiques dans le sondage
 						maybehere: maybehereValue
 					});
 				}
-
-				return {
-					...dateProposed,
-					organizers: updatedOrganizers
-				};
+				return { ...dateProposed, organizers: updatedOrganizers };
 			}
 			return dateProposed;
 		});
 
-		updateEvent(currentEvent.id, { dates_proposed: updatedDatesProposed });
+		updateEvent(currentEvent.id, { dates_proposed: updatedDatesProposed }).catch((err) => {
+			console.error("Erreur MàJ sondage:", err);
+			showAlert("Erreur lors de l'enregistrement de votre réponse.", "error");
+		});
 	};
-
 	const validateDate = (selectedDate: DatesProposed) => {
-		const hasConfirmedOrganizers = selectedDate.organizers.some((org) => org.maybehere === "oui");
+		if (!hasAuth) return; // Sécurité
+
+		const confirmedOrganizersList = filterAndConvertOrganizers(selectedDate.organizers || []);
+		const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
 
 		modalState.confirm = {
 			isOpen: true,
 			data: {
 				title: "Confirmation de la date",
 				message: hasConfirmedOrganizers
-					? "En validant cette date, les organisateur·ices inscrit·es seront notifié·es par email, et le sondage sera cloturé. Voulez-vous continuer ?"
-					: "Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date. Êtes-vous sûr·e de vouloir la valider ?",
+					? `Confirmer la date du ${lisibleDate(selectedDate.dateStart)} (${lisibleTime(selectedDate.dateStart)}-${lisibleTime(selectedDate.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
+					: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(selectedDate.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
 				variant: hasConfirmedOrganizers ? "warning" : "danger",
-				onConfirm: () => {
+				showCheckbox: { checked: true, label: "Notifier les participant·es confirmé·es ('Oui')" }, // Option de notification
+				onConfirm: async (notify?: boolean) => {
+					// Utiliser async
 					const dateEvent = new Date(selectedDate.dateStart).toISOString().split("T")[0];
 					const timeStart = new Date(selectedDate.dateStart).toTimeString().slice(0, 5);
 					const timeEnd = new Date(selectedDate.dateEnd).toTimeString().slice(0, 5);
-					// USELESS ?
-					// const confirmedOrganizers = selectedDate.organizers
-					// 	.filter((org) => org.maybehere === 'oui')
-					// 	.map((org) => {
-					// 		const existingOrganizer = currentEvent.organizers.find(
-					// 			(existing) => existing.id === org.id
-					// 		);
 
-					// 		const tasks = existingOrganizer
-					// 			? [...new Set([...existingOrganizer.tasks, getTasks.defaultTask])]
-					// 			: [getTasks.defaultTask];
+					try {
+						await updateEvent(currentEvent.id, {
+							date_event: dateEvent,
+							time_start: timeStart,
+							time_end: timeEnd,
+							dateStart: selectedDate.dateStart, // Stocker les dates ISO complètes
+							dateEnd: selectedDate.dateEnd,
+							organizers: confirmedOrganizersList, // Utiliser la liste filtrée et convertie
+							isSondage: false, // Marquer le sondage comme terminé
+							dates_proposed: [] // Vider les propositions
+						});
+						showAlert("Date validée et sondage clôturé.", "success");
 
-					// 		return {
-					// 			id: org.id,
-					// 			username: org.username,
-					// 			email: org.email,
-					// 			tasks: tasks,
-					// 			role: org.role
-					// 		};
-					// 	});
-
-					updateEvent(currentEvent.id, {
-						date_event: dateEvent,
-						time_start: timeStart,
-						time_end: timeEnd,
-						organizers: filterAndConvertOrganizers(selectedDate.organizers)
-						// dates_proposed: []
-					});
+						// TODO: Envoyer notification si notify === true
+						if (notify && confirmedOrganizersList.length > 0) {
+							// Construire et envoyer email via sendGenericEmail aux confirmedOrganizersList
+							const subject = `[Oupla] Date confirmée : ${currentEvent.event_title}`;
+							const htmlContent = `
+                                <p>Bonjour,</p>
+                                <p>La date de l'événement "${currentEvent.event_title}" a été confirmée :</p>
+                                <p><b>${lisibleDate(dateEvent)} de ${timeStart} à ${timeEnd}</b></p>
+                                <p>Merci pour votre participation !</p>
+                                <p>Cordialement,<br>L'équipe Oupla</p>
+                            `;
+							const recipientIds = confirmedOrganizersList.map((org) => org.id);
+							// Attention: sendGenericEmail prend des emails, pas des IDs.
+							// Il faudrait adapter sendGenericEmail ou récupérer les emails ici.
+							// Alternative: utiliser recipientGroups si applicable, ou envoyer N emails.
+							// Pour l'instant, on log seulement
+							console.log("TODO: Envoyer notif aux emails de:", recipientIds);
+							// await sendGenericEmail({ subject, htmlContent, recipients: confirmedEmails });
+						}
+					} catch (error) {
+						console.error("Erreur validation date:", error);
+						showAlert("Erreur lors de la validation de la date.", "error");
+					}
 				}
 			}
 		};
@@ -253,6 +276,7 @@
 	// 	}, null);
 	// 	return bestProposal?.dateStart || null;
 	// });
+	//
 </script>
 
 <div transition:fade>
@@ -267,7 +291,7 @@
 		<div class="pb-4">
 			<div class="justify-between gap-2 md:flex">
 				<!-- ::: date -->
-				<div id="Top_event_date" class="px-6 py-2 shadow md:mt-2 md:rounded-l-xl {bgDateTime}">
+				<div id="Top_event_date" class="px-6 py-2 shadow-sm md:mt-2 md:rounded-l-xl {bgDateTime}">
 					<!-- Container principal -->
 					<div
 						class="align-end flex flex-wrap items-baseline justify-center gap-x-4 md:flex-col md:items-end"
@@ -286,15 +310,15 @@
 
 						<!-- Ligne 2 : Message de statut -->
 						{#if statusMessage}
-							<span class="text-base-content/70 text-center italic">
+							<span class="text-base-content/70 text-fluid-sm text-center italic">
 								{statusMessage}
 							</span>
 						{/if}
 
 						<!-- Ligne 3 : Salles -->
 						{#if hasRooms}
-							<div class="text-base-content/70 font-medium">
-								<span class="text-fluid-sm">salle·s :</span>
+							<div class="text-base-content/70 text-fluid-sm font-medium">
+								<span>salle·s :</span>
 								{#each currentEvent.rooms as room, index (room)}
 									{#if room && room.trim() !== ""}
 										<span class="text-md text-base-content">
@@ -326,6 +350,7 @@
 				</div>
 			</div>
 
+			<!-- Contenu principal de la carte (description, orga, sondage etc) -->
 			<!-- TODO enhance condition with props  -->
 			{#if !currentEvent.canceled}
 				<div id="event_content" class="flex flex-col gap-y-4 md:p-4">
@@ -335,52 +360,45 @@
 					{/if}
 
 					<!-- ::: external_proposal -->
-					{#if !currentEvent.date_event && currentEvent.external_proposal?.period_preference && currentEvent.external_proposal.period_preference.length > 0}
+					{#if !hasDate && currentEvent.external_proposal?.period_preference && currentEvent.external_proposal.period_preference.length > 0}
 						<ExpandableCard
 							title="Période proposée par les intervenant·es :"
 							text={currentEvent.external_proposal.period_preference}
 						/>
 					{/if}
 
-					<!-- ::: Organizers Card -->
+					<!-- ::: Organizers Card / sondage -->
 
-					<div id="organizers_card" class="bg-base-200 border md:rounded-lg">
+					<div id="organizers_card" class="bg-base-100 border md:rounded-lg">
 						<div
 							class="text-fluid-sm flex w-full items-center justify-between p-1 font-semibold md:rounded-t-lg"
 						>
-							<div class="text-base-content px-2">
+							<div class="px-2">
 								{organizersLabel}
 							</div>
-							<!--::: Top - Cas 1: aucune date de proposé, ni sondage -->
 							<div class="me-1">
 								{#if currentEvent.isSondage && hasAuth}
-									<button
-										onclick={() => openModal("sondage", currentEvent)}
-										class="btn btn-link btn-compact"
-									>
+									<button onclick={openSondageModal} class="btn btn-link btn-compact">
 										<CalendarPlus />
 										<span class="not-md:hidden">Modifier le sondage</span>
 									</button>
-								{:else if hasDate && currentEvent.tasks?.length > 0}
+								{:else if hasDate && currentEvent.tasks?.length === 1}
 									<button
-										class="btn btn-link btn-compact {taskButtonState.isSubscribed
+										class="btn btn-link btn-compact {generalTaskButtonState.isSubscribed
 											? 'text-error'
 											: 'text-primary'}"
-										onclick={handleTaskSubscription}
-										disabled={taskButtonState.disabled}
+										onclick={handleGeneralTaskSubscription}
+										disabled={generalTaskButtonState.disabled}
 									>
-										{#if taskButtonState.isSubscribed}
+										{#if generalTaskButtonState.isSubscribed}
 											<UserCheck class="mr-1 h-4 w-4" />
 										{:else}
 											<UserPlus class="mr-1 h-4 w-4" />
 										{/if}
-										{taskButtonState.text}
+										{generalTaskButtonState.text}
 									</button>
 								{:else if hasNoPropositions && hasAuth}
-									<button
-										onclick={() => openModal("sondage", currentEvent)}
-										class="btn btn-compact btn-link"
-									>
+									<button onclick={openSondageModal} class="btn btn-compact btn-link">
 										<CalendarPlus />
 										<span class="not-md:hidden">Créer un sondage</span>
 									</button>
@@ -409,11 +427,12 @@
 									</div>
 									<div class="flex flex-col divide-y sm:space-y-2">
 										{#each datesFutureProposed as data (currentEvent.id + "-date-" + data.dateStart)}
-											{@const oui = data.organizers.filter((org) => org.maybehere === "oui").length}
-											{@const peutetre = data.organizers.filter(
-												(org) => org.maybehere === "peut-être"
-											).length}
-											{@const non = data.organizers.filter((org) => org.maybehere === "non").length}
+											{@const oui =
+												data.organizers.filter((org) => org.maybehere === "oui").length ?? 0}
+											{@const peutetre =
+												data.organizers.filter((org) => org.maybehere === "peut-être").length ?? 0}
+											{@const non =
+												data.organizers.filter((org) => org.maybehere === "non").length ?? 0}
 
 											<!-- USE spectial class for bestDate ? -->
 											<!-- {bestDate ===
@@ -422,13 +441,10 @@
 												: ''}
 												{showSondageDetails ? 'mb-4 ' : 'border'}
 												-->
-											<div
-												class="transition:fade border bg-white p-2 sm:rounded-lg sm:shadow-sm
-													"
-											>
+											<div class=" border bg-white p-2 sm:rounded-lg sm:shadow-sm">
 												<div class=" flex items-center justify-between gap-y-2 not-sm:flex-wrap">
+													<!-- Date, Heure et Votes -->
 													<div
-														id="sondage-date-top"
 														class="flex flex-grow items-center justify-between not-sm:flex-wrap not-sm:gap-y-2 sm:max-w-2/3"
 													>
 														<div class="flex items-center">
@@ -436,9 +452,7 @@
 																<div class="tooltip px-1" data-tip="Valider cette date">
 																	<button
 																		onclick={() => validateDate(data)}
-																		class="btn btn-outline btn-square {data.organizers.some(
-																			(org) => org.maybehere === 'oui'
-																		)
+																		class="btn btn-outline btn-square {oui > 0
 																			? 'btn-success'
 																			: 'text-neutral/50'}"
 																	>
@@ -456,7 +470,7 @@
 																</div>
 															</div>
 														</div>
-														<!--:::___ Résumé des votes -->
+														<!--::: Résumé des votes -->
 														<div class="ml-2 flex items-center space-x-1 not-sm:order-3">
 															<span
 																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {oui >
@@ -489,12 +503,12 @@
 															</span>
 														</div>
 													</div>
-
+													<!-- Boutons de vote utilisateur -->
 													<div class="mr-2 ml-auto">
 														<GroupRadioButton
 															value={data.organizers.find((org) => org.id === currentUser.id)
 																?.maybehere}
-															onChange={(newValue) =>
+															onChange={(newValue: "oui" | "non" | "peut-être") =>
 																handleSondageSubscription(data.dateStart, newValue)}
 														/>
 													</div>
@@ -558,30 +572,29 @@
 									</div>
 									{#if currentEvent.isSondage && oldDatesProposed.length > 0}
 										<div class="text-fluid-xs text-base-content/70 p-2 italic">
-											Des dates déjà passées ont été proposées précédemment, et ont été
-											automatiquement supprimées ( {#each oldDatesProposed as date (currentEvent.id + "-old-" + date.dateStart)}
-												{lisibleDate(date.dateStart)},
-											{/each} )
+											({oldDatesProposed.length} date{oldDatesProposed.length > 1 ? "s" : ""} passée{oldDatesProposed.length >
+											1
+												? "s"
+												: ""} non affichée{oldDatesProposed.length > 1 ? "s" : ""})
 										</div>
 									{/if}
-								{/if}
 
-								<!--::: Cas 3: une date est déjà proposée -->
-								{#if hasDate}
+									<!--::: Cas 3: une date est déjà proposée -->
+								{:else if hasDate}
 									<!-- tasks card -->
 									{#if currentEvent.tasks && currentEvent.tasks.length > 1}
 										<div class="sm:grid sm:grid-cols-3 sm:justify-around sm:gap-4 sm:p-4">
-											{#each currentEvent.tasks as task, index (currentEvent.id + "-task-" + task.name)}
-												{@const organizersForTask = currentEvent.organizers.filter((org) =>
-													org.tasks.includes(task.name)
+											{#each currentEvent.tasks as task (currentEvent.id + "-task-" + task.name)}
+												{@const organizersForTask = currentEvent.organizers.filter(
+													(org) => org.tasks?.includes(task.name) ?? []
 												)}
+												{@const isUserInTask = isUserSubscribedToTask(task.name)}
 												<div
 													class="text-fluid-sm border bg-white font-semibold shadow-xs sm:rounded-lg"
 												>
 													<div
-														class="text-base-content mb-2 flex justify-items-center rounded-t-lg px-4 py-1 text-center {currentEvent.organizers.some(
-															(org) => org.tasks.includes(task.name)
-														)
+														class="text-base-content mb-2 flex justify-items-center rounded-t-lg px-4 py-1 text-center {organizersForTask.length >
+														0
 															? 'text-base-content'
 															: 'text-error '}"
 													>
@@ -595,35 +608,30 @@
 															</div>
 														{/if}
 													</div>
-													<div class="mb-2 flex flex-wrap gap-2 px-2">
-														{#each organizersForTask as organizer (currentEvent.id + "-org-" + organizer.id)}
-															<span
-																transition:fade|local
-																class="badge"
-																class:border-2={organizer.id === currentUser.id}
-																class:border-slate-700={organizer.id === currentUser.id}
-																class:border={organizer.id !== currentUser.id}
-																class:border-slate-400={organizer.id !== currentUser.id}
-															>
-																{organizer.username}
-															</span>
-														{/each}
+
+													<!-- Organisateurs inscrits -->
+													<div class="mb-2 flex flex-wrap items-center gap-2 px-2">
+														{#if organizersForTask.length > 0}
+															{#each organizersForTask as organizer (currentEvent.id + "-org-" + organizer.id)}
+																<span transition:fade|local class="badge badge-soft badge-accent">
+																	{organizer.username}
+																</span>
+															{/each}
+														{/if}
+
+														<!-- Bouton d'action spécifique -->
 														<button
 															class="btn btn-sm btn-compact ml-auto"
-															onclick={() =>
-																eventsStore.manageTaskSubscription(
-																	currentEvent,
-																	currentUser,
-																	task.name
-																)}
+															onclick={() => handleSpecificTaskSubscription(task.name)}
 														>
-															{isUserSubscribedToTask(task.name) ? "Se désinscrire" : "S'inscrire"}
+															{isUserInTask ? "Se désinscrire" : "S'inscrire"}
 														</button>
 													</div>
 												</div>
 											{/each}
 										</div>
 									{:else}
+										<!-- Affichage tâche unique -->
 										<div class="flex flex-wrap gap-2">
 											{#if !currentEvent.organizers.length}
 												<span class=" text-fluid-sm text-base-content/70 p-2 italic">
@@ -631,10 +639,10 @@
 												</span>
 											{:else}
 												<div class=" flex flex-wrap gap-2 p-3">
-													{#each currentEvent.organizers.filter( (org) => org.tasks.includes(currentEvent.tasks[0].name) ) as organizer (currentEvent.id + "-org-name-" + organizer.id)}
+													{#each currentEvent.organizers as organizer (currentEvent.id + "-org-name-" + organizer.id)}
 														<span
-															class="badge badge-soft badge-neutral
-																{organizer.id === currentUser.id ? 'font-semibold' : ''}"
+															class="badge badge-soft badge-accent font-semibold
+																"
 														>
 															{organizer.username}
 														</span>
@@ -646,7 +654,7 @@
 								{/if}
 							</div>
 							<!-- ::: __ mandats a se répartir> -->
-							{#if !hasDate && currentEvent.tasks && currentEvent.tasks.length > 1}
+							{#if !hasDate && currentEvent.isSondage && currentEvent.tasks && currentEvent.tasks.length > 1}
 								<div class=" text-base-content/70 p-2">
 									<p class="text-fluid-xs">
 										Mandats à se répartir pour la gestion de l'événement : <span class="italic">
@@ -661,7 +669,7 @@
 										</p>
 									{/if}
 								</div>
-							{:else if currentEvent.tasks && currentEvent.tasks.length === 1}
+							{:else if hasDate && currentEvent.tasks && currentEvent.tasks.length === 1}
 								<div class="text-fluid-xs text-base-content/70 p-2">
 									L'inscription concerne le mandat "{currentEvent.tasks[0].name}".
 									{#if currentEvent.tasks[0].description}

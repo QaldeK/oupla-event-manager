@@ -1,33 +1,21 @@
 <script lang="ts">
-	import { modalState } from '$lib/shared/states.svelte';
-	import type { TaskType } from '$lib/types/spaceOptions';
+	import { modalState } from "$lib/shared/states.svelte";
+	import type { TaskType } from "$lib/types/types";
+	import ButtonGroupSelect from "./forModal/ButtonGroupSelect.svelte";
 
-	let modalId = 'task_dialog';
+	let modalId = "task_dialog";
 
 	let username = $derived(modalState.tasks.data.username);
-	let tasksOptions = $derived(modalState.tasks.data.tasks);
+	let tasksOptions = $derived(modalState.tasks.data.tasksAvailable);
 
 	// let tasks: TaskType[] = $state.snapshot(modalState.tasks.data.tasks);
-	let selectedTaskNames = $state<string[]>(modalState.tasks.data.selectedTasks);
-
-	const isSelected = (taskName: string) => {
-		if (!selectedTaskNames) selectedTaskNames = [];
-		return selectedTaskNames.includes(taskName);
-	};
-
-	function toggleItem(taskName: string) {
-		// S'assurer que selectedTaskNames est initialisé
-		if (!selectedTaskNames) selectedTaskNames = [];
-		if (isSelected(taskName)) {
-			selectedTaskNames = selectedTaskNames.filter((name) => name !== taskName);
-		} else {
-			selectedTaskNames = [...selectedTaskNames, taskName];
-		}
-	}
+	let selectedTasks = $state<TaskType[]>([]);
 
 	const handleSubmit = () => {
 		if (modalState.tasks.data.onSubmit) {
-			modalState.tasks.data.onSubmit(selectedTaskNames || []); // Renvoyer tableau vide si null/undefined
+			const selectedNames = selectedTasks.map((task) => task.name);
+			// 👉 Appeler onSubmit avec le tableau de noms (string[])
+			modalState.tasks.data.onSubmit(selectedNames);
 		}
 		closeModal();
 	};
@@ -41,38 +29,35 @@
 		modal?.close();
 		// Réinitialiser l'état du modal
 		modalState.tasks.isOpen = false;
-		// Optionnel: réinitialiser les données pour éviter les fuites d'état
-		modalState.tasks.data.username = '';
-		modalState.tasks.data.tasks = [];
-		modalState.tasks.data.selectedTasks = [];
+
+		modalState.tasks.data.username = "";
+		modalState.tasks.data.tasksAvailable = [];
+		modalState.tasks.data.selectedTaskNames = [];
 		modalState.tasks.data.onSubmit = null;
 	};
 
+	// 👉 Initialiser selectedTasks à partir des noms dans modalState
 	$effect(() => {
-		const modal = document.getElementById(modalId) as HTMLDialogElement;
 		if (modalState.tasks.isOpen) {
-			selectedTaskNames = modalState.tasks.data.selectedTasks;
-			modal?.showModal();
+			const initialSelectedNames = modalState.tasks.data.selectedTaskNames || [];
+			// Trouver les objets TaskType correspondants dans les options disponibles
+			selectedTasks = tasksOptions.filter((task) => initialSelectedNames.includes(task.name));
+		} else {
+			// Réinitialiser quand le modal se ferme (en plus de closeModal)
+			selectedTasks = [];
 		}
 	});
 </script>
 
-<dialog id={modalId} class="modal">
+<dialog id={modalId} class="modal" class:modal-open={modalState.tasks.isOpen}>
 	<div class="modal-box">
 		<h3 class="text-lg font-bold">Définir les roles pour {username}</h3>
 		<div class="my-4">
-			<div class="flex w-full flex-wrap items-center gap-2">
-				{#each tasksOptions as task (task.name)}
-					<button
-						class="btn btn-outline btn-sm {isSelected(task.name) &&
-							'border-4 border-green-500 font-bold'}"
-						onclick={() => toggleItem(task.name)}
-						title={task.description}
-					>
-						<span>{task.name}</span>
-					</button>
-				{/each}
-			</div>
+			<ButtonGroupSelect
+				options={tasksOptions}
+				bind:selectedItems={selectedTasks}
+				optionsLabel="name"
+			/>
 		</div>
 		<div class="modal-action">
 			<button onclick={handleCancel} class="btn btn-ghost">Annuler</button>

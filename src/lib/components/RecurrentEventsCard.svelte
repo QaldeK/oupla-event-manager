@@ -54,7 +54,7 @@
 
 	const handleSubscriptionClick = (occurrence: ValidOccurrence) => {
 		if (!currentUser) return;
-		eventsStore.manageTaskSubscription(occurrence, currentUser);
+		eventsStore.requestTaskUpdate({ event: occurrence, user: currentUser });
 	};
 
 	const getSubscriptionButtonText = (occurrence: ValidOccurrence): string => {
@@ -77,18 +77,35 @@
 			<h2 class=" text-fluid-xl font-bold">
 				{master.event_title}
 			</h2>
-			<div class="flex flex-wrap justify-between gap-4">
+			<div class="bg-base-200 flex flex-wrap justify-between gap-4 rounded-lg p-1 sm:p-2">
 				<div class="text-fluid-base mt-1">
 					{formatRecurrence(master.recurrence)}
-					<span class="text-fluid-base block">
-						Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
+					<span>
+						• Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
 					</span>
 				</div>
-				<div>
-					<span class="text-fluid-base">Tâches:</span>
-					{#each master.tasks as task (master.id + task.name)}<span
-							class="badge badge-accent badge-soft">{task.name}</span
-						>{/each}
+				<div class="space-y-2">
+					<div class="flex flex-wrap gap-2">
+						<span class="text-fluid-base">Tâches:</span>
+						{#each master.tasks as task (master.id + task.name)}<span
+								class="badge badge-primary badge-soft">{task.name}</span
+							>{/each}
+					</div>
+					{#if master.recurrence.recurrenceTeam?.length}
+						<div class="flex flex-wrap gap-2">
+							<span class="text-fluid-base">Equipe:</span>
+
+							{#each master.recurrence.recurrenceTeam as member (member.id)}
+								{#if member && typeof member === "object" && "username" in member}
+									<div class=" badge badge-accent badge-soft">
+										{member.username}
+									</div>
+								{/if}
+							{/each}
+						</div>
+					{:else}
+						<div class="text-fluid-sm text-error">Aucun organisateur assigné</div>
+					{/if}
 				</div>
 			</div>
 		</div>
@@ -107,8 +124,8 @@
 								? 'border-l-error/30 border-l-3'
 								: ''}"
 					>
-						<div class="flex flex-wrap items-center justify-between gap-y-2">
-							<span class="font-medium">
+						<div class="flex flex-wrap items-start justify-between gap-y-2">
+							<span class="text-fluid-base font-medium">
 								{lisibleDate(new Date(occurrence.date_event))}
 							</span>
 							<div class="flex flex-wrap items-center gap-4">
@@ -120,7 +137,7 @@
 									<!-- Bouton d'inscription/gestion -->
 									<button
 										onclick={() => handleSubscriptionClick(occurrence)}
-										class=" btn btn-primary btn-sm btn-soft"
+										class=" btn btn-primary btn-compact btn-soft"
 										disabled={occurrence.canceled}
 									>
 										{#if isUserSubscribed(occurrence)}
@@ -132,7 +149,7 @@
 									</button>
 									<button
 										onclick={() => onConfirm(occurrence.id)}
-										class="btn btn-sm"
+										class="btn btn-compact"
 										title="Confirmer que l'événement a lieu"
 										disabled={!Array.isArray(occurrence.organizers) ||
 											occurrence.organizers.length === 0}
@@ -155,7 +172,7 @@
 						</div>
 						<!-- Affichage des organisateurs -->
 						{#if Array.isArray(occurrence.organizers) && occurrence.organizers.length > 0}
-							<div class="flex flex-wrap items-center gap-4">
+							<div class="flex flex-wrap items-center gap-2">
 								{#each occurrence.organizers as organizer (organizer.id)}
 									<div
 										class="badge badge-accent badge-soft font-semibold"
@@ -166,41 +183,29 @@
 								{/each}
 							</div>
 						{/if}
+
+						{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
+							{@const assignedTasks =
+								occurrence.organizers?.flatMap((org) => org.tasks || []) || []}
+							{@const unassignedTasks = occurrence.tasks.filter(
+								(task) => !assignedTasks.includes(task.name)
+							)}
+							{#if unassignedTasks.length > 0}
+								<div class="text-fluid-sm text-base-content/60 ms-auto mt-1">
+									Tâches non attribuées:
+									{#each unassignedTasks as task, i (i)}
+										<span title={task.description} class="badge badge-soft badge-sm me-1 mb-1"
+											>{task.name}</span
+										>
+									{/each}
+								</div>
+							{/if}
+						{/if}
 					</div>
 				{:else}
 					<div class="text-fluid-sm">Aucune date programmée</div>
 				{/each}
 			</div>
-		</div>
-
-		<!-- Équipe récurrente -->
-		<div class="bg-base-200 rounded-xl border-t p-4">
-			<div class="mb-2 flex items-baseline justify-between">
-				<h3 class="text-fluid-sm font-medium">Équipe organisatrice</h3>
-				<button
-					onclick={() => {
-						isOrganizersModal.event = master;
-						isOrganizersModal.open = true;
-					}}
-					class="btn btn-soft btn-compact"
-				>
-					+ Gérer
-				</button>
-			</div>
-
-			{#if master.recurrence.recurrenceTeam?.length}
-				<div class="flex flex-wrap gap-2">
-					{#each master.recurrence.recurrenceTeam as member (member.id)}
-						{#if member && typeof member === "object" && "username" in member}
-							<div class=" badge">
-								{member.username}
-							</div>
-						{/if}
-					{/each}
-				</div>
-			{:else}
-				<div class="text-fluid-sm text-error">Aucun organisateur assigné</div>
-			{/if}
 		</div>
 	</div>
 	<div id="footer-card" class="flex flex-wrap justify-end gap-x-4 border-t px-2 py-1 text-right">
