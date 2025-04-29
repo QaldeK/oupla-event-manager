@@ -28,12 +28,12 @@
 	function switchToSondage() {
 		eventData.isSondage = true;
 		eventData.date_event = "";
-		if (eventData.dates_proposed?.length === 0) {
-			// Initialiser avec la date actuelle si disponible
-			if (eventData.date_event && eventData.time_start && eventData.time_end) {
-				addDateProposal(eventData.date_event, eventData.time_start, eventData.time_end);
-			}
-		}
+		// if (eventData.dates_proposed?.length === 0) {
+		// 	// Initialiser avec la date actuelle si disponible
+		// 	if (eventData.date_event && eventData.time_start && eventData.time_end) {
+		// 		addDateProposal(eventData.date_event, eventData.time_start, eventData.time_end);
+		// 	}
+		// }
 	}
 
 	const resetDate = (): void => {
@@ -52,7 +52,7 @@
 				variant: "danger",
 				title: "Annuler l'événement",
 				message:
-					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
+					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site s'il s'agissait d'un événement public.",
 				onConfirm: () => {
 					modifyRecord("events", eventData.id, { canceled: true });
 					modalState.event = false;
@@ -72,7 +72,7 @@
 					<button class="link link-primary" onclick={switchToSondage}> créer un sondage </button>
 				</p>
 			{:else}
-				<p class="text-fluid-sm">
+				<p>
 					Un sondage pour determiner la date de cet événement à lieu. Si la date choisie ne convient
 					plus, vous pouvez le
 					<button class="link link-primary" onclick={switchToSondage}>rétablir</button>
@@ -109,13 +109,11 @@
 			<ul>
 				<li>
 					La date n'est plus modifiable. Si l'événement n'a plus lieu à cette date, vous pouvez <button
-						class="hover:text-decoration-red-600 text-red-600 hover:underline"
+						class="link link-error"
 						onclick={cancelEvent}>annuler</button
 					>
 					ou
-					<button class="hover:text-decoration-orange-600 text-orange-600 hover:underline"
-						>reporter</button
-					> l'événement.
+					<button class="link link-primary">reporter</button> l'événement.
 				</li>
 				<li>
 					Si vous annulez, reportez ou modifiez les horaires de l'événement, les organisateur·ices
