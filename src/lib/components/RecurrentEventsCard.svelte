@@ -3,7 +3,7 @@
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import type { EventType, OrganizerType } from "$lib/schemas/event.schema";
 	import type { UserType } from "$lib/types/types";
-	import { lisibleDate, tooltip } from "$lib/utils";
+	import { lisibleDate } from "$lib/utils";
 	import { userDb } from "$lib/shared/userDb.svelte";
 
 	import { CalendarCheck, Pencil, PencilLine, UserCheck, UserPlus } from "lucide-svelte";
