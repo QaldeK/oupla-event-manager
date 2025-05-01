@@ -518,45 +518,42 @@
 	<!-- Aperçu interactif des dates -->
 	{#if allGeneratedDates.length > 0}
 		<div class="mt-6">
-			<h3 class="mb-3 text-lg font-medium text-gray-900">
-				Dates générées ({recurrence.recurrenceDates?.length} / {allGeneratedDates.length} sélectionnées)
-			</h3>
-			<div class="border-base-300 bg-base-100 rounded-md border p-4">
+			<div class="text-fluid-lg font-medium">
+				Dates de l'événement ({recurrence.recurrenceDates?.length} / {allGeneratedDates.length} sélectionnées)
+			</div>
+			<div class="text-fluid-sm text-base-content/80 mb-2">
+				Vous pouvez déselectionner les dates que vous souhaitez exclure.
+			</div>
+			{#if allGeneratedDates.length > 54}
+				<p class="text-warning pb-2 text-sm italic">
+					Note: Seules les 54 premières dates sont affichées ici pour la sélection. La génération
+					complète ({allGeneratedDates.length} dates) sera utilisée.
+				</p>
+			{/if}
+			<div class="flex flex-wrap gap-2">
+				<!-- 👉 Itération sur TOUTES les dates générées -->
+				{#each allGeneratedDates.slice(0, 54) as date (date)}
+					{@const isSelected = recurrence.recurrenceDates?.includes(date)}
+					<!-- 👉 Bouton agissant comme une checkbox -->
+					<button
+						type="button"
+						class="btn btn-compact {isSelected ? 'btn-accent' : 'btn-dash line-through opacity-70'}"
+						onclick={() => toggleDateSelection(date)}
+						aria-pressed={isSelected}
+					>
+						{format(parse(date, "yyyy-MM-dd", new Date()), "EEE d MMM", { locale: fr })}
+					</button>
+				{/each}
 				{#if allGeneratedDates.length > 54}
-					<p class="text-warning pb-2 text-sm italic">
-						Note: Seules les 54 premières dates sont affichées ici pour la sélection. La génération
-						complète ({allGeneratedDates.length} dates) sera utilisée.
-					</p>
-				{/if}
-				<div class="flex flex-wrap gap-2">
-					<!-- 👉 Itération sur TOUTES les dates générées -->
-					{#each allGeneratedDates.slice(0, 54) as date (date)}
-						{@const isSelected = recurrence.recurrenceDates?.includes(date)}
-						<!-- 👉 Bouton agissant comme une checkbox -->
-						<button
-							type="button"
-							class="btn btn-compact {isSelected
-								? 'btn-accent'
-								: 'btn-dash line-through opacity-70'}"
-							onclick={() => toggleDateSelection(date)}
-							aria-pressed={isSelected}
-						>
-							{format(parse(date, "yyyy-MM-dd", new Date()), "EEE d MMM", { locale: fr })}
-						</button>
-					{/each}
-					{#if allGeneratedDates.length > 54}
-						<span class="self-center p-1 text-sm"
-							>... et {allGeneratedDates.length - 54} autres</span
-						>
-					{/if}
-				</div>
-				<!-- 👉 Affichage d'erreur spécifique à recurrenceDates -->
-				{#if localErrors?.recurrenceDates?._errors?.length}
-					<p class="text-fluid-xs text-error pt-2 italic">
-						{localErrors.recurrenceDates._errors[0]}
-					</p>
+					<span class="self-center p-1 text-sm">... et {allGeneratedDates.length - 54} autres</span>
 				{/if}
 			</div>
+			<!-- 👉 Affichage d'erreur spécifique à recurrenceDates -->
+			{#if localErrors?.recurrenceDates?._errors?.length}
+				<p class="text-fluid-xs text-error pt-2 italic">
+					{localErrors.recurrenceDates._errors[0]}
+				</p>
+			{/if}
 		</div>
 	{:else if recurrence.firstDate && recurrence.lastDate && recurrence.recurrenceType}
 		<p class="text-info mt-4">

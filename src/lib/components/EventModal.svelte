@@ -550,7 +550,7 @@
 			>
 				<div class="space-y-4">
 					{#if displayMode === "RECURRENT"}
-						<div>
+						<div class="mb-8">
 							<RecurrentTab
 								bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
 								isExistingMaster={eventMode === "EDIT_RECURRENT_ALL"}
