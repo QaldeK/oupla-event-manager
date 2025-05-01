@@ -112,7 +112,7 @@
 
 		<!-- Prochaines occurrences -->
 		<div>
-			<div class="text-fluid-lg mb-2 font-semibold">
+			<div class="text-fluid-lg mb-4 font-semibold">
 				Prochaines dates (5/{occurrences.length || 0})
 			</div>
 			<div class="grid grid-cols-1 divide-y">
@@ -124,8 +124,8 @@
 								? 'border-l-error/30 border-l-3'
 								: ''}"
 					>
-						<div class="flex flex-wrap items-start justify-between gap-y-2">
-							<span class="text-fluid-base font-medium">
+						<div class="mb-2 flex flex-wrap items-start justify-between gap-y-2">
+							<span class="text-fluid-lg font-medium">
 								{lisibleDate(new Date(occurrence.date_event))}
 							</span>
 							<div class="flex flex-wrap items-center gap-4">
@@ -137,19 +137,19 @@
 									<!-- Bouton d'inscription/gestion -->
 									<button
 										onclick={() => handleSubscriptionClick(occurrence)}
-										class=" btn btn-primary btn-compact btn-soft"
+										class=" btn btn-primary not-sm:btn-square btn-compact btn-soft"
 										disabled={occurrence.canceled}
 									>
 										{#if isUserSubscribed(occurrence)}
-											<UserCheck class="mr-1 h-4 w-4" />
+											<UserCheck />
 										{:else}
-											<UserPlus class="mr-1 h-4 w-4" />
+											<UserPlus />
 										{/if}
 										<span class="not-sm:hidden"> {getSubscriptionButtonText(occurrence)}</span>
 									</button>
 									<button
 										onclick={() => onConfirm(occurrence.id)}
-										class="btn btn-compact"
+										class="btn btn-compact not-sm:btn-square"
 										title="Confirmer que l'événement a lieu"
 										disabled={!Array.isArray(occurrence.organizers) ||
 											occurrence.organizers.length === 0}
@@ -172,13 +172,23 @@
 						</div>
 						<!-- Affichage des organisateurs -->
 						{#if Array.isArray(occurrence.organizers) && occurrence.organizers.length > 0}
-							<div class="flex flex-wrap items-center gap-2">
+							<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
 								{#each occurrence.organizers as organizer (organizer.id)}
 									<div
-										class="badge badge-accent badge-soft font-semibold"
+										class=" bg-accent/5 flex rounded-md px-2 py-1"
 										title={organizer.tasks?.join(", ") || "aucune taches spécifiées"}
 									>
-										{organizer.username}
+										<span class="text-accent text-fluid-sm font-semibold">{organizer.username}</span
+										>
+										{#if occurrence.tasks?.length > 1}
+											<div class="ms-2 flex flex-wrap gap-2">
+												{#each organizer.tasks as task (organizer.id + task)}
+													<span class="badge badge-accent badge-sm badge-outline font-medium"
+														>{task}</span
+													>
+												{/each}
+											</div>
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -191,8 +201,8 @@
 								(task) => !assignedTasks.includes(task.name)
 							)}
 							{#if unassignedTasks.length > 0}
-								<div class="text-fluid-sm text-base-content/60 ms-auto mt-1">
-									Tâches non attribuées:
+								<div class=" mt-4 flex flex-wrap gap-1 sm:ms-auto">
+									<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
 									{#each unassignedTasks as task, i (i)}
 										<span title={task.description} class="badge badge-soft badge-sm me-1 mb-1"
 											>{task.name}</span
