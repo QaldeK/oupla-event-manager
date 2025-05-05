@@ -70,14 +70,14 @@
 	};
 </script>
 
-<div class="bg-base-100 border-base-300 overflow-hidden rounded-lg border shadow-md">
+<div class="bg-base-100 border-base-300 @container overflow-hidden rounded-lg border shadow-md">
 	<div class="space-y-4 p-2 md:p-4">
 		<!-- En-tête -->
-		<div class="border-b pb-2">
+		<div class=" pb-2">
 			<h2 class=" text-fluid-xl font-bold">
 				{master.event_title}
 			</h2>
-			<div class="bg-base-200 flex flex-wrap justify-between gap-4 rounded-lg p-1 sm:p-2">
+			<div class="bg-base-200 flex flex-wrap justify-between gap-4 rounded-lg p-1 @sm:p-2">
 				<div class="text-fluid-base mt-1">
 					{formatRecurrence(master.recurrence)}
 					<span>
@@ -115,16 +115,18 @@
 			<div class="text-fluid-lg mb-4 font-semibold">
 				Prochaines dates (5/{occurrences.length || 0})
 			</div>
-			<div class="grid grid-cols-1 divide-y">
+			<div class="grid grid-cols-1">
 				{#each (occurrences || []).slice(0, 5) as occurrence (occurrence.id)}
 					<div
-						class="flex flex-col px-1 py-2 md:px-2 {occurrence.isConfirmed && !occurrence.canceled
+						class="flex flex-col px-4 py-2 {occurrence.isConfirmed && !occurrence.canceled
 							? ' border-l-success/30 border-l-3'
 							: occurrence.canceled
 								? 'border-l-error/30 border-l-3'
-								: ''}"
+								: !occurrence.isConfirmed
+									? 'border-l-warning/50 border-l-3'
+									: ''}"
 					>
-						<div class="mb-2 flex flex-wrap items-start justify-between gap-y-2">
+						<div class="mb-4 flex flex-wrap items-start justify-between gap-y-2">
 							<span class="text-fluid-lg font-medium">
 								{lisibleDate(new Date(occurrence.date_event))}
 							</span>
@@ -137,7 +139,7 @@
 									<!-- Bouton d'inscription/gestion -->
 									<button
 										onclick={() => handleSubscriptionClick(occurrence)}
-										class=" btn btn-primary not-sm:btn-square btn-compact btn-soft"
+										class=" btn btn-primary btn-compact btn-soft"
 										disabled={occurrence.canceled}
 									>
 										{#if isUserSubscribed(occurrence)}
@@ -145,17 +147,17 @@
 										{:else}
 											<UserPlus />
 										{/if}
-										<span class="not-sm:hidden"> {getSubscriptionButtonText(occurrence)}</span>
+										<span> {getSubscriptionButtonText(occurrence)}</span>
 									</button>
 									<button
 										onclick={() => onConfirm(occurrence.id)}
-										class="btn btn-compact not-sm:btn-square"
+										class="btn btn-compact @max-md:btn-square"
 										title="Confirmer que l'événement a lieu"
 										disabled={!Array.isArray(occurrence.organizers) ||
 											occurrence.organizers.length === 0}
 									>
 										<CalendarCheck />
-										<span class="not-sm:hidden">Confirmer</span>
+										<span class="@max-md:hidden">Confirmer</span>
 									</button>
 								{/if}
 								<button
@@ -172,7 +174,7 @@
 						</div>
 						<!-- Affichage des organisateurs -->
 						{#if Array.isArray(occurrence.organizers) && occurrence.organizers.length > 0}
-							<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+							<div class="flex flex-wrap items-center gap-x-4 gap-y-2 @max-md:my-2">
 								{#each occurrence.organizers as organizer (organizer.id)}
 									<div
 										class=" bg-accent/5 flex rounded-md px-2 py-1"
@@ -212,13 +214,14 @@
 							{/if}
 						{/if}
 					</div>
+					<div class="divider my-2"></div>
 				{:else}
 					<div class="text-fluid-sm">Aucune date programmée</div>
 				{/each}
 			</div>
 		</div>
 	</div>
-	<div id="footer-card" class="flex flex-wrap justify-end gap-x-4 border-t px-2 py-1 text-right">
+	<div id="footer-card" class="bg-base-200 flex flex-wrap justify-end gap-x-4 px-2 py-1 text-right">
 		<button
 			onclick={() => {
 				eventState.is = master;
