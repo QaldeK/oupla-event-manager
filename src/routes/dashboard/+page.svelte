@@ -1,13 +1,13 @@
 <script lang="ts">
-	import ConflictsEvents from '$lib/components/ConflictsEvents.svelte';
-	import RecurrentEventsCard from '$lib/components/RecurrentEventsCard.svelte';
-	import UserEventsCard from '$lib/components/UserEventsCard.svelte';
-	import UserSondagesCard from '$lib/components/UserSondagesCard.svelte';
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import type { EventsRecord, EventsResponse } from '$lib/types/pocketbase';
-	import type { EventType, SyncEventRecord } from '$lib/types/event';
-	import { pb } from '$lib/pocketbase.svelte';
-	import { updateEvent } from '$lib/pocketbase.svelte';
+	import ConflictsEvents from "$lib/components/ConflictsEvents.svelte";
+	import RecurrentEventsCard from "$lib/components/RecurrentEventsCard.svelte";
+	import UserEventsCard from "$lib/components/UserEventsCard.svelte";
+	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import type { EventsRecord, EventsResponse } from "$lib/types/pocketbase";
+	import type { EventType, SyncEventRecord } from "$lib/types/event";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { updateEvent } from "$lib/pocketbase.svelte";
 
 	let isLoading = $state(true);
 	let userEvents = $state<EventType[]>([]);
@@ -39,7 +39,7 @@
 				event.dates_proposed?.some((date) =>
 					// Vérifie si l'utilisateur a répondu oui ou peut-être pour cette date
 					date.organizers?.some(
-						(org) => org.id === userId && (org.maybehere === 'oui' || org.maybehere === 'peut-être')
+						(org) => org.id === userId && (org.maybehere === "oui" || org.maybehere === "peut-être")
 					)
 				)
 			);
@@ -69,7 +69,7 @@
 		</div>
 	{:else}
 		<div>
-			<h1 class="mb-6 text-2xl font-semibold">Tableau de bord</h1>
+			<h1 class="mb-6 text-2xl font-semibold">Votre tableau de bord</h1>
 			<div class="flex flex-col gap-8">
 				<ConflictsEvents />
 
@@ -87,15 +87,7 @@
 				<!-- 👉 Remplacer la boucle par l'appel au nouveau composant -->
 				{#if userSondageEvents.length > 0}
 					<section>
-						<!-- Le titre est maintenant DANS la carte, on peut le supprimer ici -->
-						<!-- <h2 class="mb-4 text-xl font-medium">Sondages auxquels vous avez répondu</h2> -->
 						<UserSondagesCard events={userSondageEvents} />
-						<!-- L'ancienne boucle est supprimée -->
-						<!-- <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{#each userSondageEvents as event (event.id)}
-									<UserSondageCard {event} />
-								{/each}
-							</div> -->
 					</section>
 				{/if}
 
@@ -110,8 +102,8 @@
 								<!-- S'assurer que RecurrentEventsCard gère bien le cas où master.recurrence est null/undefined -->
 								{#if master.recurrence}
 									<RecurrentEventsCard
-										master={master as import('$lib/components/RecurrentEventsCard.svelte').ValidMaster}
-										occurrences={occurrences as import('$lib/components/RecurrentEventsCard.svelte').ValidOccurrence[]}
+										master={master as import("$lib/components/RecurrentEventsCard.svelte").ValidMaster}
+										occurrences={occurrences as import("$lib/components/RecurrentEventsCard.svelte").ValidOccurrence[]}
 										onConfirm={confirmEvent}
 									/>
 								{/if}
