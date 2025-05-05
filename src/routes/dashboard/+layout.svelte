@@ -497,11 +497,11 @@
 
 						<!-- Content -->
 						<main
-							class=" mt-2 flex-1 overflow-y-auto p-2 transition-all duration-300 md:p-4
+							class="mt-2 flex-1 overflow-y-auto p-2 transition-all duration-300 md:p-4
 					{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-72' : ''}
 					{sidebarState.isOpen && sidebarState.isCompact ? 'ml-20' : ''}"
 						>
-							<div class="xl:w-4/5 2xl:w-3/5">
+							<div class="4xl:w-3/5 mx-auto xl:w-4/5">
 								{@render children()}
 							</div>
 							<!--
