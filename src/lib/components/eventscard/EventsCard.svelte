@@ -284,7 +284,7 @@
 		id={currentEvent.id}
 		class="transition:fade mb-8 rounded-lg border bg-white shadow-md md:mb-4 {currentEvent.isConfirmed
 			? ''
-			: 'border-l-4 border-l-amber-500'}"
+			: 'border-l-warning/80 border-l-4'}"
 	>
 		<TopAlert thisEvent={currentEvent} />
 		<!-- <span>auth : {hasAuth}</span> -->
