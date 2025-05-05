@@ -1,8 +1,8 @@
 <script lang="ts">
-	import RecurrentEventsCard from '$lib/components/RecurrentEventsCard.svelte';
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import type { EventType } from '$lib/types/event';
-	import { updateEvent } from '$lib/pocketbase.svelte';
+	import RecurrentEventsCard from "$lib/components/RecurrentEventsCard.svelte";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import type { EventType } from "$lib/types/event";
+	import { updateEvent } from "$lib/pocketbase.svelte";
 
 	const masters = $derived(eventsStore.allMasterEvents);
 	const occurrencesMap = $derived(eventsStore.getEventsOccurences);
@@ -24,19 +24,18 @@
 	const handleConfirm = async (id: string) => {
 		await updateEvent(id, { isConfirmed: true });
 	};
-
-	$inspect('masters', masters);
-	$inspect('occurrencesMap', occurrencesMap);
 </script>
 
-<div class="2xl:grid-cols-auto grid grid-cols-1 gap-x-8 gap-y-12 md:p-4 lg:grid-cols-2">
-	{#each masters as master (master.id)}
-		<div class="grow">
-			<RecurrentEventsCard
-				{master}
-				occurrences={occurrencesByMaster.get(master.id) || []}
-				onConfirm={(id) => handleConfirm(id)}
-			/>
-		</div>
-	{/each}
+<div class="@container">
+	<div class="grid grid-cols-1 gap-x-12 gap-y-12 @md:p-4 @4xl:grid-cols-2">
+		{#each masters as master (master.id)}
+			<div class="grow">
+				<RecurrentEventsCard
+					{master}
+					occurrences={occurrencesByMaster.get(master.id) || []}
+					onConfirm={(id) => handleConfirm(id)}
+				/>
+			</div>
+		{/each}
+	</div>
 </div>
