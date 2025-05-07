@@ -7,7 +7,6 @@
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { EventsRecord, EventsResponse } from "$lib/types/pocketbase";
 	import type { EventType, SyncEventRecord } from "$lib/types/event";
-	import { pb } from "$lib/pocketbase.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import type { UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
 

@@ -22,8 +22,10 @@
     <button onclick={userDb.logout}>Logout</button>
 {/if}
 */
-import { pb } from '$lib/pocketbase.svelte';
-import type { UserType } from '$lib/types/types';
+import type { UserType } from "$lib/types/types";
+import PocketBase from "pocketbase";
+
+const pb = new PocketBase("http://127.0.0.1:8090");
 
 class UserDB {
 	private userData: UserType | null = null;
@@ -49,7 +51,7 @@ class UserDB {
 	}
 
 	get currentSpace() {
-		return this.userData?.currentSpace || '';
+		return this.userData?.currentSpace || "";
 	}
 
 	get currentRole() {
@@ -64,22 +66,22 @@ class UserDB {
 	}
 
 	get id() {
-		return this.userData?.id || '';
+		return this.userData?.id || "";
 	}
 
 	// Méthodes privées
 
 	private async buildFullUserInfo(baseUserRecord: any): Promise<UserType> {
-		const memberOfResponse = await pb.collection('spaceMembers').getFullList({
+		const memberOfResponse = await pb.collection("spaceMembers").getFullList({
 			filter: `user = "${baseUserRecord.id}"`,
-			expand: 'space'
+			expand: "space"
 		});
 
 		return {
 			...baseUserRecord,
 			memberOf: memberOfResponse.map((space) => {
 				if (!space.expand?.space) {
-					throw new Error('Espace non trouvé');
+					throw new Error("Espace non trouvé");
 				}
 				return {
 					id: space.expand.space.id,
@@ -139,12 +141,12 @@ class UserDB {
 
 	async login(email: string, password: string): Promise<UserType> {
 		try {
-			console.log('login...');
+			console.log("login...");
 			// Authentification avec PocketBase
-			const authData = await pb.collection('users').authWithPassword(email, password);
+			const authData = await pb.collection("users").authWithPassword(email, password);
 
 			if (!pb.authStore.record) {
-				throw new Error('Authentification échouée');
+				throw new Error("Authentification échouée");
 			}
 
 			const userInfo = await this.buildFullUserInfo(authData.record);
@@ -152,7 +154,7 @@ class UserDB {
 
 			return userInfo;
 		} catch (error) {
-			console.error('Login error:', error);
+			console.error("Login error:", error);
 			throw error;
 		}
 	}
@@ -162,7 +164,7 @@ class UserDB {
 			return;
 		}
 
-		const authData = await pb.collection('users').authRefresh();
+		const authData = await pb.collection("users").authRefresh();
 
 		if (pb.authStore.record) {
 			const userInfo = await this.buildFullUserInfo(pb.authStore.record);
@@ -186,16 +188,16 @@ class UserDB {
 				emailVisibility: true
 			};
 
-			await pb.collection('users').create(data);
+			await pb.collection("users").create(data);
 
 			// Attendre un peu avant la connexion
 			await new Promise((resolve) => setTimeout(resolve, 100));
 
 			// Connexion avec les nouveaux identifiants
-			const authData = await pb.collection('users').authWithPassword(email, password);
+			const authData = await pb.collection("users").authWithPassword(email, password);
 
 			if (!pb.authStore.record) {
-				throw new Error('Authentification échouée après inscription');
+				throw new Error("Authentification échouée après inscription");
 			}
 
 			const userInfo = await this.buildFullUserInfo(authData.record);
@@ -203,12 +205,13 @@ class UserDB {
 
 			return userInfo;
 		} catch (error) {
-			console.error('Register error:', error);
+			console.error("Register error:", error);
 			throw error;
 		}
 	}
 }
 
 // Création de l'instance unique
+export { pb }; // on initie et export pb depuis ici pour qu'il soit disponible au constructeur
 const userDBInstance = new UserDB();
 export const userDb = userDBInstance;

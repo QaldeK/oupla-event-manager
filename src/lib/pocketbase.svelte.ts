@@ -1,22 +1,21 @@
-import { type TaskType } from '$lib/schemas/event.schema';
+import { type TaskType } from "$lib/schemas/event.schema";
 import type {
 	Collections,
 	EventsRecord,
 	EventsResponse,
 	MessagesResponse
-} from '$lib/types/pocketbase';
-import { createDateFromString } from '$lib/utils';
-import { getSpace } from '$lib/shared/spaceOptions.svelte';
-import PocketBase from 'pocketbase';
+} from "$lib/types/pocketbase";
+import { createDateFromString } from "$lib/utils";
+import { getSpace } from "$lib/shared/spaceOptions.svelte";
 import type {
 	ListOptions,
 	ListResult,
 	RecordModel,
 	SubscribeOptions,
 	TypedPocketBase
-} from 'pocketbase';
+} from "pocketbase";
 
-import type { EventType } from './types/event';
+import type { EventType } from "./types/event";
 
 type GetOneOptions = {
 	expand?: string;
@@ -24,7 +23,8 @@ type GetOneOptions = {
 };
 
 // const pb = new PocketBase('https://oupla.pockethost.io/');
-const pb = new PocketBase('http://127.0.0.1:8090') as TypedPocketBase;
+
+import { pb } from "$lib/shared/userDb.svelte";
 export { pb };
 
 // ::: Generic functions
@@ -57,15 +57,15 @@ export const deleteRecord = async (collection: string, id: string) => {
 
 // Pour les visiteurs non connectés
 export async function loadPublicEvents(spaceId: string) {
-	return await pb.collection('events').getFullList<EventType>({
-		filter: `space = '${spaceId}' && isConfirmed = true && date_event >= '${new Date().toISOString().split('T')[0]}'`,
-		sort: 'date_event'
+	return await pb.collection("events").getFullList<EventType>({
+		filter: `space = '${spaceId}' && isConfirmed = true && date_event >= '${new Date().toISOString().split("T")[0]}'`,
+		sort: "date_event"
 	});
 }
 
 export const updateEvent = async (eventID: string, data: Partial<EventsRecord>) => {
 	try {
-		await pb.collection('events').update(eventID, data);
+		await pb.collection("events").update(eventID, data);
 	} catch (error) {
 		console.error(error);
 		throw error;
@@ -81,7 +81,7 @@ export const createEvent = async (data: Partial<EventsRecord>) => {
 			space: getSpace.id
 		};
 
-		const record = await pb.collection('events').create(eventData);
+		const record = await pb.collection("events").create(eventData);
 		return record;
 	} catch (error) {
 		console.error(error);
@@ -96,7 +96,7 @@ export const subscribe = <T extends RecordModel>(
 	options?: SubscribeOptions
 ) => {
 	pb.collection(collectionName).subscribe(
-		'*',
+		"*",
 		(data) => {
 			callback(data.record as T);
 		},
@@ -105,7 +105,7 @@ export const subscribe = <T extends RecordModel>(
 };
 
 // Fonction pour annuler l'abonnement
-export const unsubscribe = (collectionName: string, topic: string = '*'): void => {
+export const unsubscribe = (collectionName: string, topic: string = "*"): void => {
 	pb.collection(collectionName).unsubscribe(topic);
 };
 
@@ -116,7 +116,7 @@ export const getFirstListItem = async <T extends RecordModel>(
 	options?: GetOneOptions
 ): Promise<T> => {
 	try {
-		return await pb.collection(collectionName).getFirstListItem(filter || '', options);
+		return await pb.collection(collectionName).getFirstListItem(filter || "", options);
 	} catch (error) {
 		console.error(
 			`Erreur lors de la récupération du premier élément dans ${collectionName}:`,
@@ -179,7 +179,7 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 		const masterEvent = {
 			...eventData,
 			isMasterRecurrent: true,
-			date_event: '', // on ne met pas de date à l'event master
+			date_event: "", // on ne met pas de date à l'event master
 			space: getSpace.id,
 			created_by: pb.authStore.record.id,
 			recurrence: {
@@ -190,8 +190,8 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 			dateEnd: null
 		};
 
-		const masterRecord = await pb.collection('events').create({ ...masterEvent });
-		console.log('Master event créé:', masterRecord.id);
+		const masterRecord = await pb.collection("events").create({ ...masterEvent });
+		console.log("Master event créé:", masterRecord.id);
 		const recurrenceDates = eventData.recurrence.recurrenceDates;
 
 		// Créer les occurrences
@@ -215,14 +215,14 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 				dateEnd
 			};
 
-			batch.collection('events').create(occurrenceData);
+			batch.collection("events").create(occurrenceData);
 		});
 
 		// ts-int:disable-next-line: no-unused-expression
 		const createOccurrences = await batch.send();
-		console.log('Création des événements récurrents terminée');
+		console.log("Création des événements récurrents terminée");
 	} catch (error) {
-		console.error('Erreur lors de la création des événements récurrents:', error);
+		console.error("Erreur lors de la création des événements récurrents:", error);
 		throw error;
 	}
 };
@@ -232,9 +232,9 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 export const updateAllOccurrences = async (masterEvent: EventType) => {
 	try {
 		// Vérification ajoutée pour s'assurer que recurrence existe et est un objet (TS)
-		if (!masterEvent.recurrence || typeof masterEvent.recurrence !== 'object') {
-			console.error('Données de récurrence invalides ou manquantes dans masterEvent.');
-			throw new Error('Données de récurrence invalides.');
+		if (!masterEvent.recurrence || typeof masterEvent.recurrence !== "object") {
+			console.error("Données de récurrence invalides ou manquantes dans masterEvent.");
+			throw new Error("Données de récurrence invalides.");
 		}
 		const recurrenceDates = masterEvent.recurrence.recurrenceDates || [];
 
@@ -259,7 +259,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 
 		// 1. Mise à jour du master event
 		const masterUpdateData = cleanEventData({ ...masterEvent });
-		masterUpdateData.date_event = ''; // Master event n'a pas de date
+		masterUpdateData.date_event = ""; // Master event n'a pas de date
 		masterUpdateData.dateStart = null;
 		masterUpdateData.dateEnd = null;
 
@@ -268,7 +268,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 		// 	masterUpdateData.recurrence.tasks = masterEvent.tasks; // Synchronise les tâches dans l'objet recurrence du master
 		// }
 
-		await pb.collection('events').update(masterId, masterUpdateData);
+		await pb.collection("events").update(masterId, masterUpdateData);
 
 		// 2. Récupérer les occurrences existantes liées à cet événement master
 		// const existingOccurrences = eventsStore.getEventsOccurences.filter(
@@ -277,7 +277,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 
 		console.log(`Récupération des occurrences pour le master ID: ${masterId}`);
 
-		const existingOccurrences = await pb.collection('events').getFullList<EventType>({
+		const existingOccurrences = await pb.collection("events").getFullList<EventType>({
 			filter: `masterRecurrentId = '${masterId}'`
 		});
 
@@ -364,7 +364,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			try {
 				for (const recordId of toDelete) {
 					if (recordId) {
-						await pb.collection('events').delete(recordId);
+						await pb.collection("events").delete(recordId);
 					}
 				}
 			} catch (error) {
@@ -376,7 +376,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			try {
 				const batch = pb.createBatch();
 				toCreate.forEach((record) => {
-					batch.collection('events').create(record);
+					batch.collection("events").create(record);
 				});
 				await batch.send();
 				console.log(`${toCreate.length} nouvelles occurrences créées`);
@@ -393,7 +393,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 					const recordId = record.id;
 					const updateData = { ...record };
 					delete updateData.id; // On retire l'ID des données à mettre à jour
-					updateBatch.collection('events').update(recordId, updateData);
+					updateBatch.collection("events").update(recordId, updateData);
 				});
 				await updateBatch.send();
 				console.log(`${toUpdate.length} occurrences mises à jour`);
@@ -402,7 +402,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			}
 		}
 	} catch (error) {
-		console.error('Erreur lors de la mise à jour des occurrences:', error);
+		console.error("Erreur lors de la mise à jour des occurrences:", error);
 		throw error;
 	}
 };
@@ -411,8 +411,8 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 export async function sendEmail(html: string, text: string, recipient: string) {
 	try {
 		// Encoder le HTML pour éviter les problèmes de caractères spéciaux
-		const response = await pb.send('/api/send_email', {
-			method: 'POST',
+		const response = await pb.send("/api/send_email", {
+			method: "POST",
 			body: {
 				html: html,
 				text: text,
@@ -422,7 +422,7 @@ export async function sendEmail(html: string, text: string, recipient: string) {
 
 		// Gérer la réponse
 		if (response.success) {
-			console.log('Email envoyé avec succès !');
+			console.log("Email envoyé avec succès !");
 		}
 	} catch (error) {
 		console.error("Erreur lors de l'envoi de l'email:", error);
@@ -451,15 +451,15 @@ export async function sendEmail(html: string, text: string, recipient: string) {
 // Message
 export const loadMessages = async (eventId: string) => {
 	try {
-		const messages = (await pb.collection('messages').getList(1, 20, {
+		const messages = (await pb.collection("messages").getList(1, 20, {
 			filter: `event = "${eventId}"`,
-			sort: 'created',
-			expand: 'user'
+			sort: "created",
+			expand: "user"
 		})) as ListResult<MessagesResponse>;
-		console.log('Messages chargés:', messages);
+		console.log("Messages chargés:", messages);
 		return messages;
 	} catch (error) {
-		console.error('Error fetching messages:', error);
+		console.error("Error fetching messages:", error);
 		throw error;
 	}
 };
@@ -470,7 +470,7 @@ export const sendMessage = async (
 	parentId: string | null = null
 ) => {
 	try {
-		await pb.collection('messages').create({
+		await pb.collection("messages").create({
 			event: eventId,
 			user: pb.authStore.model?.id,
 			content: content,
@@ -478,7 +478,7 @@ export const sendMessage = async (
 			space: getSpace.id
 		});
 	} catch (error) {
-		console.error('Error sending message:', error);
+		console.error("Error sending message:", error);
 		throw error;
 	}
 };
@@ -495,23 +495,23 @@ export const updateMessage = async (
 			return;
 		}
 
-		await pb.collection('messages').update(message.id, {
+		await pb.collection("messages").update(message.id, {
 			content: editContent,
 			isEdited: true
 		});
 	} catch (error) {
-		console.error('Error updating message:', error);
+		console.error("Error updating message:", error);
 		throw error;
 	}
 };
 
 export const deleteMessage = async (message: MessagesResponse) => {
 	try {
-		if (confirm('Voulez-vous vraiment supprimer ce message ?')) {
-			await pb.collection('messages').delete(message.id);
+		if (confirm("Voulez-vous vraiment supprimer ce message ?")) {
+			await pb.collection("messages").delete(message.id);
 		}
 	} catch (error) {
-		console.error('Error deleting message:', error);
+		console.error("Error deleting message:", error);
 		throw error;
 	}
 };
@@ -535,7 +535,7 @@ export async function acquireLock<T extends RecordModel>(
 
 		const userId = pb.authStore.model?.id;
 		if (!userId) {
-			console.error('Utilisateur non authentifié.');
+			console.error("Utilisateur non authentifié.");
 			return null;
 		}
 
@@ -569,7 +569,7 @@ export async function refreshLock<T extends RecordModel>(
 	try {
 		const userId = pb.authStore.model?.id;
 		if (!userId) {
-			console.error('Utilisateur non authentifié pour rafraîchir le verrou.');
+			console.error("Utilisateur non authentifié pour rafraîchir le verrou.");
 			return null;
 		}
 
@@ -632,10 +632,10 @@ export async function checkAndCleanLock(
 	try {
 		// Utilise l'instance pb pour construire l'URL et gérer l'authentification
 		const response = await pb.send(`/check_and_clean_lock/${collection}/${recordId}`, {
-			method: 'GET'
+			method: "GET"
 		});
 
-		console.log('[Client] Lock check API response:', response);
+		console.log("[Client] Lock check API response:", response);
 		return response;
 	} catch (error) {
 		console.error(`[Client] Error checking/cleaning lock for document ${recordId}:`, error);
@@ -649,12 +649,12 @@ export interface GenericEmailPayload {
 	htmlContent: string;
 	textContent?: string; // Optionnel
 	recipients?: string[]; // Emails explicites
-	recipientGroups?: ('otherOrganizers' | 'recurrenceTeam' | 'spaceAdmins' | 'systemAdmins')[]; // Mots-clés
+	recipientGroups?: ("otherOrganizers" | "recurrenceTeam" | "spaceAdmins" | "systemAdmins")[]; // Mots-clés
 	fallbackRecipientGroups?: (
-		| 'otherOrganizers'
-		| 'recurrenceTeam'
-		| 'spaceAdmins'
-		| 'systemAdmins'
+		| "otherOrganizers"
+		| "recurrenceTeam"
+		| "spaceAdmins"
+		| "systemAdmins"
 	)[];
 	context?: {
 		eventId?: string;
@@ -666,21 +666,21 @@ export interface GenericEmailPayload {
 
 export async function sendGenericEmail(payload: GenericEmailPayload): Promise<void> {
 	try {
-		console.log('Payload being sent to /api/send_email:', JSON.stringify(payload, null, 2));
+		console.log("Payload being sent to /api/send_email:", JSON.stringify(payload, null, 2));
 		// Appel de la nouvelle route backend
-		await pb.send('/api/send_email', {
-			method: 'POST',
+		await pb.send("/api/send_email", {
+			method: "POST",
 			body: payload,
 			headers: {
-				'Content-Type': 'application/json'
+				"Content-Type": "application/json"
 			}
 		});
-		console.log('Generic email request sent successfully.');
+		console.log("Generic email request sent successfully.");
 	} catch (error: any) {
-		console.error('Failed to send generic email:', error);
+		console.error("Failed to send generic email:", error);
 		// Afficher plus de détails si disponibles
 		if (error?.response) {
-			console.error('PocketBase error response:', error.response);
+			console.error("PocketBase error response:", error.response);
 		}
 		// Gérer l'erreur (Sentry, toast, etc.)
 		throw error; // Propager
