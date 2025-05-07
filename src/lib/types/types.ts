@@ -16,7 +16,7 @@ export type {
 } from "./pocketbase";
 
 export type {
-	SpaceConfig, // La config de l'espace gérée par spaceOptions.svelte
+	SpaceConfig, // La config de l'espace gérée par spJaceOptions.svelte
 	SpaceUser, // Le format simplifié des membres de l'espace
 	SpaceDetails, // Détails de base d'un espace
 	SpaceOptionsType // Le type des données stockées dans le champ 'options' de spaces_options
@@ -25,7 +25,10 @@ export type {
 export type {
 	EventType, // Le type complet d'un événement (probablement basé sur EventsResponse + client-side logic)
 	OrganizerType, // Le type d'un organisateur d'événement
-	TaskType // Le type d'une tâche pour un événement
+	TaskType, // Le type d'une tâche pour un événement
+	DateProposedType,
+	ValidMaster,
+	ValidOccurrence
 } from "$lib/schemas/event.schema";
 
 export type {

@@ -243,7 +243,7 @@
 				{#if error}
 					<div class="fixed inset-0 z-50 flex items-center justify-center">
 						<div class="rounded-lg bg-white p-6 shadow-lg">
-							<h2 class="mb-4 text-xl font-bold text-red-600">Erreur d'initialisation</h2>
+							<h2 class="text-fluid-xl mb-4 font-bold text-red-600">Erreur d'initialisation</h2>
 							<p class="text-base-content">{error.message}</p>
 							<button class="btn btn-primary" onclick={() => goto("/login")}>
 								Retour à la connexion
@@ -501,7 +501,7 @@
 					{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-72' : ''}
 					{sidebarState.isOpen && sidebarState.isCompact ? 'ml-20' : ''}"
 						>
-							<div class="4xl:w-3/5 mx-auto xl:w-4/5">
+							<div class="4xl:w-3/5 mx-auto xl:mx-10">
 								{@render children()}
 							</div>
 							<!--
@@ -543,7 +543,7 @@
 	{:catch error}
 		<div class="fixed inset-0 z-50 flex items-center justify-center">
 			<div class="rounded-lg bg-white p-6 shadow-lg">
-				<h2 class="mb-4 text-xl font-bold text-red-600">Session expirée</h2>
+				<h2 class="text-fluid-xl mb-4 font-bold text-red-600">Session expirée</h2>
 				<p class="text-base-content">{error.message}</p>
 				<button class="btn btn-primary" onclick={() => goto("/login")}>
 					Retour à la connexion

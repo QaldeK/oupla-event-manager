@@ -1,11 +1,13 @@
 <script lang="ts">
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import GroupRadioButton from "$lib/components/GroupRadioButton.svelte";
-	import { updateEvent } from "$lib/pocketbase.svelte";
+	import { pb, updateEvent } from "$lib/pocketbase.svelte";
+	import { validateDate } from "../../services/eventActions";
 	import { filterAndConvertOrganizers, lisibleDate, lisibleTime } from "$lib/utils";
 	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
-	import type { EventType, OrganizerType, SyncEventRecord } from "$lib/types/event";
-	import type { UserType } from "$lib/types/types";
+	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
+	import type { OrganizerType, SyncEventRecord } from "$lib/types/event";
+	import type { EventType, UserType, DatesProposedType } from "$lib/types/types";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { getContext } from "svelte";
 	import { fade } from "svelte/transition";
@@ -75,14 +77,8 @@
 		return "Organisateur•ices";
 	});
 
-	interface DatesProposed {
-		dateStart: string;
-		dateEnd: string;
-		organizers: OrganizerType[];
-	}
-
-	let oldDatesProposed: DatesProposed[] = $state([]);
-	let datesFutureProposed: DatesProposed[] = $state([]);
+	let oldDatesProposed: DatesProposedType[] = $state([]);
+	let datesFutureProposed: DatesProposedType[] = $state([]);
 
 	let bgDateTime = $derived.by(() => {
 		if (currentEvent.canceled) return "bg-error/20";
@@ -198,67 +194,6 @@
 			showAlert("Erreur lors de l'enregistrement de votre réponse.", "error");
 		});
 	};
-	const validateDate = (selectedDate: DatesProposed) => {
-		if (!hasAuth) return; // Sécurité
-
-		const confirmedOrganizersList = filterAndConvertOrganizers(selectedDate.organizers || []);
-		const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
-
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: "Confirmation de la date",
-				message: hasConfirmedOrganizers
-					? `Confirmer la date du ${lisibleDate(selectedDate.dateStart)} (${lisibleTime(selectedDate.dateStart)}-${lisibleTime(selectedDate.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
-					: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(selectedDate.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
-				variant: hasConfirmedOrganizers ? "warning" : "danger",
-				showCheckbox: { checked: true, label: "Notifier les participant·es confirmé·es ('Oui')" }, // Option de notification
-				onConfirm: async (notify?: boolean) => {
-					// Utiliser async
-					const dateEvent = new Date(selectedDate.dateStart).toISOString().split("T")[0];
-					const timeStart = new Date(selectedDate.dateStart).toTimeString().slice(0, 5);
-					const timeEnd = new Date(selectedDate.dateEnd).toTimeString().slice(0, 5);
-
-					try {
-						await updateEvent(currentEvent.id, {
-							date_event: dateEvent,
-							time_start: timeStart,
-							time_end: timeEnd,
-							dateStart: selectedDate.dateStart, // Stocker les dates ISO complètes
-							dateEnd: selectedDate.dateEnd,
-							organizers: confirmedOrganizersList, // Utiliser la liste filtrée et convertie
-							isSondage: false, // Marquer le sondage comme terminé
-							dates_proposed: [] // Vider les propositions
-						});
-						showAlert("Date validée et sondage clôturé.", "success");
-
-						// TODO: Envoyer notification si notify === true
-						if (notify && confirmedOrganizersList.length > 0) {
-							// Construire et envoyer email via sendGenericEmail aux confirmedOrganizersList
-							const subject = `[Oupla] Date confirmée : ${currentEvent.event_title}`;
-							const htmlContent = `
-                                <p>Bonjour,</p>
-                                <p>La date de l'événement "${currentEvent.event_title}" a été confirmée :</p>
-                                <p><b>${lisibleDate(dateEvent)} de ${timeStart} à ${timeEnd}</b></p>
-                                <p>Merci pour votre participation !</p>
-                                <p>Cordialement,<br>L'équipe Oupla</p>
-                            `;
-							const recipientIds = confirmedOrganizersList.map((org) => org.id);
-							// Attention: sendGenericEmail prend des emails, pas des IDs.
-							// Il faudrait adapter sendGenericEmail ou récupérer les emails ici.
-							// Alternative: utiliser recipientGroups si applicable, ou envoyer N emails.
-							// Pour l'instant, on log seulement
-							console.log("TODO: Envoyer notif aux emails de:", recipientIds);
-							// await sendGenericEmail({ subject, htmlContent, recipients: confirmedEmails });
-						}
-					} catch (error) {
-						console.error("Erreur validation date:", error);
-						showAlert("Erreur lors de la validation de la date.", "error");
-					}
-				}
-			}
-		};
-	};
 
 	// USELESS ? Keep It ?
 	// const bestDate = $derived.by(() => {
@@ -279,7 +214,7 @@
 	//
 </script>
 
-<div transition:fade>
+<div transition:fade class="@container">
 	<div
 		id={currentEvent.id}
 		class="transition:fade mb-8 rounded-lg border bg-white shadow-md md:mb-4 {currentEvent.isConfirmed
@@ -369,36 +304,42 @@
 
 					<!-- ::: Organizers Card / sondage -->
 
-					<div id="organizers_card" class="bg-base-100 border md:rounded-lg">
+					<div id="organizers_card" class="bg-base-100 shadow-sm md:rounded-lg">
 						<div
 							class="text-fluid-sm flex w-full items-center justify-between p-1 font-semibold md:rounded-t-lg"
 						>
-							<div class="px-2">
+							<div class="p-2">
 								{organizersLabel}
 							</div>
 							<div class="me-1">
 								{#if currentEvent.isSondage && hasAuth}
-									<button onclick={openSondageModal} class="btn btn-link btn-compact">
+									<button
+										onclick={openSondageModal}
+										class="btn btn-primary btn-outline btn-compact"
+									>
 										<CalendarPlus />
 										<span class="not-md:hidden">Modifier le sondage</span>
 									</button>
 								{:else if hasDate && currentEvent.tasks?.length === 1}
 									<button
-										class="btn btn-link btn-compact {generalTaskButtonState.isSubscribed
-											? 'text-error'
-											: 'text-primary'}"
+										class="btn btn-outline btn-compact {generalTaskButtonState.isSubscribed
+											? 'btn-error'
+											: 'btn-primary'}"
 										onclick={handleGeneralTaskSubscription}
 										disabled={generalTaskButtonState.disabled}
 									>
 										{#if generalTaskButtonState.isSubscribed}
-											<UserCheck class="mr-1 h-4 w-4" />
+											<UserCheck />
 										{:else}
-											<UserPlus class="mr-1 h-4 w-4" />
+											<UserPlus />
 										{/if}
 										{generalTaskButtonState.text}
 									</button>
 								{:else if hasNoPropositions && hasAuth}
-									<button onclick={openSondageModal} class="btn btn-compact btn-link">
+									<button
+										onclick={openSondageModal}
+										class="btn btn-compact btn-primary btn-outline"
+									>
 										<CalendarPlus />
 										<span class="not-md:hidden">Créer un sondage</span>
 									</button>
@@ -409,167 +350,7 @@
 							<div class=" flex flex-col rounded-b-lg {currentEvent.isSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
 								{#if currentEvent.isSondage}
-									<div class=" text-base-content items-baseline gap-2 p-2">
-										<!-- <p class="ml-auto text-fluid-sm">Serez vous disponibles à ces dates ?</p> -->
-
-										<!-- __ Bouton afficher/masquer tous les détails -->
-										<button
-											class="btn btn-link btn-compact ml-auto flex"
-											onclick={toggleAllDetails}
-										>
-											{showSondageDetails ? "Masquer les détails" : "Afficher les détails"}
-											{#if showSondageDetails}
-												<ChevronUp class="ml-1 h-3 w-3" />
-											{:else}
-												<ChevronDown class="ml-1 h-3 w-3" />
-											{/if}
-										</button>
-									</div>
-									<div class="flex flex-col divide-y sm:space-y-2">
-										{#each datesFutureProposed as data (currentEvent.id + "-date-" + data.dateStart)}
-											{@const oui =
-												data.organizers.filter((org) => org.maybehere === "oui").length ?? 0}
-											{@const peutetre =
-												data.organizers.filter((org) => org.maybehere === "peut-être").length ?? 0}
-											{@const non =
-												data.organizers.filter((org) => org.maybehere === "non").length ?? 0}
-
-											<!-- USE spectial class for bestDate ? -->
-											<!-- {bestDate ===
-											data.dateStart
-												? 'ring-success/30 ring-2'
-												: ''}
-												{showSondageDetails ? 'mb-4 ' : 'border'}
-												-->
-											<div class=" border bg-white p-2 sm:rounded-lg sm:shadow-sm">
-												<div class=" flex items-center justify-between gap-y-2 not-sm:flex-wrap">
-													<!-- Date, Heure et Votes -->
-													<div
-														class="flex flex-grow items-center justify-between not-sm:flex-wrap not-sm:gap-y-2 sm:max-w-2/3"
-													>
-														<div class="flex items-center">
-															{#if hasAuth}
-																<div class="tooltip px-1" data-tip="Valider cette date">
-																	<button
-																		onclick={() => validateDate(data)}
-																		class="btn btn-outline btn-square {oui > 0
-																			? 'btn-success'
-																			: 'text-neutral/50'}"
-																	>
-																		<CalendarCheck />
-																	</button>
-																</div>
-															{/if}
-															<div
-																class="text-fluid-base flex flex-wrap gap-x-4 px-3 font-semibold not-sm:order-2"
-															>
-																<div>{lisibleDate(data.dateStart)}</div>
-
-																<div>
-																	{lisibleTime(data.dateStart)} - {lisibleTime(data.dateEnd)}
-																</div>
-															</div>
-														</div>
-														<!--::: Résumé des votes -->
-														<div class="ml-2 flex items-center space-x-1 not-sm:order-3">
-															<span
-																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {oui >
-																0
-																	? 'bg-success/20'
-																	: ''}"
-															>
-																<ThumbsUp class="mr-0.5 h-4 w-4" />
-																{oui}
-															</span>
-
-															<span
-																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {peutetre >
-																0
-																	? 'text-warning-content bg-warning/20'
-																	: ''}"
-															>
-																<BadgeHelp class="mr-0.5 h-4 w-4" />
-																{peutetre}
-															</span>
-
-															<span
-																class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {non >
-																0
-																	? 'bg-error/20 text-error-content'
-																	: ''}"
-															>
-																<ThumbsDown class="mr-0.5 h-4 w-4" />
-																{non}
-															</span>
-														</div>
-													</div>
-													<!-- Boutons de vote utilisateur -->
-													<div class="mr-2 ml-auto">
-														<GroupRadioButton
-															value={data.organizers.find((org) => org.id === currentUser.id)
-																?.maybehere}
-															onChange={(newValue: "oui" | "non" | "peut-être") =>
-																handleSondageSubscription(data.dateStart, newValue)}
-														/>
-													</div>
-												</div>
-												<!--:::__ Section expandable pour les détails des votes -->
-												{#if showSondageDetails}
-													<div transition:fade={{ duration: 150 }} class="mt-2 px-1">
-														<div class="bg-base-100 rounded-md p-2">
-															{#if data.organizers.length === 0}
-																<p class="text-fluid-sm text-base-content/70">
-																	Aucune réponse pour le moment
-																</p>
-															{:else}
-																<div class="text-fluid-sm grid gap-1">
-																	<div
-																		class=" text-base-content/70 grid grid-cols-3 gap-1 font-medium"
-																	>
-																		<div class="flex items-center">
-																			<ThumbsUp class="text-success mr-1 h-4" /> Disponible
-																		</div>
-																		<div class="flex items-center">
-																			<BadgeHelp class="text-warning mr-1 h-4" /> Peut-être
-																		</div>
-																		<div class="flex items-center">
-																			<ThumbsDown class="text-error mr-1 h-4" /> Indisponible
-																		</div>
-																	</div>
-
-																	<hr class="my-1" />
-
-																	<div class="grid grid-cols-3 gap-1">
-																		<div class="flex flex-wrap gap-2">
-																			{#each data.organizers.filter((org) => org.maybehere === "oui") as org (org.id)}
-																				<div class="badge bg-success/20">
-																					{org.username}
-																				</div>
-																			{/each}
-																		</div>
-																		<div class="flex flex-wrap gap-2">
-																			{#each data.organizers.filter((org) => org.maybehere === "peut-être") as org (org.id)}
-																				<div class="badge bg-warning/20">
-																					{org.username}
-																				</div>
-																			{/each}
-																		</div>
-																		<div class="flex flex-wrap gap-2">
-																			{#each data.organizers.filter((org) => org.maybehere === "non") as org (org.id)}
-																				<div class="badge bg-error/20">
-																					{org.username}
-																				</div>
-																			{/each}
-																		</div>
-																	</div>
-																</div>
-															{/if}
-														</div>
-													</div>
-												{/if}
-											</div>
-										{/each}
-									</div>
+									<UserSondagesCard {currentEvent} {currentUser} showHeader={false} />
 									{#if currentEvent.isSondage && oldDatesProposed.length > 0}
 										<div class="text-fluid-xs text-base-content/70 p-2 italic">
 											({oldDatesProposed.length} date{oldDatesProposed.length > 1 ? "s" : ""} passée{oldDatesProposed.length >
@@ -613,7 +394,10 @@
 													<div class="mb-2 flex flex-wrap items-center gap-2 px-2">
 														{#if organizersForTask.length > 0}
 															{#each organizersForTask as organizer (currentEvent.id + "-org-" + organizer.id)}
-																<span transition:fade|local class="badge badge-soft badge-accent">
+																<span
+																	transition:fade|local
+																	class="badge badge-accent badge-outline"
+																>
 																	{organizer.username}
 																</span>
 															{/each}
@@ -621,7 +405,7 @@
 
 														<!-- Bouton d'action spécifique -->
 														<button
-															class="btn btn-sm btn-compact ml-auto"
+															class="btn btn-compact ml-auto"
 															onclick={() => handleSpecificTaskSubscription(task.name)}
 														>
 															{isUserInTask ? "Se désinscrire" : "S'inscrire"}
@@ -641,7 +425,7 @@
 												<div class=" flex flex-wrap gap-2 p-3">
 													{#each currentEvent.organizers as organizer (currentEvent.id + "-org-name-" + organizer.id)}
 														<span
-															class="badge badge-soft badge-accent font-semibold
+															class="badge badge-outline badge-accent font-semibold
 																"
 														>
 															{organizer.username}

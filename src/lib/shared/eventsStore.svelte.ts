@@ -13,6 +13,7 @@ import { updateEvent, sendGenericEmail, type GenericEmailPayload } from "$lib/po
 import type { UserType } from "$lib/types/types";
 
 import { modalState, openTaskModal, showAlert } from "$lib/shared/states.svelte";
+import { userDb } from "./userDb.svelte";
 import { getSpace } from "./spaceOptions.svelte";
 
 // Ajouter ces types au début du fichier
@@ -64,6 +65,8 @@ export type SyncEventRecord = EventsRecord & {
 		created_by?: UsersResponse;
 	};
 };
+
+const userId = $derived(userDb?.current?.id);
 
 class EventsStore {
 	#store = $state({
@@ -215,6 +218,39 @@ class EventsStore {
 	getEventById = $derived.by(() => (id: string): SyncEventRecord | undefined => {
 		if (!this.#store.syncStore) return undefined;
 		return this.#store.syncStore.get(id);
+	});
+
+	// Récupère les événements où l'utilisateur est organisateur
+	userEvents = $derived(
+		this.allEvents.filter(
+			(event) =>
+				!event.isRecurrent && event.date_event && event.organizers?.some((org) => org.id === userId)
+		)
+	);
+
+	// Récupère les événements récurrents où l'utilisateur est dans l'équipe
+	userRecurrentEvents = $derived(
+		this.allMasterEvents.filter((event) =>
+			event.recurrence?.recurrenceTeam?.some((member) => member?.id === userId)
+		)
+	);
+
+	// Récupère les sondages auxquels l'utilisateur a répondu
+	userSondageEvents = $derived(
+		this.eventsWithSondage.filter((event) =>
+			event.dates_proposed?.some((dateProposal) =>
+				dateProposal.organizers?.some(
+					(org) => org.id === userId && (org.maybehere === "oui" || org.maybehere === "peut-être")
+				)
+			)
+		)
+	);
+
+	// Récupère les autres sondages actuels (où l'utilisateur n'a pas répondu)
+	otherSondageEvents = $derived(() => {
+		if (!userId) return [];
+		const responded = new Set(this.userSondageEvents(userId).map((e) => e.id));
+		return this.eventsWithSondage.filter((event) => !responded.has(event.id));
 	});
 
 	// USELESS

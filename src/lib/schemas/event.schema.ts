@@ -374,6 +374,19 @@ export function validateEvent(
 	}
 }
 
+// ::: Autre types
+
+export interface ValidMaster extends EventType {
+	id: string;
+	recurrence: NonNullable<EventType["recurrence"]>;
+}
+
+export interface ValidOccurrence extends EventType {
+	id: string;
+	date_event: string;
+	masterRecurrentId: string;
+}
+
 // ::: FONCTION UTILITAIRE POUR CRÉER UN NOUVEL ÉVÉNEMENT :::
 // Cette fonction crée un nouvel événement avec des valeurs par défaut
 export function getNewEvent(): EventType {

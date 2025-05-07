@@ -4,54 +4,19 @@
 	import UserEventsCard from "$lib/components/UserEventsCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { EventsRecord, EventsResponse } from "$lib/types/pocketbase";
 	import type { EventType, SyncEventRecord } from "$lib/types/event";
 	import { pb } from "$lib/pocketbase.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
+	import type { UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
 
-	let isLoading = $state(true);
-	let userEvents = $state<EventType[]>([]);
-	let userSondageEvents = $state<EventType[]>([]);
-	let recurrentEvents = $state<EventType[]>([]);
+	let userEvents = $derived(eventsStore.userEvents);
+	let userRecurrentEvents = $derived(eventsStore.userRecurrentEvents);
+	let userSondageEvents = $derived(eventsStore.userSondageEvents);
+	let otherSondagesCount = $derived(eventsStore.otherSondageEvents.length);
 
-	$effect(() => {
-		if (eventsStore.isInitialized && pb.authStore.isValid) {
-			const userId = pb.authStore.model?.id;
-			if (!userId) {
-				isLoading = false;
-				return; // Si pas d'ID utilisateur, on arrête
-			}
-
-			const allEvents = eventsStore.allEvents;
-			const allMasterEvents = eventsStore.allMasterEvents;
-
-			// Events où l'utilisateur est organisateur (non récurrents, avec date)
-			userEvents = allEvents.filter(
-				(event) =>
-					!event.isRecurrent &&
-					event.date_event && // Assure que date_event existe
-					event.organizers?.some((org) => org.id === userId)
-			);
-
-			// Events (sondages) où l'utilisateur a répondu "oui" ou "peut-être"
-			userSondageEvents = allEvents.filter((event) =>
-				// Vérifie s'il y a des dates proposées
-				event.dates_proposed?.some((date) =>
-					// Vérifie si l'utilisateur a répondu oui ou peut-être pour cette date
-					date.organizers?.some(
-						(org) => org.id === userId && (org.maybehere === "oui" || org.maybehere === "peut-être")
-					)
-				)
-			);
-
-			// Events récurrents où l'utilisateur fait partie de l'équipe
-			recurrentEvents = allMasterEvents.filter((event) =>
-				event.recurrence?.recurrenceTeam?.some((member) => member?.id === userId)
-			);
-
-			isLoading = false;
-		}
-	});
+	let currentUser = $derived<UserType | null>(userDb.current);
 
 	const confirmEvent = async (id: string) => {
 		try {
@@ -63,68 +28,66 @@
 </script>
 
 <div>
-	{#if isLoading}
-		<div class="flex h-64 items-center justify-center">
-			<span class="loading loading-spinner loading-lg"></span>
-		</div>
-	{:else}
-		<div>
-			<h1 class="mb-6 text-2xl font-semibold">Votre tableau de bord</h1>
-			<div class="flex flex-col gap-8">
-				<ConflictsEvents />
+	<div>
+		<h1 class="mb-6 text-2xl font-semibold">Votre tableau de bord</h1>
+		<div class="flex flex-col gap-8">
+			<ConflictsEvents />
 
-				{#if userEvents.length > 0}
-					<section>
-						<h2 class="mb-4 text-xl font-medium">Vos prochains événements</h2>
-						<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-							{#each userEvents as event (event.id)}
-								<UserEventsCard {event} />
-							{/each}
-						</div>
-					</section>
-				{/if}
-
-				<!-- 👉 Remplacer la boucle par l'appel au nouveau composant -->
-				{#if userSondageEvents.length > 0}
-					<section>
-						<UserSondagesCard events={userSondageEvents} />
-					</section>
-				{/if}
-
-				{#if recurrentEvents.length > 0}
-					<section>
-						<h2 class="mb-4 text-xl font-medium">Vos événements récurrents</h2>
-						<div class="space-y-4">
-							{#each recurrentEvents as master (master.id)}
-								{@const occurrences = eventsStore.getEventsOccurences.filter(
-									(event) => event.masterRecurrentId === master.id
-								)}
-								<!-- S'assurer que RecurrentEventsCard gère bien le cas où master.recurrence est null/undefined -->
-								{#if master.recurrence}
-									<RecurrentEventsCard
-										master={master as import("$lib/components/RecurrentEventsCard.svelte").ValidMaster}
-										occurrences={occurrences as import("$lib/components/RecurrentEventsCard.svelte").ValidOccurrence[]}
-										onConfirm={confirmEvent}
-									/>
-								{/if}
-							{/each}
-						</div>
-					</section>
-				{/if}
-
-				<!-- Message si aucun événement/sondage/récurrent -->
-				{#if userEvents.length === 0 && userSondageEvents.length === 0 && recurrentEvents.length === 0}
-					<div class="bg-base-200 rounded-md border p-6 text-center">
-						<p class="text-lg">Aucune activité pour le moment.</p>
-						<p class="text-base-content/70 text-sm">
-							Vous n'organisez aucun événement, n'avez pas répondu à des sondages ou ne faites
-							partie d'aucune équipe récurrente.
-						</p>
-						<!-- Optionnel: Ajouter un bouton pour créer un événement -->
-						<!-- <button class="btn btn-primary btn-sm mt-4">Créer un événement</button> -->
+			{#if userEvents.length > 0}
+				<section class="my-8">
+					<h2 class="text-fluid-xl font-bold">Vos prochains événements</h2>
+					<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
+						{#each userEvents as event (event.id)}
+							<div><UserEventsCard {event} /></div>
+						{/each}
 					</div>
-				{/if}
-			</div>
+				</section>
+			{/if}
+
+			{#if userSondageEvents.length > 0}
+				<section class="my-8">
+					<h2 class=" text-fluid-xl font-bold">Sondages auxquels vous avez répondu</h2>
+					<div class="space-y-4">
+						{#each userSondageEvents as currentEvent (currentEvent.id)}
+							<UserSondagesCard {currentEvent} {currentUser} bg="bg-base-100" showHeader={true} />
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			{#if userRecurrentEvents.length > 0}
+				<section class="@container my-8">
+					<h2 class="text-fluid-xl font-bold">Vos événements récurrents</h2>
+					<div class="grid grid-cols-1 gap-10 @4xl:grid-cols-2">
+						{#each userRecurrentEvents as master (master.id)}
+							{@const occurrences = eventsStore.getEventsOccurences.filter(
+								(event) => event.masterRecurrentId === master.id
+							)}
+							<!-- S'assurer que RecurrentEventsCard gère bien le cas où master.recurrence est null/undefined -->
+							{#if master.recurrence}
+								<RecurrentEventsCard
+									master={master as ValidMaster}
+									occurrences={occurrences as ValidOccurrence[]}
+									onConfirm={confirmEvent}
+								/>
+							{/if}
+						{/each}
+					</div>
+				</section>
+			{/if}
+
+			<!-- Message si aucun événement/sondage/récurrent -->
+			{#if userEvents.length === 0 && userSondageEvents.length === 0 && userRecurrentEvents.length === 0}
+				<div class="bg-base-200 rounded-md border p-6 text-center">
+					<p class="text-lg">Aucune activité pour le moment.</p>
+					<p class="text-base-content/70 text-sm">
+						Vous n'organisez aucun événement, n'avez pas répondu à des sondages ou ne faites partie
+						d'aucune équipe récurrente.
+					</p>
+					<!-- Optionnel: Ajouter un bouton pour créer un événement -->
+					<!-- <button class="btn btn-primary btn-sm mt-4">Créer un événement</button> -->
+				</div>
+			{/if}
 		</div>
-	{/if}
+	</div>
 </div>

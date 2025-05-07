@@ -1,25 +1,13 @@
 <script lang="ts">
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import type { EventType, OrganizerType } from "$lib/schemas/event.schema";
-	import type { UserType } from "$lib/types/types";
-	import { lisibleDate } from "$lib/utils";
+	import type { EventType, UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
+	import { lisibleDate, lisibleTime } from "$lib/utils";
 	import { userDb } from "$lib/shared/userDb.svelte";
 
-	import { CalendarCheck, Pencil, PencilLine, UserCheck, UserPlus } from "lucide-svelte";
+	import { CalendarCheck, Pencil, UserCheck, UserPlus } from "lucide-svelte";
 
 	type RecurrenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY_BY_DATE" | "MONTHLY_BY_DAY";
-
-	interface ValidMaster extends EventType {
-		id: string;
-		recurrence: NonNullable<EventType["recurrence"]>;
-	}
-
-	interface ValidOccurrence extends EventType {
-		id: string;
-		date_event: string;
-		masterRecurrentId: string;
-	}
 
 	let {
 		master,
@@ -70,7 +58,7 @@
 	};
 </script>
 
-<div class="bg-base-100 border-base-300 @container overflow-hidden rounded-lg border shadow-md">
+<div class="@container flex h-full flex-col overflow-hidden rounded-lg border bg-white shadow-md">
 	<div class="space-y-4 p-2 md:p-4">
 		<!-- En-tête -->
 		<div class=" pb-2">
@@ -97,7 +85,7 @@
 
 							{#each master.recurrence.recurrenceTeam as member (member.id)}
 								{#if member && typeof member === "object" && "username" in member}
-									<div class=" badge badge-accent badge-soft">
+									<div class=" badge badge-accent badge-outline">
 										{member.username}
 									</div>
 								{/if}
@@ -115,10 +103,11 @@
 			<div class="text-fluid-lg mb-4 font-semibold">
 				Prochaines dates (5/{occurrences.length || 0})
 			</div>
-			<div class="grid grid-cols-1">
+			<div class="grid grid-cols-1 space-y-4">
 				{#each (occurrences || []).slice(0, 5) as occurrence (occurrence.id)}
 					<div
-						class="flex flex-col px-4 py-2 {occurrence.isConfirmed && !occurrence.canceled
+						class="bg-base-100 flex flex-col rounded-lg px-4 py-2 shadow-sm {occurrence.isConfirmed &&
+						!occurrence.canceled
 							? ' border-l-success/30 border-l-3'
 							: occurrence.canceled
 								? 'border-l-error/30 border-l-3'
@@ -126,29 +115,19 @@
 									? 'border-l-warning/50 border-l-3'
 									: ''}"
 					>
-						<div class="mb-4 flex flex-wrap items-start justify-between gap-y-2">
-							<span class="text-fluid-lg font-medium">
-								{lisibleDate(new Date(occurrence.date_event))}
-							</span>
+						<div class="mb-4 flex flex-wrap items-start justify-between gap-2">
+							<div class="grid-cols grid">
+								<span class="text-fluid-lg font-medium">
+									{lisibleDate(new Date(occurrence.date_event))}
+								</span>
+								<span class="text-fluid-base">{occurrence.time_start} - {occurrence.time_end}</span>
+							</div>
 							<div class="flex flex-wrap items-center gap-4">
 								{#if occurrence.canceled}
 									<span class="text-fluid-sm text-error text-nowrap">✗ Annulé</span>
 								{:else if occurrence.isConfirmed}
 									<span class="text-fluid-sm text-success text-nowrap">✓ Confirmé</span>
 								{:else}
-									<!-- Bouton d'inscription/gestion -->
-									<button
-										onclick={() => handleSubscriptionClick(occurrence)}
-										class=" btn btn-primary btn-compact btn-soft"
-										disabled={occurrence.canceled}
-									>
-										{#if isUserSubscribed(occurrence)}
-											<UserCheck />
-										{:else}
-											<UserPlus />
-										{/if}
-										<span> {getSubscriptionButtonText(occurrence)}</span>
-									</button>
 									<button
 										onclick={() => onConfirm(occurrence.id)}
 										class="btn btn-compact @max-md:btn-square"
@@ -177,17 +156,14 @@
 							<div class="flex flex-wrap items-center gap-x-4 gap-y-2 @max-md:my-2">
 								{#each occurrence.organizers as organizer (organizer.id)}
 									<div
-										class=" bg-accent/5 flex rounded-md px-2 py-1"
+										class=" bg-accent/5 text-accent flex rounded-md px-2 py-1"
 										title={organizer.tasks?.join(", ") || "aucune taches spécifiées"}
 									>
-										<span class="text-accent text-fluid-sm font-semibold">{organizer.username}</span
-										>
+										<span class="text-fluid-sm font-semibold">{organizer.username}</span>
 										{#if occurrence.tasks?.length > 1}
 											<div class="ms-2 flex flex-wrap gap-2">
 												{#each organizer.tasks as task (organizer.id + task)}
-													<span class="badge badge-accent badge-sm badge-outline font-medium"
-														>{task}</span
-													>
+													<span class="text-fluid-xs">{task}</span>
 												{/each}
 											</div>
 										{/if}
@@ -196,32 +172,51 @@
 							</div>
 						{/if}
 
-						{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
-							{@const assignedTasks =
-								occurrence.organizers?.flatMap((org) => org.tasks || []) || []}
-							{@const unassignedTasks = occurrence.tasks.filter(
-								(task) => !assignedTasks.includes(task.name)
-							)}
-							{#if unassignedTasks.length > 0}
-								<div class=" mt-4 flex flex-wrap gap-1 sm:ms-auto">
-									<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
-									{#each unassignedTasks as task, i (i)}
-										<span title={task.description} class="badge badge-soft badge-sm me-1 mb-1"
-											>{task.name}</span
-										>
-									{/each}
-								</div>
+						<div class="ms-auto mt-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+							<!-- Bouton d'inscription/gestion -->
+
+							{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
+								{@const assignedTasks =
+									occurrence.organizers?.flatMap((org) => org.tasks || []) || []}
+								{@const unassignedTasks = occurrence.tasks.filter(
+									(task) => !assignedTasks.includes(task.name)
+								)}
+								{#if unassignedTasks.length > 0}
+									<div class=" ms-auto flex flex-wrap gap-1">
+										<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
+										{#each unassignedTasks as task, i (i)}
+											<span
+												title={task.description}
+												class="badge badge-soft badge-sm me-1 mb-1 font-medium">{task.name}</span
+											>
+										{/each}
+									</div>
+								{/if}
 							{/if}
-						{/if}
+							<button
+								onclick={() => handleSubscriptionClick(occurrence)}
+								class=" btn btn-primary btn-compact btn-soft ms-auto"
+								disabled={occurrence.canceled}
+							>
+								{#if isUserSubscribed(occurrence)}
+									<UserCheck />
+								{:else}
+									<UserPlus />
+								{/if}
+								<span> {getSubscriptionButtonText(occurrence)}</span>
+							</button>
+						</div>
 					</div>
-					<div class="divider my-2"></div>
 				{:else}
 					<div class="text-fluid-sm">Aucune date programmée</div>
 				{/each}
 			</div>
 		</div>
 	</div>
-	<div id="footer-card" class="bg-base-200 flex flex-wrap justify-end gap-x-4 px-2 py-1 text-right">
+	<div
+		id="footer-card"
+		class="bg-base-200 mt-auto flex flex-wrap justify-end gap-x-4 px-2 py-1 text-right"
+	>
 		<button
 			onclick={() => {
 				eventState.is = master;
@@ -229,7 +224,7 @@
 			}}
 			class="btn"
 		>
-			<PencilLine class="mr-2" />
+			<Pencil class="mr-2" />
 			Modifier toutes les occurences
 		</button>
 	</div>

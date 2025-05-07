@@ -44,7 +44,7 @@
 	);
 </script>
 
-<div class="@container mb-4 flex h-full flex-col rounded-lg border shadow-md">
+<div class="@container mb-12 flex flex-col rounded-lg border bg-white shadow-md">
 	<!-- En-tête -->
 	<div class="items-top flex gap-4 @max-md:flex-col @md:justify-between">
 		<div
