@@ -2,10 +2,13 @@
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import type { EventType, UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
-	import { lisibleDate, lisibleTime } from "$lib/utils";
+	import { lisibleDate } from "$lib/utils";
+	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
+
 	import { userDb } from "$lib/shared/userDb.svelte";
 
 	import { CalendarCheck, Pencil, UserCheck, UserPlus } from "lucide-svelte";
+	import { getMonthlyRecurrenceLabel } from "$lib/utils/monthlyRecurrence";
 
 	type RecurrenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY_BY_DATE" | "MONTHLY_BY_DAY";
 
@@ -26,7 +29,7 @@
 			WEEKLY: "Hebdomadaire",
 			BIWEEKLY: "Bi-hebdomadaire",
 			MONTHLY_BY_DATE: "Mensuel (date fixe)",
-			MONTHLY_BY_DAY: "Mensuel (jour spécifique)"
+			MONTHLY_BY_DAY: "Mensuel"
 		};
 
 		return (
@@ -65,9 +68,14 @@
 			<h2 class=" text-fluid-xl font-bold">
 				{master.event_title}
 			</h2>
-			<div class="bg-base-200 flex flex-wrap justify-between gap-4 rounded-lg p-1 @sm:p-2">
+			<div
+				class="bg-info/10 flex flex-wrap justify-between gap-4 rounded-lg px-2 py-1 @sm:px-4 @sm:py-2"
+			>
 				<div class="text-fluid-base mt-1">
 					{formatRecurrence(master.recurrence)}
+					{#if master.recurrence.recurrenceType === "MONTHLY_BY_DAY"}
+						<span>• {getMonthlyRecurrenceLabel(master.recurrence)}</span>
+					{/if}
 					<span>
 						• Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
 					</span>
@@ -85,7 +93,7 @@
 
 							{#each master.recurrence.recurrenceTeam as member (member.id)}
 								{#if member && typeof member === "object" && "username" in member}
-									<div class=" badge badge-accent badge-outline">
+									<div class=" badge badge-accent badge-soft">
 										{member.username}
 									</div>
 								{/if}
@@ -176,22 +184,7 @@
 							<!-- Bouton d'inscription/gestion -->
 
 							{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
-								{@const assignedTasks =
-									occurrence.organizers?.flatMap((org) => org.tasks || []) || []}
-								{@const unassignedTasks = occurrence.tasks.filter(
-									(task) => !assignedTasks.includes(task.name)
-								)}
-								{#if unassignedTasks.length > 0}
-									<div class=" ms-auto flex flex-wrap gap-1">
-										<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
-										{#each unassignedTasks as task, i (i)}
-											<span
-												title={task.description}
-												class="badge badge-soft badge-sm me-1 mb-1 font-medium">{task.name}</span
-											>
-										{/each}
-									</div>
-								{/if}
+								<UnassignedTasks event={occurrence} class="mt-2 ml-auto" />
 							{/if}
 							<button
 								onclick={() => handleSubscriptionClick(occurrence)}

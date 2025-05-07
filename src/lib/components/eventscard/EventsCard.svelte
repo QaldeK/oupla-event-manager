@@ -1,30 +1,17 @@
 <script lang="ts">
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
-	import GroupRadioButton from "$lib/components/GroupRadioButton.svelte";
-	import { pb, updateEvent } from "$lib/pocketbase.svelte";
-	import { validateDate } from "../../services/eventActions";
-	import { filterAndConvertOrganizers, lisibleDate, lisibleTime } from "$lib/utils";
+	import { updateEvent } from "$lib/pocketbase.svelte";
+	import { lisibleDate } from "$lib/utils";
 	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
-	import type { OrganizerType, SyncEventRecord } from "$lib/types/event";
 	import type { EventType, UserType, DatesProposedType } from "$lib/types/types";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { getContext } from "svelte";
+	import { getMonthlyRecurrenceLabel } from "$lib/utils/monthlyRecurrence";
+
 	import { fade } from "svelte/transition";
 
-	import {
-		BadgeHelp,
-		CalendarCheck,
-		Info,
-		ChevronDown,
-		ChevronUp,
-		ThumbsDown,
-		ThumbsUp,
-		UserCheck,
-		Edit,
-		MessageSquare,
-		Currency
-	} from "lucide-svelte";
+	import { Info, UserCheck } from "lucide-svelte";
 	import { CalendarPlus, UserPlus } from "lucide-svelte";
 
 	import ButtonAction from "./ButtonAction.svelte";
@@ -350,7 +337,7 @@
 							<div class=" flex flex-col rounded-b-lg {currentEvent.isSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
 								{#if currentEvent.isSondage}
-									<UserSondagesCard {currentEvent} {currentUser} showHeader={false} />
+									<UserSondagesCard {currentEvent} {currentUser} />
 									{#if currentEvent.isSondage && oldDatesProposed.length > 0}
 										<div class="text-fluid-xs text-base-content/70 p-2 italic">
 											({oldDatesProposed.length} date{oldDatesProposed.length > 1 ? "s" : ""} passée{oldDatesProposed.length >
