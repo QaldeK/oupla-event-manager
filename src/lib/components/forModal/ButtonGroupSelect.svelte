@@ -9,14 +9,14 @@
 		optionsLabel = "",
 		defaultOption = "",
 		Icon = null,
-		optionsDisabled = []
+		isDisabled = false
 	} = $props<{
 		selectedItems?: OptionType[];
 		options: OptionType[];
 		optionsLabel?: string;
 		defaultOption?: OptionType;
 		Icon?: unknown;
-		optionsDisabled?: OptionType[];
+		isDisabled?: boolean;
 	}>();
 
 	const getOptionValue = (option: OptionType): any => {
@@ -38,15 +38,7 @@
 		return selectedItems.some((item) => getOptionValue(item) === optionValue);
 	};
 
-	const isDisabled = (option: OptionType) => {
-		// 👉 Nouvelle fonction helper
-		return optionsDisabled.some(
-			(disabledOption: OptionType) => getOptionValue(disabledOption) === getOptionValue(option)
-		);
-	};
-
 	function toggleItem(option: any) {
-		if (isDisabled(option)) return; //  Ne rien faire si l'option est désactivée
 		const currentSelectedItems = selectedItems ?? [];
 		const optionValue = getOptionValue(option);
 		if (isSelected(option)) {
@@ -88,7 +80,7 @@
 			class:btn-dash={!isSelected(option)}
 			title={description}
 			onclick={() => toggleItem(option)}
-			disabled={isDisabled(option)}
+			disabled={isDisabled}
 		>
 			{#if Icon}
 				<Icon size={16} />

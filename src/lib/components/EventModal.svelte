@@ -615,11 +615,12 @@
 		<!-- ::: ROle & Oragnizers -->
 		<!-- FIXIT : checker ce qui doit apparaitre, et utiliser des props $derived en fonction d'eventMode plutot que des #if -->
 
-		{#snippet groupedTasksSnippet(label: string, tasks: TaskType[])}
+		{#snippet groupedTasksSnippet(label: string, tasks: TaskType[], isDisabled?: boolean)}
 			<div class=" space-y-2 rounded-xl p-3 shadow-sm">
 				<div class="text-base-content/70 text-fluid-sm italic">{label}</div>
 				<ButtonGroupSelect
 					options={tasks}
+					{isDisabled}
 					bind:selectedItems={eventData.tasks}
 					optionsLabel="name"
 				/>
@@ -637,11 +638,14 @@
 				{/if}
 
 				{#if groupedTasks.on.length > 0}
-					{@render groupedTasksSnippet("Pendant l'événement", groupedTasks.on)}
+					{@const isDisabled = eventData.isSondage}
+					{@render groupedTasksSnippet("Pendant l'événement", groupedTasks.on, isDisabled)}
 				{/if}
 
 				{#if groupedTasks.after.length > 0}
-					{@render groupedTasksSnippet("Après l'événement", groupedTasks.after)}
+					{@const isDisabled = eventData.isSondage}
+
+					{@render groupedTasksSnippet("Après l'événement", groupedTasks.after, isDisabled)}
 				{/if}
 
 				{#if groupedTasks.other.length > 0}
