@@ -39,19 +39,19 @@
  * et peuvent être rechargées depuis PocketBase si nécessaire.
  */
 // FIXIT : N'est pas actualisé lorsque changement depuis Pocketbase
-import { pb } from '$lib/pocketbase.svelte';
+import { pb } from "$lib/pocketbase.svelte";
 import type {
 	SpaceMembersResponse,
 	SpacesOptionsResponse,
 	UsersResponse
-} from '$lib/types/pocketbase';
+} from "$lib/types/pocketbase";
 import type {
 	SpaceConfig,
 	SpaceDetails,
 	SpaceOptionsType,
 	SpaceUser,
 	TaskType
-} from '$lib/types/types';
+} from "$lib/types/types";
 
 // Structure pour stocker les IDs des enregistrements supprimés
 interface DeletedRecords {
@@ -69,10 +69,10 @@ class SpaceMembersManager {
 
 	async loadMembers(spaceId: string) {
 		const records = await pb
-			.collection('spaceMembers')
+			.collection("spaceMembers")
 			.getFullList<SpaceMembersResponse<unknown, { user: UsersResponse }>>({
 				filter: `space="${spaceId}"`,
-				expand: 'user'
+				expand: "user"
 			});
 
 		this.members = records.map((record) => ({
@@ -106,7 +106,7 @@ class SpaceOptionsDB {
 		this.isPublicMode = true;
 		try {
 			const record = await pb
-				.collection('spaces_options')
+				.collection("spaces_options")
 				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceId}"`);
 
 			if (!record.public_site) {
@@ -118,20 +118,20 @@ class SpaceOptionsDB {
 			_spaceConfig = {
 				id: record.space,
 				configId: record.id,
-				name: record.expand?.space?.name || '',
-				description: record.expand?.space?.description || '',
+				name: record.expand?.space?.name || "",
+				description: record.expand?.space?.description || "",
 				rooms: [],
 				categories: [],
 				members: [], // Vide en mode public
 				tasks: {
 					list: [],
-					defaultTask: ''
+					defaultTask: ""
 				}
 			};
 
 			return _spaceConfig;
 		} catch (error) {
-			console.error('Failed to load public space options:', error);
+			console.error("Failed to load public space options:", error);
 			throw error;
 		}
 	}
@@ -143,20 +143,20 @@ class SpaceOptionsDB {
 		}
 
 		this.isPublicMode = false;
-		console.log('Loading spaceConfig for space:', spaceId);
+		console.log("Loading spaceConfig for space:", spaceId);
 
 		try {
 			const localData = await this.get(spaceId);
 
 			if (localData) {
-				console.log('Loaded initial config from localStorage', localData);
+				console.log("Loaded initial config from localStorage", localData);
 				_spaceConfig = localData.config;
 			}
 
 			await this.refreshFromPocketBase(spaceId);
 			return _spaceConfig;
 		} catch (error) {
-			console.error('Failed to load space options:', error);
+			console.error("Failed to load space options:", error);
 			throw error;
 		}
 	}
@@ -174,9 +174,9 @@ class SpaceOptionsDB {
 		try {
 			// Charger les options de l'espace
 			const record = await pb
-				.collection('spaces_options')
+				.collection("spaces_options")
 				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceID}"`, {
-					expand: 'space'
+					expand: "space"
 				});
 
 			// Charger les membres
@@ -189,14 +189,14 @@ class SpaceOptionsDB {
 			const categories = record.categories || [];
 			const tasks = record.tasks || {
 				list: [],
-				defaultTask: ''
+				defaultTask: ""
 			};
 
 			this.optionOf = {
 				space: {
 					id: record.space,
-					name: record.expand?.space?.name || '',
-					description: record.expand?.space?.description || ''
+					name: record.expand?.space?.name || "",
+					description: record.expand?.space?.description || ""
 				}
 			};
 
@@ -222,10 +222,10 @@ class SpaceOptionsDB {
 				_spaceConfig = newConfig;
 				configId = newConfigId;
 				await this.set(newConfig);
-				console.log('Config updated from PocketBase');
+				console.log("Config updated from PocketBase");
 			}
 		} catch (error) {
-			console.error('Failed to refresh from PocketBase:', error);
+			console.error("Failed to refresh from PocketBase:", error);
 			throw error;
 		}
 	}
@@ -235,10 +235,10 @@ class SpaceOptionsDB {
 	async getPublicSpaceInfo(spaceId: string): Promise<PublicSpaceInfo | null> {
 		try {
 			const record = await pb
-				.collection('spaces_options')
+				.collection("spaces_options")
 				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceId}"`, {
-					expand: 'space',
-					fields: 'categories,rooms,public_site,space,expand.space.name,expand.space.description'
+					expand: "space",
+					fields: "categories,rooms,public_site,space,expand.space.name,expand.space.description"
 				});
 
 			if (!record.public_site) {
@@ -247,14 +247,14 @@ class SpaceOptionsDB {
 
 			return {
 				id: record.space,
-				name: record.expand?.space?.name || '',
-				description: record.expand?.space?.description || '',
+				name: record.expand?.space?.name || "",
+				description: record.expand?.space?.description || "",
 				categories: record.categories || [],
 				rooms: record.rooms || [],
 				public_site: record.public_site
 			};
 		} catch (error) {
-			console.error('Failed to load public space info:', error);
+			console.error("Failed to load public space info:", error);
 			return null;
 		}
 	}
@@ -265,10 +265,10 @@ export const loadSpaceOptions = spaceOptionsDB.loadSpaceOptions;
 export const getPublicSpaceInfo = spaceOptionsDB.getPublicSpaceInfo.bind(spaceOptionsDB);
 
 let _spaceConfig = $state<SpaceConfig>({
-	id: '',
-	configId: '',
-	name: '',
-	description: '',
+	id: "",
+	configId: "",
+	name: "",
+	description: "",
 	rooms: [],
 	categories: [],
 	members: [],
@@ -290,7 +290,7 @@ export const getSpace = {
 				};
 
 				// Effectuer la mise à jour
-				await pb.collection('spaces_options').update(configId, updateData);
+				await pb.collection("spaces_options").update(configId, updateData);
 
 				// Mise à jour du state local
 				_spaceConfig = newConfig;
@@ -300,11 +300,11 @@ export const getSpace = {
 
 				return true;
 			} catch (error) {
-				console.error('Failed to update space config:', error);
+				console.error("Failed to update space config:", error);
 				throw error;
 			}
 		} else {
-			throw new Error('Invalid space configuration');
+			throw new Error("Invalid space configuration");
 		}
 	},
 
@@ -325,13 +325,13 @@ export const getSpace = {
 	},
 
 	get defaultTask(): TaskType {
-		const defaultTask = _spaceConfig.tasks.find((task) => task.type === 'default');
+		const defaultTask = _spaceConfig.tasks.find((task) => task.isDefault === true);
 		// Si aucune tâche par défaut n'est trouvée, créez une tâche par défaut
 		if (!defaultTask && _spaceConfig.tasks.length === 0) {
 			return {
-				name: 'Here',
-				description: 'Tâche par défaut automatiquement créée',
-				type: 'default'
+				name: "Here",
+				description: "Tâche par défaut automatiquement créée",
+				type: "onEvent"
 			};
 		}
 		return defaultTask || _spaceConfig.tasks[0];

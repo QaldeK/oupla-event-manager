@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { lisibleDate, lisibleTime } from '$lib/utils';
-	import { eventState, modalState } from '$lib/shared/states.svelte';
+	// USELESS ???
+	import { Badge } from "$lib/components/ui/badge";
+	import * as Tooltip from "$lib/components/ui/tooltip";
+	import { lisibleDate, lisibleTime } from "$lib/utils";
+	import { eventState, modalState } from "$lib/shared/states.svelte";
 
-	import { CalendarPlus } from 'lucide-svelte';
+	import { CalendarPlus } from "lucide-svelte";
 
 	let { thisEvent, sondageMultiple } = $props();
 
@@ -91,7 +92,7 @@
 	</div>
 	{#if data.organizers.length >= 1 && missingTasks(data).length > 0}
 		<div class="text-fluid-sm flex px-2 text-red-700">
-			Personne pour : {missingTasks(data).join(', ')}
+			Personne pour : {missingTasks(data).join(", ")}
 		</div>
 	{/if}
 {/snippet}

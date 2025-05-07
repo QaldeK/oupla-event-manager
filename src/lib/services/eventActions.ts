@@ -1,8 +1,7 @@
 // src/lib/services/eventActions.ts
 import { updateEvent } from "$lib/pocketbase.svelte";
-import { showAlert, eventState } from "$lib/shared/states.svelte";
-// EventType et OrganizerType sont supposés être exportés depuis event.schema.ts
-// OrganizerType doit inclure la propriété 'maybehere'.
+import { showAlert, getSpace } from "$lib/shared";
+import { formatDatePb, formatTimePb, filterAndConvertOrganizers } from "$lib/utils";
 import type { EventType, OrganizerType, TaskType, DateProposedType } from "$lib/types/types";
 import type { UserType } from "$lib/types/types";
 
@@ -19,7 +18,8 @@ import type { UserType } from "$lib/types/types";
 export async function validateDate(
 	currentEvent: EventType,
 	dateProposal: DateProposedType,
-	currentUser: UserType | null
+	currentUser: UserType | null,
+	notify?: boolean
 ): Promise<void> {
 	if (!currentUser) {
 		showAlert("Utilisateur non authentifié. Veuillez vous reconnecter.", "error");
@@ -35,40 +35,50 @@ export async function validateDate(
 	// Vérifier si l'utilisateur actuel a le rôle 'admin' ou 'dev'.
 	// UserType.currentRole est utilisé conformément à sa définition.
 	// FIXIT hasAuth
-	if (!["admin"].includes(currentUser.currentRole)) {
-		showAlert(
-			"Permissions insuffisantes. Seuls les administrateurs ou développeurs peuvent valider une date.",
-			"error"
-		);
-		return;
-	}
+	// if (!["admin"].includes(currentUser.currentRole)) {
+	// 	showAlert(
+	// 		"Permissions insuffisantes. Seuls les administrateurs ou développeurs peuvent valider une date.",
+	// 		"error"
+	// 	);
+	// 	return;
+	// }
 
 	// Préparer les données pour la mise à jour de l'événement.
 	// Utilise Partial<EventType> mais attention aux champs spécifiques de PocketBase (id, expand, etc.)
 	const eventDataToUpdate: Partial<EventType> = {
+		date_event: formatDatePb(dateProposal.dateStart),
+		time_start: formatTimePb(dateProposal.dateStart),
+		time_end: formatTimePb(dateProposal.dateEnd),
 		dateStart: dateProposal.dateStart,
 		dateEnd: dateProposal.dateEnd,
-		isSondage: false // Le sondage est terminé, l'événement devient un événement standard.
+		isSondage: false
 	};
 
-	// Déterminer les organisateurs pour l'événement validé.
-	// On prend ceux qui ont répondu "oui" à la date validée.
-	const confirmedOrganizers = dateProposal.organizers
-		?.filter((org) => org.maybehere === "oui")
-		.map((org) => ({
-			id: org.id,
-			username: org.username,
-			tasks: [] // TODO : initialiser a defaultTask
-		}));
+	const confirmedOrganizers: OrganizerType[] =
+		filterAndConvertOrganizers(dateProposal.organizers) || [];
 
-	//FIXIT !AI : on merge les organizers existant a confirmedOrganizers (sans doublon)
-	if (confirmedOrganizers && confirmedOrganizers.length > 0) {
-		eventDataToUpdate.organizers = confirmedOrganizers as OrganizerType[];
-	} else {
-		// S'il n'y a pas d'organisateurs ayant répondu "oui",
-		// on conserve les organisateurs existants de l'événement ou on initialise à un tableau vide.
-		eventDataToUpdate.organizers = currentEvent.organizers || [];
+	// 👉 Simplification: Créer une liste d'organisateurs en partant de ceux déjà présents
+	const updatedOrganizers = [...(currentEvent.organizers || [])];
+
+	// 👉 Parcourir les organisateurs confirmés pour cette date
+	for (const confirmedOrg of confirmedOrganizers) {
+		// Chercher si l'organisateur existe déjà
+		const existingOrgIndex = updatedOrganizers.findIndex((org) => org.id === confirmedOrg.id);
+
+		if (existingOrgIndex !== -1) {
+			// 👉 Si l'organisateur existe, on met simplement à jour son statut et sa disponibilité
+			// tout en préservant ses tâches existantes
+			updatedOrganizers[existingOrgIndex] = {
+				...confirmedOrg,
+				tasks: updatedOrganizers[existingOrgIndex].tasks
+			};
+		} else {
+			// 👉 Si c'est un nouvel organisateur, on l'ajoute simplement
+			updatedOrganizers.push(confirmedOrg);
+		}
 	}
+
+	eventDataToUpdate.organizers = updatedOrganizers;
 
 	try {
 		await updateEvent(currentEvent.id, eventDataToUpdate as Partial<EventType>);
@@ -84,3 +94,15 @@ export async function validateDate(
 		);
 	}
 }
+
+export const getUnassignedTasks = (event: EventType) => {
+	if (!Array.isArray(event.tasks) || !Array.isArray(event.organizers)) {
+		return [];
+	}
+
+	// Récupérer toutes les tâches assignées
+	const assignedTasks = event.organizers.flatMap((org) => org.tasks || []);
+
+	// Filtrer les tâches non assignées
+	return event.tasks.filter((task) => !assignedTasks.includes(task.name));
+};

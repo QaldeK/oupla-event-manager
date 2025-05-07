@@ -2,6 +2,7 @@
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { EventType } from "$lib/schemas/event.schema";
 	import { lisibleDate, lisibleTime } from "$lib/utils";
+	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import { Pencil, UserMinus } from "lucide-svelte";
 	import type { UserType } from "$lib/types/types";
@@ -44,7 +45,7 @@
 	);
 </script>
 
-<div class="@container mb-12 flex flex-col rounded-lg border bg-white shadow-md">
+<div class="@container flex flex-col rounded-lg border bg-white shadow-md">
 	<!-- En-tête -->
 	<div class="items-top flex gap-4 @max-md:flex-col @md:justify-between">
 		<div
@@ -106,25 +107,10 @@
 					>Il n'y a pas d'autre organisateur·ice pour le moment</span
 				>
 			{/if}
-		</div>
-		{#if Array.isArray(event.tasks) && event.tasks.length > 1}
-			{@const assignedTasks = event.organizers?.flatMap((org) => org.tasks || []) || []}
-			{@const unassignedTasks = event.tasks.filter((task) => !assignedTasks.includes(task.name))}
-			{#if unassignedTasks.length > 0}
-				<div class="ms-auto mt-auto flex flex-wrap gap-1 pt-4">
-					<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
-					{#each unassignedTasks as task, i (i)}
-						<span title={task.description} class="badge badge-soft badge-sm me-1 mb-1"
-							>{task.name}</span
-						>
-					{/each}
-				</div>
-			{:else}
-				<div class="text-fluid-sm text-base-content/60 ms-auto mt-auto flex flex-wrap gap-1 pt-4">
-					Toutes les tâches sont attribuées
-				</div>
+			{#if Array.isArray(event.tasks) && event.tasks.length > 1}
+				<UnassignedTasks {event} class="mt-2 ml-auto" />
 			{/if}
-		{/if}
+		</div>
 	</div>
 
 	<div class="mt-auto flex justify-end gap-x-2 border-t px-3 py-1.5">

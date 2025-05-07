@@ -3,7 +3,7 @@
 	import type { EventType, DateProposedType } from "$lib/types/types";
 
 	import { validateDate } from "$lib/services/eventActions";
-	import { lisibleDate, lisibleTime } from "$lib/utils";
+	import { lisibleDate, lisibleTime, filterAndConvertOrganizers } from "$lib/utils";
 	import {
 		Pencil,
 		BadgeHelp,
@@ -26,7 +26,7 @@
 	} = $props<{
 		currentEvent: EventType; // 👉 corrigé: EventType au lieu de EventType[]
 		currentUser: UserType | null;
-		bg: string;
+		bg?: string;
 		showHeader?: boolean;
 	}>();
 
@@ -71,6 +71,27 @@
 			showAlert("Erreur lors de l'enregistrement de votre réponse.", "error");
 		}
 	}
+
+	const handleValidateDate = (currentEvent: EventType, dateProposal:DateProposedType, currentUser: UserType) => {
+
+	const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
+	const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
+
+	modalState.confirm = {
+				isOpen: true,
+				data: {
+					title: "Cloturer le sondage",
+					message: hasConfirmedOrganizers
+						? `Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(dateProposal.dateStart)}-${lisibleTime(dateProposal.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
+						: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(dateProposal.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
+					variant: hasConfirmedOrganizers ? "warning" : "danger",
+					showCheckbox: { checked: true, label: "Notifier les participant·es" }, // Option de notification
+					onConfirm: async (notify?: boolean) => {
+					  validateDate(currentEvent, dateProposal, currentUser, notify?)
+
+					}
+				}}}
+
 </script>
 
 <div class={{ "rounded-lg border bg-white p-4 shadow-sm": showHeader }}>
@@ -132,10 +153,9 @@
 						</span>
 						<div class="tooltip float-end ms-2" data-tip="Valider cette date">
 							<button
-								onclick={() => validateDate(currentEvent, dateProposal, currentUser)}
+								onclick={() => handleValidateDate(currentEvent, dateProposal, currentUser)}
 								class="btn btn-outline btn-compact {oui > 0 ? 'btn-success' : 'text-neutral/50'}"
 								title="Valider cette date"
-								disabled={!currentUser || !["admin", "dev"].includes(currentUser.currentRole)}
 							>
 								<CalendarCheck />
 							</button>
