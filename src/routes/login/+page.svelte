@@ -1,57 +1,55 @@
 <script lang="ts">
-	import { userDb } from '$lib/shared/userDb.svelte';
-	import { pb } from '$lib/pocketbase.svelte';
+	import { userDb } from "$lib/shared/userDb.svelte";
+	import { pb } from "$lib/pocketbase.svelte";
 
-	import { goto } from '$app/navigation';
+	import { goto } from "$app/navigation";
 
-	let email = $state('***REMOVED***');
-	let password = $state('***REMOVED***');
-	let message = $state('');
+	let email = $state("***REMOVED***");
+	let password = $state("***REMOVED***");
+	let message = $state("");
 
 	$effect(() => {
 		if (pb.authStore.isValid) {
-			goto('/dashboard');
+			goto("/dashboard");
 		} else {
-			console.log('Utilisateur non connecté');
+			console.log("Utilisateur non connecté");
 		}
 	});
 
 	const handleLogin = async () => {
 		try {
 			await userDb.login(email, password);
-			goto('/dashboard');
+			goto("/dashboard");
 		} catch (error) {
-			message = 'Erreur de connexion : ' + (error instanceof Error ? error.message : String(error));
+			message = "Erreur de connexion : " + (error instanceof Error ? error.message : String(error));
 		}
 	};
 </script>
 
-<div class="flex items-center justify-center">
-	<div class="max-w-md rounded-lg bg-white p-8 shadow-lg">
-		<h1 class="mb-4 text-2xl font-bold">Connexion</h1>
-		<form onsubmit={handleLogin} class="space-y-4">
-			<label class="block">
-				<span class="text-gray-700">Email</span>
-				<input
-					type="email"
-					bind:value={email}
-					class="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-xs focus:border-indigo-300 focus:ring-3 focus:ring-indigo-200 focus:outline-hidden"
-				/>
-			</label>
-			<label class="block">
-				<span class="text-gray-700">Mot de passe</span>
-				<input
-					type="password"
-					bind:value={password}
-					class="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 shadow-xs focus:border-indigo-300 focus:ring-3 focus:ring-indigo-200 focus:outline-hidden"
-				/>
-			</label>
-			<button
-				type="submit"
-				class="rounded-full bg-blue-500 px-4 py-2 font-bold text-white hover:bg-blue-700"
-				>Se connecter</button
-			>
-		</form>
-		<p class="text-center">{message}</p>
+<div class="flex min-h-screen items-center justify-center">
+	<div class="card bg-base-100 w-full max-w-sm shadow-xl">
+		<div class="card-body">
+			<h1 class="card-title">Connexion</h1>
+			<form onsubmit={handleLogin} class="space-y-4">
+				<div class="form-control">
+					<label class="label" for="email">
+						<span class="label-text">Email</span>
+					</label>
+					<input type="email" bind:value={email} class="input input-bordered w-full" />
+				</div>
+				<div class="form-control">
+					<label class="label" for="password">
+						<span class="label-text">Mot de passe</span>
+					</label>
+					<input type="password" bind:value={password} class="input input-bordered w-full" />
+				</div>
+				<div class="form-control mt-6">
+					<button type="submit" class="btn btn-primary">Se connecter</button>
+				</div>
+			</form>
+			{#if message}
+				<p class="text-error text-center">{message}</p>
+			{/if}
+		</div>
 	</div>
 </div>

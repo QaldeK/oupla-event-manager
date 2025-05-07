@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { Tipex, defaultExtensions } from '@friendofsvelte/tipex';
-	import { TextAlign } from '@tiptap/extension-text-align';
-	import type { TipexEditor } from '@friendofsvelte/tipex';
-	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
+	import { Tipex, defaultExtensions } from "@friendofsvelte/tipex";
+	import { TextAlign } from "@tiptap/extension-text-align";
+	import type { TipexEditor } from "@friendofsvelte/tipex";
+	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
 	import {
 		createEditableDocumentStore,
 		INACTIVITY_TIMEOUT_MS
-	} from '$lib/shared/editableDocumentStore.svelte';
-	import * as sitePageStore from '$lib/shared/sitePageStore.svelte';
-	import type { SitePagesResponse } from '$lib/types/pocketbase';
-	import { AlertCircle, Info, Save, Eye, EyeOff } from 'lucide-svelte';
-	import ColorSelect from '$lib/components/ColorSelect.svelte';
+	} from "$lib/shared/editableDocumentStore.svelte";
+	import * as sitePageStore from "$lib/shared/sitePageStore.svelte";
+	import type { SitePagesResponse } from "$lib/types/pocketbase";
+	import { AlertCircle, Info, Save, Eye, EyeOff } from "lucide-svelte";
+	import ColorSelect from "$lib/components/ColorSelect.svelte";
 
 	// Interface pour les props
 	interface Props {
@@ -20,7 +20,7 @@
 	}
 
 	const { docId, onClose: onClose, initialEditMode = true }: Props = $props();
-	const collectionName = 'site_pages';
+	const collectionName = "site_pages";
 
 	// Préparer les actions pour le store éditable
 	const sitePageActions = {
@@ -36,7 +36,7 @@
 		docId,
 		collectionName,
 		actions: sitePageActions,
-		fieldsToSave: ['title', 'content', 'section', 'componentConfig'],
+		fieldsToSave: ["title", "content", "section", "componentConfig"],
 		initialEditMode: initialEditMode
 	});
 
@@ -45,21 +45,21 @@
 	let showUIOptions = $state(false);
 
 	// États dérivés
-	let title = $derived(editableDoc.doc?.title ?? '');
-	let content = $derived(editableDoc.doc?.content ?? '');
+	let title = $derived(editableDoc.doc?.title ?? "");
+	let content = $derived(editableDoc.doc?.content ?? "");
 
 	let uiOptions = $derived.by(() => {
 		const defaultOptions = {
-			bgColor: 'bg-base-100',
+			bgColor: "bg-base-100",
 			showTitle: true,
-			textColor: 'text-base-content'
+			textColor: "text-base-content"
 		};
 
 		if (!editableDoc.doc) return defaultOptions;
 		return { ...defaultOptions, ...(editableDoc.doc.componentConfig || {}) };
 	});
 
-	let currentBgColor = $derived.by(() => getCurrentValue('bgColor'));
+	let currentBgColor = $derived.by(() => getCurrentValue("bgColor"));
 
 	// État temporaire (local) pour les modifications d'UI options
 	// Utilisé pour retarder les mises à jour et éviter les boucles
@@ -68,65 +68,65 @@
 	// Liste des options de couleurs de fond disponibles
 	const bgColorOptions = [
 		{
-			value: 'bg-base-100',
-			label: 'Fond principal',
-			color: 'base-100',
-			textColor: 'text-base-content'
+			value: "bg-base-100",
+			label: "Fond principal",
+			color: "base-100",
+			textColor: "text-base-content"
 		},
 		{
-			value: 'bg-base-200',
-			label: 'Fond secondaire',
-			color: 'base-200',
-			textColor: 'text-base-content'
+			value: "bg-base-200",
+			label: "Fond secondaire",
+			color: "base-200",
+			textColor: "text-base-content"
 		},
 		{
-			value: 'bg-base-300',
-			label: 'Fond tertiaire',
-			color: 'base-300',
-			textColor: 'text-base-content'
+			value: "bg-base-300",
+			label: "Fond tertiaire",
+			color: "base-300",
+			textColor: "text-base-content"
 		},
-		{ value: 'bg-neutral', label: 'Neutre', color: 'neutral', textColor: 'text-neutral-content' },
-		{ value: 'bg-primary', label: 'Primaire', color: 'primary', textColor: 'text-primary-content' },
+		{ value: "bg-neutral", label: "Neutre", color: "neutral", textColor: "text-neutral-content" },
+		{ value: "bg-primary", label: "Primaire", color: "primary", textColor: "text-primary-content" },
 		{
-			value: 'bg-secondary',
-			label: 'Secondaire',
-			color: 'secondary',
-			textColor: 'text-secondary-content'
+			value: "bg-secondary",
+			label: "Secondaire",
+			color: "secondary",
+			textColor: "text-secondary-content"
 		},
-		{ value: 'bg-accent', label: 'Accent', color: 'accent', textColor: 'text-accent-content' },
+		{ value: "bg-accent", label: "Accent", color: "accent", textColor: "text-accent-content" },
 		{
-			value: 'bg-warning',
-			label: 'Avertissement',
-			color: 'warning',
-			textColor: 'text-warning-content'
+			value: "bg-warning",
+			label: "Avertissement",
+			color: "warning",
+			textColor: "text-warning-content"
 		},
-		{ value: 'bg-error', label: 'Erreur', color: 'error', textColor: 'text-error-content' },
-		{ value: 'bg-success', label: 'Succès', color: 'success', textColor: 'text-success-content' },
+		{ value: "bg-error", label: "Erreur", color: "error", textColor: "text-error-content" },
+		{ value: "bg-success", label: "Succès", color: "success", textColor: "text-success-content" },
 		{
-			value: 'bg-primary/10',
-			label: 'Primaire (10%)',
-			color: 'primary',
-			textColor: 'text-primary-content'
-		},
-		{
-			value: 'bg-secondary/10',
-			label: 'Secondaire (10%)',
-			color: 'secondary',
-			textColor: 'text-secondary-content'
+			value: "bg-primary/10",
+			label: "Primaire (10%)",
+			color: "primary",
+			textColor: "text-primary-content"
 		},
 		{
-			value: 'bg-transparent',
-			label: 'Transparent',
-			color: 'transparent',
-			textColor: 'text-base-content'
+			value: "bg-secondary/10",
+			label: "Secondaire (10%)",
+			color: "secondary",
+			textColor: "text-secondary-content"
 		},
-		{ value: 'bg-white', label: 'Blanc', color: 'white', textColor: 'text-base-content' }
+		{
+			value: "bg-transparent",
+			label: "Transparent",
+			color: "transparent",
+			textColor: "text-base-content"
+		},
+		{ value: "bg-white", label: "Blanc", color: "white", textColor: "text-base-content" }
 	];
 
 	// Extensions Tipex
 	const tipexExtensions = [
 		...defaultExtensions,
-		TextAlign.configure({ types: ['heading', 'paragraph'] })
+		TextAlign.configure({ types: ["heading", "paragraph"] })
 	];
 
 	// Synchroniser Tipex lorsque le contenu change via le store (ex: subscription) ET qu'on n'édite pas
@@ -135,7 +135,7 @@
 			return;
 		}
 
-		const currentStoreContent = editableDoc.doc?.content ?? '';
+		const currentStoreContent = editableDoc.doc?.content ?? "";
 		if (editor.getHTML() !== currentStoreContent) {
 			console.log(`[PageBlockEditor ${docId}] Syncing Tipex with store content.`);
 			editor.commands.setContent(currentStoreContent, false);
@@ -182,7 +182,7 @@
 			try {
 				// Mise à jour du document avec tous les changements en une seule fois
 				await sitePageActions.updateDoc(docId, changes);
-				console.log('[PageBlockEditor] Sauvegarde manuelle réussie');
+				console.log("[PageBlockEditor] Sauvegarde manuelle réussie");
 
 				// Réinitialiser les changements en attente
 				pendingUiChanges = {};
@@ -190,7 +190,7 @@
 				// Libérer le verrou (sans sauvegarde supplémentaire, déjà fait)
 				await editableDoc.stopEditing(false);
 			} catch (error) {
-				console.error('[PageBlockEditor] Erreur lors de la sauvegarde:', error);
+				console.error("[PageBlockEditor] Erreur lors de la sauvegarde:", error);
 				// L'erreur sera affichée via l'état error du store
 			}
 		} else {
@@ -219,7 +219,7 @@
 		pendingUiChanges = { ...pendingUiChanges, [key]: value };
 
 		// Si bgColor change, mettre à jour automatiquement textColor
-		if (key === 'bgColor') {
+		if (key === "bgColor") {
 			const selectedBgColor = bgColorOptions.find((option) => option.value === value);
 			if (selectedBgColor) {
 				pendingUiChanges = { ...pendingUiChanges, textColor: selectedBgColor.textColor };
@@ -284,10 +284,10 @@
 					<input
 						type="checkbox"
 						class="toggle toggle-primary"
-						checked={getCurrentValue('showTitle')}
-						onclick={() => updateUIOption('showTitle', !getCurrentValue('showTitle'))}
+						checked={getCurrentValue("showTitle")}
+						onclick={() => updateUIOption("showTitle", !getCurrentValue("showTitle"))}
 					/>
-					{#if getCurrentValue('showTitle')}
+					{#if getCurrentValue("showTitle")}
 						<Eye size={16} />
 					{:else}
 						<EyeOff size={16} />
@@ -313,10 +313,11 @@
 			<div class="border-base-300 mb-4 rounded-md border border-dashed p-2">
 				<h4 class="text-base-content/60 mb-2 text-xs font-medium">Prévisualisation</h4>
 				<div class="rounded-md {getCurrentValue('bgColor')} p-4 shadow-sm">
-					{#if getCurrentValue('showTitle')}
+					{#if getCurrentValue("showTitle")}
 						<h2 class="mb-4 text-xl font-bold {getCurrentValue('textColor')}">
-							{title || 'Titre du bloc'}
+							{title || "Titre du bloc"}
 						</h2>
+						text-xl
 					{/if}
 					<div class="{getCurrentValue('textColor')} opacity-70">
 						Prévisualisation du contenu du bloc...

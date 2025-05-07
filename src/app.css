@@ -130,7 +130,7 @@
 	}
 
 	.btn-compact {
-		--btn-scale: 0.75; /* Facteur de réduction de 20% */
+		--btn-scale: 0.85;
 		height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
 		min-height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
 		padding-top: calc(0.25rem * var(--btn-scale)) !important;

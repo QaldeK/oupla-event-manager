@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { pb } from '$lib/pocketbase.svelte';
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
-	import { modalState } from '$lib/shared/states.svelte';
-	import { showAlert } from '$lib/shared/states.svelte';
-	import { fade } from 'svelte/transition';
+	import { pb } from "$lib/pocketbase.svelte";
+	import { getSpace } from "$lib/shared/spaceOptions.svelte";
+	import { modalState } from "$lib/shared/states.svelte";
+	import { showAlert } from "$lib/shared/states.svelte";
+	import { fade } from "svelte/transition";
 
 	// États réactifs avec $state
-	let email = $state('qk-oupla@gmx.com');
-	let username = $state('qko');
+	let email = $state("qk-oupla@gmx.com");
+	let username = $state("qko");
 	let isLoading = $state(false);
-	let invitationLink = $state('');
+	let invitationLink = $state("");
 
 	// Valeur dérivée pour la validation du formulaire
 	let isValid = $derived(!!email && !!username);
@@ -18,7 +18,7 @@
 
 	async function handleSubmit() {
 		if (!isValid) {
-			showAlert("L'email et le nom d'utilisateur sont requis", 'error');
+			showAlert("L'email et le nom d'utilisateur sont requis", "error");
 			return;
 		}
 
@@ -29,7 +29,7 @@
 
 		try {
 			// Créer l'utilisateur avec invitationToken comme mot de passe
-			const user = await pb.collection('users').create({
+			const user = await pb.collection("users").create({
 				email,
 				username,
 				password: invitationToken,
@@ -41,17 +41,17 @@
 			});
 
 			// Ajouter l'utilisateur à l'espace
-			await pb.collection('spaceMembers').create({
+			await pb.collection("spaceMembers").create({
 				space: getSpace.id,
 				user: user.id,
-				role: 'invited'
+				role: "invited"
 			});
 
 			// Générer et afficher le lien d'invitation
 			invitationLink = `${window.location.origin}/auth/invitation-setpassword?token=${invitationToken}&mail=${encodeURIComponent(email)}&uname=${encodeURIComponent(username)}`;
 
-			await pb.send('/api/send-invitation', {
-				method: 'POST',
+			await pb.send("/api/send-invitation", {
+				method: "POST",
 				body: {
 					email,
 					username,
@@ -60,10 +60,10 @@
 				}
 			});
 
-			showAlert('Invitation créée avec succès', 'success');
+			showAlert("Invitation créée avec succès", "success");
 		} catch (error) {
 			console.error("Erreur lors de l'invitation:", error);
-			showAlert("Erreur lors de l'invitation de l'utilisateur", 'error');
+			showAlert("Erreur lors de l'invitation de l'utilisateur", "error");
 		} finally {
 			isLoading = false;
 		}
@@ -72,9 +72,9 @@
 	async function copyLink() {
 		try {
 			await navigator.clipboard.writeText(invitationLink);
-			showAlert('Lien copié dans le presse-papier', 'success');
+			showAlert("Lien copié dans le presse-papier", "success");
 		} catch (error) {
-			showAlert('Erreur lors de la copie du lien', 'error');
+			showAlert("Erreur lors de la copie du lien", "error");
 		}
 	}
 </script>
@@ -84,7 +84,7 @@
 	class=" fixed inset-0 z-50 flex items-center justify-center bg-black/80"
 >
 	<div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-		<h2 class="mb-4 text-xl font-bold">Inviter un utilisateur</h2>
+		<h2 class="text-fluid-xl mb-4 font-bold">Inviter un utilisateur</h2>
 
 		<form class="space-y-4" onsubmit={handleSubmit}>
 			<div>
@@ -135,7 +135,7 @@
 				</button>
 				{#if !invitationLink}
 					<button type="submit" class="btn btn-primary" disabled={isLoading}>
-						{isLoading ? 'Création...' : "Créer l'invitation"}
+						{isLoading ? "Création..." : "Créer l'invitation"}
 					</button>
 				{/if}
 			</div>

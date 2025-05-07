@@ -4,40 +4,40 @@
 		getPages,
 		createPad,
 		deletePad
-	} from '$lib/shared/sitePageStore.svelte';
+	} from "$lib/shared/sitePageStore.svelte";
 
-	import type { PublicEventInfo } from '$lib/shared/publicStore.svelte';
+	import type { PublicEventInfo } from "$lib/shared/publicStore.svelte";
 
-	import { showAlert, modalState } from '$lib/shared/states.svelte';
+	import { showAlert, modalState } from "$lib/shared/states.svelte";
 
-	import { pb } from '$lib/pocketbase.svelte';
-	import { SitePagesSectionOptions, type SitePagesResponse } from '$lib/types/pocketbase';
+	import { pb } from "$lib/pocketbase.svelte";
+	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
 
-	import { modifyRecord } from '$lib/pocketbase.svelte';
+	import { modifyRecord } from "$lib/pocketbase.svelte";
 
-	import { format } from 'date-fns';
-	import { fr } from 'date-fns/locale';
-	import { goto } from '$app/navigation';
+	import { format } from "date-fns";
+	import { fr } from "date-fns/locale";
+	import { goto } from "$app/navigation";
 
-	import { AlertCircle, GripVertical, Pencil, Trash2, Palette, Sun, Moon, X } from 'lucide-svelte';
-	import { draggable, droppable, type DragDropState } from '@thisux/sveltednd';
-	import { fade, slide } from 'svelte/transition';
-	import { flip } from 'svelte/animate';
+	import { AlertCircle, GripVertical, Pencil, Trash2, Palette, Sun, Moon, X } from "lucide-svelte";
+	import { draggable, droppable, type DragDropState } from "@thisux/sveltednd";
+	import { fade, slide } from "svelte/transition";
+	import { flip } from "svelte/animate";
 
-	import ConfigModal from './components/ConfigModal.svelte';
-	import NavBarHeaderConfig from './components/NavBarHeaderConfig.svelte';
+	import ConfigModal from "./components/ConfigModal.svelte";
+	import NavBarHeaderConfig from "./components/NavBarHeaderConfig.svelte";
 
-	import ColorSelect from '$lib/components/ColorSelect.svelte';
-	import PublicEventCard from '$lib/components/public/PublicEventCard.svelte';
-	import PageBlockEditor from '$lib/components/public/PageBlockEditor.svelte';
-	import Modal from '$lib/components/Modal.svelte';
+	import ColorSelect from "$lib/components/ColorSelect.svelte";
+	import PublicEventCard from "$lib/components/public/PublicEventCard.svelte";
+	import PageBlockEditor from "$lib/components/public/PageBlockEditor.svelte";
+	import Modal from "$lib/components/Modal.svelte";
 
-	import { getDefaultThemeOptions, type PublicSiteThemeOptions } from '$lib/types/theme.d';
-	import { onMount } from 'svelte';
-	import '/src/daisy.css';
+	import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
+	import { onMount } from "svelte";
+	import "/src/daisy.css";
 
 	let isLoading = $state(true);
-	let newPageTitle = $state('');
+	let newPageTitle = $state("");
 	let isCreating = $state(false);
 	let isUpdatingOrder = $state(false);
 	let error = $state<string | null>(null);
@@ -56,133 +56,133 @@
 
 	let optionsRecordId = $state<string | null>(null);
 	let spaceId = $state<string | null>(null);
-	let previewMode = $state<'light' | 'dark'>('light');
+	let previewMode = $state<"light" | "dark">("light");
 
 	let pages = $derived.by(() => getPages());
 
 	let navLinks = $derived(theme.components.primaryNavLinks);
 
-	let navLinkTitle = $state('');
-	let navLinkUrl = $state('');
-	let navSelectedPage = $state<'selectPage' | '' | string>('selectPage');
+	let navLinkTitle = $state("");
+	let navLinkUrl = $state("");
+	let navSelectedPage = $state<"selectPage" | "" | string>("selectPage");
 
 	const daisyThemes = {
 		light: [
-			'light',
-			'cupcake',
-			'bumblebee',
-			'emerald',
-			'corporate',
-			'fantasy',
-			'wireframe',
-			'cmyk',
-			'autumn',
-			'acid',
-			'lemonade',
-			'winter',
-			'garden',
-			'lofi',
-			'pastel',
-			'retro',
-			'cyberpunk',
-			'valentine',
-			'nord'
+			"light",
+			"cupcake",
+			"bumblebee",
+			"emerald",
+			"corporate",
+			"fantasy",
+			"wireframe",
+			"cmyk",
+			"autumn",
+			"acid",
+			"lemonade",
+			"winter",
+			"garden",
+			"lofi",
+			"pastel",
+			"retro",
+			"cyberpunk",
+			"valentine",
+			"nord"
 		],
 		dark: [
-			'dark',
-			'synthwave',
-			'business',
-			'halloween',
-			'forest',
-			'aqua',
-			'black',
-			'luxury',
-			'dracula',
-			'night',
-			'coffee',
-			'dim',
-			'sunset'
+			"dark",
+			"synthwave",
+			"business",
+			"halloween",
+			"forest",
+			"aqua",
+			"black",
+			"luxury",
+			"dracula",
+			"night",
+			"coffee",
+			"dim",
+			"sunset"
 		]
 	};
 
 	const allBackgroundColors = [
-		{ value: 'bg-base-100', label: 'Fond principal', color: 'base-100' },
-		{ value: 'bg-base-200', label: 'Fond secondaire', color: 'base-200' },
-		{ value: 'bg-base-300', label: 'Fond tertiaire', color: 'base-300' },
-		{ value: 'bg-neutral', label: 'Neutre', color: 'neutral' },
+		{ value: "bg-base-100", label: "Fond principal", color: "base-100" },
+		{ value: "bg-base-200", label: "Fond secondaire", color: "base-200" },
+		{ value: "bg-base-300", label: "Fond tertiaire", color: "base-300" },
+		{ value: "bg-neutral", label: "Neutre", color: "neutral" },
 		// { value: 'bg-gray-800', label: 'Gray-dark', color: 'gray-800' },
-		{ value: 'bg-primary', label: 'Primaire', color: 'primary' },
-		{ value: 'bg-secondary', label: 'Secondaire', color: 'secondary' },
-		{ value: 'bg-primary/5', label: 'Primaire (5%)', color: 'primary' },
-		{ value: 'bg-primary/10', label: 'Primaire (10%)', color: 'primary' },
-		{ value: 'bg-secondary/10', label: 'Secondaire (10%)', color: 'secondary' },
-		{ value: 'bg-transparent', label: 'Transparent', color: 'transparent' },
-		{ value: 'bg-white', label: 'Blanc', color: 'white' },
-		{ value: 'bg-base-300/50', label: 'Fond léger', color: 'base-300' }
+		{ value: "bg-primary", label: "Primaire", color: "primary" },
+		{ value: "bg-secondary", label: "Secondaire", color: "secondary" },
+		{ value: "bg-primary/5", label: "Primaire (5%)", color: "primary" },
+		{ value: "bg-primary/10", label: "Primaire (10%)", color: "primary" },
+		{ value: "bg-secondary/10", label: "Secondaire (10%)", color: "secondary" },
+		{ value: "bg-transparent", label: "Transparent", color: "transparent" },
+		{ value: "bg-white", label: "Blanc", color: "white" },
+		{ value: "bg-base-300/50", label: "Fond léger", color: "base-300" }
 	];
 
 	const allTextColors = [
-		{ value: 'text-base-content', label: 'Texte principal', color: 'base-content' },
-		{ value: 'text-base-content/70', label: 'Texte secondaire', color: 'base-content' },
-		{ value: 'text-base-content/50', label: 'Texte tertiaire', color: 'base-content' },
-		{ value: 'text-primary-content', label: 'Sur primaire', color: 'primary-content' },
-		{ value: 'text-secondary-content', label: 'Sur secondaire', color: 'secondary-content' },
-		{ value: 'text-neutral-content', label: 'Sur neutre', color: 'neutral-content' },
-		{ value: 'text-primary', label: 'Primaire', color: 'primary' },
-		{ value: 'text-secondary', label: 'Secondaire', color: 'secondary' }
+		{ value: "text-base-content", label: "Texte principal", color: "base-content" },
+		{ value: "text-base-content/70", label: "Texte secondaire", color: "base-content" },
+		{ value: "text-base-content/50", label: "Texte tertiaire", color: "base-content" },
+		{ value: "text-primary-content", label: "Sur primaire", color: "primary-content" },
+		{ value: "text-secondary-content", label: "Sur secondaire", color: "secondary-content" },
+		{ value: "text-neutral-content", label: "Sur neutre", color: "neutral-content" },
+		{ value: "text-primary", label: "Primaire", color: "primary" },
+		{ value: "text-secondary", label: "Secondaire", color: "secondary" }
 	];
 
 	// Options pour les tailles de texte fluide
 	const fluidTextSizes = [
-		{ value: 'text-fluid-xs', label: 'Très petit (XS)' },
-		{ value: 'text-fluid-sm', label: 'Petit (SM)' },
-		{ value: 'text-fluid-base', label: 'Base' },
-		{ value: 'text-fluid-lg', label: 'Grand (LG)' },
-		{ value: 'text-fluid-xl', label: 'Très grand (XL)' },
-		{ value: 'text-fluid-2xl', label: 'Énorme (2XL)' },
-		{ value: 'text-fluid-3xl', label: 'Gigantesque (3XL)' }
+		{ value: "text-fluid-xs", label: "Très petit (XS)" },
+		{ value: "text-fluid-sm", label: "Petit (SM)" },
+		{ value: "text-fluid-base", label: "Base" },
+		{ value: "text-fluid-lg", label: "Grand (LG)" },
+		{ value: "text-fluid-xl", label: "Très grand (XL)" },
+		{ value: "text-fluid-2xl", label: "Énorme (2XL)" },
+		{ value: "text-fluid-3xl", label: "Gigantesque (3XL)" }
 	];
 
 	// Options pour les arrondis
 	const roundedOptions = [
-		{ value: 'rounded-none', label: 'Aucun' },
-		{ value: 'rounded-sm', label: 'Petit' },
-		{ value: 'rounded-md', label: 'Moyen' },
-		{ value: 'rounded-lg', label: 'Grand' },
-		{ value: 'rounded-xl', label: 'Très grand' },
-		{ value: 'rounded-2xl', label: 'Énorme' }
+		{ value: "rounded-none", label: "Aucun" },
+		{ value: "rounded-sm", label: "Petit" },
+		{ value: "rounded-md", label: "Moyen" },
+		{ value: "rounded-lg", label: "Grand" },
+		{ value: "rounded-xl", label: "Très grand" },
+		{ value: "rounded-2xl", label: "Énorme" }
 	];
 
 	// Options pour les ombres
 	const shadowOptions = [
-		{ value: 'shadow-none', label: 'Aucune' },
-		{ value: 'shadow-sm', label: 'Légère' },
-		{ value: 'shadow', label: 'Normale' },
-		{ value: 'shadow-md', label: 'Moyenne' },
-		{ value: 'shadow-lg', label: 'Grande' },
-		{ value: 'shadow-xl', label: 'Très grande' },
-		{ value: 'shadow-2xl', label: 'Énorme' }
+		{ value: "shadow-none", label: "Aucune" },
+		{ value: "shadow-sm", label: "Légère" },
+		{ value: "shadow", label: "Normale" },
+		{ value: "shadow-md", label: "Moyenne" },
+		{ value: "shadow-lg", label: "Grande" },
+		{ value: "shadow-xl", label: "Très grande" },
+		{ value: "shadow-2xl", label: "Énorme" }
 	];
 
 	// Exemple de donnée pour la carte événement
 	const sampleEvent: Partial<PublicEventInfo> = {
-		id: 'example-id',
-		event_title: 'Soirée découverte - Exemple de carte',
+		id: "example-id",
+		event_title: "Soirée découverte - Exemple de carte",
 		desc_public: `<p>Ceci est un exemple de description d'événement qui peut être formaté en HTML.
 		              C'est une prévisualisation pour montrer comment votre thème s'appliquera aux cartes d'événements.</p>
 		              <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin euismod,
 		              nunc eget ultricies tincidunt, nunc nunc tincidunt metus, vitae faucibus velit nunc ac risus.</p>`,
 		date_event: new Date().toISOString(),
-		start_event: '19:30',
-		start_public: '19:00',
-		prix: '5€',
+		start_event: "19:30",
+		start_public: "19:00",
+		prix: "5€",
 		is_prix_libre: false,
 		isMixiteChoisie: false,
-		mixite: '',
+		mixite: "",
 		is_age_no_restriction: true,
-		age_advice: '',
+		age_advice: "",
 		canceled: false,
-		categories: ['Atelier', 'Culture']
+		categories: ["Atelier", "Culture"]
 	};
 
 	// Charger les options existantes au montage
@@ -190,14 +190,14 @@
 		spaceId = await getCurrentAdminSpaceId();
 
 		if (!spaceId) {
-			showAlert('Impossible de déterminer votre espace. Vérifiez vos permissions.', 'error');
+			showAlert("Impossible de déterminer votre espace. Vérifiez vos permissions.", "error");
 			return;
 		}
 
 		try {
 			// Essayer de récupérer l'enregistrement d'options pour cet espace
 			const optionsRecord = await pb
-				.collection('spaces_options')
+				.collection("spaces_options")
 				.getFirstListItem(`space = "${spaceId}"`);
 			optionsRecordId = optionsRecord.id;
 
@@ -224,14 +224,14 @@
 
 			// S'assurer que daisyThemeLight et daisyThemeDark existent
 			if (!theme.daisyThemeLight) {
-				theme.daisyThemeLight = theme.daisyTheme || 'light';
+				theme.daisyThemeLight = theme.daisyTheme || "light";
 			}
 			if (!theme.daisyThemeDark) {
-				theme.daisyThemeDark = theme.daisyTheme || 'dark';
+				theme.daisyThemeDark = theme.daisyTheme || "dark";
 			}
 			initialTheme = JSON.parse(JSON.stringify(theme));
 		} catch (e: unknown) {
-			if (typeof e === 'object' && e !== null && 'status' in e && e.status === 404) {
+			if (typeof e === "object" && e !== null && "status" in e && e.status === 404) {
 				console.log(`Aucune option d'apparence existante trouvée pour l'espace ${spaceId}.`);
 				theme = getDefaultThemeOptions(); // Utiliser les valeurs par défaut
 				optionsRecordId = null;
@@ -239,8 +239,8 @@
 			} else {
 				console.error("Erreur lors du chargement des options d'apparence:", e);
 				showAlert(
-					`Erreur chargement: ${typeof e === 'object' && e !== null && 'message' in e && e.message}`,
-					'error'
+					`Erreur chargement: ${typeof e === "object" && e !== null && "message" in e && e.message}`,
+					"error"
 				);
 				theme = getDefaultThemeOptions();
 				initialTheme = JSON.parse(JSON.stringify(theme));
@@ -282,7 +282,7 @@
 			const pageSection = page.section;
 
 			if (pageSection && Object.values(SitePagesSectionOptions).includes(pageSection)) {
-				groups[pageSection as Exclude<keyof GroupedPages, 'page'>].push(page);
+				groups[pageSection as Exclude<keyof GroupedPages, "page">].push(page);
 			} else if (pageSection === SitePagesSectionOptions.page) {
 				groups[SitePagesSectionOptions.page].push(page);
 			} else {
@@ -297,10 +297,10 @@
 		for (const key in groups) {
 			// Vérification que la clé appartient bien aux types attendus
 			if (Object.values(SitePagesSectionOptions).includes(key as SitePagesSectionOptions)) {
-				const groupKey = key as Exclude<keyof GroupedPages, 'other'>;
+				const groupKey = key as Exclude<keyof GroupedPages, "other">;
 				groups[groupKey].sort((a, b) => {
-					const posA = typeof a.pos === 'number' ? a.pos : Infinity;
-					const posB = typeof b.pos === 'number' ? b.pos : Infinity;
+					const posA = typeof a.pos === "number" ? a.pos : Infinity;
+					const posB = typeof b.pos === "number" ? b.pos : Infinity;
 					// Si les positions sont égales (ou toutes deux Infinity), trier par date de création comme fallback
 					if (posA === posB) {
 						return new Date(a.created).getTime() - new Date(b.created).getTime();
@@ -309,7 +309,7 @@
 				});
 			}
 		}
-		console.log('Grouped pages:', groups);
+		console.log("Grouped pages:", groups);
 		return groups;
 	});
 
@@ -317,7 +317,7 @@
 
 	async function handleCreatePage() {
 		if (!newPageTitle.trim()) {
-			showAlert('Le titre de la page ne peut pas être vide', 'error');
+			showAlert("Le titre de la page ne peut pas être vide", "error");
 			return;
 		}
 
@@ -327,11 +327,11 @@
 			console.log(newPageTitle);
 
 			const newPage = await createPad(newPageTitle, SitePagesSectionOptions.page);
-			newPageTitle = '';
+			newPageTitle = "";
 			// Rediriger vers la page nouvellement créée
 			goto(`/dashboard/site_pages/${newPage.id}`);
 		} catch (e) {
-			showAlert('Erreur lors de la création de la page', 'error');
+			showAlert("Erreur lors de la création de la page", "error");
 			console.error(e);
 		} finally {
 			isCreating = false;
@@ -347,7 +347,7 @@
 
 			const itemsInSection = groupedPages[blockSection] || [];
 			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
-				const currentPos = typeof item.pos === 'number' ? item.pos : -1;
+				const currentPos = typeof item.pos === "number" ? item.pos : -1;
 				return Math.max(max, currentPos);
 			}, -1); // Base -1 pour que la première position soit 0
 			const nextPos = maxPos + 1;
@@ -365,7 +365,7 @@
 		} catch (e) {
 			showAlert(
 				`Erreur lors de la création du bloc: ${e instanceof Error ? e.message : e}`,
-				'error'
+				"error"
 			);
 			console.error(e);
 		} finally {
@@ -377,17 +377,17 @@
 		modalState.confirm = {
 			isOpen: true,
 			data: {
-				title: 'Supprimer la page',
-				message: 'Êtes vous sure de vouloir supprimer cette page ? Cette action est définitive',
-				variant: 'warning',
+				title: "Supprimer la page",
+				message: "Êtes vous sure de vouloir supprimer cette page ? Cette action est définitive",
+				variant: "warning",
 				onConfirm: async () => {
-					console.log('try to delete', id);
+					console.log("try to delete", id);
 					try {
 						await deletePad(id);
 						modalState.confirm.isOpen = false;
-						showAlert('Page supprimée', 'success');
+						showAlert("Page supprimée", "success");
 					} catch (e) {
-						showAlert(`Erreur lors de la suppression (${e})`, 'error');
+						showAlert(`Erreur lors de la suppression (${e})`, "error");
 						modalState.confirm.isOpen = false;
 					}
 				}
@@ -409,20 +409,20 @@
 		// --- Calcul de la prochaine position dans la *nouvelle* section ---
 		const itemsInNewSection = groupedPages[newSectionKey] || [];
 		const maxPos = itemsInNewSection.reduce((max: number, item: SitePagesResponse) => {
-			const currentPos = typeof item.pos === 'number' ? item.pos : -1;
+			const currentPos = typeof item.pos === "number" ? item.pos : -1;
 			return Math.max(max, currentPos);
 		}, -1);
 		const nextPos = maxPos + 1;
 		// --- Fin du Calcul ---
 
 		try {
-			await modifyRecord('site_pages', draggedItem.id, {
+			await modifyRecord("site_pages", draggedItem.id, {
 				section: targetContainer,
 				pos: nextPos
 			});
 		} catch (error) {
-			console.error('Erreur lors du déplacement du bloc:', error);
-			showAlert('Erreur lors du déplacement du bloc', 'error');
+			console.error("Erreur lors du déplacement du bloc:", error);
+			showAlert("Erreur lors du déplacement du bloc", "error");
 		} finally {
 			isUpdatingOrder = false;
 		}
@@ -440,11 +440,11 @@
 		if (!targetContainer || !sourceContainer || sourceContainer !== targetContainer) {
 			// Ne devrait pas arriver si 'disabled' est bien configuré sur le droppable de l'item,
 			// mais sécurité supplémentaire. Géré par handleSectionDrop si containers différents.
-			console.log('Item drop ignored: different containers or no target container.');
+			console.log("Item drop ignored: different containers or no target container.");
 			return;
 		}
 		if (draggedItem.id === targetItem.id) {
-			console.log('Item drop ignored: dropped on itself.');
+			console.log("Item drop ignored: dropped on itself.");
 			return; // On ne peut pas se déposer sur soi-même
 		}
 		// Vérifie que le type de container est valide pour le réordonnancement
@@ -454,8 +454,8 @@
 			sectionType === SitePagesSectionOptions.page ||
 			!Object.values(SitePagesSectionOptions).includes(sectionType)
 		) {
-			console.error('Tentative de réordonnancement dans une section invalide:', sectionType);
-			showAlert("Le réordonnancement n'est pas autorisé dans cette section.", 'error');
+			console.error("Tentative de réordonnancement dans une section invalide:", sectionType);
+			showAlert("Le réordonnancement n'est pas autorisé dans cette section.", "error");
 			return;
 		}
 
@@ -470,7 +470,7 @@
 			console.error(
 				"Erreur interne: Impossible de trouver l'élément déplacé ou cible dans la section."
 			);
-			showAlert('Erreur lors de la préparation du réordonnancement.', 'error');
+			showAlert("Erreur lors de la préparation du réordonnancement.", "error");
 			isUpdatingOrder = false;
 			return;
 		}
@@ -498,13 +498,13 @@
 		try {
 			// Utiliser Promise.all pour envoyer toutes les mises à jour en parallèle
 			await Promise.all(
-				updates.map((update) => modifyRecord('site_pages', update.id, update.data))
+				updates.map((update) => modifyRecord("site_pages", update.id, update.data))
 			);
 			// showAlert('Ordre des blocs mis à jour', 'success');
 			// L'UI se mettra à jour via l'abonnement au store `pages` qui déclenchera le recalcul de `groupedPages`
 		} catch (error) {
 			console.error("Erreur lors de la mise à jour de l'ordre des blocs:", error);
-			showAlert("Erreur lors de la mise à jour de l'ordre", 'error');
+			showAlert("Erreur lors de la mise à jour de l'ordre", "error");
 			// L'abonnement resynchronisera avec l'état potentiellement incohérent de la DB.
 			// Une gestion d'erreur plus poussée pourrait être nécessaire pour la robustesse.
 		} finally {
@@ -518,7 +518,7 @@
 		if (!user) return null;
 		try {
 			const memberRecord = await pb
-				.collection('spaceMembers')
+				.collection("spaceMembers")
 				.getFirstListItem(`user = "${user.id}" && role = "admin"`);
 			return memberRecord?.space || null;
 		} catch {
@@ -539,20 +539,20 @@
 
 			let savedRecord;
 			if (optionsRecordId) {
-				savedRecord = await pb.collection('spaces_options').update(optionsRecordId, dataToSave);
+				savedRecord = await pb.collection("spaces_options").update(optionsRecordId, dataToSave);
 			} else {
-				savedRecord = await pb.collection('spaces_options').create(dataToSave);
+				savedRecord = await pb.collection("spaces_options").create(dataToSave);
 				optionsRecordId = savedRecord.id;
 			}
 			// Mettre à jour initialTheme après une sauvegarde réussie
 			initialTheme = theme;
 			// theme = savedRecord.publicSiteTheme as PublicSiteThemeOptions;
-			showAlert('Apparence sauvegardée avec succès !', 'success');
+			showAlert("Apparence sauvegardée avec succès !", "success");
 		} catch (e: unknown) {
 			console.error("Erreur lors de la sauvegarde de l'apparence:", e);
 			showAlert(
-				`Erreur sauvegarde: ${typeof e === 'object' && e !== null && 'message' in e && e.message}`,
-				'error'
+				`Erreur sauvegarde: ${typeof e === "object" && e !== null && "message" in e && e.message}`,
+				"error"
 			);
 		}
 	}
@@ -565,7 +565,7 @@
 
 	// Calculer le thème actif en fonction du mode
 	function getCurrentTheme() {
-		return previewMode === 'light' ? theme.daisyThemeLight : theme.daisyThemeDark;
+		return previewMode === "light" ? theme.daisyThemeLight : theme.daisyThemeDark;
 	}
 
 	// --- fonctions utilitaires ---
@@ -582,15 +582,15 @@
 	function getSectionConfigKey(section: SitePagesSectionOptions) {
 		switch (section) {
 			case SitePagesSectionOptions.header:
-				return 'header';
+				return "header";
 			case SitePagesSectionOptions.leftSide:
-				return 'leftSidebar';
+				return "leftSidebar";
 			case SitePagesSectionOptions.rightSide:
-				return 'rightSidebar';
+				return "rightSidebar";
 			case SitePagesSectionOptions.footer:
-				return 'footer';
+				return "footer";
 			case SitePagesSectionOptions.top:
-				return 'top'; // Ex: 'top' n'a pas de config dédiée dans layoutSections
+				return "top"; // Ex: 'top' n'a pas de config dédiée dans layoutSections
 		}
 	}
 
@@ -599,7 +599,7 @@
 		const navLinks = theme.components.primaryNavLinks || [];
 
 		// Si une page est sélectionnée
-		if (navSelectedPage && navSelectedPage !== 'selectPage') {
+		if (navSelectedPage && navSelectedPage !== "selectPage") {
 			const page = groupedPages.page.find((p) => p.id === navSelectedPage); // Utiliser groupedPages.page
 			if (page) {
 				// Utilisation de l'assignation directe car 'theme' est $state
@@ -611,9 +611,9 @@
 						// TODO: Confirmer la structure de l'URL publique des pages
 					}
 				];
-				navSelectedPage = 'selectPage'; // Réinitialiser la sélection
+				navSelectedPage = "selectPage"; // Réinitialiser la sélection
 			} else {
-				showAlert('Page sélectionnée introuvable.', 'error');
+				showAlert("Page sélectionnée introuvable.", "error");
 			}
 		}
 		// Sinon utiliser le titre et l'URL personnalisés
@@ -622,13 +622,13 @@
 				...navLinks,
 				{
 					title: navLinkTitle,
-					url: navLinkUrl || '#' // URL par défaut si vide
+					url: navLinkUrl || "#" // URL par défaut si vide
 				}
 			];
-			navLinkTitle = '';
-			navLinkUrl = '';
+			navLinkTitle = "";
+			navLinkUrl = "";
 		} else {
-			showAlert('Veuillez sélectionner une page ou entrer un titre de lien personnalisé.', 'error');
+			showAlert("Veuillez sélectionner une page ou entrer un titre de lien personnalisé.", "error");
 		}
 	}
 
@@ -642,17 +642,17 @@
 	}
 
 	function formatDate(dateString: string) {
-		return format(new Date(dateString), 'dd MMMM yyyy à HH:mm', { locale: fr });
+		return format(new Date(dateString), "dd MMMM yyyy à HH:mm", { locale: fr });
 	}
 </script>
 
-{$inspect('themeLoaded', { theme })}
-{$inspect('initialTheme', { initialTheme })}
+{$inspect("themeLoaded", { theme })}
+{$inspect("initialTheme", { initialTheme })}
 
 {#if !isLoading}
-	{#snippet daisy_theme(daisy_theme: string, themeCategory: 'light' | 'dark')}
+	{#snippet daisy_theme(daisy_theme: string, themeCategory: "light" | "dark")}
 		{@const isCurrentThemeForCategory =
-			themeCategory === 'light'
+			themeCategory === "light"
 				? theme.daisyThemeLight === daisy_theme
 				: theme.daisyThemeDark === daisy_theme}
 		{@const isSelectedCategory = theme.defaultMode === themeCategory}
@@ -669,14 +669,14 @@
 				class="bg-base-100 text-base-content w-full cursor-pointer font-sans"
 				data-theme={daisy_theme}
 				onclick={() => {
-					if (themeCategory === 'light') {
+					if (themeCategory === "light") {
 						theme.daisyThemeLight = daisy_theme;
-						if (theme.defaultMode === 'light') {
+						if (theme.defaultMode === "light") {
 							theme.daisyTheme = daisy_theme;
 						}
 					} else {
 						theme.daisyThemeDark = daisy_theme;
-						if (theme.defaultMode === 'dark') {
+						if (theme.defaultMode === "dark") {
 							theme.daisyTheme = daisy_theme;
 						}
 					}
@@ -690,7 +690,7 @@
 						class="bg-base-100 col-span-4 col-start-2 row-span-3 row-start-1 flex flex-col gap-1 p-2"
 					>
 						<div class="flex items-center gap-1 font-bold">
-							{#if themeCategory === 'light'}
+							{#if themeCategory === "light"}
 								<Sun class="h-3 w-3" />
 							{:else}
 								<Moon class="h-3 w-3" />
@@ -740,7 +740,7 @@
 				callbacks: { onDrop: handleSectionDrop },
 				disabled: isHeader,
 				attributes: {
-					dragOverClass: 'ring-2 ring-primary/50 bg-primary/5'
+					dragOverClass: "ring-2 ring-primary/50 bg-primary/5"
 				}
 			}}
 		>
@@ -804,7 +804,7 @@
 											dragData: block,
 											disabled: isUpdatingOrder,
 											attributes: {
-												draggingClass: 'opacity-50 ring-2 ring-primary shadow-lg'
+												draggingClass: "opacity-50 ring-2 ring-primary shadow-lg"
 											}
 										}}
 										use:droppable={{
@@ -814,7 +814,7 @@
 													handleItemDrop(state as DragDropState<SitePagesResponse>, block)
 											},
 											attributes: {
-												dragOverClass: 'outline bg-warnig outline-2 outline-offset-2 outline-accent'
+												dragOverClass: "outline bg-warnig outline-2 outline-offset-2 outline-accent"
 											}
 										}}
 										animate:flip={{ duration: 200 }}
@@ -877,13 +877,13 @@
 						<div class="join rounded-md border">
 							<button
 								class="join-item btn btn-sm ${previewMode === 'light' ? 'btn-active' : ''}"
-								onclick={() => (previewMode = 'light')}
+								onclick={() => (previewMode = "light")}
 							>
 								<Sun size={16} />
 							</button>
 							<button
 								class="join-item btn btn-sm ${previewMode === 'dark' ? 'btn-active' : ''}"
-								onclick={() => (previewMode = 'dark')}
+								onclick={() => (previewMode = "dark")}
 							>
 								<Moon size={16} />
 							</button>
@@ -899,7 +899,7 @@
 								<Sun size={16} class="mr-2" />
 								Thème clair: {theme.daisyThemeLight}
 							</div>
-							{@render daisy_theme(theme.daisyThemeLight, 'light')}
+							{@render daisy_theme(theme.daisyThemeLight, "light")}
 						</div>
 
 						<!-- Thème sombre actuel -->
@@ -908,7 +908,7 @@
 								<Moon size={16} class="mr-2" />
 								Thème sombre: {theme.daisyThemeDark}
 							</div>
-							{@render daisy_theme(theme.daisyThemeDark, 'dark')}
+							{@render daisy_theme(theme.daisyThemeDark, "dark")}
 						</div>
 						<div class="bg-base-100/50 inset-0 flex items-end justify-end p-4">
 							<button class="btn btn-primary" onclick={() => (themeModalOpen = true)}>
@@ -928,8 +928,8 @@
 										name="defaultMode"
 										class="radio radio-primary"
 										value="light"
-										checked={theme.defaultMode === 'light'}
-										onclick={() => (theme.defaultMode = 'light')}
+										checked={theme.defaultMode === "light"}
+										onclick={() => (theme.defaultMode = "light")}
 									/>
 									<span class="label-text flex items-center gap-1">
 										<Sun size={16} /> Clair
@@ -941,8 +941,8 @@
 										name="defaultMode"
 										class="radio radio-primary"
 										value="dark"
-										checked={theme.defaultMode === 'dark'}
-										onclick={() => (theme.defaultMode = 'dark')}
+										checked={theme.defaultMode === "dark"}
+										onclick={() => (theme.defaultMode = "dark")}
 									/>
 									<span class="label-text flex items-center gap-1">
 										<Moon size={16} /> Sombre
@@ -979,12 +979,12 @@
 					>
 						<!-- Header -->
 						<div class="lg:col-span-3">
-							{@render blockSection(SitePagesSectionOptions.header, 'Header')}
+							{@render blockSection(SitePagesSectionOptions.header, "Header")}
 						</div>
 
 						<!-- Left Sidebar -->
 						<div class="lg:row-start-2">
-							{@render blockSection(SitePagesSectionOptions.leftSide, 'Sidebar Gauche')}
+							{@render blockSection(SitePagesSectionOptions.leftSide, "Sidebar Gauche")}
 						</div>
 
 						<!-- Zone centrale (peut contenir d'autres éléments ou rester vide) -->
@@ -999,12 +999,12 @@
 
 						<!-- Right Sidebar -->
 						<div class="lg:col-start-3 lg:row-start-2">
-							{@render blockSection(SitePagesSectionOptions.rightSide, 'Sidebar Droite')}
+							{@render blockSection(SitePagesSectionOptions.rightSide, "Sidebar Droite")}
 						</div>
 
 						<!-- Footer -->
 						<div class="lg:col-span-3 lg:row-start-3">
-							{@render blockSection(SitePagesSectionOptions.footer, 'Footer')}
+							{@render blockSection(SitePagesSectionOptions.footer, "Footer")}
 						</div>
 					</div>
 				</fieldset>
@@ -1026,7 +1026,7 @@
 						<p class="text-base-content/60 py-2 text-center">Aucun lien configuré</p>
 					{:else}
 						<div class="space-y-2">
-							{#each navLinks as link, index ('navLink' + index)}
+							{#each navLinks as link, index ("navLink" + index)}
 								<div class="bg-base-100 flex items-center justify-between rounded p-2">
 									<span class="flex-1 pr-2 italic">{link.title}</span>
 									<span class="text-base-content/50 mr-2 text-xs">({link.url})</span>
@@ -1049,21 +1049,21 @@
 						<div class="tabs tabs-boxed">
 							<button
 								class="tab {navSelectedPage === '' ? 'tab-active' : ''}"
-								onclick={() => (navSelectedPage = '')}>Personnalisé</button
+								onclick={() => (navSelectedPage = "")}>Personnalisé</button
 							>
 							<button
 								class="tab {navSelectedPage !== '' ? 'tab-active' : ''}"
 								onclick={() => {
-									navLinkTitle = '';
-									navLinkUrl = '';
-									if (navSelectedPage === '') navSelectedPage = 'selectPage';
+									navLinkTitle = "";
+									navLinkUrl = "";
+									if (navSelectedPage === "") navSelectedPage = "selectPage";
 								}}>Page existante</button
 							>
 						</div>
 					</div>
 
 					<div class="flex items-end gap-4">
-						{#if navSelectedPage !== ''}
+						{#if navSelectedPage !== ""}
 							<!-- Sélection d'une page existante -->
 							<div class="form-control flex-1">
 								<label class="label" for="pagesSelect">
@@ -1302,11 +1302,11 @@
 					<div class="flex justify-center py-12">
 						<span class="loading loading-dots loading-lg"></span>
 					</div>
-				{:else if groupedPages['page'].length === 0}
+				{:else if groupedPages["page"].length === 0}
 					<p class="text-base-content/70 text-center">Aucune page générale trouvée.</p>
 				{:else}
 					<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-						{#each groupedPages['page'] as page (page.id)}
+						{#each groupedPages["page"] as page (page.id)}
 							{#key page.updated}
 								<!-- Re-render l'élément si 'updated' change -->
 								<a
@@ -1314,7 +1314,9 @@
 									class="card bg-base-100 shadow-md transition-all duration-300 ease-in-out hover:-translate-y-1 hover:shadow-xl"
 								>
 									<div class="card-body">
-										<h3 class="card-title truncate text-xl" title={page.title}>{page.title}</h3>
+										<h3 class="card-title text-fluid-xl truncate" title={page.title}>
+											{page.title}
+										</h3>
 										{#if page.section}
 											<div class="mt-1">
 												<!-- Ajout d'index pour la clé dans chaque -->
@@ -1341,14 +1343,14 @@
 			<!-- Ajouter un nouveau bouton de création sous la liste existante -->
 			<div class="card bg-base-200 mx-auto mt-8 mb-8 max-w-lg p-4 shadow-md">
 				<div class="card-body p-4">
-					<h2 class="card-title mb-2 text-xl">Créer une nouvelle page générale</h2>
+					<h2 class="card-title text-fluid-xl mb-2">Créer une nouvelle page générale</h2>
 					<div class="flex flex-col gap-2 sm:flex-row">
 						<input
 							type="text"
 							class="input input-bordered w-full"
 							placeholder="Titre de la nouvelle page"
 							bind:value={newPageTitle}
-							onkeydown={(e) => e.key === 'Enter' && handleCreatePage()}
+							onkeydown={(e) => e.key === "Enter" && handleCreatePage()}
 							disabled={isCreating}
 						/>
 						<button
@@ -1368,7 +1370,7 @@
 			<!-- Bouton Sauvegarder -->
 			{#if haveUnsavedChanges}
 				<div
-					transition:slide={{ duration: 300, axis: 'y' }}
+					transition:slide={{ duration: 300, axis: "y" }}
 					class="bg-base-300/70 fixed bottom-0 left-0 flex w-full justify-end gap-4 px-4 py-2 shadow-lg"
 				>
 					<button
@@ -1404,7 +1406,7 @@
 				</h3>
 				<div class="rounded-box mb-6 grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
 					{#each daisyThemes.light as themeItem (themeItem)}
-						{@render daisy_theme(themeItem, 'light')}
+						{@render daisy_theme(themeItem, "light")}
 					{/each}
 				</div>
 
@@ -1415,7 +1417,7 @@
 				</h3>
 				<div class="rounded-box grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 md:grid-cols-4">
 					{#each daisyThemes.dark as themeItem (themeItem)}
-						{@render daisy_theme(themeItem, 'dark')}
+						{@render daisy_theme(themeItem, "dark")}
 					{/each}
 				</div>
 
@@ -1440,12 +1442,12 @@
 			<ConfigModal
 				title={`Configuration de la section ${
 					currentConfigSection === SitePagesSectionOptions.header
-						? 'Entête'
+						? "Entête"
 						: currentConfigSection === SitePagesSectionOptions.leftSide
-							? 'Sidebar Gauche'
+							? "Sidebar Gauche"
 							: currentConfigSection === SitePagesSectionOptions.rightSide
-								? 'Sidebar Droite'
-								: 'Pied de page'
+								? "Sidebar Droite"
+								: "Pied de page"
 				}`}
 				onClose={closeConfigModal}
 			>
@@ -1461,7 +1463,7 @@
 							>
 								{#each getBackgroundOptionsForSection() as option (option.value)}
 									{@const isActive = sectionStyle?.bgClass === option.value}
-									{@const textClass = sectionStyle?.textClass || 'text-base-content'}
+									{@const textClass = sectionStyle?.textClass || "text-base-content"}
 
 									<button
 										type="button"
@@ -1494,7 +1496,7 @@
 							>
 								{#each getTextOptionsForSection() as option (option)}
 									{@const isActive = sectionStyle?.textClass === option.value}
-									{@const bgClass = sectionStyle?.textClass || 'bg-base-100'}
+									{@const bgClass = sectionStyle?.textClass || "bg-base-100"}
 
 									<button
 										type="button"

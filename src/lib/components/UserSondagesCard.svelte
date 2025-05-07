@@ -1,133 +1,238 @@
 <script lang="ts">
-	import { eventState, modalState } from '$lib/shared/states.svelte';
-	import type { EventType } from '$lib/types/event';
-	import { lisibleDate } from '$lib/utils';
-	import { getContext } from 'svelte';
-	import { PencilLine, BadgeHelp, ThumbsUp, ThumbsDown } from 'lucide-svelte';
-	import type { UserType } from '$lib/types/types';
-	import { updateEvent } from '$lib/pocketbase.svelte';
+	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
+	import type { EventType, DateProposedType } from "$lib/types/types";
 
-	let { events } = $props<{
-		events: EventType[];
+	import { validateDate } from "$lib/services/eventActions";
+	import { lisibleDate, lisibleTime } from "$lib/utils";
+	import {
+		Pencil,
+		BadgeHelp,
+		ThumbsUp,
+		ThumbsDown,
+		CalendarCheck,
+		ChevronDown,
+		ChevronUp
+	} from "lucide-svelte";
+	import type { UserType } from "$lib/types/types";
+	import { updateEvent } from "$lib/pocketbase.svelte";
+	import GroupRadioButton from "./GroupRadioButton.svelte";
+	import { fade } from "svelte/transition";
+
+	let {
+		currentEvent,
+		currentUser,
+		bg = "bg-white",
+		showHeader = false
+	} = $props<{
+		currentEvent: EventType; // 👉 corrigé: EventType au lieu de EventType[]
+		currentUser: UserType | null;
+		bg: string;
+		showHeader?: boolean;
 	}>();
 
-	let currentUser: UserType = getContext('currentUser');
+	let showSondageDetails = $state(false);
 
-	// Trouve la réponse de l'utilisateur pour un événement spécifique
-	const getUserResponse = (event: EventType) => {
-		if (!event.dates_proposed?.length) return null;
+	async function handleSondageSubscription(
+		eventId: string,
+		dateStart: string,
+		maybehereValue: "oui" | "non" | "peut-être"
+	) {
+		if (!currentUser) return;
 
-		for (const date of event.dates_proposed) {
-			const userResponse = date.organizers?.find((org) => org.id === currentUser.id);
-			if (userResponse) {
-				return {
-					date: date.dateStart,
-					response: userResponse.maybehere
-				};
+		const eventDatesProposed = currentEvent.dates_proposed ?? [];
+
+		const updatedDatesProposed = eventDatesProposed.map((dateProposed: DateProposedType) => {
+			if (dateProposed.dateStart === dateStart) {
+				let updatedOrganizers = [...(dateProposed.organizers ?? [])];
+				const userIndex = updatedOrganizers.findIndex((org) => org.id === currentUser.id);
+
+				if (userIndex !== -1) {
+					updatedOrganizers[userIndex] = {
+						...updatedOrganizers[userIndex],
+						maybehere: maybehereValue
+					};
+				} else {
+					updatedOrganizers.push({
+						id: currentUser.id,
+						username: currentUser.username,
+						tasks: [],
+						maybehere: maybehereValue
+					});
+				}
+				return { ...dateProposed, organizers: updatedOrganizers };
 			}
+			return dateProposed;
+		});
+
+		try {
+			await updateEvent(eventId, { dates_proposed: updatedDatesProposed });
+		} catch (err) {
+			console.error("Erreur MàJ sondage:", err);
+			showAlert("Erreur lors de l'enregistrement de votre réponse.", "error");
 		}
-		return null;
-	};
-
-	// Retourne les classes et l'icône pour le badge de réponse
-	const getResponseBadge = (response: string | undefined) => {
-		if (!response) return null;
-		switch (response) {
-			case 'oui':
-				return { class: 'badge-success', icon: ThumbsUp, text: 'Dispo' };
-			case 'peut-être':
-				return { class: 'badge-warning', icon: BadgeHelp, text: 'Peut-être' };
-			case 'non':
-				return { class: 'badge-error', icon: ThumbsDown, text: 'Indispo' };
-			default:
-				return null;
-		}
-	};
-
-	// Retire la réponse de l'utilisateur pour un événement spécifique
-	const removeResponse = (event: EventType) => {
-		if (!event.dates_proposed?.length) return;
-
-		// Crée une nouvelle version de dates_proposed sans la réponse de l'utilisateur
-		const updatedDatesProposed = event.dates_proposed.map((date) => ({
-			...date,
-			// Filtre l'organisateur correspondant à l'utilisateur courant
-			organizers: date.organizers?.filter((org) => org.id !== currentUser.id) ?? []
-		}));
-
-		// Ouvre une modale de confirmation
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: 'Retirer votre réponse',
-				message: `Voulez-vous vraiment retirer votre réponse pour l'événement "${event.event_title}" ?`,
-				onConfirm: () => updateEvent(event.id, { dates_proposed: updatedDatesProposed }),
-				variant: 'warning'
-			}
-		};
-	};
+	}
 </script>
 
-<div class="bg-base-100 overflow-hidden rounded-lg border shadow-md">
-	<div class="space-y-2 p-4">
-		<!-- En-tête de la carte -->
-		<div class="border-b pb-2">
-			<h2 class=" text-xl font-bold">Sondages auxquels vous avez répondu</h2>
+<div class={{ "rounded-lg border bg-white p-4 shadow-sm": showHeader }}>
+	{#if showHeader}
+		<!-- En-tête de l'événement -->
+		<div class="mb-2 flex items-center justify-between gap-2">
+			<div>
+				<span class="text-fluid-lg font-semibold">{currentEvent.event_title}</span>
+				{#if currentEvent.categories?.length}
+					<span class="text-base-content/70 text-fluid-base ms-4">
+						{currentEvent.categories.join(", ")}
+					</span>
+				{/if}
+			</div>
+
+			<button
+				onclick={() => {
+					eventState.is = currentEvent;
+					modalState.event = true;
+				}}
+				class="btn btn-square btn-soft btn-sm"
+			>
+				<Pencil size={18} />
+			</button>
 		</div>
+	{/if}
+	<!-- Dates proposées -->
+	<div class="@container">
+		<button
+			onclick={() => {
+				showSondageDetails = !showSondageDetails;
+			}}
+			class="btn btn-link ml-auto flex font-semibold"
+		>
+			{showSondageDetails ? "Masquer les détails" : "Afficher les détails"}
+			{#if showSondageDetails}
+				<ChevronUp class="ml-1 h-4 w-4" />
+			{:else}
+				<ChevronDown class="ml-1 h-4 w-4" />
+			{/if}
+		</button>
+		<div class="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
+			{#each currentEvent.dates_proposed as dateProposal (dateProposal.dateStart)}
+				{@const oui = dateProposal.organizers?.filter((org) => org.maybehere === "oui").length ?? 0}
+				{@const peutetre =
+					dateProposal.organizers?.filter((org) => org.maybehere === "peut-être").length ?? 0}
+				{@const non = dateProposal.organizers?.filter((org) => org.maybehere === "non").length ?? 0}
+				{@const userResponse = dateProposal.organizers?.find(
+					(org) => org.id === currentUser.id
+				)?.maybehere}
 
-		<!-- Liste des événements de type sondage -->
-		{#if events.length > 0}
-			<div class="space-y-3 pt-2">
-				{#each events as event (event.id)}
-					{@const userResponseDetails = getUserResponse(event)}
-					{@const badge = getResponseBadge(userResponseDetails?.response)}
-					{@const Icon = badge?.icon}
-					<div class="flex items-start justify-between border-b pb-2 last:border-b-0 last:pb-0">
-						<div class="flex-1 pr-2">
-							<div class="text-fluid-lg font-semibold">{event.event_title}</div>
-							{#if userResponseDetails}
-								<div class="text-sm">
-									<span>Votre réponse pour le: </span>
-									<span class="font-medium">
-										{lisibleDate(new Date(userResponseDetails.date))}
-									</span>
-									{#if badge}
-										<div class="badge badge-sm badge-outline ml-2 {badge.class}">
-											<Icon size={14} />
-											{badge.text}
-										</div>
-									{/if}
-								</div>
-							{:else}
-								<!-- Fallback si la réponse n'est pas trouvée (ne devrait pas arriver avec le filtre actuel) -->
-								<span class="text-warning text-sm">Réponse non trouvée</span>
-							{/if}
+				<div class="{bg} flex flex-col gap-2 rounded-lg p-2 shadow-sm">
+					<div class="flex-1">
+						<span class="text-fluid-base font-medium">
+							{lisibleDate(dateProposal.dateStart)}
+						</span>
+						<span class="text-fluid-sm ms-2">
+							{lisibleTime(dateProposal.dateStart)} - {lisibleTime(dateProposal.dateEnd)}
+						</span>
+						<div class="tooltip float-end ms-2" data-tip="Valider cette date">
 							<button
-								onclick={() => removeResponse(event)}
-								class="btn btn-link btn-xs text-error p-0"
+								onclick={() => validateDate(currentEvent, dateProposal, currentUser)}
+								class="btn btn-outline btn-compact {oui > 0 ? 'btn-success' : 'text-neutral/50'}"
+								title="Valider cette date"
+								disabled={!currentUser || !["admin", "dev"].includes(currentUser.currentRole)}
 							>
-								Retirer ma réponse
-							</button>
-						</div>
-
-						<!-- Bouton Modifier -->
-						<div class="flex-none">
-							<button
-								onclick={() => {
-									eventState.is = event;
-									modalState.event = true;
-								}}
-								class="btn btn-square btn-ghost btn-sm"
-								aria-label="Modifier l'événement {event.event_title}"
-							>
-								<PencilLine class="h-4 w-4" />
+								<CalendarCheck />
 							</button>
 						</div>
 					</div>
-				{/each}
-			</div>
-		{:else}
-			<p class="text-sm text-gray-500">Vous n'avez répondu à aucun sondage pour le moment.</p>
-		{/if}
+
+					<div class="flex flex-wrap items-center justify-between gap-4">
+						<div class="flex items-center space-x-1">
+							<span
+								class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {oui >
+								0
+									? 'bg-success/20'
+									: ''}"
+							>
+								<ThumbsUp class="mr-0.5 h-4 w-4" />
+								{oui}
+							</span>
+
+							<span
+								class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {peutetre >
+								0
+									? 'bg-warning/20'
+									: ''}"
+							>
+								<BadgeHelp class="mr-0.5 h-4 w-4" />
+								{peutetre}
+							</span>
+
+							<span
+								class="text-fluid-sm flex items-center rounded-full px-1.5 py-0.5 font-medium {non >
+								0
+									? 'bg-error/20'
+									: ''}"
+							>
+								<ThumbsDown class="mr-0.5 h-4 w-4" />
+								{non}
+							</span>
+						</div>
+
+						<!-- Boutons de vote -->
+						<GroupRadioButton
+							value={userResponse}
+							onChange={(newValue) =>
+								handleSondageSubscription(currentEvent.id, dateProposal.dateStart, newValue)}
+						/>
+					</div>
+					{#if showSondageDetails}
+						<div transition:fade={{ duration: 150 }} class="mt-2 px-1">
+							<div class="bg-base-100 rounded-md p-2">
+								{#if !dateProposal.organizers || dateProposal.organizers.length === 0}
+									<p class="text-fluid-sm text-base-content/70">Aucune réponse pour le moment</p>
+								{:else}
+									<div class="text-fluid-sm grid gap-1">
+										<div class=" text-base-content/70 grid grid-cols-3 gap-1 font-medium">
+											<div class="flex flex-wrap items-center justify-center">
+												<ThumbsUp class="text-success mr-1 h-4" /> Disponible
+											</div>
+											<div class="flex flex-wrap items-center justify-center">
+												<BadgeHelp class="text-warning mr-1 h-4" /> Peut-être
+											</div>
+											<div class="flex flex-wrap items-center justify-center">
+												<ThumbsDown class="text-error mr-1 h-4" /> Indisponible
+											</div>
+										</div>
+
+										<hr class="my-1" />
+
+										<div class="grid grid-cols-3 gap-1">
+											<div class="flex flex-wrap gap-2">
+												{#each dateProposal.organizers.filter((org) => org.maybehere === "oui") as org (org.id)}
+													<div class="badge bg-success/20">
+														{org.username}
+													</div>
+												{/each}
+											</div>
+											<div class="flex flex-wrap gap-2">
+												{#each dateProposal.organizers.filter((org) => org.maybehere === "peut-être") as org (org.id)}
+													<div class="badge bg-warning/20">
+														{org.username}
+													</div>
+												{/each}
+											</div>
+											<div class="flex flex-wrap gap-2">
+												{#each dateProposal.organizers.filter((org) => org.maybehere === "non") as org (org.id)}
+													<div class="badge bg-error/20">
+														{org.username}
+													</div>
+												{/each}
+											</div>
+										</div>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
 	</div>
 </div>

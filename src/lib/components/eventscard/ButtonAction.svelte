@@ -1,12 +1,12 @@
 <script lang="ts">
-	import DropDownModEvent from '$lib/components/DropDownModEvent.svelte';
-	import { type EventType } from '$lib/types/event';
-	import { lisibleDate } from '$lib/utils';
-	import { pb } from '$lib/pocketbase.svelte';
-	import { showAlert } from '$lib/shared/states.svelte';
-	import { eventState, messageSheet, modalState } from '$lib/shared/states.svelte';
-	import { hasAuthorizations } from '$lib/shared/states.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import DropDownModEvent from "$lib/components/DropDownModEvent.svelte";
+	import { type EventType } from "$lib/types/event";
+	import { lisibleDate } from "$lib/utils";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { showAlert } from "$lib/shared/states.svelte";
+	import { eventState, messageSheet, modalState } from "$lib/shared/states.svelte";
+	import { hasAuthorizations } from "$lib/shared/states.svelte";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
 	import {
 		CalendarPlus,
@@ -15,7 +15,7 @@
 		Menu,
 		CalendarX,
 		CalendarCheck
-	} from 'lucide-svelte';
+	} from "lucide-svelte";
 
 	// ::: props and reactive states
 
@@ -49,7 +49,7 @@
 
 	function handleModifyClick(event: EventType) {
 		if (!hasAuth) {
-			showAlert("Vous n'êtes pas autorisé à modifier cet événement.", 'error');
+			showAlert("Vous n'êtes pas autorisé à modifier cet événement.", "error");
 			return;
 		}
 		modifyEvent(event);
@@ -62,13 +62,13 @@
 
 	async function confirmEvent() {
 		try {
-			await pb.collection('events').update(currentEvent.id, { isConfirmed: true });
+			await pb.collection("events").update(currentEvent.id, { isConfirmed: true });
 			showAlert(
 				"L'événement a bien été confirmé. Il est maintenant visible sur le site publique, et vous pouvez l'ajouter à la newsletter.",
-				'info'
+				"info"
 			);
 		} catch (error) {
-			console.error('Error updating event:', error);
+			console.error("Error updating event:", error);
 		}
 	}
 
@@ -76,17 +76,17 @@
 		modalState.confirm = {
 			isOpen: true,
 			data: {
-				variant: 'danger',
+				variant: "danger",
 				title: "Annuler l'événement",
 				message:
 					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
 				onConfirm: async () => {
 					try {
-						await pb.collection('events').update(currentEvent.id, { canceled: true });
-						showAlert("L'événement a bien été annulé", 'info');
+						await pb.collection("events").update(currentEvent.id, { canceled: true });
+						showAlert("L'événement a bien été annulé", "info");
 					} catch (error) {
-						console.error('Error updating event:', error);
-						showAlert("Une erreur est survenue lors de l'annulation", 'error');
+						console.error("Error updating event:", error);
+						showAlert("Une erreur est survenue lors de l'annulation", "error");
 					}
 				}
 			}
@@ -95,34 +95,34 @@
 
 	async function redoEvent() {
 		try {
-			await pb.collection('events').update(currentEvent.id, { canceled: false });
-			showAlert("L'événement a bien été rétablit", 'info');
+			await pb.collection("events").update(currentEvent.id, { canceled: false });
+			showAlert("L'événement a bien été rétablit", "info");
 		} catch (error) {
-			console.error('Error updating event:', error);
+			console.error("Error updating event:", error);
 		}
 	}
 
 	async function publishEvent() {
 		try {
-			await pb.collection('events').update(currentEvent.id, { isPublished: true });
+			await pb.collection("events").update(currentEvent.id, { isPublished: true });
 			showAlert(
 				"L'événement a été publié avec succès et est maintenant visible par le public.",
-				'success'
+				"success"
 			);
 		} catch (error) {
-			console.error('Error publishing event:', error);
-			showAlert("Une erreur est survenue lors de la publication de l'événement", 'error');
+			console.error("Error publishing event:", error);
+			showAlert("Une erreur est survenue lors de la publication de l'événement", "error");
 		}
 	}
 </script>
 
 <div
-	class="bg-base-100 flex flex-wrap justify-end gap-x-4 gap-y-1 rounded-b-lg border-t p-2 text-right"
+	class="bg-base-100 @container flex flex-wrap justify-end gap-x-4 gap-y-1 rounded-b-lg border-t p-2 text-right"
 >
 	<div class="mr-auto">
 		<button onclick={() => messageSheet.openMessages(currentEvent.id)} class="btn relative">
-			<MessageCircle class="mr-1 h-4 w-4" />
-			Discussion
+			<MessageCircle />
+			<span class="@max-md:hidden">Discussion</span>
 		</button>
 	</div>
 
@@ -137,7 +137,7 @@
 			<button class="btn" onclick={() => confirmEvent()}> confirmer </button>
 		{/if}
 		{#if currentEvent.isRecurrent}
-			<div class={!hasAuth ? 'cursor-default opacity-50' : ''}>
+			<div class={!hasAuth ? "cursor-default opacity-50" : ""}>
 				<DropDownModEvent {currentEvent} {hasAuth} />
 			</div>
 		{:else}

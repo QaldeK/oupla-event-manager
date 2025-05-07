@@ -1,9 +1,9 @@
 <script lang="ts">
 	// import { pastEventsStore } from '$lib/shared/eventsStore.svelte'; // TODO
-	import { getSpace } from '$lib/shared/spaceOptions.svelte';
-	import type { EventsRecord } from '$lib/types/pocketbase';
-	import { format } from 'date-fns';
-	import { fr } from 'date-fns/locale';
+	import { getSpace } from "$lib/shared/spaceOptions.svelte";
+	import type { EventsRecord } from "$lib/types/pocketbase";
+	import { format } from "date-fns";
+	import { fr } from "date-fns/locale";
 
 	let isLoading = $state(true);
 
@@ -46,12 +46,12 @@
 	});
 
 	function formatMonth(monthKey: string) {
-		const date = new Date(monthKey + '-01');
-		return format(date, 'MMMM yyyy', { locale: fr });
+		const date = new Date(monthKey + "-01");
+		return format(date, "MMMM yyyy", { locale: fr });
 	}
 
 	function formatEventDate(date: string) {
-		return format(new Date(date), 'dd MMMM yyyy', { locale: fr });
+		return format(new Date(date), "dd MMMM yyyy", { locale: fr });
 	}
 </script>
 
@@ -69,7 +69,7 @@
 	{:else}
 		{#each Array.from(months.entries()) as [monthKey, events]}
 			<div class="mb-8">
-				<h2 class="mb-4 text-xl font-semibold">{formatMonth(monthKey)}</h2>
+				<h2 class="text-fluid-xl mb-4 font-semibold">{formatMonth(monthKey)}</h2>
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					{#each events as event}
 						<div class="rounded-lg bg-white p-4 shadow transition-shadow hover:shadow-md">
@@ -83,7 +83,7 @@
 								</p>
 								{#if event.rooms?.length}
 									<p class="mt-1">
-										Salles : {event.rooms.join(', ')}
+										Salles : {event.rooms.join(", ")}
 									</p>
 								{/if}
 							</div>
