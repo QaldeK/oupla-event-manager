@@ -27,7 +27,8 @@
 		validateEvent,
 		type TaskType,
 		type RequiredRecurrenceType,
-		type EventType
+		type EventType,
+		type DateProposedType
 	} from "$lib/schemas/event.schema";
 	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import {
@@ -36,7 +37,15 @@
 		modalState,
 		showAlert
 	} from "$lib/shared/states.svelte";
-	import { createDateFromString, lisibleDate, isValidDate } from "$lib/utils";
+	import {
+		createDateFromString,
+		lisibleDate,
+		isValidDate,
+		lisibleTime,
+		filterAndConvertOrganizers,
+		formatDatePb,
+		formatTimePb
+	} from "$lib/utils";
 
 	import { slide } from "svelte/transition";
 
@@ -222,6 +231,8 @@
 		}
 	});
 
+	let hasSondageValidation = $state(false);
+
 	// ::: $effect
 
 	$effect.pre(() => {
@@ -274,6 +285,60 @@
 	});
 
 	// ::: functions utilities
+
+	function handleFormDateValidation(dateProposal: DateProposedType) {
+		const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
+		const updateEventData = () =>
+			(eventData = {
+				...eventData,
+				date_event: formatDatePb(dateProposal.dateStart),
+				time_start: formatTimePb(dateProposal.dateStart),
+				time_end: formatTimePb(dateProposal.dateEnd),
+				dateStart: dateProposal.dateStart,
+				dateEnd: dateProposal.dateEnd,
+				isSondage: false,
+				organizers: filterAndConvertOrganizers(dateProposal.organizers)
+			});
+		const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
+		if (!hasConfirmedOrganizers) {
+			modalState.confirm = {
+				isOpen: true,
+				data: {
+					title: "Valider cette date",
+					message: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(dateProposal.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
+					variant: hasConfirmedOrganizers ? "warning" : "danger",
+					onConfirm: () => {
+						updateEventData();
+						hasSondageValidation = true;
+					}
+				}
+			};
+		} else {
+			updateEventData();
+			hasSondageValidation = true;
+		}
+	}
+
+	function confirmNotifSondageClosed(isConfirmed: boolean) {
+		modalState.confirm = {
+			isOpen: true,
+			data: {
+				title: "Cloture du sondage",
+				message: isConfirmed
+					? `Vous avez valider la date du ${lisibleDate(eventData.dateStart)} et cloturé le sondage. Les participants au sondage seront notifié par email de la date choisie`
+					: `Vous avez valider la date (${lisibleDate(eventData.dateStart)}) et cloturé le sondage, Si les différents champs obligatoires sont renseignés, et les mandats attribués, vous pouvez confirmer l'événement (s'il s'agit d'un événement public, il sera publié sur le site et diffusable sur la newsletter). Les participant·es au sondage seront notifiés par email`,
+				variant: isConfirmed ? "info" : "warning",
+				onConfirm: () => {
+					submitForm();
+				},
+				additionalButton: {
+					label: "Confirmer l'événement",
+					variant: "success",
+					onClick: () => handleConfirm()
+				}
+			}
+		};
+	}
 
 	//  gérer l'ajout depuis AddTaskForm
 	function handleAddTask(newTask: TaskType) {
@@ -408,6 +473,8 @@
 		if (eventMode === "EDIT_RECURRENT_ALL") {
 			isAlertDialogOpen = true;
 			// Le submitForm sera appelé via confirmSubmit après confirmation dans la modale
+		} else if (hasSondageValidation) {
+			confirmNotifSondageClosed(false);
 		} else {
 			// Sinon, soumettre directement
 			await submitForm();
@@ -569,9 +636,7 @@
 								onUpdateDatesProposed={(dates) => {
 									eventData.dates_proposed = dates;
 								}}
-								onUpdateIsSondage={(isSondage) => {
-									eventData.isSondage = isSondage;
-								}}
+								onValidateDate={handleFormDateValidation}
 								localErrors={formattedErrors?.dates_proposed?._errors
 									? { dates_proposed: formattedErrors.dates_proposed._errors }
 									: null}

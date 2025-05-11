@@ -2,15 +2,14 @@
 
 // export const eventsList = $state();
 
-import { getNewEvent } from "$lib/schemas/event.schema";
+import { getNewEvent, type TaskType } from "$lib/schemas/event.schema";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
-import { type TaskType } from "$lib/schemas/event.schema";
 
 export interface ConfirmModalData {
 	title: string;
 	message: string;
 	variant?: "warning" | "info" | "danger";
-
+	confirmLabel?: string;
 	showCheckbox?: {
 		label: string;
 		checked: boolean;
@@ -18,6 +17,11 @@ export interface ConfirmModalData {
 	showCancelEventButton?: {
 		label: string;
 		onCancelEvent: () => void | Promise<void>;
+	};
+	additionalButton?: {
+		label: string;
+		variant?: "primary" | "secondary" | "accent" | "ghost" | "success" | "warning" | "error";
+		onClick: () => void | Promise<void>;
 	};
 
 	onConfirm: ((notifyOthers?: boolean, customMessage?: string) => void | Promise<void>) | null;

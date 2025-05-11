@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { modalState } from '$lib/shared/states.svelte';
-	import { AlertOctagon, AlertTriangle, Info } from 'lucide-svelte';
-	import Modal from './Modal.svelte';
+	import { modalState } from "$lib/shared/states.svelte";
+	import { AlertOctagon, AlertTriangle, Info } from "lucide-svelte";
+	import Modal from "./Modal.svelte";
 
 	// --- États dérivés des données du modal ---
 	let title = $derived(modalState.confirm.data.title);
 	let message = $derived(modalState.confirm.data.message);
-	let variant = $derived(modalState.confirm.data.variant || 'warning');
-	// 👉 Nouvelles données optionnelles
+	let variant = $derived(modalState.confirm.data.variant || "warning");
+	let confirmLabel = $derived(modalState.confirm.data.confirmLabel || "Continuer");
+	let additionnalButton = $derived(modalState.confirm.data.additionalButton || null);
 	let checkboxConfig = $derived(modalState.confirm.data.showCheckbox);
 	let cancelEventConfig = $derived(modalState.confirm.data.showCancelEventButton);
 	let onConfirmCallback = $derived(modalState.confirm.data.onConfirm);
@@ -23,14 +24,14 @@
 
 	const getIconColor = () => {
 		switch (variant) {
-			case 'warning':
-				return 'text-warning';
-			case 'info':
-				return 'text-info';
-			case 'danger':
-				return 'text-error';
+			case "warning":
+				return "text-warning";
+			case "info":
+				return "text-info";
+			case "danger":
+				return "text-error";
 			default:
-				return 'text-warning';
+				return "text-warning";
 		}
 	};
 
@@ -43,6 +44,11 @@
 	}
 
 	function handleCancel() {
+		closeModal();
+	}
+
+	function handleAdditionnalButton() {
+		additionnalButton?.onClick();
 		closeModal();
 	}
 
@@ -68,11 +74,11 @@
 		<div class="p-4">
 			<div class="flex items-start gap-4">
 				<div class={`flex-shrink-0 self-center ${getIconColor()}`}>
-					{#if variant === 'warning'}
+					{#if variant === "warning"}
 						<AlertTriangle size={36} />
-					{:else if variant === 'info'}
+					{:else if variant === "info"}
 						<Info size={36} />
-					{:else if variant === 'danger'}
+					{:else if variant === "danger"}
 						<AlertOctagon size={36} />
 					{:else}
 						<AlertTriangle size={36} />
@@ -104,7 +110,12 @@
 			</div>
 			<div class="flex gap-2">
 				<button class="btn btn-ghost" onclick={handleCancel}>Annuler</button>
-				<button class="btn btn-primary" onclick={handleConfirm}>Continuer</button>
+				{#if additionnalButton}
+					<button class="btn btn-{additionnalButton.variant}" onclick={handleAdditionnalButton}
+						>{additionnalButton.label}</button
+					>
+				{/if}
+				<button class="btn btn-primary" onclick={handleConfirm}>{confirmLabel}</button>
 			</div>
 		</div>
 	</div>

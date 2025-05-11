@@ -369,11 +369,17 @@
 														{task.name}
 														{#if task.description}
 															<div
-																class="tooltip tooltip-info ml-auto text-sm"
+																class="tooltip tooltip-info ml-2 text-sm"
 																data-tip={task.description}
 															>
 																<Info size={18} />
 															</div>
+															<button
+																class="link ml-auto {isUserInTask ? 'link-error' : 'link-primary'}"
+																onclick={() => handleSpecificTaskSubscription(task.name)}
+															>
+																{isUserInTask ? "Se désinscrire" : "S'inscrire"}
+															</button>
 														{/if}
 													</div>
 
@@ -389,14 +395,6 @@
 																</span>
 															{/each}
 														{/if}
-
-														<!-- Bouton d'action spécifique -->
-														<button
-															class="btn btn-compact ml-auto"
-															onclick={() => handleSpecificTaskSubscription(task.name)}
-														>
-															{isUserInTask ? "Se désinscrire" : "S'inscrire"}
-														</button>
 													</div>
 												</div>
 											{/each}

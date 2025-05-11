@@ -1,7 +1,13 @@
 // src/lib/services/eventActions.ts
 import { updateEvent } from "$lib/pocketbase.svelte";
-import { showAlert, getSpace } from "$lib/shared";
-import { formatDatePb, formatTimePb, filterAndConvertOrganizers } from "$lib/utils";
+import { showAlert, getSpace, modalState } from "$lib/shared";
+import {
+	formatDatePb,
+	formatTimePb,
+	filterAndConvertOrganizers,
+	lisibleDate,
+	lisibleTime
+} from "$lib/utils";
 import type { EventType, OrganizerType, TaskType, DateProposedType } from "$lib/types/types";
 import type { UserType } from "$lib/types/types";
 
@@ -32,17 +38,6 @@ export async function validateDate(
 		return;
 	}
 
-	// Vérifier si l'utilisateur actuel a le rôle 'admin' ou 'dev'.
-	// UserType.currentRole est utilisé conformément à sa définition.
-	// FIXIT hasAuth
-	// if (!["admin"].includes(currentUser.currentRole)) {
-	// 	showAlert(
-	// 		"Permissions insuffisantes. Seuls les administrateurs ou développeurs peuvent valider une date.",
-	// 		"error"
-	// 	);
-	// 	return;
-	// }
-
 	// Préparer les données pour la mise à jour de l'événement.
 	// Utilise Partial<EventType> mais attention aux champs spécifiques de PocketBase (id, expand, etc.)
 	const eventDataToUpdate: Partial<EventType> = {
@@ -57,10 +52,8 @@ export async function validateDate(
 	const confirmedOrganizers: OrganizerType[] =
 		filterAndConvertOrganizers(dateProposal.organizers) || [];
 
-	// 👉 Simplification: Créer une liste d'organisateurs en partant de ceux déjà présents
 	const updatedOrganizers = [...(currentEvent.organizers || [])];
 
-	// 👉 Parcourir les organisateurs confirmés pour cette date
 	for (const confirmedOrg of confirmedOrganizers) {
 		// Chercher si l'organisateur existe déjà
 		const existingOrgIndex = updatedOrganizers.findIndex((org) => org.id === confirmedOrg.id);
@@ -73,7 +66,6 @@ export async function validateDate(
 				tasks: updatedOrganizers[existingOrgIndex].tasks
 			};
 		} else {
-			// 👉 Si c'est un nouvel organisateur, on l'ajoute simplement
 			updatedOrganizers.push(confirmedOrg);
 		}
 	}
@@ -94,6 +86,30 @@ export async function validateDate(
 		);
 	}
 }
+
+export const handleValidateDate = (
+	currentEvent: EventType,
+	dateProposal: DateProposedType,
+	currentUser: UserType
+) => {
+	const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
+	const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
+
+	modalState.confirm = {
+		isOpen: true,
+		data: {
+			title: "Cloturer le sondage",
+			message: hasConfirmedOrganizers
+				? `Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(dateProposal.dateStart)}-${lisibleTime(dateProposal.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
+				: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(dateProposal.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
+			variant: hasConfirmedOrganizers ? "warning" : "danger",
+			showCheckbox: { checked: true, label: "Notifier les participant·es" },
+			onConfirm: async (notify?: boolean) => {
+				await validateDate(currentEvent, dateProposal, currentUser, notify);
+			}
+		}
+	};
+};
 
 export const getUnassignedTasks = (event: EventType) => {
 	if (!Array.isArray(event.tasks) || !Array.isArray(event.organizers)) {

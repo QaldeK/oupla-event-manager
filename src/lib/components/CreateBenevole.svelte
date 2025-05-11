@@ -1,29 +1,29 @@
 <!-- TODO -->
 <script>
-	import Modal from '$lib/lib/components/Modal.svelte';
-	import { pb } from '$lib/pocketbase.svelte';
-	import { isBenevoleModal } from '$lib/shared/states.svelte';
+	import Modal from "$lib/components/Modal.svelte";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { isBenevoleModal } from "$lib/shared/states.svelte";
 
 	let newUser = {
-		name: '',
-		mail: '',
-		role: ''
+		name: "",
+		mail: "",
+		role: ""
 	};
-	let response = '';
+	let response = "";
 
 	const submitForm = async () => {
 		try {
-			const record = await pb.collection('benevoles').create(newUser);
+			const record = await pb.collection("benevoles").create(newUser);
 		} catch (error) {
-			response = 'Erreur lors de la création du bénévole :' + error;
+			response = "Erreur lors de la création du bénévole :" + error;
 			return;
 		}
 		newUser = {
-			name: '',
-			mail: '',
-			role: ''
+			name: "",
+			mail: "",
+			role: ""
 		};
-		response = '';
+		response = "";
 	};
 </script>
 

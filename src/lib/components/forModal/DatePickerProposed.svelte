@@ -6,29 +6,25 @@
 
 	import type { EventType, DateProposedType, OrganizerType } from "$lib/types/event";
 	import { addTime, lisibleDate, lisibleTime, isValidDate } from "$lib/utils";
-	import { eventState, getSpace } from "$lib/shared";
+	import { eventState, getSpace, userDb } from "$lib/shared";
 	import { fade } from "svelte/transition";
 
 	import { CalendarCheck, PlusCircle, Trash2, UserPlus } from "lucide-svelte";
 	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 
-	// Props avec typage strict
 	interface Props {
 		eventData: EventType;
 		onUpdateDatesProposed: (dates: DateProposedType[]) => void;
-		onUpdateIsSondage: (isSondage: boolean) => void;
+		onValidateDate: (date: DateProposedType) => void;
 		localErrors?: Record<string, string[] | undefined> | null;
 	}
 
-	let { eventData, onUpdateDatesProposed, onUpdateIsSondage, localErrors = null }: Props = $props();
+	let { eventData, onUpdateDatesProposed, onValidateDate, localErrors = null }: Props = $props();
 
 	// States
 	let selectedDate = $state<string[]>([]);
 	let startTime = $state("");
 	let endTime = $state("");
-	let dateAccepted = $state<DateProposedType | null>(null);
-	let oldDatesProposed = $state<DateProposedType[]>([]);
-	let datesFutureProposed = $state<DateProposedType[]>([]);
 
 	// Derived values
 	let eventId = $derived(eventState.is?.id);
@@ -36,6 +32,22 @@
 	let spaceMembers = $derived(getSpace.members);
 
 	let rooms = $derived(eventState.is?.rooms); // for conflicts
+
+	let datesFutureProposed = $derived.by(() => {
+		const now = new Date();
+		if (!eventData?.dates_proposed) return [];
+		return eventData.dates_proposed
+			.filter((date) => new Date(date.dateStart) >= now)
+			.sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+	});
+
+	let oldDatesProposed = $derived.by(() => {
+		const now = new Date();
+		if (!eventData?.dates_proposed) return [];
+		return eventData.dates_proposed
+			.filter((date) => new Date(date.dateStart) < now)
+			.sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+	});
 
 	// 👉 Organizers pour le modal (calculé quand le modal s'ouvre)
 	let organizersForModal = $derived.by(() => {
@@ -54,7 +66,7 @@
 	});
 
 	// Computed best date
-	const bestDate = $derived(() => {
+	const bestDate = $derived.by(() => {
 		if (!eventData.dates_proposed?.length) return null;
 
 		return eventData.dates_proposed.reduce(
@@ -69,53 +81,10 @@
 		).best;
 	});
 
-	// Effects
-	$effect(() => {
-		// 👉 Utiliser eventData.dates_proposed directement pour éviter dépendance circulaire potentielle
-		const currentDates = eventData.dates_proposed ?? [];
-		if (!eventId || !currentDates.length) {
-			oldDatesProposed = [];
-			datesFutureProposed = [];
-			return;
-		}
-
-		const today = new Date();
-		today.setHours(0, 0, 0, 0); // Comparer uniquement les dates
-
-		const future: DateProposedType[] = [];
-		const past: DateProposedType[] = [];
-
-		currentDates.forEach((date) => {
-			try {
-				if (isValidDate(new Date(date.dateStart))) {
-					if (new Date(date.dateStart) < today) {
-						past.push(date);
-					} else {
-						future.push(date);
-					}
-				}
-			} catch {
-				// Gérer les dates invalides si nécessaire
-			}
-		});
-
-		oldDatesProposed = past;
-		// Trier uniquement les dates futures
-		datesFutureProposed = future.sort(
-			(a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime()
-		);
-	});
-
 	// Functions
-	function validateDate(dateToAccept: DateProposedType) {
-		// TODO: ConfirmDialog si pas de maybehere 'oui'
-		dateAccepted = dateToAccept;
-		// Préparer la mise à jour pour le parent (EventModal)
-
-		// On ne met PAS à jour eventData directement ici pour éviter les effets de bord.
-		// EventModal sera responsable de mettre à jour son eventData basé sur cette acceptation.
-		// Pour l'instant, on met juste isSondage à false via le callback.
-		onUpdateIsSondage(false);
+	function validateDate(dateProposed: DateProposedType) {
+		// On utilise la fonction passée en props
+		onValidateDate(dateProposed);
 	}
 
 	function addDateProposedType() {
@@ -159,9 +128,7 @@
 		}
 
 		if (newProposals.length > 0) {
-			const updatedDates = [...(eventData.dates_proposed || []), ...newProposals].sort(
-				(a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime()
-			);
+			const updatedDates = [...(eventData.dates_proposed || []), ...newProposals];
 			onUpdateDatesProposed(updatedDates);
 		}
 
@@ -182,15 +149,6 @@
 			const updatedDates = (eventData.dates_proposed ?? []).filter((_, i) => i !== globalIndex);
 			onUpdateDatesProposed(updatedDates);
 		}
-	}
-
-	function handleUpdateOrganizers(dateIndex: number, newOrganizers: OrganizerType[]) {
-		if (!eventData.dates_proposed) return;
-
-		const updatedDates = eventData.dates_proposed.map((date, i) =>
-			i === dateIndex ? { ...date, organizers: newOrganizers } : date
-		);
-		onUpdateDatesProposed(updatedDates);
 	}
 
 	function handleMaybehereChange(
@@ -293,25 +251,14 @@
 	}
 
 	function handleDatePickerChange(newValue: string | string[]) {
-		console.log("DatePicker proposed new value:", newValue);
-		// Assurer que c'est toujours un tableau car on est en mode multiple ici
 		if (Array.isArray(newValue)) {
 			selectedDate = newValue;
-		} else {
-			// Gérer le cas où on recevrait une string (ne devrait pas arriver en mode multiple avec confirmDate)
-			console.warn("Received non-array value in multiple mode from DatePicker:", newValue);
-			selectedDate = newValue ? [newValue] : []; // Convertir en tableau ou vider
 		}
 	}
 </script>
 
 {#snippet ProposedDateCard(date: DateProposedType, displayIndex: number)}
-	<div
-		class="mt-4 rounded-xl shadow"
-		class:bg-green-50={dateAccepted?.dateStart === date.dateStart}
-		class:bg-white={dateAccepted?.dateStart !== date.dateStart}
-		transition:fade|global
-	>
+	<div class="mt-4 rounded-xl bg-white shadow" transition:fade|global>
 		<div
 			class="py-.5 bg-base-300 grid items-center justify-center rounded-t-xl px-4 font-semibold sm:flex sm:justify-between"
 		>
@@ -367,7 +314,9 @@
 				{#each date.organizers?.filter((org) => org.maybehere === "peut-être") ?? [] as organizer (organizer.id)}
 					<span class="badge badge-warning badge-outline">{organizer.username}</span>
 				{/each}
-				<!-- On n'affiche généralement pas les "non" -->
+				{#each date.organizers?.filter((org) => org.maybehere === "non") ?? [] as organizer (organizer.id)}
+					<span class="badge badge-error badge-outline">{organizer.username}</span>
+				{/each}
 			</div>
 			{#if !date.organizers || date.organizers.length === 0}
 				<p class="text-fluid-sm text-base-content/60 italic">
@@ -458,7 +407,6 @@
 		<h3 class="font-semibold">Dates proposées :</h3>
 		<div out:fade|global>
 			{#each datesFutureProposed as date, index (date.dateStart + date.dateEnd)}
-				<!-- Clé plus stable -->
 				{@render ProposedDateCard(date, index)}
 			{/each}
 		</div>

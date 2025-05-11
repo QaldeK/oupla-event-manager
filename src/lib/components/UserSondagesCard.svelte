@@ -74,22 +74,22 @@
 
 	const handleValidateDate = (currentEvent: EventType, dateProposal:DateProposedType, currentUser: UserType) => {
 
-	const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
-	const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
+  	const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
+  	const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
 
-	modalState.confirm = {
-				isOpen: true,
-				data: {
-					title: "Cloturer le sondage",
-					message: hasConfirmedOrganizers
-						? `Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(dateProposal.dateStart)}-${lisibleTime(dateProposal.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
-						: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(dateProposal.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
-					variant: hasConfirmedOrganizers ? "warning" : "danger",
-					showCheckbox: { checked: true, label: "Notifier les participant·es" }, // Option de notification
-					onConfirm: async (notify?: boolean) => {
-					  validateDate(currentEvent, dateProposal, currentUser, notify?)
+  	modalState.confirm = {
+  				isOpen: true,
+  				data: {
+  					title: "Cloturer le sondage",
+  					message: hasConfirmedOrganizers
+  						? `Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(dateProposal.dateStart)}-${lisibleTime(dateProposal.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
+  						: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(dateProposal.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
+  					variant: hasConfirmedOrganizers ? "warning" : "danger",
+  					showCheckbox: { checked: true, label: "Notifier les participant·es" }, // Option de notification
+  					onConfirm: async (notify?: boolean) => {
+  					  validateDate(currentEvent, dateProposal, currentUser, notify?)
 
-					}
+  					}
 				}}}
 
 </script>
