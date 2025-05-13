@@ -440,8 +440,8 @@ export function buildEventTimeInfoMap(
 			addEventToMap(dateKey, mainEventInfo);
 		}
 
-		// 2. Traiter les dates proposées (sondages)
-		if (Array.isArray(event.dates_proposed)) {
+		// 2. Traiter les dates proposées (sondages) uniquement si l'événement n'a pas de date_event
+		if (Array.isArray(event.dates_proposed) && !event.date_event) {
 			for (const proposed of event.dates_proposed) {
 				if (proposed.dateStart && proposed.dateEnd) {
 					// Créer un objet temporaire pour createEventTimeInfo
