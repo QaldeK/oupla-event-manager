@@ -46,11 +46,13 @@
 		formatDatePb,
 		formatTimePb
 	} from "$lib/utils";
+	import { canEventBeValidated } from "$lib/services/eventActions";
 
 	import { slide } from "svelte/transition";
 
 	import { Save, UserPlus, X } from "lucide-svelte";
 	import TimeReservation from "./forModal/TimeReservation.svelte";
+	import EventValidationStatus from "./EventValidationStatus.svelte";
 
 	type EventMode =
 		| "NEW_SINGLE" // Création événement unique
@@ -94,6 +96,7 @@
 	let categories: string[] = getSpace.categories;
 	let spaceMembers = $derived(getOrganizersPossibles());
 	let showAddTaskForm = $state(false);
+	const missingForConfirmation = $derived(canEventBeValidated(eventData));
 
 	let organizersPossibles = $derived.by(() => {
 		// Commencez avec les membres de l'espace par défaut
@@ -243,6 +246,13 @@
 		}
 	});
 
+	// Check PublishValidation if canBeValidated, only on load
+	$effect(() => {
+		if (missingForConfirmation) {
+			validateCurrentEvent(ValidationSchemaType.PUBLISH);
+		}
+	});
+
 	$effect(() => {
 		if (eventData.date_event && eventData.time_start && eventData.time_end) {
 			try {
@@ -326,7 +336,7 @@
 				title: "Cloture du sondage",
 				message: isConfirmed
 					? `Vous avez valider la date du ${lisibleDate(eventData.dateStart)} et cloturé le sondage. Les participants au sondage seront notifié par email de la date choisie`
-					: `Vous avez valider la date (${lisibleDate(eventData.dateStart)}) et cloturé le sondage, Si les différents champs obligatoires sont renseignés, et les mandats attribués, vous pouvez confirmer l'événement (s'il s'agit d'un événement public, il sera publié sur le site et diffusable sur la newsletter). Les participant·es au sondage seront notifiés par email`,
+					: `Vous avez valider la date (${lisibleDate(eventData.dateStart)}) et cloturé le sondage, Si les différents champs obligatoires sont renseignés, et les mandats attribués, vous pouvez confirmer l'événement (s'il s'agit d'un événement public, il sera publié sur le site et diffusable sur la newsletter). Les participant·es au sondage seront notifiés par email.`,
 				variant: isConfirmed ? "info" : "warning",
 				onConfirm: () => {
 					submitForm();
@@ -359,24 +369,6 @@
 			showAlert(`Une tâche nommée "${newTask.name}" existe déjà.`, "error");
 		}
 	}
-
-	// let hasMultipleTasks = $derived(eventData.tasks && eventData.tasks.length > 1);
-
-	// Fonction pour appliquer une proposition unique
-	// function applyProposal(proposal: {
-	// 	date_event: string;
-	// 	time_start: string;
-	// 	time_end: string;
-	// 	start_event?: string;
-	// }) {
-	// 	eventData = {
-	// 		...eventData,
-	// 		date_event: proposal.date_event,
-	// 		time_start: proposal.time_start,
-	// 		time_end: proposal.time_end,
-	// 		start_event: proposal.start_event || proposal.time_start // fallback sur time_start si start_event n'est pas défini
-	// 	};
-	// }
 
 	// Fonction pour convertir les propositions sélectionnées en dates de sondage
 	function convertSelectedToProposed() {
@@ -423,8 +415,8 @@
 
 		if (!validationResult.success && validationResult.errors) {
 			errors = validationResult.errors.flatten().fieldErrors;
-			formattedErrors = validationResult.errors.format(); // Utiliser format() pour une structure plus riche si nécessaire
-			showAlert("Erreur dans les données. Veuillez vérifier les champs.", "error");
+			formattedErrors = validationResult.errors.format();
+
 			return false;
 		}
 
@@ -473,7 +465,7 @@
 		if (eventMode === "EDIT_RECURRENT_ALL") {
 			isAlertDialogOpen = true;
 			// Le submitForm sera appelé via confirmSubmit après confirmation dans la modale
-		} else if (hasSondageValidation) {
+		} else if (hasSondageValidation && !eventData.isSondage) {
 			confirmNotifSondageClosed(false);
 		} else {
 			// Sinon, soumettre directement
@@ -534,407 +526,414 @@
 <!-- {$inspect('activeTabDate', activeTabDate)} -->
 <!-- {$inspect('activeSondageTab', activeSondageTab)} -->
 
-<Modal>
+<Modal padding={false}>
 	<!-- {$inspect('recurrenceDates', recurrenceDates)} -->
+	<div class="p-2 pb-0 md:p-6">
+		<h1 class="text-fluid-2xl p-2">{modalTitle}</h1>
 
-	<h1 class="mb-4 text-2xl">{modalTitle}</h1>
+		<!-- <div class="fixed top-6 right-4 z-50 flex flex-col gap-4">
+			<button onclick={closeModal} class=" rounded-full"
+				><X
+					strokeWidth={2.75}
+					class="rounded-full border-4 border-gray-700 bg-gray-100 text-gray-700 hover:border-red-900 hover:text-red-900 md:h-8 md:w-8"
+				/></button
+			>
 
-	<div class="fixed top-6 right-4 z-50 flex flex-col gap-4">
-		<button onclick={closeModal} class=" rounded-full"
-			><X
-				strokeWidth={2.75}
-				class="rounded-full border-4 border-gray-700 bg-gray-100 text-gray-700 hover:border-red-900 hover:text-red-900 md:h-8 md:w-8"
-			/></button
-		>
-
-		<button onclick={handleSave} class="btn btn-sm">
-			<Save />
-		</button>
-	</div>
-	<form class="space-y-10">
-		<div class="flex flex-wrap items-center">
-			<div class="w-full items-center space-y-2 md:w-1/2">
-				<label for="event_title" class="text-fluid-sm">Nom de l'événement</label>
-				<input
-					use:debounce={{
-						onChange: (v) => (eventData.event_title = v)
-					}}
-					value={eventData.event_title}
-					type="text"
-					id="event_title"
-					name="event_title"
-					class="input block w-full"
-				/>
-				{#if errors.event_title}
-					<p class="text-fluid-sm text-red-500 italic">{errors.event_title[0]}</p>
-				{/if}
+			<button onclick={handleSave} class="btn btn-sm">
+				<Save />
+			</button>
+		</div> -->
+		<form class="space-y-10">
+			<div class="flex flex-wrap items-center space-y-2 md:mx-4">
+				<div class="w-full items-center space-y-2 md:w-1/2">
+					<label for="event_title" class="text-fluid-sm">Nom de l'événement</label>
+					<input
+						use:debounce={{
+							onChange: (v) => (eventData.event_title = v)
+						}}
+						value={eventData.event_title}
+						type="text"
+						id="event_title"
+						name="event_title"
+						class="input block w-full"
+					/>
+					{#if errors.event_title}
+						<p class="text-fluid-sm text-error italic">{errors.event_title[0]}</p>
+					{/if}
+				</div>
+				<div class="w-min-fit flex flex-wrap items-center pt-2 md:ms-2">
+					<div class="">
+						<Checkbox
+							label="Evénement public"
+							id="public_event"
+							bind:checked={eventData.isPublic}
+							help="Les événements non-public ne seront pas visible sur le site ni ajouté à la newsletter"
+						/>
+					</div>
+					<div class="">
+						{#if eventMode === "NEW_SINGLE" || eventMode === "NEW_RECURRENT"}
+							<Checkbox
+								bind:checked={eventData.isRecurrent}
+								id="recurrent"
+								label="événement récurrent"
+							/>
+						{/if}
+					</div>
+				</div>
 			</div>
-			<div class="w-min-fit flex flex-wrap items-center pt-2 md:ms-2">
-				<div class="">
-					<Checkbox
-						label="Evénement public"
-						id="public_event"
-						bind:checked={eventData.isPublic}
-						help="Les événements non-public ne seront pas visible sur le site ni ajouté à la newsletter"
+
+			<!-- ::: date event -->
+
+			{#snippet ExternalProposalPref()}
+				{#if hasExternalPreference}
+					<Info variant="warning">
+						<p class="italic">
+							Cet événement à été proposé par un utilisateur depuis le site publique
+						</p>
+						<div class=" text-fluid-sm p-2">
+							Période indiquée comme possible pour l'intervenant·e:
+							<p class="border-l-4 ps-2 italic">
+								"{eventData.external_proposal?.period_preference}"
+							</p>
+						</div>
+					</Info>
+				{/if}
+			{/snippet}
+
+			<div id="dateOrg" transition:slide>
+				<Frame title={dateAndHoursTitle}>
+					<div class="space-y-4">
+						{#if displayMode === "RECURRENT"}
+							<div class="mb-8">
+								<RecurrentTab
+									bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
+									isExistingMaster={eventMode === "EDIT_RECURRENT_ALL"}
+									localErrors={formattedErrors?.recurrence}
+								/>
+							</div>
+							<div>
+								<TimeReservation localErrors={errors} bind:eventData />
+							</div>
+						{:else if displayMode === "SONDAGE"}
+							<div>
+								{@render ExternalProposalPref()}
+
+								<DatePickerProposed
+									{eventData}
+									onUpdateDatesProposed={(dates) => {
+										eventData.dates_proposed = dates;
+									}}
+									onValidateDate={handleFormDateValidation}
+									onUpdateIsSondage={() => (eventData.isSondage = false)}
+									localErrors={formattedErrors?.dates_proposed?._errors
+										? { dates_proposed: formattedErrors.dates_proposed._errors }
+										: null}
+								/>
+							</div>
+						{:else}
+							<div>
+								{@render ExternalProposalPref()}
+
+								{#if eventData.external_proposal?.proposals}
+									<Info>
+										<div class="mb-2">
+											<p class="mb-2">Dates proposées :</p>
+											<div class="flex flex-wrap gap-2">
+												{#each eventData.external_proposal?.proposals as proposal, index (index)}
+													<div class="flex items-center gap-2">
+														<Checkbox
+															bind:checked={proposal.selected}
+															label={`${lisibleDate(proposal.date_event)} - ${proposal.time_start}`}
+															id={index}
+														/>
+													</div>
+												{/each}
+											</div>
+											<div class="flex justify-end">
+												<button class="btn btn-xs" onclick={convertSelectedToProposed}>
+													Convertir les dates sélectionnées en sondage
+												</button>
+											</div>
+										</div>
+									</Info>
+								{/if}
+
+								<DateUniq bind:eventData {startDateObject} {endDateObject} localErrors={errors} />
+							</div>
+						{/if}
+					</div>
+				</Frame>
+			</div>
+
+			<!-- ::: ROle & Oragnizers -->
+			<!-- FIXIT : checker ce qui doit apparaitre, et utiliser des props $derived en fonction d'eventMode plutot que des #if -->
+
+			{#snippet groupedTasksSnippet(label: string, tasks: TaskType[], isDisabled?: boolean)}
+				<div class=" space-y-2 rounded-xl p-3 shadow-sm">
+					<div class="text-base-content/70 text-fluid-sm italic">{label}</div>
+					<ButtonGroupSelect
+						options={tasks}
+						{isDisabled}
+						bind:selectedItems={eventData.tasks}
+						optionsLabel="name"
 					/>
 				</div>
-				<div class="">
-					{#if eventMode === "NEW_SINGLE" || eventMode === "NEW_RECURRENT"}
-						<Checkbox
-							bind:checked={eventData.isRecurrent}
-							id="recurrent"
-							label="événement récurrent"
-						/>
+			{/snippet}
+
+			<Frame title="Rôles">
+				<div class="mb-2 block font-medium">
+					{tasksLabel}
+				</div>
+
+				<div class="flex flex-wrap gap-x-6 gap-y-4">
+					{#if groupedTasks.before.length > 0}
+						{@render groupedTasksSnippet("Avant l'événement", groupedTasks.before)}
+					{/if}
+
+					{#if groupedTasks.on.length > 0}
+						{@const isDisabled = eventData.isSondage}
+						{@render groupedTasksSnippet("Pendant l'événement", groupedTasks.on, isDisabled)}
+					{/if}
+
+					{#if groupedTasks.after.length > 0}
+						{@const isDisabled = eventData.isSondage}
+
+						{@render groupedTasksSnippet("Après l'événement", groupedTasks.after, isDisabled)}
+					{/if}
+
+					{#if groupedTasks.other.length > 0}
+						{@render groupedTasksSnippet("Autres tâches", groupedTasks.other)}
 					{/if}
 				</div>
-			</div>
-		</div>
-
-		<!-- ::: date event -->
-
-		<!-- FIXIT condition chelou -->
-		{#snippet ExternalProposalPref()}
-			{#if hasExternalPreference}
-				<Info variant="warning">
-					<p class="italic">
-						Cet événement à été proposé par un utilisateur depuis le site publique
-					</p>
-					<div class=" text-fluid-sm p-2">
-						Période indiquée comme possible pour l'intervenant·e:
-						<p class="border-l-4 ps-2 italic">
-							"{eventData.external_proposal?.period_preference}"
-						</p>
-					</div>
-				</Info>
-			{/if}
-		{/snippet}
-
-		<div id="dateOrg" transition:slide>
-			<Frame
-				title={dateAndHoursTitle}
-				class_title="text-fluid-md md:text-fluid-lg "
-				class_frame="md:p-8"
-			>
-				<div class="space-y-4">
-					{#if displayMode === "RECURRENT"}
-						<div class="mb-8">
-							<RecurrentTab
-								bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
-								isExistingMaster={eventMode === "EDIT_RECURRENT_ALL"}
-								localErrors={formattedErrors?.recurrence}
-							/>
-						</div>
-						<div>
-							<TimeReservation localErrors={errors} bind:eventData />
-						</div>
-					{:else if displayMode === "SONDAGE"}
-						<div>
-							{@render ExternalProposalPref()}
-
-							<DatePickerProposed
-								{eventData}
-								onUpdateDatesProposed={(dates) => {
-									eventData.dates_proposed = dates;
-								}}
-								onValidateDate={handleFormDateValidation}
-								localErrors={formattedErrors?.dates_proposed?._errors
-									? { dates_proposed: formattedErrors.dates_proposed._errors }
-									: null}
-							/>
-						</div>
+				<div class="mt-8 flex flex-wrap gap-4">
+					{#if !showAddTaskForm}
+						<button
+							class="btn btn-outline btn-primary btn-compact"
+							onclick={() => (showAddTaskForm = true)}
+						>
+							+ Ajouter une tâche personnalisée
+						</button>
 					{:else}
-						<div>
-							{@render ExternalProposalPref()}
-
-							{#if eventData.external_proposal?.proposals}
-								<Info>
-									<div class="mb-2">
-										<p class="mb-2">Dates proposées :</p>
-										<div class="flex flex-wrap gap-2">
-											{#each eventData.external_proposal?.proposals as proposal, index (index)}
-												<div class="flex items-center gap-2">
-													<Checkbox
-														bind:checked={proposal.selected}
-														label={`${lisibleDate(proposal.date_event)} - ${proposal.time_start}`}
-														id={index}
-													/>
-												</div>
-											{/each}
-										</div>
-										<div class="flex justify-end">
-											<button class="btn btn-xs" onclick={convertSelectedToProposed}>
-												Convertir les dates sélectionnées en sondage
-											</button>
-										</div>
-									</div>
-								</Info>
-							{/if}
-
-							<DateUniq bind:eventData {startDateObject} {endDateObject} localErrors={errors} />
-						</div>
+						<!-- 👉 Affiche le formulaire d'ajout de tâche -->
+						<AddTaskForm onAddTask={handleAddTask} onCancel={() => (showAddTaskForm = false)} />
 					{/if}
-				</div>
-			</Frame>
-		</div>
 
-		<!-- ::: ROle & Oragnizers -->
-		<!-- FIXIT : checker ce qui doit apparaitre, et utiliser des props $derived en fonction d'eventMode plutot que des #if -->
-
-		{#snippet groupedTasksSnippet(label: string, tasks: TaskType[], isDisabled?: boolean)}
-			<div class=" space-y-2 rounded-xl p-3 shadow-sm">
-				<div class="text-base-content/70 text-fluid-sm italic">{label}</div>
-				<ButtonGroupSelect
-					options={tasks}
-					{isDisabled}
-					bind:selectedItems={eventData.tasks}
-					optionsLabel="name"
-				/>
-			</div>
-		{/snippet}
-
-		<Frame title="Rôles">
-			<div class="mb-2 block font-medium">
-				{tasksLabel}
-			</div>
-
-			<div class="flex flex-wrap gap-x-6 gap-y-4">
-				{#if groupedTasks.before.length > 0}
-					{@render groupedTasksSnippet("Avant l'événement", groupedTasks.before)}
-				{/if}
-
-				{#if groupedTasks.on.length > 0}
-					{@const isDisabled = eventData.isSondage}
-					{@render groupedTasksSnippet("Pendant l'événement", groupedTasks.on, isDisabled)}
-				{/if}
-
-				{#if groupedTasks.after.length > 0}
-					{@const isDisabled = eventData.isSondage}
-
-					{@render groupedTasksSnippet("Après l'événement", groupedTasks.after, isDisabled)}
-				{/if}
-
-				{#if groupedTasks.other.length > 0}
-					{@render groupedTasksSnippet("Autres tâches", groupedTasks.other)}
-				{/if}
-			</div>
-			<div class="mt-8 flex flex-wrap gap-4">
-				{#if !showAddTaskForm}
 					<button
 						class="btn btn-outline btn-primary btn-compact"
-						onclick={() => (showAddTaskForm = true)}
-					>
-						+ Ajouter une tâche personnalisée
-					</button>
-				{:else}
-					<!-- 👉 Affiche le formulaire d'ajout de tâche -->
-					<AddTaskForm onAddTask={handleAddTask} onCancel={() => (showAddTaskForm = false)} />
-				{/if}
-
-				<button
-					class="btn btn-outline btn-primary btn-compact"
-					onclick={() => {
-						// Ajouter toutes les tâches de l'espace
-						const allTasks = [...(eventData.tasks || []), ...getSpace.tasks];
-
-						// Éliminer les doublons par nom
-						eventData.tasks = allTasks.filter(
-							(task, index, self) => index === self.findIndex((t) => t.name === task.name)
-						);
-					}}
-				>
-					ajoutez tous les rôles
-				</button>
-			</div>
-		</Frame>
-
-		{#if eventMode !== "NEW_RECURRENT" && eventMode !== "EDIT_RECURRENT_ALL"}
-			<Frame title="Organisateur·ices">
-				<OrganizersAndTasksSelect
-					{organizersPossibles}
-					tasks={eventData.tasks}
-					bind:organizers={eventData.organizers}
-					hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
-				/>
-
-				{#if errors.organizers}
-					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
-				{/if}
-			</Frame>
-			<!-- Cas 2 : Si MasterEvent d'un événement récurrent -->
-		{:else}
-			<Frame title="Organisateur·ices">
-				<p class="text-fluid-sm mb-4">
-					Ajoutez les personnes qui participent à organiser ces événements récurrents (celles et
-					ceux qui pourront s'inscrire sur l'organisation des occurrences de chaque événement)
-				</p>
-				{#if eventData.recurrence}
-					<ButtonGroupSelect
-						options={organizersPossibles}
-						bind:selectedItems={eventData.recurrence.recurrenceTeam}
-						optionsLabel="username"
-						Icon={UserPlus}
-					/>
-					<button
-						class="btn btn-outline btn-primary btn-compact mt-4"
 						onclick={() => {
-							if (eventData.recurrence) {
-								eventData.recurrence.recurrenceTeam = organizersPossibles;
-							}
+							// Ajouter toutes les tâches de l'espace
+							const allTasks = [...(eventData.tasks || []), ...getSpace.tasks];
+
+							// Éliminer les doublons par nom
+							eventData.tasks = allTasks.filter(
+								(task, index, self) => index === self.findIndex((t) => t.name === task.name)
+							);
 						}}
 					>
-						→ ajoutez tout le monde
+						ajoutez tous les rôles
 					</button>
-				{/if}
-				{#if errors.organizers}
-					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.organizers[0]}</p>
-				{/if}
+				</div>
 			</Frame>
 
-			<AutoConfirmSettings bind:eventData />
-		{/if}
-
-		<Frame>
-			<div class="flex flex-col gap-4 md:flex-row">
-				<div class="flex flex-1 flex-col gap-1">
-					<Checkbox label="Prix libre" id="prix_libre" bind:checked={eventData.is_prix_libre} />
-					{#if !eventData.is_prix_libre}
-						<label for="prix" class="flex" transition:slide>
-							<input
-								type="text"
-								class="input flex flex-1"
-								id="prix"
-								placeholder="Prix ?"
-								bind:value={eventData.prix}
-							/>
-						</label>
-						{#if errors.prix}
-							<p class="text-fluid-sm p-2 text-red-500 italic">{errors.prix[0]}</p>
-						{/if}
-					{/if}
-				</div>
-				<div class="flex flex-1 flex-col gap-1">
-					<Checkbox label="Mixité" id="ismixite" bind:checked={eventData.isMixiteChoisie} />
-					{#if eventData.isMixiteChoisie}
-						<label for="mixite" class="flex" transition:slide>
-							<input
-								type="text"
-								class="input flex flex-1"
-								id="mixite"
-								bind:value={eventData.mixite}
-								placeholder="Décrivez le type de mixité"
-							/>
-						</label>
-						{#if errors.mixite}
-							<p class="text-fluid-sm p-2 text-red-500 italic">{errors.mixite[0]}</p>
-						{/if}
-					{/if}
-				</div>
-				<div class="flex flex-1 flex-col gap-1">
-					<Checkbox
-						label="Tout public"
-						id="all_public"
-						bind:checked={eventData.is_age_no_restriction}
+			{#if eventMode !== "NEW_RECURRENT" && eventMode !== "EDIT_RECURRENT_ALL"}
+				<Frame title="Organisateur·ices">
+					<OrganizersAndTasksSelect
+						{organizersPossibles}
+						tasks={eventData.tasks}
+						bind:organizers={eventData.organizers}
+						hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
 					/>
-					{#if !eventData.is_age_no_restriction}
-						<label for="age" class="flex" transition:slide>
-							<input
-								type="number"
-								class="input flex flex-1"
-								id="age"
-								placeholder="Age minimum ?"
-								bind:value={eventData.age_advice}
-							/>
-						</label>
-						{#if errors.age_advice}
-							<p class="text-fluid-sm p-2 text-red-500 italic">{errors.age_advice[0]}</p>
-						{/if}
+
+					{#if errors.organizers}
+						<p class="text-fluid-sm text-error p-2 italic">{errors.organizers[0]}</p>
 					{/if}
+				</Frame>
+				<!-- Cas 2 : Si MasterEvent d'un événement récurrent -->
+			{:else}
+				<Frame title="Organisateur·ices">
+					<p class="text-fluid-sm mb-4">
+						Ajoutez les personnes qui participent à organiser ces événements récurrents (celles et
+						ceux qui pourront s'inscrire sur l'organisation des occurrences de chaque événement)
+					</p>
+					{#if eventData.recurrence}
+						<ButtonGroupSelect
+							options={organizersPossibles}
+							bind:selectedItems={eventData.recurrence.recurrenceTeam}
+							optionsLabel="username"
+							Icon={UserPlus}
+						/>
+						<button
+							class="btn btn-outline btn-primary btn-compact mt-4"
+							onclick={() => {
+								if (eventData.recurrence) {
+									eventData.recurrence.recurrenceTeam = organizersPossibles;
+								}
+							}}
+						>
+							→ ajoutez tout le monde
+						</button>
+					{/if}
+					{#if errors.organizers}
+						<p class="text-fluid-sm text-error p-2 italic">{errors.organizers[0]}</p>
+					{/if}
+				</Frame>
+
+				<AutoConfirmSettings bind:eventData />
+			{/if}
+
+			<Frame>
+				<div class="flex flex-col gap-4 md:flex-row">
+					<div class="flex flex-1 flex-col gap-1">
+						<Checkbox label="Prix libre" id="prix_libre" bind:checked={eventData.is_prix_libre} />
+						{#if !eventData.is_prix_libre}
+							<label for="prix" class="flex" transition:slide>
+								<input
+									type="text"
+									class="input flex flex-1"
+									id="prix"
+									placeholder="Prix ?"
+									bind:value={eventData.prix}
+								/>
+							</label>
+							{#if errors.prix}
+								<p class="text-fluid-sm text-error p-2 italic">{errors.prix[0]}</p>
+							{/if}
+						{/if}
+					</div>
+					<div class="flex flex-1 flex-col gap-1">
+						<Checkbox label="Mixité" id="ismixite" bind:checked={eventData.isMixiteChoisie} />
+						{#if eventData.isMixiteChoisie}
+							<label for="mixite" class="flex" transition:slide>
+								<input
+									type="text"
+									class="input flex flex-1"
+									id="mixite"
+									bind:value={eventData.mixite}
+									placeholder="Décrivez le type de mixité"
+								/>
+							</label>
+							{#if errors.mixite}
+								<p class="text-fluid-sm text-error p-2 italic">{errors.mixite[0]}</p>
+							{/if}
+						{/if}
+					</div>
+					<div class="flex flex-1 flex-col gap-1">
+						<Checkbox
+							label="Tout public"
+							id="all_public"
+							bind:checked={eventData.is_age_no_restriction}
+						/>
+						{#if !eventData.is_age_no_restriction}
+							<label for="age" class="flex" transition:slide>
+								<input
+									type="number"
+									class="input flex flex-1"
+									id="age"
+									placeholder="Age minimum ?"
+									bind:value={eventData.age_advice}
+								/>
+							</label>
+							{#if errors.age_advice}
+								<p class="text-fluid-sm text-error p-2 italic">{errors.age_advice[0]}</p>
+							{/if}
+						{/if}
+					</div>
 				</div>
+			</Frame>
+			<div class="mb-0 flex flex-col md:mx-4 md:flex-row md:justify-between md:gap-4">
+				<!-- ::: rooms -->
+				<Frame title="Salles réservées" class_frame="md:w-auto">
+					<div id="rooms" class="">
+						<GroupCheckBox
+							groupItems={rooms}
+							bind:eventDataGroup={eventData.rooms}
+							classLabel="w-full"
+						/>
+					</div>
+					{#if errors.rooms}
+						<p class="text-fluid-sm text-error p-2 italic">{errors.rooms[0]}</p>
+					{/if}
+				</Frame>
+
+				<!-- ::: catégories -->
+
+				<Frame title="Type d'événement" class_frame="md:flex-1 content-center">
+					<div id="categories" class="">
+						<GroupCheckBox
+							groupItems={categories}
+							bind:eventDataGroup={eventData.categories}
+							classLabel="w-full md:w-fit"
+						/>
+					</div>
+					{#if errors.categories}
+						<p class="text-fluid-sm text-error p-2 italic">{errors.categories[0]}</p>
+					{/if}
+				</Frame>
 			</div>
-		</Frame>
-		<div class="mb-0 flex flex-wrap justify-between">
-			<!-- ::: rooms -->
-			<Frame title="Salles réservées" class_frame="sm:me-6">
-				<div id="rooms" class="flex flex-wrap items-center gap-2">
-					<GroupCheckBox
-						groupItems={rooms}
-						bind:eventDataGroup={eventData.rooms}
-						classLabel="w-full"
-					/>
+			<!-- ::: description -->
+			<div class="space-y-1 md:mx-4">
+				<label for="description" class="ms-2 block font-semibold text-gray-700"
+					>Description de l'événement</label
+				>
+				<Textarea
+					id="description"
+					name="description"
+					rows={8}
+					placeholder="Description de l'événement destiné aux bénévoles/organisateur·ices"
+					value={eventData.description}
+					debounce={{
+						enabled: true,
+						wait: 500,
+						onChange: (v) => (eventData.description = v)
+					}}
+				/>
+			</div>
+
+			<!-- ::: Description publique -->
+			<Frame title="Description publique">
+				<Info>
+					<p>
+						Description destinée au public (Newsletter, site). Inutile de renseigner le titre, la
+						date, les horaires, prix, mixité, etc. <span class="text-fluid-sm">
+							(ils seront automatiquement ajoutés et mis en forme lors de la génération de la
+							newsletter et du site)
+						</span>
+					</p>
+				</Info>
+				<div>
+					<Quill bind:html={eventData.desc_public} />
 				</div>
-				{#if errors.rooms}
-					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.rooms[0]}</p>
-				{/if}
+				{#if errors.desc_public}<p class="text-fluid-sm text-error p-2 italic">
+						{errors.desc_public[0]}
+					</p>{/if}
 			</Frame>
 
-			<!-- ::: catégories -->
-
-			<Frame title="Type d'événement" class_frame="flex-1 items-center content-center">
-				<div id="categories" class="align-">
-					<GroupCheckBox groupItems={categories} bind:eventDataGroup={eventData.categories} />
-				</div>
-				{#if errors.categories}
-					<p class="text-fluid-sm p-2 text-red-500 italic">{errors.categories[0]}</p>
-				{/if}
-			</Frame>
-		</div>
-
-		<!-- ::: description -->
-		<div class="space-y-1">
-			<label for="description" class="ms-2 block font-semibold text-gray-700"
-				>Description de l'événement</label
-			>
-			<Textarea
-				id="description"
-				name="description"
-				rows={8}
-				placeholder="Description de l'événement destiné aux bénévoles/organisateur·ices"
-				value={eventData.description}
-				debounce={{
-					enabled: true,
-					wait: 500,
-					onChange: (v) => (eventData.description = v)
-				}}
-			/>
-		</div>
-
-		<!-- ::: Description publique -->
-		<Frame title="Description publique">
-			<Info>
-				<p>
-					Description destinée au public (Newsletter, site). Inutile de renseigner le titre, la
-					date, les horaires, prix, mixité, etc. <span class="text-fluid-sm">
-						(ils seront automatiquement ajoutés et mis en forme lors de la génération de la
-						newsletter et du site)
-					</span>
-				</p>
-			</Info>
 			<div>
-				<Quill bind:html={eventData.desc_public} />
+				<EventValidationStatus event={eventData} {missingForConfirmation} />
 			</div>
-			{#if errors.desc_public}<p class="text-fluid-sm p-2 text-red-500 italic">
-					{errors.desc_public[0]}
-				</p>{/if}
-		</Frame>
-
-		<div class="mb-4 flex flex-wrap justify-end gap-x-4 gap-y-2">
+		</form>
+		<div
+			class="bottom-0 left-0 mt-2 flex w-full flex-wrap justify-end gap-x-4 gap-y-2 border-t bg-white p-2 md:sticky"
+		>
 			<button
 				type="button"
 				class="btn btn-error block w-full font-bold sm:w-fit"
 				onclick={closeModal}>Fermer sans enregistrer</button
 			>
-			<button
-				type="button"
-				class="btn btn-accent block w-full font-bold sm:w-fit"
-				onclick={handleConfirm}>Enregistrer et Confirmer l'événement</button
-			>
+			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage)}
+				<button
+					type="button"
+					class="btn btn-accent block w-full font-bold sm:w-fit"
+					onclick={handleConfirm}>Enregistrer et Confirmer l'événement</button
+				>
+			{/if}
 			<button
 				class="btn btn-primary block w-full font-bold sm:w-fit"
 				type="button"
 				onclick={handleSave}>Enregistrer</button
 			>
 		</div>
-	</form>
+	</div>
 
 	<!-- AlertDialog pour la confirmation de modification de toutes les occurrences -->
 	<dialog id="confirm_recurrence_modal" class="modal" open={isAlertDialogOpen}>
