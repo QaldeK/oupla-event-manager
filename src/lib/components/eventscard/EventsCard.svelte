@@ -64,8 +64,8 @@
 		return "Organisateur•ices";
 	});
 
-	let oldDatesProposed: DatesProposedType[] = $state([]);
-	let datesFutureProposed: DatesProposedType[] = $state([]);
+	let oldDatesProposed: DateProposedType[] = $state([]);
+	let datesFutureProposed: DateProposedType[] = $state([]);
 
 	let bgDateTime = $derived.by(() => {
 		if (currentEvent.canceled) return "bg-error/20";
@@ -335,7 +335,7 @@
 								{/if}
 							</div>
 						</div>
-						<div>
+						<div class="@container">
 							<div class=" flex flex-col rounded-b-lg {currentEvent.isSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
 								{#if currentEvent.isSondage}
@@ -353,7 +353,9 @@
 								{:else if hasDate}
 									<!-- tasks card -->
 									{#if currentEvent.tasks && currentEvent.tasks.length > 1}
-										<div class="sm:grid sm:grid-cols-3 sm:justify-around sm:gap-4 sm:p-4">
+										<div
+											class="@xl:grid @xl:grid-cols-2 @xl:justify-around @xl:gap-4 @xl:p-4 @3xl:grid-cols-3"
+										>
 											{#each currentEvent.tasks as task (currentEvent.id + "-task-" + task.name)}
 												{@const organizersForTask = currentEvent.organizers.filter(
 													(org) => org.tasks?.includes(task.name) ?? []
