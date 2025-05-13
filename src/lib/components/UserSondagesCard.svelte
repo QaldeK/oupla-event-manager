@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
 	import type { EventType, DateProposedType } from "$lib/types/types";
-	import { validateEvent, ValidationSchemaType } from "$lib/schemas/event.schema";
 
 	import {
 		handleDateValidationModal,
 		prepareDateValidationData,
-		updateEventData,
-		validateDate
+		updateEventData
 	} from "$lib/services/eventActions";
-	import { lisibleDate, lisibleTime, filterAndConvertOrganizers } from "$lib/utils";
+	import { lisibleDate, lisibleTime } from "$lib/utils";
 	import {
 		Pencil,
 		BadgeHelp,
