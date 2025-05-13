@@ -127,6 +127,14 @@ const validateCommonFields = (data: any, ctx: z.RefinementCtx) => {
 			path: ["start_public"]
 		});
 	}
+
+	if (data.isPublic && data.desc_public.length < 14) {
+		ctx.addIssue({
+			code: z.ZodIssueCode.custom,
+			message: "Une description est requise pour les événements publique",
+			path: ["desc_public"]
+		});
+	}
 };
 
 // ::: TYPES DÉRIVÉS DES SOUS-STRUCTURES :::
@@ -139,6 +147,7 @@ export type ExternalProposalType = z.infer<typeof ExternalProposalSchema>;
 export type TaskType = z.infer<typeof TaskSchema>;
 
 export type TasktypeType = z.infer<typeof TaskSchema.shape.type>;
+
 // === SCHÉMA DE FORMULAIRE PRINCIPAL ===
 // Ce schéma définit les contraintes de validation pour l'interface utilisateur
 const BaseEventFormSchema = z.object({
@@ -276,18 +285,9 @@ export const SaveEventSchema = BaseEventFormSchema.pick({
 // Schéma de publication avec validations spécifiques + communes
 export const PublishEventSchema = BaseEventFormSchema.extend({
 	recurrence: RecurrenceSchema.nullable().optional(), // Allow null or undefined
-	// Pour tasks, on peut temporairement assouplir la validation
-	// en attendant la mise à jour de la config
-	tasks: z
-		.array(
-			z.object({
-				name: z.string(),
-				description: z.string(),
-				type: z.string() // Temporairement on accepte n'importe quelle string
-			})
-		)
-		.min(1, "Au moins une tâche est requise")
-});
+
+	tasks: z.array(TaskSchema).min(1, "Au moins une tâche est requise")
+}).superRefine(validateCommonFields);
 
 // Schéma récurrent avec validations spécifiques + communes
 export const SaveRecurrentMasterSchema = BaseEventFormSchema.extend({
