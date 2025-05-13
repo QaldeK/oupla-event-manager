@@ -16,10 +16,17 @@
 		eventData: EventType;
 		onUpdateDatesProposed: (dates: DateProposedType[]) => void;
 		onValidateDate: (date: DateProposedType) => void;
+		onUpdateIsSondage: () => void;
 		localErrors?: Record<string, string[] | undefined> | null;
 	}
 
-	let { eventData, onUpdateDatesProposed, onValidateDate, localErrors = null }: Props = $props();
+	let {
+		eventData,
+		onUpdateDatesProposed,
+		onValidateDate,
+		onUpdateIsSondage,
+		localErrors = null
+	}: Props = $props();
 
 	// States
 	let selectedDate = $state<string[]>([]);
@@ -36,17 +43,13 @@
 	let datesFutureProposed = $derived.by(() => {
 		const now = new Date();
 		if (!eventData?.dates_proposed) return [];
-		return eventData.dates_proposed
-			.filter((date) => new Date(date.dateStart) >= now)
-			.sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+		return eventData.dates_proposed.filter((date) => new Date(date.dateStart) >= now);
 	});
 
 	let oldDatesProposed = $derived.by(() => {
 		const now = new Date();
 		if (!eventData?.dates_proposed) return [];
-		return eventData.dates_proposed
-			.filter((date) => new Date(date.dateStart) < now)
-			.sort((a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime());
+		return eventData.dates_proposed.filter((date) => new Date(date.dateStart) < now);
 	});
 
 	// 👉 Organizers pour le modal (calculé quand le modal s'ouvre)
@@ -66,20 +69,20 @@
 	});
 
 	// Computed best date
-	const bestDate = $derived.by(() => {
-		if (!eventData.dates_proposed?.length) return null;
+	// const bestDate = $derived.by(() => {
+	// 	if (!eventData.dates_proposed?.length) return null;
 
-		return eventData.dates_proposed.reduce(
-			(acc, curr) => {
-				const organizersCount = curr.organizers.length;
-				if (organizersCount > acc.maxOrganizers) {
-					return { maxOrganizers: organizersCount, best: curr.dateStart };
-				}
-				return acc;
-			},
-			{ maxOrganizers: -1, best: null as string | null }
-		).best;
-	});
+	// 	return eventData.dates_proposed.reduce(
+	// 		(acc, curr) => {
+	// 			const organizersCount = curr.organizers.length;
+	// 			if (organizersCount > acc.maxOrganizers) {
+	// 				return { maxOrganizers: organizersCount, best: curr.dateStart };
+	// 			}
+	// 			return acc;
+	// 		},
+	// 		{ maxOrganizers: -1, best: null as string | null }
+	// 	).best;
+	// });
 
 	// Functions
 	function validateDate(dateProposed: DateProposedType) {
@@ -129,7 +132,11 @@
 
 		if (newProposals.length > 0) {
 			const updatedDates = [...(eventData.dates_proposed || []), ...newProposals];
-			onUpdateDatesProposed(updatedDates);
+			onUpdateDatesProposed(
+				updatedDates.sort(
+					(a, b) => new Date(a.dateStart).getTime() - new Date(b.dateStart).getTime()
+				)
+			);
 		}
 
 		// Reset form
@@ -262,7 +269,7 @@
 		<div
 			class="py-.5 bg-base-300 grid items-center justify-center rounded-t-xl px-4 font-semibold sm:flex sm:justify-between"
 		>
-			<div class="text-fluid-base">
+			<div class="text-fluid-base p-0.5">
 				<span class="text-nowrap">{lisibleDate(date.dateStart)},</span>
 				<span class="ms-1 text-nowrap">
 					de {lisibleTime(date.dateStart)} à {lisibleTime(date.dateEnd)}
@@ -275,7 +282,7 @@
 			<div class="flex justify-center gap-x-6 p-1">
 				<button
 					type="button"
-					class="btn btn-soft btn-sm btn-primary not-sm:w-1/3"
+					class="btn btn-soft btn-sm btn-primary not-sm:w-1/4"
 					onclick={() => openOrganizerModal(displayIndex)}
 				>
 					<UserPlus />
@@ -284,7 +291,7 @@
 
 				<button
 					type="button"
-					class="btn btn-soft btn-error btn-sm not-sm:w-1/3"
+					class="btn btn-soft btn-error btn-sm not-sm:w-1/4"
 					onclick={() => removeDateProposedType(displayIndex)}
 				>
 					<Trash2 />
@@ -293,7 +300,7 @@
 
 				<button
 					type="button"
-					class="btn btn-sm btn-soft not-sm:w-1/3 {!date.organizers?.some(
+					class="btn btn-sm btn-soft not-sm:w-1/4 {!date.organizers?.some(
 						(org) => org.maybehere === 'oui'
 					)
 						? 'btn-warning'
@@ -371,11 +378,11 @@
 			{eventId}
 			mode="multiple"
 			placeholder="Selectionnez une ou plusieurs dates"
-			label="Choisissez les dates à proposer"
+			label="Ajoutez des propositions de dates"
 		/>
-		<div class="flex flex-col gap-y-1">
+		<div class="flex grow flex-col gap-y-1">
 			<span class="text-fluid-sm"> Heures de réservation du lieu </span>
-			<div class="flex items-center gap-x-4 gap-y-2 not-md:flex-wrap">
+			<div class="flex grow items-center gap-x-4 gap-y-2 not-md:flex-wrap">
 				<div>
 					<TimePickRange bind:value={startTime} placeholder="début" classAdd="md:w-32 w-full" />
 				</div>
@@ -404,7 +411,7 @@
 
 	<!-- Liste des dates proposées futures -->
 	{#if datesFutureProposed.length > 0}
-		<h3 class="font-semibold">Dates proposées :</h3>
+		<!-- <div class="text-fluid-base font-semibold">Dates proposées :</div> -->
 		<div out:fade|global>
 			{#each datesFutureProposed as date, index (date.dateStart + date.dateEnd)}
 				{@render ProposedDateCard(date, index)}
@@ -419,9 +426,7 @@
 	{#if oldDatesProposed.length > 0}
 		<div class="text-fluid-sm mt-4 border-t pt-2 text-gray-500 italic">
 			Note : Les dates passées suivantes ont été automatiquement retirées du sondage actif :
-			{#each oldDatesProposed as date (date.dateStart)}
-				{lisibleDate(date.dateStart)}
-			{/each}
+			{oldDatesProposed.map((date) => lisibleDate(date.dateStart)).join(", ")}
 		</div>
 	{/if}
 </div>

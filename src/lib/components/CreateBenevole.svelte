@@ -82,7 +82,7 @@
 					</button>
 				</div>
 
-				<p class="mt-4 text-red-500"></p>
+				<p class="text-error mt-4"></p>
 			</form>
 		</div>
 	</div>

@@ -1,39 +1,39 @@
 <script lang="ts">
-	import TimePickRange from '$lib/components/TimePickRange.svelte';
-	import { addTime } from '$lib/utils';
-	import { showAlert } from '$lib/shared/states.svelte';
-	import 'flatpickr/dist/flatpickr.min.css';
-	import 'tippy.js/dist/tippy.css';
+	import TimePickRange from "$lib/components/TimePickRange.svelte";
+	import { addTime } from "$lib/utils";
+	import { showAlert } from "$lib/shared/states.svelte";
+	import "flatpickr/dist/flatpickr.min.css";
+	import "tippy.js/dist/tippy.css";
 
 	let {
 		localErrors,
 		eventData = $bindable({
-			time_start: '',
-			time_end: '',
-			start_public: '',
-			start_event: ''
+			time_start: "",
+			time_end: "",
+			start_public: "",
+			start_event: ""
 		})
 	} = $props();
 
 	let isLoading: boolean = true;
-	let alertMsg = $state('');
+	let alertMsg = $state("");
 
 	$effect(() => {
-		if (alertMsg !== '') {
-			showAlert(alertMsg, 'error');
+		if (alertMsg !== "") {
+			showAlert(alertMsg, "error");
 		}
 	});
 
 	$effect(() => {
 		if (!eventData.time_start || !eventData.time_end) return;
 
-		let timeStart = parseInt(eventData.time_start.replace(':', ''));
-		let timeEnd = parseInt(eventData.time_end.replace(':', ''));
+		let timeStart = parseInt(eventData.time_start.replace(":", ""));
+		let timeEnd = parseInt(eventData.time_end.replace(":", ""));
 		let startPublic = eventData.start_public
-			? parseInt(eventData.start_public.replace(':', ''))
+			? parseInt(eventData.start_public.replace(":", ""))
 			: null;
 		let startEvent = eventData.start_event
-			? parseInt(eventData.start_event.replace(':', ''))
+			? parseInt(eventData.start_event.replace(":", ""))
 			: null;
 
 		const isTimeEndBeforeStart = timeEnd <= timeStart;
@@ -44,7 +44,7 @@
 
 		if (isTimeEndAfter00) {
 			alertMsg = "L'heure de fin ne peut pas être après 23:59";
-			eventData.time_end = '23:59';
+			eventData.time_end = "23:59";
 		} else if (isTimeEndBeforeStart) {
 			alertMsg = "L'heure de fin doit être apres l'heure de debut...";
 			eventData.time_end = addTime(eventData.time_start, 180);
@@ -115,7 +115,7 @@
 		</div>
 		<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires annoncées au public</p>
 		{#if localErrors.start_public}
-			<p class="text-fluid-sm text-red-500 italic">{localErrors.start_public}</p>
+			<p class="text-fluid-sm text-error italic">{localErrors.start_public}</p>
 		{/if}
 	</div>
 </div>

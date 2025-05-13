@@ -1,21 +1,21 @@
 <script lang="ts">
 	// FIXIT : clean/filter passed events !
-	import EventCard from '$lib/components/eventscard/EventsCard.svelte';
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import type { EventType } from '$lib/types/event';
-	import type { EventsRecord } from '$lib/types/pocketbase';
+	import EventCard from "$lib/components/eventscard/EventsCard.svelte";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import type { EventType } from "$lib/types/event";
+	import type { EventsRecord } from "$lib/types/pocketbase";
 
-	import { page } from '$app/state';
+	import { page } from "$app/state";
 
 	// Filtres basés sur l'URL
 	const activeFilters = $derived.by(() => ({
-		status: page.url.searchParams.get('status') || 'all',
-		organizer: page.url.searchParams.get('organizer') || 'all'
+		status: page.url.searchParams.get("status") || "all",
+		organizer: page.url.searchParams.get("organizer") || "all"
 	}));
 
 	// Filtrage réactif avec $effect en utilisant eventsStore
 	let filteredEvents: EventType[] = $state<EventType[]>([]);
-	let eventsPageTitle = $state('');
+	let eventsPageTitle = $state("");
 
 	$effect(() => {
 		let events;
@@ -23,39 +23,39 @@
 
 		// Filtrage par statut via eventsStore
 		switch (activeFilters.status) {
-			case 'confirmed':
+			case "confirmed":
 				events = eventsStore.confirmedEvents;
-				pageTitle = 'Événements Confirmés';
+				pageTitle = "Événements Confirmés";
 				break;
-			case 'pending':
+			case "pending":
 				events = eventsStore.unconfirmedEvents;
-				pageTitle = 'Événements en Attente de Confirmation';
+				pageTitle = "Événements en Attente de Confirmation";
 				break;
-			case 'eventsWithoutDate':
+			case "eventsWithoutDate":
 				events = eventsStore.eventsWithoutDate;
-				pageTitle = 'Événements Sans Date';
+				pageTitle = "Événements Sans Date";
 				break;
 			case `unconfirmed`:
 				events = eventsStore.unconfirmedEvents;
-				pageTitle = 'Événements Non Confirmés';
+				pageTitle = "Événements Non Confirmés";
 				break;
 			case `eventsWithSondage`:
 				events = eventsStore.eventsWithSondage;
-				pageTitle = 'Événements avec Sondage';
+				pageTitle = "Événements avec Sondage";
 				break;
 
 			case `eventsWithoutDateProposition`:
 				events = eventsStore.eventsWithoutDateProposition;
-				pageTitle = 'Événements Sans Proposition de Date';
+				pageTitle = "Événements Sans Proposition de Date";
 				break;
 			case `eventsWithoutOrganizers`:
 				events = eventsStore.eventsWithoutOrganizers;
-				pageTitle = 'Événements Sans Organisateurs';
+				pageTitle = "Événements Sans Organisateurs";
 				break;
 
 			default:
 				events = eventsStore.allEvents;
-				pageTitle = 'Tous les Événements';
+				pageTitle = "Tous les Événements";
 		}
 
 		filteredEvents = events;

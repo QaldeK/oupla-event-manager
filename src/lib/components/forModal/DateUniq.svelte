@@ -27,13 +27,7 @@
 	// Fonction de transition vers le mode sondage
 	function switchToSondage() {
 		eventData.isSondage = true;
-		eventData.date_event = "";
-		// if (eventData.dates_proposed?.length === 0) {
-		// 	// Initialiser avec la date actuelle si disponible
-		// 	if (eventData.date_event && eventData.time_start && eventData.time_end) {
-		// 		addDateProposal(eventData.date_event, eventData.time_start, eventData.time_end);
-		// 	}
-		// }
+		resetDate();
 	}
 
 	const resetDate = (): void => {
@@ -42,7 +36,7 @@
 		eventData.time_end = "";
 		eventData.start_event = "";
 		eventData.start_public = "";
-		eventData.organizers = [];
+		eventData.organizers = []; // FIXIT : les organizer inscrit a des tasks beforeEvent peuvent etre préserver pour ces taches
 	};
 
 	const cancelEvent = (): void => {
@@ -92,7 +86,7 @@
 			/>
 
 			{#if localErrors && localErrors.date_event}
-				<p class="text-fluid-sm p-2 text-red-500 italic">{localErrors.date_event}</p>
+				<p class="text-fluid-sm text-error p-2 italic">{localErrors.date_event}</p>
 			{/if}
 		</div>
 	{:else}

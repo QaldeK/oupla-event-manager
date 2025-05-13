@@ -240,8 +240,8 @@
 	}
 </script>
 
-<div class="flex items-end gap-x-4">
-	<div class="flex flex-col gap-y-1">
+<div class="flex flex-1 items-end gap-x-4">
+	<div class="flex flex-1 flex-col gap-y-1">
 		<label for={dpId} class="text-fluid-sm block">
 			{label}
 		</label>
@@ -249,7 +249,7 @@
 			bind:this={dateInput}
 			id={dpId}
 			type="text"
-			class="input input-bordered w-full min-w-60 sm:min-w-92"
+			class="input input-bordered min-w-60 sm:min-w-92"
 			{placeholder}
 			readonly
 		/>

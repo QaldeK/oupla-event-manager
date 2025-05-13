@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { findConflictsForEvent, type Conflict } from '$lib/utils/eventConflicts';
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import { isValidDate } from '$lib/utils';
-	import { format } from 'date-fns';
-	import { fr } from 'date-fns/locale';
+	import { findConflictsForEvent, type Conflict } from "$lib/utils/eventConflicts";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { isValidDate } from "$lib/utils";
+	import { format } from "date-fns";
+	import { fr } from "date-fns/locale";
 
 	let { eventId, startDate, endDate, rooms } = $props<{
 		eventId?: string;
@@ -29,9 +29,9 @@
 		// 3. Obtenir la clé de date (YYYY-MM-DD) pour la map (utilise l'objet Date reçu)
 		let dateKey: string;
 		try {
-			dateKey = format(startDate, 'yyyy-MM-dd');
+			dateKey = format(startDate, "yyyy-MM-dd");
 		} catch {
-			console.error('ConflictAlert: Error formatting dateKey from startDate', { startDate });
+			console.error("ConflictAlert: Error formatting dateKey from startDate", { startDate });
 			return [];
 		}
 
@@ -51,7 +51,7 @@
 				}
 			);
 		} catch (error) {
-			console.error('ConflictAlert: Error calling findConflictsForEvent', error);
+			console.error("ConflictAlert: Error calling findConflictsForEvent", error);
 			return [];
 		}
 	});
@@ -61,7 +61,7 @@
 		conflicts.filter(
 			(conflict) =>
 				// Conflits directs
-				conflict.conflictType === 'confirmed' && conflict.hasSameRoom
+				conflict.conflictType === "confirmed" && conflict.hasSameRoom
 		)
 	);
 
@@ -73,61 +73,61 @@
 	const formatDateForDisplay = (dateObj: Date | null) => {
 		if (dateObj && isValidDate(dateObj)) {
 			try {
-				return format(dateObj, 'EEE d MMMM', { locale: fr });
+				return format(dateObj, "EEE d MMMM", { locale: fr });
 			} catch {
-				return 'date invalide';
+				return "date invalide";
 			}
 		}
-		return 'date inconnue'; // Fallback
+		return "date inconnue"; // Fallback
 	};
 
 	const dateOfConflict = formatDateForDisplay(startDate);
 
 	const getConflictColor = (conflictType: string) => {
 		switch (conflictType) {
-			case 'confirmed':
-				return 'text-red-500';
-			case 'unconfirmed':
-				return 'text-orange-500';
-			case 'sondage':
-				return 'text-gray-500';
-			case 'close-confirmed':
-			case 'close-unconfirmed':
-				return 'text-gray-500';
+			case "confirmed":
+				return "text-error";
+			case "unconfirmed":
+				return "text-orange-500";
+			case "sondage":
+				return "text-gray-500";
+			case "close-confirmed":
+			case "close-unconfirmed":
+				return "text-gray-500";
 			default:
-				return 'text-gray-500';
+				return "text-gray-500";
 		}
 	};
 
 	const getConflictTypeMsg = (conflictType: string) => {
 		switch (conflictType) {
-			case 'confirmed':
-				return 'événement confirmé';
-			case 'unconfirmed':
-				return 'événement non confirmé';
-			case 'sondage':
-				return 'date proposé dans un sondage';
-			case 'close-confirmed':
-				return 'événement proche confirmé';
-			case 'close-unconfirmed':
-				return 'événement proche non confirmé';
+			case "confirmed":
+				return "événement confirmé";
+			case "unconfirmed":
+				return "événement non confirmé";
+			case "sondage":
+				return "date proposé dans un sondage";
+			case "close-confirmed":
+				return "événement proche confirmé";
+			case "close-unconfirmed":
+				return "événement proche non confirmé";
 			default:
-				return '';
+				return "";
 		}
 	};
 	const getRoomMsg = (hasSameRoom: boolean, rooms: string[] | undefined) => {
 		// Si les salles sont undefined ou vides
-		if (!rooms || rooms.length === 0 || (rooms.length === 1 && rooms[0] === '')) {
-			return { msg: '- salle non précisée', style: '' };
+		if (!rooms || rooms.length === 0 || (rooms.length === 1 && rooms[0] === "")) {
+			return { msg: "- salle non précisée", style: "" };
 		}
 
 		// Si les événements partagent une salle
 		if (hasSameRoom) {
-			return { msg: `au même endroit : ${rooms.join(', ')}`, style: 'font-semibold' };
+			return { msg: `au même endroit : ${rooms.join(", ")}`, style: "font-semibold" };
 		}
 
 		// Si l'événement a des salles
-		return { msg: `- salle: ${rooms.join(', ')}`, style: '' };
+		return { msg: `- salle: ${rooms.join(", ")}`, style: "" };
 	};
 </script>
 
@@ -135,7 +135,7 @@
 	<div
 		class="bg-warning/20 text-fluid-sm cursor-pointer items-center gap-1 rounded-xl p-2 px-4 text-gray-500 hover:text-gray-700"
 		onclick={() => (isExpanded = !isExpanded)}
-		onkeydown={(e) => e.key === 'Enter' && (isExpanded = !isExpanded)}
+		onkeydown={(e) => e.key === "Enter" && (isExpanded = !isExpanded)}
 		role="button"
 		tabindex="0"
 	>
@@ -152,7 +152,7 @@
 							réduire
 						{/if}
 						<svg
-							class={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+							class={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
 							xmlns="http://www.w3.org/2000/svg"
 							fill="none"
 							viewBox="0 0 24 24"
@@ -171,7 +171,7 @@
 
 			{#if !isExpanded && hasRealConflict.value}
 				<ul class="ms-2">
-					{#each realConflicts as conflict (conflict.id)}
+					{#each realConflicts as conflict, index (conflict.id + index)}
 						<li
 							class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(
 								conflict.conflictType
@@ -193,7 +193,7 @@
 
 		{#if isExpanded}
 			<ul class="ms-2">
-				{#each conflicts as conflict (conflict.id)}
+				{#each conflicts as conflict, index (conflict.id + index)}
 					<li
 						class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(conflict.conflictType)}`}
 					>

@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
 	import type { EventType, DateProposedType } from "$lib/types/types";
+	import { validateEvent, ValidationSchemaType } from "$lib/schemas/event.schema";
 
-	import { validateDate } from "$lib/services/eventActions";
+	import {
+		handleDateValidationModal,
+		prepareDateValidationData,
+		updateEventData,
+		validateDate
+	} from "$lib/services/eventActions";
 	import { lisibleDate, lisibleTime, filterAndConvertOrganizers } from "$lib/utils";
 	import {
 		Pencil,
@@ -21,11 +27,13 @@
 	let {
 		currentEvent,
 		currentUser,
+		dates,
 		bg = "bg-white",
 		showHeader = false
 	} = $props<{
-		currentEvent: EventType; // 👉 corrigé: EventType au lieu de EventType[]
+		currentEvent: EventType;
 		currentUser: UserType | null;
+		dates: Date[];
 		bg?: string;
 		showHeader?: boolean;
 	}>();
@@ -72,26 +80,25 @@
 		}
 	}
 
-	const handleValidateDate = (currentEvent: EventType, dateProposal:DateProposedType, currentUser: UserType) => {
-
-  	const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
-  	const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
-
-  	modalState.confirm = {
-  				isOpen: true,
-  				data: {
-  					title: "Cloturer le sondage",
-  					message: hasConfirmedOrganizers
-  						? `Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(dateProposal.dateStart)}-${lisibleTime(dateProposal.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.`
-  						: `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(dateProposal.dateStart)}). Êtes-vous sûr·e de vouloir la valider ?`,
-  					variant: hasConfirmedOrganizers ? "warning" : "danger",
-  					showCheckbox: { checked: true, label: "Notifier les participant·es" }, // Option de notification
-  					onConfirm: async (notify?: boolean) => {
-  					  validateDate(currentEvent, dateProposal, currentUser, notify?)
-
-  					}
-				}}}
-
+	const handleValidateDate = (
+		currentEvent: EventType,
+		dateProposal: DateProposedType,
+		currentUser: UserType
+	) => {
+		handleDateValidationModal(currentEvent, dateProposal, currentUser, {
+			additionalAction: {
+				condition: true,
+				label: "Valider la date et confirmer l'événement",
+				action: async (notify?: boolean) => {
+					const eventDataToUpdate = prepareDateValidationData(currentEvent, dateProposal);
+					await updateEventData(currentEvent.id, {
+						...eventDataToUpdate,
+						isConfirmed: true
+					});
+				}
+			}
+		});
+	};
 </script>
 
 <div class={{ "rounded-lg border bg-white p-4 shadow-sm": showHeader }}>
@@ -134,7 +141,7 @@
 			{/if}
 		</button>
 		<div class="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
-			{#each currentEvent.dates_proposed as dateProposal (dateProposal.dateStart)}
+			{#each dates as dateProposal (dateProposal.dateStart)}
 				{@const oui = dateProposal.organizers?.filter((org) => org.maybehere === "oui").length ?? 0}
 				{@const peutetre =
 					dateProposal.organizers?.filter((org) => org.maybehere === "peut-être").length ?? 0}
