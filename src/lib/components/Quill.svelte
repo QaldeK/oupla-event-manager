@@ -1,17 +1,20 @@
-<script>
-	import { Editor } from '@tadashi/svelte-editor-quill';
+<script lang="ts">
+	import { Editor } from "@tadashi/svelte-editor-quill";
 
-	let { html = $bindable() } = $props();
+	interface Props {
+		html: string | undefined;
+	}
+	let { html = $bindable() }: Props = $props();
 
 	const options = {
-		theme: 'snow',
-		placeholder: 'tapez votre description ici'
+		theme: "snow",
+		placeholder: "tapez votre description ici"
 	};
-	let text = $state('');
+	let text = $state("");
 
 	let debounceTimer;
 
-	const onTextChange = (markup, plaintext) => {
+	const onTextChange = (markup: string, plaintext: string) => {
 		html = markup;
 		text = plaintext;
 	};

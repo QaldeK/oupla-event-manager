@@ -13,7 +13,7 @@
 {#if unassignedTasks.length > 0}
 	<div class="flex flex-wrap gap-1 {className}">
 		<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
-		{#each unassignedTasks as task (task.name)}
+		{#each unassignedTasks as task, index (task.name + event.id + index)}
 			<span title={task.description} class="badge badge-soft badge-sm me-1 mb-1 font-medium"
 				>{task.name}</span
 			>

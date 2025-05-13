@@ -1,14 +1,14 @@
 <script lang="ts">
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
+	import EventValidationStatus from "$lib/components/EventValidationStatus.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import { lisibleDate } from "$lib/utils";
 	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
-	import type { EventType, UserType, DatesProposedType } from "$lib/types/types";
+	import type { EventType, UserType, DateProposedType } from "$lib/types/types";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { getContext } from "svelte";
-	import { getMonthlyRecurrenceLabel } from "$lib/utils/monthlyRecurrence";
-
+	import { canEventBeValidated } from "$lib/services/eventActions";
 	import { fade } from "svelte/transition";
 
 	import { Info, UserCheck } from "lucide-svelte";
@@ -72,6 +72,8 @@
 		else if (currentEvent.isConfirmed) return "bg-success/20";
 		else return "bg-warning/20";
 	});
+
+	const canBeValidated = $derived(canEventBeValidated(currentEvent));
 
 	// --- effect ---
 
@@ -337,7 +339,7 @@
 							<div class=" flex flex-col rounded-b-lg {currentEvent.isSondage ? 'mb-4 p-2' : ''} ">
 								<!--::: Cas 2:  sondage est en cours -->
 								{#if currentEvent.isSondage}
-									<UserSondagesCard {currentEvent} {currentUser} />
+									<UserSondagesCard {currentEvent} {currentUser} dates={datesFutureProposed} />
 									{#if currentEvent.isSondage && oldDatesProposed.length > 0}
 										<div class="text-fluid-xs text-base-content/70 p-2 italic">
 											({oldDatesProposed.length} date{oldDatesProposed.length > 1 ? "s" : ""} passée{oldDatesProposed.length >
@@ -452,6 +454,9 @@
 				</div>
 			{/if}
 		</div>
+		{#if canBeValidated}
+			<EventValidationStatus event={currentEvent} showButton={true} {canBeValidated} />
+		{/if}
 		<ButtonAction thisEvent={currentEvent} />
 	</div>
 </div>

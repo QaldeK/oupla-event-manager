@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { fade } from 'svelte/transition';
+	import { fade } from "svelte/transition";
 
-	let { children } = $props();
+	let { children, padding = true } = $props();
 	// État pour stocker la position du scroll
 	let scrollPosition = $state<number>(0);
 
@@ -11,11 +11,11 @@
 		scrollPosition = window.scrollY;
 
 		// Simplement bloquer le scroll sans fixer la position
-		document.body.style.overflow = 'hidden';
+		document.body.style.overflow = "hidden";
 
 		// Cleanup function
 		return () => {
-			document.body.style.overflow = '';
+			document.body.style.overflow = "";
 			window.scrollTo(0, scrollPosition);
 		};
 	});
@@ -26,7 +26,9 @@
 	transition:fade={{ duration: 150 }}
 >
 	<div
-		class="bg-base-100 relative max-h-dvh w-full max-w-6xl overflow-y-auto rounded-xl p-2 shadow-lg sm:mx-auto md:mx-4 md:max-h-[calc(100dvh-2rem)] md:p-6"
+		class="bg-base-100 relative max-h-dvh w-full max-w-6xl overflow-y-auto rounded-xl shadow-lg sm:mx-auto md:mx-4 md:max-h-[calc(100dvh-2rem)] {padding
+			? 'p-2 md:p-6'
+			: ''} "
 	>
 		{@render children?.()}
 	</div>

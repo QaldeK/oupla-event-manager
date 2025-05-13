@@ -1,10 +1,16 @@
-<script>
+<script lang="ts">
+	interface Props {
+		groupItems: string[];
+		eventDataGroup: string[];
+		classLabel?: string;
+		classSpanLabel?: string;
+	}
 	let {
 		groupItems,
 		eventDataGroup = $bindable(),
-		classSpanLabel = 'text-fluid-sm font-medium',
-		classLabel = ''
-	} = $props();
+		classSpanLabel = "text-fluid-sm font-medium",
+		classLabel = ""
+	}: Props = $props();
 </script>
 
 <div class="flex flex-wrap items-center gap-3">
