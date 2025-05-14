@@ -203,9 +203,8 @@
 	//
 </script>
 
-<div transition:fade class="@container">
+<div transition:fade class="@container" id={currentEvent.id}>
 	<div
-		id={currentEvent.id}
 		class="transition:fade mb-8 rounded-lg border bg-white shadow-md md:mb-4 {currentEvent.isConfirmed
 			? ''
 			: 'border-l-warning/80 border-l-4'}"

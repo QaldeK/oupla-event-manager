@@ -87,7 +87,7 @@ export const openTaskModal = (params: {
 	selectedTaskNames: string[];
 	eventIsConfirmed: boolean;
 	eventId?: string;
-	onSubmit: (result: string[]) => void | Promise<void>;
+	onSubmit: (result: string[], notifyOthers?: boolean) => void | Promise<void>;
 }) => {
 	modalState.tasks = {
 		isOpen: true,

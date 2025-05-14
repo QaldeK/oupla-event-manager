@@ -614,7 +614,7 @@ class EventsStore {
 		if (options.notifyOthers && options.taskBeingLeft !== undefined) {
 			// Notifier seulement si désinscription
 			try {
-				const subject = `[Oupla] Désinscription d'un·e organisateur·ice : ${event.event_title}`;
+				const subject = `[Oupla] Désinscription de ${username} : ${event.event_title}`;
 				const eventDateStr = event.date_event
 					? new Date(event.date_event).toLocaleDateString("fr-FR", {
 							weekday: "long",
@@ -646,11 +646,12 @@ class EventsStore {
                     `;
 				}
 
-				htmlBody += `<p style="margin-top: 1.5em;"><a href="${window.location.origin}/dashboard/events?status=pending&highlight=${event.id}">Voir l'événement</a></p>`; // Ajouter lien
-				htmlBody += `<p style="margin-top: 1.5em;">Cordialement,<br>L'équipe Oupla</p>`;
+				htmlBody += `<p style="margin-top: 1.5em;"><a href="${window.location.origin}/dashboard/events?status=confirmed&highlight=${event.id}">Voir l'événement</a></p>`; // Ajouter lien
+				htmlBody += `<p style="margin-top: 1.5em;><italic>Ceci est un message automatique envoyé par le système Oupla.</italic></p>
+`;
 
 				let recipientGroups: GenericEmailPayload["recipientGroups"] = [];
-				let fallbackRecipientGroups: GenericEmailPayload["fallbackRecipientGroups"] = [
+				const fallbackRecipientGroups: GenericEmailPayload["fallbackRecipientGroups"] = [
 					"spaceAdmins"
 				];
 
@@ -723,18 +724,47 @@ class EventsStore {
 				selectedTaskNames: userCurrentTasks,
 				eventIsConfirmed: event.isConfirmed ?? false,
 				eventId: event.id,
-				onSubmit: async (selectedTaskNames: string[]) => {
+				onSubmit: async (selectedTaskNames: string[], notifyOthers?: boolean) => {
 					// Utilise TaskModalSubmitResult
 					try {
+						// Détecter les tâches supprimées
+						const removedTasks = userCurrentTasks.filter(
+							(task) => !selectedTaskNames.includes(task)
+						);
+
+						const hasRemovedTasks = removedTasks.length > 0;
+						const isCompleteUnsubscribe =
+							userCurrentTasks.length > 0 && selectedTaskNames.length === 0;
+
+						// Si c'est un événement confirmé et qu'il y a des tâches supprimées
+						// ou une désinscription complète, vérifier si on doit notifier (paramètre ou true par défaut)
+						const shouldNotify =
+							event.isConfirmed &&
+							(hasRemovedTasks || isCompleteUnsubscribe) &&
+							(notifyOthers !== undefined ? notifyOthers : true);
+
 						// Appelle #executeTaskUpdate avec les tâches sélectionnées
 						await this.#executeTaskUpdate(
 							event.id,
 							user.id,
 							user.username,
-							selectedTaskNames
-							// Pas d'options de notification ici, géré par #execute si désinscription
+							selectedTaskNames,
+							// Ajouter des options de notification si nécessaire
+							shouldNotify
+								? {
+										notifyOthers: true,
+										taskBeingLeft: removedTasks.join(", ")
+									}
+								: {}
 						);
-						showAlert("Vos tâches ont été mises à jour.", "success");
+
+						if (hasRemovedTasks) {
+							showAlert(`Vous vous êtes désinscrit de ${removedTasks.length} tâche(s)`, "success");
+						} else if (isCompleteUnsubscribe) {
+							showAlert("Vous vous êtes désinscrit de l'événement", "success");
+						} else {
+							showAlert("Vos tâches ont été mises à jour.", "success");
+						}
 					} catch (error) {
 						/* Erreur déjà gérée par #executeTaskUpdate */
 					}
@@ -777,7 +807,7 @@ class EventsStore {
 
 				let message = `L'événement "${event.event_title}" est confirmé. Êtes-vous sûr·e de vouloir vous désinscrire de la tâche "${targetTask}" ?`;
 				if (isLastOverall) {
-					message = `Vous êtes le/la dernier·e organisateur·ice pour cet événement (${targetTask}). Si l'événement doit avoir lieu bientôt, songez à l'annuler. Veuillez confirmer votre désinscription.`;
+					message = `Vous êtes le/la dernier·e organisateur·ice pour cet événement (${targetTask}). Si l'événement doit avoir lieu bientôt, songez à l'annuler. Cliquez sur "continuer" pour confirmer votre désinscription.`;
 				} else if (isLastForThisTask) {
 					// Ajouter une nuance si dernier pour cette tâche mais pas globalement
 					message += `\nAttention : vous êtes la seule personne inscrite pour cette tâche spécifique.`;

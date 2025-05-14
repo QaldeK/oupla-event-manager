@@ -5,7 +5,7 @@
 	import { UserMinus, UserPlus, ListTodo } from "lucide-svelte";
 	import { fade, slide } from "svelte/transition";
 	import ButtonGroupSelect from "./ButtonGroupSelect.svelte";
-	import { openTaskModal } from "$lib/shared/states.svelte";
+	import { openTaskModal, showAlert } from "$lib/shared/states.svelte";
 
 	let {
 		organizersPossibles = [],
@@ -69,7 +69,7 @@
 				selectedTaskNames: currentSelectedTaskNames,
 				eventIsConfirmed: false, // On est dans l'éditeur, l'état de confirmation importe peu ici
 				// eventId: eventData.id, // On n'a pas l'ID de l'event ici, pas grave pour ce callback
-				onSubmit: (resultTaskNames: string[]) => {
+				onSubmit: (resultTaskNames: string[], notifyOthers?: boolean) => {
 					// 👉 Mettre à jour la prop `organizers` (état local de EventModal)
 					const index = organizers.findIndex((org) => org.id === user.id);
 					const updatedOrganizerData = {

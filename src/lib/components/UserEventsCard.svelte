@@ -97,7 +97,7 @@
 				{#each event.organizers as organizer (organizer.id)}
 					<div
 						class="badge badge-soft badge-accent me-2 font-semibold {organizer.username ===
-							currentUser.username && 'hidden'}"
+							currentUser?.username && 'hidden'}"
 					>
 						{organizer.username}
 					</div>
