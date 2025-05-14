@@ -915,12 +915,10 @@
 		<div
 			class="bottom-0 left-0 mt-2 flex w-full flex-wrap justify-end gap-x-4 gap-y-2 border-t bg-white p-2 md:sticky"
 		>
-			<button
-				type="button"
-				class="btn btn-error block w-full font-bold sm:w-fit"
-				onclick={closeModal}>Fermer sans enregistrer</button
+			<button type="button" class="btn block w-full font-bold sm:w-fit" onclick={closeModal}
+				>Fermer sans enregistrer</button
 			>
-			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage)}
+			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage && !eventData.isConfirmed)}
 				<button
 					type="button"
 					class="btn btn-accent block w-full font-bold sm:w-fit"
