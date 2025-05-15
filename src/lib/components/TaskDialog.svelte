@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { modalState } from "$lib/shared/states.svelte";
 	import type { TaskType } from "$lib/types/types";
+	import { AlertTriangle } from "lucide-svelte";
 	import ButtonGroupSelect from "./forModal/ButtonGroupSelect.svelte";
-	import { AlertTriangle, Info } from "lucide-svelte";
 
 	let modalId = "task_dialog";
 

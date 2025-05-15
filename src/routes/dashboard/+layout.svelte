@@ -8,14 +8,14 @@
 	import TaskDialog from "$lib/components/TaskDialog.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	// store
-	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { messageStore } from "$lib/shared/messageStore.svelte";
-	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
-	import { userDb } from "$lib/shared/userDb.svelte";
 	import Alert from "$lib/components/Alert.svelte";
 	import InviteUserModal from "$lib/components/InviteUserModal.svelte";
 	import { pb } from "$lib/pocketbase.svelte";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { messageStore } from "$lib/shared/messageStore.svelte";
+	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
 	import { messageSheet, modalState } from "$lib/shared/states.svelte";
+	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { CurrentUser } from "$lib/types/types";
 
 	import { goto } from "$app/navigation";
@@ -28,9 +28,10 @@
 		AlertTriangle,
 		Calendar,
 		CalendarPlus,
-		CalendarPlus2,
 		CalendarSearch,
+		CircleUserRound,
 		Clock,
+		Globe,
 		LogOut,
 		Mail,
 		Menu,
@@ -38,9 +39,7 @@
 		RefreshCw,
 		Settings,
 		UserPlus,
-		Users,
-		CircleUserRound,
-		Globe
+		Users
 	} from "lucide-svelte";
 
 	let { children } = $props();

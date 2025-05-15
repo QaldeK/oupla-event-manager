@@ -1,16 +1,15 @@
 <script lang="ts">
-	import Info from "$lib/components/Info.svelte";
-	import TimePickRange from "$lib/components/TimePickRange.svelte";
 	import DatePicker from "$lib/components/forModal/DatePicker.svelte";
 	import GroupRadioButton from "$lib/components/GroupRadioButton.svelte";
+	import Info from "$lib/components/Info.svelte";
+	import TimePickRange from "$lib/components/TimePickRange.svelte";
 
-	import type { EventType, DateProposedType, OrganizerType } from "$lib/types/event";
-	import { addTime, lisibleDate, lisibleTime, isValidDate } from "$lib/utils";
-	import { eventState, getSpace, userDb } from "$lib/shared";
+	import { eventState, getSpace } from "$lib/shared";
+	import type { DateProposedType, EventType } from "$lib/types/event";
+	import { addTime, isValidDate, lisibleDate, lisibleTime } from "$lib/utils";
 	import { fade } from "svelte/transition";
 
 	import { CalendarCheck, PlusCircle, Trash2, UserPlus } from "lucide-svelte";
-	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 
 	interface Props {
 		eventData: EventType;

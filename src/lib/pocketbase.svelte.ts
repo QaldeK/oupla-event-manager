@@ -1,4 +1,5 @@
 import { type TaskType } from "$lib/schemas/event.schema";
+import { getSpace } from "$lib/shared/spaceOptions.svelte";
 import type {
 	Collections,
 	EventsRecord,
@@ -6,14 +7,7 @@ import type {
 	MessagesResponse
 } from "$lib/types/pocketbase";
 import { createDateFromString } from "$lib/utils";
-import { getSpace } from "$lib/shared/spaceOptions.svelte";
-import type {
-	ListOptions,
-	ListResult,
-	RecordModel,
-	SubscribeOptions,
-	TypedPocketBase
-} from "pocketbase";
+import type { ListOptions, ListResult, RecordModel, SubscribeOptions } from "pocketbase";
 
 import type { EventType } from "./types/event";
 

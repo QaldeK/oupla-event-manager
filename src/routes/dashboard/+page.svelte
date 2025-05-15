@@ -47,8 +47,15 @@
 				<section class="my-8">
 					<h2 class=" text-fluid-xl font-bold">Sondages auxquels vous avez répondu</h2>
 					<div class="space-y-4">
+						<!-- FIXIT : manage oldDates exclusion -->
 						{#each userSondageEvents as currentEvent (currentEvent.id)}
-							<UserSondagesCard {currentEvent} {currentUser} bg="bg-base-100" showHeader={true} />
+							<UserSondagesCard
+								{currentEvent}
+								{currentUser}
+								bg="bg-base-100"
+								showHeader={true}
+								dates={currentEvent.dates_proposed}
+							/>
 						{/each}
 					</div>
 				</section>

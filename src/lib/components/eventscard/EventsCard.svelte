@@ -1,18 +1,17 @@
 <script lang="ts">
-	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import EventValidationStatus from "$lib/components/EventValidationStatus.svelte";
-	import { updateEvent } from "$lib/pocketbase.svelte";
-	import { lisibleDate } from "$lib/utils";
-	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
+	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
-	import type { EventType, UserType, DateProposedType } from "$lib/types/types";
-	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { getContext } from "svelte";
+	import { updateEvent } from "$lib/pocketbase.svelte";
 	import { canEventBeValidated } from "$lib/services/eventActions";
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
+	import type { DateProposedType, EventType, UserType } from "$lib/types/types";
+	import { lisibleDate } from "$lib/utils";
+	import { getContext } from "svelte";
 	import { fade } from "svelte/transition";
 
-	import { Info, UserCheck } from "lucide-svelte";
-	import { CalendarPlus, UserPlus } from "lucide-svelte";
+	import { CalendarPlus, Info, UserCheck, UserPlus } from "lucide-svelte";
 
 	import ButtonAction from "./ButtonAction.svelte";
 	import TopAlert from "./TopAlert.svelte";

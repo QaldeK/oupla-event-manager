@@ -1,26 +1,26 @@
 <script lang="ts">
 	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
-	import type { EventType, DateProposedType } from "$lib/types/types";
+	import type { DateProposedType, EventType } from "$lib/types/types";
 
+	import { updateEvent } from "$lib/pocketbase.svelte";
 	import {
 		handleDateValidationModal,
 		prepareDateValidationData,
 		updateEventData
 	} from "$lib/services/eventActions";
+	import type { UserType } from "$lib/types/types";
 	import { lisibleDate, lisibleTime } from "$lib/utils";
 	import {
-		Pencil,
 		BadgeHelp,
-		ThumbsUp,
-		ThumbsDown,
 		CalendarCheck,
 		ChevronDown,
-		ChevronUp
+		ChevronUp,
+		Pencil,
+		ThumbsDown,
+		ThumbsUp
 	} from "lucide-svelte";
-	import type { UserType } from "$lib/types/types";
-	import { updateEvent } from "$lib/pocketbase.svelte";
-	import GroupRadioButton from "./GroupRadioButton.svelte";
 	import { fade } from "svelte/transition";
+	import GroupRadioButton from "./GroupRadioButton.svelte";
 
 	let {
 		currentEvent,

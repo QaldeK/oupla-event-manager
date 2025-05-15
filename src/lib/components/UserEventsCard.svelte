@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { eventState, modalState } from "$lib/shared/states.svelte";
-	import type { EventType } from "$lib/schemas/event.schema";
-	import { lisibleDate, lisibleTime } from "$lib/utils";
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
-	import { userDb } from "$lib/shared/userDb.svelte";
-	import { Pencil, UserMinus } from "lucide-svelte";
-	import type { UserType } from "$lib/types/types";
+	import type { EventType } from "$lib/schemas/event.schema";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { eventState, modalState } from "$lib/shared/states.svelte";
+	import { userDb } from "$lib/shared/userDb.svelte";
+	import type { UserType } from "$lib/types/types";
+	import { lisibleDate } from "$lib/utils";
+	import { Pencil, UserMinus } from "lucide-svelte";
 
 	let { event } = $props<{
 		event: EventType;

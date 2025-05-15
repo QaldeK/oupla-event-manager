@@ -4,10 +4,10 @@
 	import Frame from "$lib/components/Frame.svelte";
 	import GroupCheckBox from "$lib/components/GroupCheckBox.svelte";
 	import Info from "$lib/components/Info.svelte";
-	import AutoConfirmSettings from "$lib/components/forModal/AutoConfirmSettings.svelte";
-	import AddTaskForm from "$lib/components/forModal/AddTaskForm.svelte";
 	import Modal from "$lib/components/Modal.svelte";
 	import Quill from "$lib/components/Quill.svelte";
+	import AddTaskForm from "$lib/components/forModal/AddTaskForm.svelte";
+	import AutoConfirmSettings from "$lib/components/forModal/AutoConfirmSettings.svelte";
 	import ButtonGroupSelect from "$lib/components/forModal/ButtonGroupSelect.svelte";
 	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
 	import DateUniq from "$lib/components/forModal/DateUniq.svelte";
@@ -22,14 +22,15 @@
 	} from "$lib/pocketbase.svelte";
 	import {
 		ValidationSchemaType,
-		getNewEvent,
 		getDefaultRecurrence,
+		getNewEvent,
 		validateEvent,
-		type TaskType,
-		type RequiredRecurrenceType,
+		type DateProposedType,
 		type EventType,
-		type DateProposedType
+		type RequiredRecurrenceType,
+		type TaskType
 	} from "$lib/schemas/event.schema";
+	import { canEventBeValidated } from "$lib/services/eventActions";
 	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import {
 		eventState,
@@ -39,20 +40,18 @@
 	} from "$lib/shared/states.svelte";
 	import {
 		createDateFromString,
-		lisibleDate,
-		isValidDate,
-		lisibleTime,
 		filterAndConvertOrganizers,
 		formatDatePb,
-		formatTimePb
+		formatTimePb,
+		isValidDate,
+		lisibleDate
 	} from "$lib/utils";
-	import { canEventBeValidated } from "$lib/services/eventActions";
 
 	import { slide } from "svelte/transition";
 
-	import { Save, UserPlus, X } from "lucide-svelte";
-	import TimeReservation from "./forModal/TimeReservation.svelte";
+	import { UserPlus } from "lucide-svelte";
 	import EventValidationStatus from "./EventValidationStatus.svelte";
+	import TimeReservation from "./forModal/TimeReservation.svelte";
 
 	type EventMode =
 		| "NEW_SINGLE" // Création événement unique
