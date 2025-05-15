@@ -1,16 +1,16 @@
 // src/lib/services/eventActions.ts
 import { updateEvent } from "$lib/pocketbase.svelte";
-import { showAlert, getSpace, modalState } from "$lib/shared";
+import { validateEvent, ValidationSchemaType } from "$lib/schemas/event.schema";
+import { notificationService } from "$lib/services/notificationService.svelte";
+import { modalState, showAlert } from "$lib/shared";
+import type { DateProposedType, EventType, UserType } from "$lib/types/types";
 import {
+	filterAndConvertOrganizers,
 	formatDatePb,
 	formatTimePb,
-	filterAndConvertOrganizers,
 	lisibleDate,
 	lisibleTime
 } from "$lib/utils";
-import type { EventType, OrganizerType, TaskType, DateProposedType } from "$lib/types/types";
-import type { UserType } from "$lib/types/types";
-import { validateEvent, ValidationSchemaType } from "$lib/schemas/event.schema";
 
 /**
  * Prépare les données de l'événement pour la validation d'une date
@@ -78,7 +78,8 @@ export async function validateDate(
 	currentEvent: EventType,
 	dateProposal: DateProposedType,
 	currentUser: UserType | null,
-	notify?: boolean
+	notify: boolean = true,
+	willBeConfirmed: boolean = false
 ): Promise<void> {
 	if (!currentUser) {
 		showAlert("Utilisateur non authentifié. Veuillez vous reconnecter.", "error");
@@ -96,8 +97,24 @@ export async function validateDate(
 	await updateEventData(
 		currentEvent.id,
 		eventDataToUpdate,
-		"La date de l'événement a été validée et enregistrée avec succès. Un email avertira celles et ceux ayant participé au sondage"
+		"La date de l'événement a été validée et enregistrée avec succès."
 	);
+
+	// Envoyer une notification aux participants du sondage si demandé
+	if (notify) {
+		await notificationService.sendSondageValidationNotification({
+			event: currentEvent,
+			dateProposal,
+			user: currentUser,
+			options: { 
+				showUserFeedback: true,
+				willBeConfirmed: willBeConfirmed,
+				specificFeedbackMessage: willBeConfirmed 
+					? "Date validée et événement confirmé. Notification envoyée aux participants."
+					: "Date validée. Notification envoyée aux participants du sondage."
+			}
+		});
+	}
 }
 
 /**
@@ -156,10 +173,31 @@ export function handleDateValidationModal(
 			showCheckbox: { checked: true, label: "Notifier les participant·es" },
 			onConfirm: async (notify?: boolean) => {
 				const eventDataToUpdate = prepareDateValidationData(currentEvent, dateProposal);
+				// Déterminer si l'événement sera également confirmé
+				let willBeConfirmed = false;
+				if (options?.additionalAction?.condition && canBePublished && hasConfirmedOrganizers) {
+					willBeConfirmed = true;
+				}
+				
 				if (options?.onValidate) {
 					await options.onValidate(eventDataToUpdate);
+					// Envoyer notification après validation si notify est vrai
+					if (notify) {
+						await notificationService.sendSondageValidationNotification({
+							event: currentEvent,
+							dateProposal,
+							user: currentUser,
+							options: { 
+								showUserFeedback: true,
+								willBeConfirmed: willBeConfirmed,
+								specificFeedbackMessage: willBeConfirmed 
+									? "Date validée et événement confirmé. Notification envoyée aux participants."
+									: "Date validée. Notification envoyée aux participants du sondage."
+							}
+						});
+					}
 				} else {
-					await validateDate(currentEvent, dateProposal, currentUser, notify);
+					await validateDate(currentEvent, dateProposal, currentUser, notify, willBeConfirmed);
 				}
 			},
 			additionalButton
