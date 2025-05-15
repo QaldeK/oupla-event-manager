@@ -1,20 +1,19 @@
+import type { EventType, OrganizerType } from "$lib/schemas/event.schema";
 import { SyncStore } from "$lib/shared/syncState.svelte";
-import type { EventsRecord, UsersResponse } from "$lib/types/pocketbase.ts";
-import type { EventType, OrganizerType, TaskType } from "$lib/schemas/event.schema";
 import { Collections } from "$lib/types/pocketbase";
-import { format, parse } from "date-fns";
+import type { EventsRecord, UsersResponse } from "$lib/types/pocketbase.ts";
+import type { StoreConfig } from "$lib/types/syncState.types";
 import {
 	buildEventTimeInfoMap,
 	type EventTimeInfo // Importe le type si besoin
 } from "$lib/utils/eventConflicts";
-import type { StoreConfig } from "$lib/types/syncState.types";
+import { format, parse } from "date-fns";
 
-import { updateEvent, sendGenericEmail, type GenericEmailPayload } from "$lib/pocketbase.svelte";
+import { updateEvent } from "$lib/pocketbase.svelte";
 import type { UserType } from "$lib/types/types";
 
 import { modalState, openTaskModal, showAlert } from "$lib/shared/states.svelte";
 import { userDb } from "./userDb.svelte";
-import { getSpace } from "./spaceOptions.svelte";
 
 // Ajouter ces types au début du fichier
 export interface EventConflict {
@@ -534,6 +533,9 @@ class EventsStore {
 		newTasks: string[],
 		options: { notifyOthers?: boolean; customMessage?: string; taskBeingLeft?: string } = {}
 	): Promise<void> {
+		// Importer le service de notification
+		const { notificationService } = await import("$lib/services/notificationService.svelte");
+
 		// Renvoyer Promise<void> pour async
 		const event = this.getEventById(eventId); // Récupérer l'événement frais depuis le store
 		if (!event) {
@@ -612,65 +614,18 @@ class EventsStore {
 
 		// --- Notification (si désinscription et demandé) ---
 		if (options.notifyOthers && options.taskBeingLeft !== undefined) {
-			// Notifier seulement si désinscription
+			// Utiliser le service de notification pour les désinscriptions
 			try {
-				const subject = `[Oupla] Désinscription de ${username} : ${event.event_title}`;
-				const eventDateStr = event.date_event
-					? new Date(event.date_event).toLocaleDateString("fr-FR", {
-							weekday: "long",
-							day: "numeric",
-							month: "long"
-						})
-					: "date inconnue";
-
-				const taskInfo = options.taskBeingLeft
-					? `de la tâche "<b>${options.taskBeingLeft}</b>"`
-					: `de ses tâches`; // Fallback
-
-				let htmlBody = `
-                    <p>Bonjour,</p>
-                    <p>L'utilisateur·ice <b>${username}</b> s'est désinscrit·e ${taskInfo} pour l'événement "<b>${event.event_title}</b>" prévu le ${eventDateStr}.</p>
-                `;
-
-				if (options.customMessage && options.customMessage.trim() !== "") {
-					const escapedCustomMessage = options.customMessage
-						.replace(/</g, "&lt;")
-						.replace(/>/g, "&gt;");
-					htmlBody = `
-                        <p><b>Message de ${username} :</b></p>
-                        <blockquote style="padding-left: 1em; border-left: 3px solid #ccc; margin-left: 0.5em; font-style: italic;">
-                            ${escapedCustomMessage.replace(/\n/g, "<br>")}
-                        </blockquote>
-                        <hr style="margin: 1em 0;">
-                        ${htmlBody}
-                    `;
-				}
-
-				htmlBody += `<p style="margin-top: 1.5em;"><a href="${window.location.origin}/dashboard/events?status=confirmed&highlight=${event.id}">Voir l'événement</a></p>`; // Ajouter lien
-				htmlBody += `<p style="margin-top: 1.5em;><italic>Ceci est un message automatique envoyé par le système Oupla.</italic></p>
-`;
-
-				let recipientGroups: GenericEmailPayload["recipientGroups"] = [];
-				const fallbackRecipientGroups: GenericEmailPayload["fallbackRecipientGroups"] = [
-					"spaceAdmins"
-				];
-
-				if (event.isRecurrent || event.masterRecurrentId) {
-					// Cibler équipe récurrence si occurrence ou master
-					recipientGroups = ["recurrenceTeam"];
-				} else {
-					recipientGroups = ["otherOrganizers"];
-				}
-
-				const payload: GenericEmailPayload = {
-					subject: subject,
-					htmlContent: htmlBody,
-					recipientGroups,
-					fallbackRecipientGroups,
-					context: { eventId: event.id, excludeUserId: userId }
-				};
-				console.log("Sending notification email with payload:", payload);
-				await sendGenericEmail(payload);
+				await notificationService.sendTaskUnsubscriptionNotification({
+					event,
+					user: { id: userId, username },
+					task: options.taskBeingLeft,
+					options: {
+						customMessage: options.customMessage,
+						notifyOthers: options.notifyOthers,
+						showUserFeedback: true
+					}
+				});
 			} catch (err) {
 				console.error("Erreur lors de l'envoi de la notification:", err);
 				showAlert(

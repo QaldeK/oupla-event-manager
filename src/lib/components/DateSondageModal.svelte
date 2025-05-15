@@ -1,10 +1,12 @@
 <script lang="ts">
 	import Modal from "$lib/components/Modal.svelte";
 	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
-	import type { EventType, DateProposedType, OrganizerType } from "$lib/types/types";
-	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
 	import { updateEvent } from "$lib/pocketbase.svelte";
+	import { notificationService } from "$lib/services/notificationService.svelte";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
+	import { userDb } from "$lib/shared/userDb.svelte";
+	import type { DateProposedType, EventType } from "$lib/types/types";
+	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
 
 	let eventData = $state<EventType>({ ...eventState.is });
 	let dateAccepted: DateProposedType | null = $state(null);
@@ -59,6 +61,15 @@
 									dates_proposed: [] // Vider les propositions
 								};
 								await updateEvent(eventData.id!, dataToUpdate);
+
+								// Envoyer notification aux participants du sondage
+								await notificationService.sendSondageValidationNotification({
+									event: eventData,
+									dateProposal: dateAccepted,
+									user: userDb.current,
+									options: { showUserFeedback: true }
+								});
+
 								closeModal();
 							}
 						}
@@ -76,6 +87,10 @@
 						isSondage: false,
 						dates_proposed: []
 					};
+
+					// Variables pour notification à envoyer après la mise à jour
+					const shouldNotify = true;
+					const proposalToNotify = dateAccepted;
 				}
 			}
 			// Cas 2: Pas de date validée, on sauvegarde juste les dates proposées actuelles
@@ -90,6 +105,16 @@
 			// Appeler PocketBase seulement si des données sont à mettre à jour
 			if (Object.keys(dataToUpdate).length > 0) {
 				await updateEvent(eventData.id, dataToUpdate);
+
+				// Si une date a été acceptée, envoyer une notification
+				if (dateAccepted && proposalToNotify) {
+					await notificationService.sendSondageValidationNotification({
+						event: eventData,
+						dateProposal: proposalToNotify,
+						user: userDb.current,
+						options: { showUserFeedback: true }
+					});
+				}
 			}
 			closeModal();
 		} catch (error) {
@@ -118,6 +143,8 @@
 		<button type="button" class="btn btn-ghost" onclick={closeModal}>Fermer sans enregistrer</button
 		>
 
-		<button class="btn btn-primary" type="button" onclick={handleSubmit}>Enregistrer</button>
+		<button class="btn btn-primary" type="button" onclick={handleSubmit}>
+			{dateAccepted ? "Valider et notifier" : "Enregistrer"}
+		</button>
 	</div>
 </Modal>
