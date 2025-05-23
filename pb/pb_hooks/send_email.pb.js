@@ -3,7 +3,7 @@
 
 routerAdd("POST", "/api/send_email", (e) => {
 	// --- Charger les utilitaires ---
-	const utils = require(`${__hooks}/utils.js`);
+	const utils = require(`${__hooks}/utils_email.js`);
 	const logger = $app.logger();
 
 	// --- Vérification d'authentification ---

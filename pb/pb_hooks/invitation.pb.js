@@ -1,15 +1,15 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-routerAdd('POST', '/api/send-invitation', async (e) => {
+routerAdd("POST", "/api/send-invitation", async (e) => {
 	let body = e.requestInfo().body;
 	const { email, username, invitationToken, space } = body;
 
 	//FIXIT : space undefined ?
-	console.log('space', space);
+	console.log("space", space);
 
 	// Validate email and username (add more robust validation as needed)
 	if (!email || !username) {
-		throw new Error('Email and username are required.');
+		throw new Error("Email and username are required.");
 	}
 
 	// BUG La création de l'utilisateur est faite dans le composant svelte, parce que ceci ne fonctionne pas.
@@ -30,9 +30,7 @@ routerAdd('POST', '/api/send-invitation', async (e) => {
 
 	// $app.save(record);
 
-	// TODO : real html adress !
-
-	const actionUrl = `http://localhost:5173/auth/invitation-setpassword?mail=${email}&uname=${username}&token=${invitationToken}`;
+	const actionUrl = `${$app.settings().meta.appURL}/auth/invitation-setpassword?mail=${email}&uname=${username}&token=${invitationToken}`;
 
 	$app.newMailClient().send({
 		from: {
@@ -45,7 +43,7 @@ routerAdd('POST', '/api/send-invitation', async (e) => {
 				name: username
 			}
 		],
-		subject: 'Invitation à rejoindre Oupla',
+		subject: "Invitation à rejoindre Oupla",
 		html: `
                 <html>
                 <head>
@@ -63,13 +61,13 @@ routerAdd('POST', '/api/send-invitation', async (e) => {
 });
 
 onRecordAfterUpdateSuccess((e) => {
-	console.log('👉 UPDATE INVITATION TOKEN');
+	console.log("👉 UPDATE INVITATION TOKEN");
 	const record = e.record;
 
-	if (record.get('invitationToken') === 'used') {
-		record.set('invitationToken', null);
-		record.set('verified', true);
+	if (record.get("invitationToken") === "used") {
+		record.set("invitationToken", null);
+		record.set("verified", true);
 		$app.save(record);
 	}
 	e.next();
-}, 'users');
+}, "users");
