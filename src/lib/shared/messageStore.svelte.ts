@@ -1,6 +1,6 @@
-import { SyncStore } from '$lib/shared/syncState.svelte';
-import type { MessagesRecord, MessagesResponse, UsersResponse } from '$lib/types/pocketbase';
-import { Collections } from '$lib/types/pocketbase';
+import { SyncStore } from "$lib/shared/syncState.svelte";
+import type { MessagesRecord, MessagesResponse, UsersResponse } from "$lib/types/pocketbase";
+import { Collections } from "$lib/types/pocketbase";
 
 /*
  *   **`MessageExpand` Interface:**  Cette interface décrit la structure de la propriété `expand` *que nous utilisons réellement*.  Cela rend le code beaucoup plus sûr en termes de types.  Nous savons que `user` est une relation vers la collection `users`, donc nous utilisons `UsersResponse`.  `replyingTo` peut aussi avoir un `expand`, donc c'est récursif.  `[key: string]: any` permet d'autres champs d'extension possibles.
@@ -31,34 +31,30 @@ class MessageStoreClass {
 		error: null
 	});
 
-	/**
-	 * Initialise le store de messages en créant un SyncStore et en le synchronisant avec PocketBase.
-	 * @param {string} spaceId - L'identifiant de l'espace pour filtrer les messages.
-	 * @returns {Promise<void>}
-	 */
 	async init(spaceId: string) {
 		if (!spaceId) {
-			this.#store.error = new Error('Space ID is required to initialize messageStore.');
+			this.#store.error = new Error("Space ID is required to initialize messageStore.");
 			return;
 		}
 		try {
 			const syncStore = new SyncStore<MessageStoreRecord>({
-				name: 'messageStore',
+				name: "messageStore",
 				version: 1,
 				indexes: {
 					byEvent: {
-						path: 'event',
-						type: 'single'
+						path: "event",
+						type: "single"
 					}
 				},
 				sync: {
-					mode: 'realtime',
-					filter: `space = "${spaceId}"` // Correction coquille : spaceId entre guillemets
+					mode: "realtime",
+					filter: `space = "${spaceId}"`,
+					expand: "user,replyingTo,replyingTo.user" // Expansion des relations utilisateur et réponses
 				},
 				trackUpdates: true,
 				cache: {
 					maxRecords: 500,
-					strategy: 'lru'
+					strategy: "lru"
 				}
 			});
 			await syncStore.init(Collections.Messages);
@@ -67,7 +63,7 @@ class MessageStoreClass {
 			// console.log('Message store initialized successfully (Class)');
 		} catch (error) {
 			this.#store.error = error as Error;
-			console.error('Failed to initialize messageStore (Class):', error);
+			console.error("Failed to initialize messageStore (Class):", error);
 		}
 	}
 	async clearAndDestroy(): Promise<void> {
@@ -78,18 +74,28 @@ class MessageStoreClass {
 		this.#store.isInitialized = false;
 		this.#store.error = null;
 	}
+
 	/**
 	 * Retourne les messages d'un événement spécifique.
 	 * @param {string} eventId - L'identifiant de l'événement.
 	 * @returns {MessagesRecord[]} - Tableau des messages pour cet événement.
 	 */
-	getMessageOfEvent = (eventId: string): MessagesRecord[] => {
+	getMessageOfEvent = $derived.by(() => (id: string): MessagesRecord[] => {
 		if (!this.#store.syncStore) {
-			console.warn('messageStore is not initialized yet.');
+			console.warn("messageStore is not initialized yet.");
 			return [];
 		}
-		return this.#store.syncStore.getByIndex('byEvent', eventId) as MessagesRecord[]; // Cast nécessaire car getByIndex retourne T[]
-	};
+		// Pour redeclancher getByIndex lorsqu'un nouveau message est crée
+		const allMessage = this.#store.syncStore.allRecords;
+
+		return this.#store.syncStore
+			.query()
+			.byIndex("byEvent", id)
+			.sort((a, b) => {
+				return new Date(a.created).getTime() - new Date(b.created).getTime();
+			})
+			.exec() as MessagesRecord[];
+	});
 
 	get isInitialized(): boolean {
 		return this.#store.isInitialized;
