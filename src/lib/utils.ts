@@ -99,6 +99,11 @@ export const lisibleTime = (date: Date | string | undefined) => {
 	return format(new Date(date), "kk:mm", { locale: fr });
 };
 
+export const lisibleDateTime = (date: Date | string | undefined) => {
+	if (!date) return "";
+	return format(new Date(date), "EEEE d MMMM à kk:mm", { locale: fr });
+};
+
 export const formatDatePb = (date: Date | string) => {
 	return format(new Date(date), "yyyy-MM-dd");
 };

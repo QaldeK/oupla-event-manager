@@ -99,7 +99,7 @@
 	};
 </script>
 
-<div class={{ "rounded-lg border bg-white p-4 shadow-sm": showHeader }}>
+<div class={{ "bg-base-200 rounded-lg  p-4 shadow-lg": showHeader }}>
 	{#if showHeader}
 		<!-- En-tête de l'événement -->
 		<div class="mb-2 flex items-center justify-between gap-2">

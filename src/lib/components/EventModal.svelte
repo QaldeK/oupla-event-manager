@@ -7,7 +7,6 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import Quill from "$lib/components/Quill.svelte";
 	import AddTaskForm from "$lib/components/forModal/AddTaskForm.svelte";
-	import AutoConfirmSettings from "$lib/components/forModal/AutoConfirmSettings.svelte";
 	import ButtonGroupSelect from "$lib/components/forModal/ButtonGroupSelect.svelte";
 	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
 	import DateUniq from "$lib/components/forModal/DateUniq.svelte";
@@ -52,6 +51,7 @@
 	import { UserPlus } from "lucide-svelte";
 	import EventValidationStatus from "./EventValidationStatus.svelte";
 	import TimeReservation from "./forModal/TimeReservation.svelte";
+	import OtherSetting from "./forModal/OtherSetting.svelte";
 
 	type EventMode =
 		| "NEW_SINGLE" // Création événement unique
@@ -731,6 +731,21 @@
 					>
 						ajoutez tous les rôles
 					</button>
+					{#if eventData.isPublic && (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL")}
+						<div class="form-control">
+							<label class="label cursor-pointer">
+								<span class="label-text"
+									>Empécher la confirmation de l'événement même si toutes les tâches ne sont pas
+									assignées</span
+								>
+								<input
+									type="checkbox"
+									class="toggle toggle-warning"
+									bind:checked={eventData.recurrence.allTasksRequired}
+								/>
+							</label>
+						</div>
+					{/if}
 				</div>
 			</Frame>
 
@@ -772,12 +787,14 @@
 							→ ajoutez tout le monde
 						</button>
 					{/if}
-					{#if errors.organizers}
-						<p class="text-fluid-sm text-error p-2 italic">{errors.organizers[0]}</p>
+					{#if formattedErrors?.recurrence?.recurrenceTeam._errors}
+						<p class="text-fluid-sm text-error p-2 italic">
+							{formattedErrors.recurrence.recurrenceTeam._errors[0]}
+						</p>
 					{/if}
 				</Frame>
 
-				<AutoConfirmSettings bind:eventData />
+				<OtherSetting bind:data={eventData.recurrence} />
 			{/if}
 
 			<Frame>
@@ -830,6 +847,7 @@
 									id="age"
 									placeholder="Age minimum ?"
 									bind:value={eventData.age_advice}
+									min="0"
 								/>
 							</label>
 							{#if errors.age_advice}

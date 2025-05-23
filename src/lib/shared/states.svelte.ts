@@ -4,6 +4,7 @@
 
 import { getNewEvent, type TaskType } from "$lib/schemas/event.schema";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
+import type { UserType } from "$lib/types/types";
 
 export interface ConfirmModalData {
 	title: string;
@@ -158,37 +159,10 @@ export const displayState = $state({
 export const messageSheet = $state({
 	isOpen: false,
 	currentEventId: <string | null>null,
-	openMessages(eventId: string) {
+	currentEventName: <string | null>null,
+	openMessages(eventId: string, eventName: string) {
 		this.currentEventId = eventId;
+		this.currentEventName = eventName;
 		this.isOpen = true;
 	}
 });
-
-import { userDb } from "$lib/shared/userDb.svelte";
-
-// FIXIT recurrenceTeam
-export const hasAuthorizations = (params: {
-	isRecurrent?: boolean;
-	recurrenceTeam?: string[];
-	createdBy?: string;
-}): boolean => {
-	const currentUser = userDb.current;
-	const currentRole = userDb.currentRole;
-
-	if (!currentUser) return false;
-
-	// Admin a toujours les droits
-	if (currentRole === "admin") return true;
-
-	// Vérifie si l'utilisateur fait partie de l'équipe récurrente
-	if (params.isRecurrent && params.recurrenceTeam?.includes(currentUser.id)) {
-		return true;
-	}
-
-	// Vérifie si l'utilisateur est le créateur et a le rôle "helpers"
-	if (currentRole === "helpers" && params.createdBy === currentUser.id) {
-		return true;
-	}
-
-	return false;
-};

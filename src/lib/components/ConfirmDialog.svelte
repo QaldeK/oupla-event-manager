@@ -15,12 +15,7 @@
 	let onCancelEventCallback = $derived(cancelEventConfig?.onCancelEvent);
 
 	// --- État local pour la checkbox ---
-	let notifyOthers = $state(checkboxConfig?.checked ?? false); // Initialiser avec la valeur par défaut
-
-	// 👉 Mettre à jour l'état local si la configuration change (par exemple, si le modal est réutilisé rapidement)
-	$effect(() => {
-		notifyOthers = checkboxConfig?.checked ?? false;
-	});
+	let notifyOthers = $derived(checkboxConfig?.checked); // Initialiser avec la valeur par défaut
 
 	const getIconColor = () => {
 		switch (variant) {
@@ -36,7 +31,6 @@
 	};
 
 	function handleConfirm() {
-		// 👉 Passer l'état de la checkbox au callback
 		if (onConfirmCallback) {
 			onConfirmCallback(notifyOthers);
 		}
@@ -70,35 +64,34 @@
 
 <Modal>
 	<div class="">
-		<h3 class="text-fluid-lg font-bold not-sm:text-center">{title}</h3>
-		<div class="p-4">
-			<div class="flex items-start gap-4">
-				<div class={`flex-shrink-0 self-center ${getIconColor()}`}>
-					{#if variant === "warning"}
-						<AlertTriangle size={36} />
-					{:else if variant === "info"}
-						<Info size={36} />
-					{:else if variant === "danger"}
-						<AlertOctagon size={36} />
-					{:else}
-						<AlertTriangle size={36} />
-					{/if}
-				</div>
-				<span class="text-fluid-base flex-grow">
-					{message}
-				</span>
+		<div class="flex items-center gap-4 not-sm:flex-col">
+			<div class={`flex-shrink-0 self-center sm:self-start  ${getIconColor()}`}>
+				{#if variant === "warning"}
+					<AlertTriangle size={36} />
+				{:else if variant === "info"}
+					<Info size={36} />
+				{:else if variant === "danger"}
+					<AlertOctagon size={36} />
+				{:else}
+					<AlertTriangle size={36} />
+				{/if}
 			</div>
-
-			<!-- 👉 Affichage conditionnel de la checkbox -->
-			{#if checkboxConfig}
-				<div class="mt-4">
-					<label class="flex cursor-pointer items-center justify-end">
-						<input type="checkbox" bind:checked={notifyOthers} class="checkbox checkbox-sm" />
-						<span class="label-text ml-2">{checkboxConfig.label}</span>
-					</label>
-				</div>
-			{/if}
+			<div class="flex flex-col gap-4 p-2">
+				<p class="text-fluid-lg font-semibold not-sm:text-center">{title}</p>
+				<p class="text-fluid-base flex-grow">
+					{@html message}
+				</p>
+			</div>
 		</div>
+		<!-- 👉 Affichage conditionnel de la checkbox -->
+		{#if checkboxConfig}
+			<div class="mt-4">
+				<label class="flex cursor-pointer items-center justify-end">
+					<input type="checkbox" bind:checked={notifyOthers} class="checkbox checkbox-sm" />
+					<span class="label-text ml-2">{checkboxConfig.label}</span>
+				</label>
+			</div>
+		{/if}
 		<div class="modal-action justify-between">
 			<!-- 👉 Affichage conditionnel du bouton d'annulation -->
 			<div>
@@ -108,14 +101,14 @@
 					</button>
 				{/if}
 			</div>
-			<div class="flex gap-2">
-				<button class="btn btn-ghost" onclick={handleCancel}>Annuler</button>
+			<div class="flex flex-wrap gap-2">
+				<button class="btn btn-ghost grow" onclick={handleCancel}>Annuler</button>
 				{#if additionnalButton}
 					<button class="btn btn-{additionnalButton.variant}" onclick={handleAdditionnalButton}
 						>{additionnalButton.label}</button
 					>
 				{/if}
-				<button class="btn btn-primary" onclick={handleConfirm}>{confirmLabel}</button>
+				<button class="btn btn-primary grow" onclick={handleConfirm}>{confirmLabel}</button>
 			</div>
 		</div>
 	</div>

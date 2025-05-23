@@ -2,15 +2,14 @@
 	import DatePicker from "$lib/components/forModal/DatePicker.svelte";
 	import MultiSelect from "./MultiSelect.svelte";
 	import {
-		getMonthlyRecurrenceLabel,
+		getRecurrenceLabel,
 		getOccurrenceInMonth,
 		getLastDayOfWeekInMonth,
 		getNthDayOfMonth
-	} from "$lib/utils/monthlyRecurrence";
+	} from "$lib/utils/recurrence";
 
-	import type { RequiredRecurrenceType } from "$lib/types/types";
+	import { type RequiredRecurrenceType, RecurrenceTypeValues } from "$lib/schemas/event.schema";
 	import {
-		addDays,
 		addMonths,
 		addWeeks,
 		endOfMonth,
@@ -37,19 +36,10 @@
 		isExistingMaster = false
 	}: RecurrentTabProps = $props();
 
-	interface RecurrenceChoice {
-		WEEKLY: string;
-		BIWEEKLY: string;
-		MONTHLY_BY_DATE: string;
-		MONTHLY_BY_DAY: string;
-	}
+	// Utilisation des valeurs importées directement depuis le schéma
+	const recurrenceChoice = RecurrenceTypeValues;
 
-	const recurrenceChoice: RecurrenceChoice = {
-		WEEKLY: "WEEKLY",
-		BIWEEKLY: "BIWEEKLY",
-		MONTHLY_BY_DATE: "MONTHLY_BY_DATE",
-		MONTHLY_BY_DAY: "MONTHLY_BY_DAY"
-	};
+	let isMounted = $state(false);
 
 	/**
 	 * Génère TOUTES les dates récurrentes potentielles en fonction des paramètres
@@ -151,15 +141,19 @@
 			}
 
 			// Ensure dates are sorted
-			// FIXIT : sort only when submit
 			dates.sort((a, b) =>
 				compareAsc(parse(a, "yyyy-MM-dd", new Date()), parse(b, "yyyy-MM-dd", new Date()))
 			);
 			return dates;
 		} catch (error) {
 			console.error("Error generating recurring dates:", error);
-			return []; // Return empty array on error
+			return [];
 		}
+	});
+
+	// Montage du composant
+	$effect(() => {
+		isMounted = true;
 	});
 
 	// --- Effect ---
@@ -224,7 +218,6 @@
 				}
 			} catch (error) {
 				console.error("Error setting default last date:", error);
-				// Gérer l'erreur, peut-être effacer lastDate ou logger
 			}
 		}
 	});
@@ -232,7 +225,16 @@
 	$effect(() => {
 		const generated = allGeneratedDates; // Dépendance sur la valeur dérivée
 
-		recurrence.recurrenceDates = [...generated];
+		// N'écraser les dates que si on crée un nouvel événement (pas lors de l'édition)
+		// ou si aucune date n'est encore sélectionnée
+		if (
+			(!isExistingMaster ||
+				!recurrence.recurrenceDates ||
+				recurrence.recurrenceDates.length === 0) &&
+			isMounted
+		) {
+			recurrence.recurrenceDates = [...generated];
+		}
 	});
 
 	// --- Functions ---
@@ -255,62 +257,8 @@
 	}
 
 	let labelOfOcurrence = $derived.by(() => {
-		return getMonthlyRecurrenceLabel(recurrence);
+		return getRecurrenceLabel(recurrence);
 	});
-
-	// // Condition dérivée pour la génération des dates
-	// let shouldGenerateDates = $derived<boolean>(
-	// 	Boolean(recurrence?.firstDate && recurrence?.lastDate && recurrence?.recurrenceType)
-	// );
-
-	// // Gestion unifiée de la mise à jour des dates récurrentes
-	// $effect(() => {
-	// 	// Reset si les conditions ne sont pas remplies
-	// 	if (!shouldGenerateDates) {
-	// 		if (recurrence?.recurrenceDates?.length > 0) {
-	// 			recurrence.recurrenceDates = [];
-	// 		}
-	// 		return;
-	// 	}
-
-	// 	// Pour MONTHLY_BY_DAY, on s'assure d'avoir selectedOccurrences correct
-	// 	if (
-	// 		recurrence.recurrenceType === recurrenceChoice.MONTHLY_BY_DAY &&
-	// 		selectedOccurrences?.length === 0
-	// 	) {
-	// 		const firstDay = parse(recurrence.firstDate, "yyyy-MM-dd", new Date());
-	// 		selectedOccurrences = [getOccurrenceInMonth(firstDay)];
-	// 	}
-
-	// 	// Préparation des options pour la génération
-	// 	const options =
-	// 		recurrence.recurrenceType === recurrenceChoice.MONTHLY_BY_DAY
-	// 			? { occurrences: selectedOccurrences }
-	// 			: {};
-
-	// 	// Génération des nouvelles dates
-	// 	const newDates = generateRecurringDates(
-	// 		recurrence.firstDate,
-	// 		recurrence.lastDate,
-	// 		recurrence.recurrenceType,
-	// 		options
-	// 	);
-
-	// 	// Mise à jour uniquement si les dates ont changé
-	// 	if (JSON.stringify(recurrence.recurrenceDates) !== JSON.stringify(newDates)) {
-	// 		recurrence.recurrenceDates = newDates;
-	// 	}
-	// });
-
-	// // Determine une eventData.lastDate par default (4 mois plus tard)
-	// $effect(() => {
-	// 	let firstDate = recurrence.firstDate;
-	// 	if (firstDate) {
-	// 		let defaultLastDate = addMonths(parse(firstDate, "yyyy-MM-dd", new Date()), 4);
-	// 		let defaultLastDateFormated = format(defaultLastDate, "yyyy-MM-dd");
-	// 		recurrence.lastDate = defaultLastDateFormated;
-	// 	}
-	// });
 </script>
 
 <!-- {$inspect('allDates', allDates)} -->
@@ -341,7 +289,7 @@
 					<p class="text-fluid-sm">Première date</p>
 
 					<div class="badge badge-xl badge-soft font-medium">
-						{lisibleDate(recurrence.firstDate)}
+						{lisibleDate(recurrence.firstDate || "")}
 					</div>
 				</div>
 			{/if}
@@ -371,7 +319,7 @@
 				aria-describedby="recurrence-type-description"
 				class="select"
 			>
-				<option value="" disabled selected> Choisissez un type de récurrence </option>
+				<option value={undefined} disabled selected> Choisissez un type de récurrence </option>
 				<option value={recurrenceChoice.WEEKLY}>Hebdomadaire</option>
 				<option value={recurrenceChoice.BIWEEKLY}>Bi-hebdomadaire</option>
 				<option value={recurrenceChoice.MONTHLY_BY_DATE}>Mensuel (même date)</option>
@@ -396,7 +344,7 @@
 					{ value: 4, label: "4eme" },
 					{ value: 5, label: "Dernier" }
 				]}
-				placeholder="Tous les {labelOfOcurrence} du mois"
+				placeholder={`Tous les ${labelOfOcurrence} du mois`}
 			/>
 			{#if localErrors?.monthlyByDayOccurrences?._errors?.length}
 				<p class="text-fluid-xs text-error italic">

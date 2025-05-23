@@ -11,16 +11,18 @@
 </script>
 
 {#if unassignedTasks.length > 0}
-	<div class="flex flex-wrap gap-1 {className}">
-		<span class="text-fluid-sm text-base-content/60">Tâches non attribuées:</span>
-		{#each unassignedTasks as task, index (task.name + event.id + index)}
-			<span title={task.description} class="badge badge-soft badge-sm me-1 mb-1 font-medium"
-				>{task.name}</span
-			>
-		{/each}
+	<div class="text-base-content/60 flex flex-wrap gap-1 {className}">
+		<div class="text-fluid-sm me-2 font-medium">Tâches non attribuées:</div>
+		<div class="flex flex-wrap gap-1">
+			{#each unassignedTasks as task, index (task.name + event.id + index)}
+				<span title={task.description} class="badge badge-dash badge-sm font-medium"
+					>{task.name}</span
+				>
+			{/each}
+		</div>
 	</div>
 {:else}
-	<div class="text-fluid-sm text-base-content/60 flex flex-wrap gap-1 {className}">
+	<div class="text-fluid-sm text-base-content/60 text-right italic {className}">
 		Toutes les tâches sont attribuées
 	</div>
 {/if}

@@ -1,5 +1,5 @@
-import { getFirstListItem, getFullList, getList, getOne, pb } from '$lib/pocketbase.svelte';
-import type { Collections, TypedPocketBase } from '$lib/types/pocketbase';
+import { getFirstListItem, getFullList, getList, getOne, pb } from "$lib/pocketbase.svelte";
+import type { Collections, TypedPocketBase } from "$lib/types/pocketbase";
 import type {
 	Collection,
 	IndexConfig,
@@ -9,10 +9,10 @@ import type {
 	StoreConfig,
 	StoreRecord,
 	SyncError
-} from '$lib/types/syncState.types';
-import type { ListResult, RecordSubscription } from 'pocketbase';
+} from "$lib/types/syncState.types";
+import type { ListResult, RecordSubscription } from "pocketbase";
 
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap } from "svelte/reactivity";
 
 const subscribe = <T extends StoreRecord>(
 	collectionName: Collections,
@@ -20,17 +20,17 @@ const subscribe = <T extends StoreRecord>(
 	options?: { filter?: string }
 ): (() => void) => {
 	pb.collection(collectionName).subscribe(
-		'*',
+		"*",
 		(data: RecordSubscription<T>) => {
 			// Vérifier et convertir l'action
-			if (['create', 'update', 'delete'].includes(data.action)) {
+			if (["create", "update", "delete"].includes(data.action)) {
 				callback(data as unknown as PocketBaseEventData<T>);
 			}
 		},
 		options
 	);
 
-	return () => pb.collection(collectionName).unsubscribe('*');
+	return () => pb.collection(collectionName).unsubscribe("*");
 };
 
 // Interface pour les données internes du store (privées)
@@ -65,6 +65,14 @@ export class SyncStore<T extends StoreRecord> {
 
 	// Exposer des getters réactifs avec $derived
 	readonly allRecords = $derived<T[]>(Array.from(this.store.byId.values()));
+	readonly indexedRecords = $derived.by(() => {
+		// Créer une copie réactive des index
+		const result = new Map();
+		for (const [indexName, indexMap] of this.store.indexes.entries()) {
+			result.set(indexName, new Map(indexMap));
+		}
+		return result;
+	});
 	readonly error = $derived<SyncError | null>(this.store.error);
 	readonly isSyncing = $derived<boolean>(this.store.isSyncing);
 	readonly isInitialized = $derived<boolean>(this.store.isInitialized);
@@ -85,10 +93,10 @@ export class SyncStore<T extends StoreRecord> {
 	private normalizeConfig(config: StoreConfig<T>): StoreConfig<T> {
 		return {
 			...config,
-			primaryKey: config.primaryKey ?? 'id',
+			primaryKey: config.primaryKey ?? "id",
 			indexes: config.indexes ?? {},
 			sync: {
-				mode: config.sync?.mode ?? 'manual',
+				mode: config.sync?.mode ?? "manual",
 				filter: config.sync?.filter,
 				interval: config.sync?.interval,
 				expand: config.sync?.expand,
@@ -97,13 +105,13 @@ export class SyncStore<T extends StoreRecord> {
 			trackUpdates: config.trackUpdates ?? false,
 			cache: {
 				maxRecords: config.cache?.maxRecords ?? 1000,
-				strategy: config.cache?.strategy ?? 'lru'
+				strategy: config.cache?.strategy ?? "lru"
 			}
 		};
 	}
 
 	constructor(private config: StoreConfig<T>) {
-		console.log('🚀 Création du store:', config.name);
+		console.log("🚀 Création du store:", config.name);
 		this.config = this.normalizeConfig(config);
 		this.initPromise = this.initDb();
 	}
@@ -238,14 +246,14 @@ export class SyncStore<T extends StoreRecord> {
 			values = indexConfig.transform(record);
 		}
 
-		return indexConfig.type === 'array'
+		return indexConfig.type === "array"
 			? values.flat().filter((v): v is string | number => v !== undefined)
 			: values.filter((v): v is string | number => v !== undefined);
 	}
 
 	private getValueByPath(obj: T, path: string[]): string | number | undefined {
 		return path.reduce((current: any, key) => {
-			if (key === '*' && Array.isArray(current)) {
+			if (key === "*" && Array.isArray(current)) {
 				return current.flatMap((item) => item);
 			}
 			return (current as Record<string, unknown>)[key];
@@ -272,7 +280,7 @@ export class SyncStore<T extends StoreRecord> {
 	 */
 	public getAllByIndex(indexName: string): Map<string | number, T[]> {
 		if (!this.store.isInitialized) {
-			throw new Error('Store not initialized. Call init() first.');
+			throw new Error("Store not initialized. Call init() first.");
 		}
 
 		const result = new Map<string | number, T[]>();
@@ -298,7 +306,7 @@ export class SyncStore<T extends StoreRecord> {
 
 	public query(): QueryBuilder<T> {
 		if (!this.isInitialized) {
-			throw new Error('Store not initialized. Call init() first.');
+			throw new Error("Store not initialized. Call init() first.");
 		}
 		return new QueryBuilder(this);
 	}
@@ -318,7 +326,7 @@ export class SyncStore<T extends StoreRecord> {
 
 	public getAllByIndexCached(indexName: string): Map<string | number, T[]> {
 		if (!this.store.isInitialized) {
-			throw new Error('Store not initialized. Call init() first.');
+			throw new Error("Store not initialized. Call init() first.");
 		}
 
 		const currentTimestamp = this.store.lastSync?.getTime() ?? Date.now();
@@ -370,7 +378,7 @@ export class SyncStore<T extends StoreRecord> {
 	// Méthode pour charger une page spécifique
 	public async loadPage(pageNumber: number): Promise<T[]> {
 		if (!this.collection) {
-			throw new Error('Store not initialized');
+			throw new Error("Store not initialized");
 		}
 
 		try {
@@ -384,7 +392,7 @@ export class SyncStore<T extends StoreRecord> {
 
 			const result = await this.collection.getList<T>(pageNumber, this.pagination.perPage, {
 				filter: this.config.sync?.filter,
-				sort: '-created' // ou autre tri par défaut
+				sort: "-created" // ou autre tri par défaut
 			});
 
 			// Mettre à jour l'état de pagination
@@ -484,7 +492,7 @@ export class SyncStore<T extends StoreRecord> {
 
 			const nextBatch = await this.collection.getList<T>(1, this.infiniteScroll.batchSize, {
 				filter: this.config.sync?.filter,
-				sort: '-created',
+				sort: "-created",
 				skip: this.infiniteScroll.loadedCount // Ignorer les éléments déjà chargés
 			});
 
@@ -497,7 +505,7 @@ export class SyncStore<T extends StoreRecord> {
 
 			return nextBatch.items;
 		} catch (error) {
-			this.handleError(error, 'Erreur lors du chargement de données supplémentaires');
+			this.handleError(error, "Erreur lors du chargement de données supplémentaires");
 			throw error;
 		} finally {
 			this.infiniteScroll.isLoading = false;
@@ -527,7 +535,7 @@ export class SyncStore<T extends StoreRecord> {
 			await this.initPromise;
 
 			if (!this.db) {
-				throw new Error('IndexedDB initialization failed');
+				throw new Error("IndexedDB initialization failed");
 			}
 
 			// 2. Charger lastSync
@@ -552,11 +560,11 @@ export class SyncStore<T extends StoreRecord> {
 			console.log(`📊 ${this.config.name}: ${this.store.byId.size} enregistrements chargés`);
 
 			// 5. Configurer la synchronisation en temps réel si nécessaire
-			if (this.config.sync?.mode === 'realtime') {
+			if (this.config.sync?.mode === "realtime") {
 				console.log(`🔄 ${this.config.name}: Configuration du mode temps réel`);
 				await this.setupRealtimeSync();
 				console.log(`✅ ${this.config.name}: Mode temps réel activé`);
-			} else if (this.config.sync?.mode === 'interval') {
+			} else if (this.config.sync?.mode === "interval") {
 				console.log(
 					`⏱️ ${this.config.name}: Configuration du mode intervalle (${this.config.sync.interval}ms)`
 				);
@@ -584,10 +592,11 @@ export class SyncStore<T extends StoreRecord> {
 		console.log(`👉 ${this.config.name}: Configuration des événements temps réel`);
 		console.log(`📡 ${this.config.name}: Filtre:`, this.config.sync?.filter);
 
-		const unsubscribeFunc = this.collection.subscribe(
-			'*',
+		// Subscribe to all events
+		this.collection.subscribe(
+			"*",
 			((data: RecordSubscription<T>) => {
-				if (['create', 'update', 'delete'].includes(data.action)) {
+				if (["create", "update", "delete"].includes(data.action)) {
 					const typedData = data as unknown as PocketBaseEventData<T>;
 					console.log(
 						`📥 ${this.config.name}: Événement reçu:`,
@@ -595,11 +604,11 @@ export class SyncStore<T extends StoreRecord> {
 						typedData.record?.id
 					);
 					switch (typedData.action) {
-						case 'create':
-						case 'update':
+						case "create":
+						case "update":
 							void this.handleRecordUpdate(typedData.record);
 							break;
-						case 'delete':
+						case "delete":
 							void this.handleRecordDeletion(typedData.record.id);
 							break;
 					}
@@ -611,9 +620,12 @@ export class SyncStore<T extends StoreRecord> {
 			}
 		);
 
+		// Store the unsubscribe function that will be called on cleanup
 		this.unsubscribe = () => {
 			console.log(`🧹 ${this.config.name}: Nettoyage des souscriptions`);
-			unsubscribeFunc;
+			if (this.collection) {
+				this.collection.unsubscribe();
+			}
 		};
 	}
 
@@ -632,9 +644,9 @@ export class SyncStore<T extends StoreRecord> {
 
 			// Appliquer la stratégie de cache si nécessaire
 			await this.enforceCacheLimit();
-			console.log('Record update complete'); // Debug log
+			console.log("Record update complete"); // Debug log
 		} catch (error) {
-			this.handleError(error, 'Erreur lors de la mise à jour du record');
+			this.handleError(error, "Erreur lors de la mise à jour du record");
 		}
 	}
 
@@ -649,7 +661,7 @@ export class SyncStore<T extends StoreRecord> {
 			// Supprimer de IndexedDB
 			await this.deleteFromIndexedDb(recordId);
 		} catch (error) {
-			this.handleError(error, 'Erreur lors de la suppression du record');
+			this.handleError(error, "Erreur lors de la suppression du record");
 		}
 	}
 
@@ -696,7 +708,7 @@ export class SyncStore<T extends StoreRecord> {
 			);
 		} catch (error) {
 			console.error(`⚠️ ${this.config.name}: Erreur de synchronisation:`, error);
-			this.handleError(error, 'Erreur de synchronisation');
+			this.handleError(error, "Erreur de synchronisation");
 		} finally {
 			this.store.isSyncing = false;
 		}
@@ -770,9 +782,9 @@ export class SyncStore<T extends StoreRecord> {
 						// Créer les index
 						if (this.config.indexes) {
 							Object.entries(this.config.indexes).forEach(([name, config]) => {
-								if (typeof config.path === 'string') {
+								if (typeof config.path === "string") {
 									store.createIndex(name, config.path, {
-										multiEntry: config.type === 'array'
+										multiEntry: config.type === "array"
 									});
 								}
 							});
@@ -794,11 +806,11 @@ export class SyncStore<T extends StoreRecord> {
 	}
 	private async loadFromIndexedDb(): Promise<void> {
 		if (!this.db) {
-			throw new Error('Store not properly initialized');
+			throw new Error("Store not properly initialized");
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, 'readonly');
+			const transaction = this.db!.transaction(this.config.name, "readonly");
 			const store = transaction.objectStore(this.config.name);
 			const request = store.getAll();
 
@@ -821,11 +833,11 @@ export class SyncStore<T extends StoreRecord> {
 
 	private async deleteFromIndexedDb(recordId: string): Promise<void> {
 		if (!this.db) {
-			throw new Error('Store not properly initialized');
+			throw new Error("Store not properly initialized");
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, 'readwrite');
+			const transaction = this.db!.transaction(this.config.name, "readwrite");
 			const store = transaction.objectStore(this.config.name);
 			const request = store.delete(recordId);
 
@@ -849,11 +861,11 @@ export class SyncStore<T extends StoreRecord> {
 
 	private async saveToIndexedDb(record: T): Promise<void> {
 		if (!this.db || !this.store.isInitialized) {
-			throw new Error('Store not properly initialized');
+			throw new Error("Store not properly initialized");
 		}
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, 'readwrite');
+			const transaction = this.db!.transaction(this.config.name, "readwrite");
 			const store = transaction.objectStore(this.config.name);
 			const request = store.put(record);
 
@@ -899,10 +911,10 @@ export class SyncStore<T extends StoreRecord> {
 			baseFilter: this.config.sync?.filter,
 			hasCache: this.store.byId.size > 0,
 			lastSync: this.store.lastSync,
-			finalFilter: filters.filter(Boolean).join(' && ') || ''
+			finalFilter: filters.filter(Boolean).join(" && ") || ""
 		});
 
-		return filters.filter(Boolean).join(' && ') || '';
+		return filters.filter(Boolean).join(" && ") || "";
 	}
 
 	private buildSortString(): string | undefined {
@@ -910,14 +922,14 @@ export class SyncStore<T extends StoreRecord> {
 		if (!sort) return undefined;
 
 		if (Array.isArray(sort)) {
-			return sort.join(',');
+			return sort.join(",");
 		}
 		return sort;
 	}
 
 	private handleError(error: unknown, context: string): void {
 		const syncError = {
-			message: `${context}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			message: `${context}: ${error instanceof Error ? error.message : "Unknown error"}`,
 			timestamp: new Date(),
 			details: error
 		};
@@ -975,7 +987,7 @@ export class SyncStore<T extends StoreRecord> {
 			);
 		} catch (error) {
 			console.error(`❌ ${this.config.name}: Erreur lors du refresh forcé:`, error);
-			this.handleError(error, 'Erreur lors du refresh forcé');
+			this.handleError(error, "Erreur lors du refresh forcé");
 			throw error;
 		} finally {
 			this.store.isSyncing = false;
@@ -1013,7 +1025,7 @@ export class SyncStore<T extends StoreRecord> {
 		if (!this.db) return;
 
 		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, 'readwrite');
+			const transaction = this.db!.transaction(this.config.name, "readwrite");
 			const store = transaction.objectStore(this.config.name);
 			const request = store.clear();
 

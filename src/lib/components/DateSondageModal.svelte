@@ -3,7 +3,7 @@
 	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import { notificationService } from "$lib/services/notificationService.svelte";
-	import { eventState, modalState } from "$lib/shared/states.svelte";
+	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { DateProposedType, EventType } from "$lib/types/types";
 	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
@@ -117,9 +117,9 @@
 				}
 			}
 			closeModal();
-		} catch (error) {
-			console.error("Erreur lors de la sauvegarde du sondage :", error);
-			// TODO: Afficher une alerte à l'utilisateur
+		} catch (e) {
+			console.error("Erreur lors de la sauvegarde du sondage :", e);
+			showAlert("Erreur lors de la sauvegarde du sondage :", "error");
 		}
 	}
 </script>

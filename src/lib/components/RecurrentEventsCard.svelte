@@ -1,41 +1,29 @@
 <script lang="ts">
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import type { EventType, UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
+	import { confirmEventAction } from "$lib/services/eventActions";
+	import type {
+		EventType,
+		UserType,
+		ValidMaster,
+		ValidOccurrence,
+		RecurrenceType
+	} from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
 
 	import { userDb } from "$lib/shared/userDb.svelte";
 
 	import { CalendarCheck, Pencil, UserCheck, UserPlus } from "lucide-svelte";
-	import { getMonthlyRecurrenceLabel } from "$lib/utils/monthlyRecurrence";
+	import { getRecurrenceLabel, formatRecurrence } from "$lib/utils/recurrence";
+	import OrgAndTasksCard from "./OrgAndTasksCard.svelte";
 
-	type RecurrenceType = "WEEKLY" | "BIWEEKLY" | "MONTHLY_BY_DATE" | "MONTHLY_BY_DAY";
-
-	let {
-		master,
-		occurrences = [],
-		onConfirm
-	} = $props<{
+	let { master, occurrences = [] } = $props<{
 		master: ValidMaster;
 		occurrences: ValidOccurrence[];
-		onConfirm: (id: string) => Promise<void>;
 	}>();
 
 	let currentUser: UserType | null = $derived(userDb.current);
-
-	const formatRecurrence = (recurrence: NonNullable<EventType["recurrence"]>): string => {
-		const recurrenceTypes: Record<RecurrenceType, string> = {
-			WEEKLY: "Hebdomadaire",
-			BIWEEKLY: "Bi-hebdomadaire",
-			MONTHLY_BY_DATE: "Mensuel (date fixe)",
-			MONTHLY_BY_DAY: "Mensuel"
-		};
-
-		return (
-			recurrenceTypes[recurrence.recurrenceType as RecurrenceType] || recurrence.recurrenceType
-		);
-	};
 
 	// déterminer si l'utilisateur est inscrit à au moins une tâche
 	const isUserSubscribed = (occurrence: ValidOccurrence): boolean => {
@@ -46,6 +34,10 @@
 	const handleSubscriptionClick = (occurrence: ValidOccurrence) => {
 		if (!currentUser) return;
 		eventsStore.requestTaskUpdate({ event: occurrence, user: currentUser });
+	};
+
+	const handleConfirmClick = async (occurrence: ValidOccurrence) => {
+		await confirmEventAction(occurrence, currentUser as UserType, true);
 	};
 
 	const getSubscriptionButtonText = (occurrence: ValidOccurrence): string => {
@@ -61,7 +53,7 @@
 	};
 </script>
 
-<div class="@container flex h-full flex-col overflow-hidden rounded-lg border bg-white shadow-md">
+<div class="bg-base-200 @container flex h-full flex-col overflow-hidden rounded-lg shadow-lg">
 	<div class="space-y-4 p-2 md:p-4">
 		<!-- En-tête -->
 		<div class=" pb-2">
@@ -69,31 +61,29 @@
 				{master.event_title}
 			</h2>
 			<div
-				class="bg-info/10 flex flex-wrap justify-between gap-4 rounded-lg px-2 py-1 @sm:px-4 @sm:py-2"
+				class="bg-primary/10 flex flex-wrap justify-between gap-4 rounded-lg px-2 py-1.5 @sm:px-4 @sm:py-2"
 			>
-				<div class="text-fluid-base mt-1">
+				<div class="text-fluid-base">
 					{formatRecurrence(master.recurrence)}
-					{#if master.recurrence.recurrenceType === "MONTHLY_BY_DAY"}
-						<span>• {getMonthlyRecurrenceLabel(master.recurrence)}</span>
-					{/if}
+					<span>• {getRecurrenceLabel(master.recurrence)}</span>
 					<span>
 						• Programmés jusqu'au {lisibleDate(new Date(master.recurrence.lastDate))}
 					</span>
 				</div>
-				<div class="space-y-2">
-					<div class="flex flex-wrap gap-2">
-						<span class="text-fluid-base">Tâches:</span>
+				<div class="flex flex-wrap space-y-2 gap-x-8">
+					<div class="flex flex-wrap items-baseline gap-2">
+						<span class="text-fluid-sm text-base-content/60 font-medium">Tâches:</span>
 						{#each master.tasks as task (master.id + task.name)}<span
-								class="badge badge-primary badge-soft">{task.name}</span
+								class="badge badge-primary badge-sm badge-outline">{task.name}</span
 							>{/each}
 					</div>
 					{#if master.recurrence.recurrenceTeam?.length}
-						<div class="flex flex-wrap gap-2">
-							<span class="text-fluid-base">Equipe:</span>
+						<div class="flex flex-wrap items-baseline gap-2">
+							<span class="text-fluid-sm text-base-content/60 font-medium">Equipe:</span>
 
 							{#each master.recurrence.recurrenceTeam as member (member.id)}
 								{#if member && typeof member === "object" && "username" in member}
-									<div class=" badge badge-accent badge-soft">
+									<div class=" badge badge-sm badge-accent badge-outline">
 										{member.username}
 									</div>
 								{/if}
@@ -137,11 +127,9 @@
 									<span class="text-fluid-sm text-success text-nowrap">✓ Confirmé</span>
 								{:else}
 									<button
-										onclick={() => onConfirm(occurrence.id)}
+										onclick={() => handleConfirmClick(occurrence)}
 										class="btn btn-compact @max-md:btn-square"
 										title="Confirmer que l'événement a lieu"
-										disabled={!Array.isArray(occurrence.organizers) ||
-											occurrence.organizers.length === 0}
 									>
 										<CalendarCheck />
 										<span class="@max-md:hidden">Confirmer</span>
@@ -161,31 +149,20 @@
 						</div>
 						<!-- Affichage des organisateurs -->
 						{#if Array.isArray(occurrence.organizers) && occurrence.organizers.length > 0}
-							<div class="flex flex-wrap items-center gap-x-4 gap-y-2 @max-md:my-2">
-								{#each occurrence.organizers as organizer (organizer.id)}
-									<div
-										class=" bg-accent/5 text-accent flex rounded-md px-2 py-1"
-										title={organizer.tasks?.join(", ") || "aucune taches spécifiées"}
-									>
-										<span class="text-fluid-sm font-semibold">{organizer.username}</span>
-										{#if occurrence.tasks?.length > 1}
-											<div class="ms-2 flex flex-wrap gap-2">
-												{#each organizer.tasks as task (organizer.id + task)}
-													<span class="text-fluid-xs">{task}</span>
-												{/each}
-											</div>
-										{/if}
-									</div>
-								{/each}
+							<OrgAndTasksCard organizers={occurrence.organizers} tasks={occurrence.tasks} />
+						{:else}
+							<div class="text-fluid-sm text-base-content/60">
+								Aucun·e organisateur·ice inscrit·e
 							</div>
 						{/if}
 
-						<div class="ms-auto mt-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+						<div class="mt-4 flex flex-wrap items-center justify-between gap-4">
 							<!-- Bouton d'inscription/gestion -->
-
-							{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
-								<UnassignedTasks event={occurrence} class="mt-2 ml-auto" />
-							{/if}
+							<div>
+								{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
+									<UnassignedTasks event={occurrence} class="" />
+								{/if}
+							</div>
 							<button
 								onclick={() => handleSubscriptionClick(occurrence)}
 								class=" btn btn-primary btn-compact btn-soft ms-auto"
@@ -206,10 +183,7 @@
 			</div>
 		</div>
 	</div>
-	<div
-		id="footer-card"
-		class="bg-base-200 mt-auto flex flex-wrap justify-end gap-x-4 px-2 py-1 text-right"
-	>
+	<div id="footer-card" class="bg-base-200 mt-auto flex flex-wrap justify-end gap-x-4 px-2 py-1">
 		<button
 			onclick={() => {
 				eventState.is = master;

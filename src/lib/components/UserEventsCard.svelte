@@ -6,7 +6,7 @@
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
-	import { Pencil, UserMinus } from "lucide-svelte";
+	import { ListTodo, Pencil, UserMinus } from "lucide-svelte";
 
 	let { event } = $props<{
 		event: EventType;
@@ -45,29 +45,26 @@
 	);
 </script>
 
-<div class="@container flex flex-col rounded-lg border bg-white shadow-md">
+<div class="@container flex flex-col rounded-lg border shadow-lg">
 	<!-- En-tête -->
-	<div class="items-top flex gap-4 @max-md:flex-col @md:justify-between">
+	<div
+		id="header-user-event-card"
+		class="items-top flex gap-2 @max-md:flex-col @md:justify-between"
+	>
 		<div
-			class="text-fluid-base @max-md:flex @max-md:flex-wrap @max-md:gap-x-4 @max-md:px-4 @max-md:py-1 @max-md:align-middle @md:order-2 @md:text-right {eventStatus.bg} @max-md:rounded-t-lg @md:self-start @md:rounded-tr-lg @md:rounded-bl-lg @md:py-2 @md:pr-4 @md:pl-8"
+			class="text-fluid-base @max-dm:px-2 flex flex-wrap items-center @max-md:justify-between @max-md:gap-x-4 @max-md:px-4 @max-md:py-2 @max-md:align-middle @md:order-2 @md:max-w-56 @md:gap-x-3 @md:gap-y-1 @md:text-right {eventStatus.bg} @max-md:rounded-t-lg @md:justify-end @md:self-start @md:rounded-tr-lg @md:rounded-bl-lg @md:py-2 @md:pr-4 @md:pl-8"
 		>
-			{#if event.date_event}
-				<div class="font-medium">{lisibleDate(new Date(event.date_event))}</div>
-				{#if event.time_start && event.time_end}
-					<div class="text-base-content/80">{event.time_start} - {event.time_end}</div>
-				{/if}
-			{:else if event.dates_proposed?.length}
-				<div class="text-warning">Sondage en cours</div>
-			{:else}
-				<div class="text-base-content/70 italic">Date à définir</div>
-			{/if}
-			<div class="text-fluid-xs font-medium italic {eventStatus.labelColor}">
+			<div class="font-semibold text-nowrap">{lisibleDate(new Date(event.date_event))}</div>
+			<div class="text-base-content text-fluid-sm font-medium text-nowrap">
+				{event.time_start} - {event.time_end}
+			</div>
+			<div class="text-fluid-xs text-end font-medium text-nowrap italic {eventStatus.labelColor}">
 				{eventStatus.label}
 			</div>
 		</div>
-		<div class="grid px-4 pb-2 @md:my-4">
+		<div class="grid px-4 @md:my-4">
 			<div class="text-fluid-lg font-bold">{event.event_title}</div>
-			<div class="text-fluid-base mt-1 mb-2">
+			<div class="text-fluid-sm mt-1 mb-2">
 				{#each event.categories as category, index (category)}
 					<span class="font-medium uppercase">
 						{category}{index < event.categories.length - 1 ? ", " : ""}
@@ -77,23 +74,19 @@
 		</div>
 	</div>
 
-	<div class="flex flex-1 flex-col gap-2 p-4">
+	<div class="flex flex-1 flex-col gap-3 px-4 py-2">
 		<!-- Organisateurs et tâches -->
-		<div class="my-2 flex flex-wrap items-center gap-2">
-			{#if currentUserTasks.length > 0}
-				<div class="text-fluid-sm">Vos taches:</div>
-				{#each currentUserTasks as taskName (taskName)}
-					<div class="badge badge-primary badge-soft font-semibold">
-						{taskName}
-					</div>
-				{/each}
-			{:else if isCurrentUserSubscribed()}
-				<div class="badge badge-warning badge-soft font-semibold">Aucune tâche assignée</div>
-			{/if}
+		<div class="flex flex-wrap items-center gap-2">
+			<div class="text-base-content/60 me-2">Vos taches:</div>
+			{#each currentUserTasks as taskName (taskName)}
+				<div class="badge badge-primary badge-soft font-semibold">
+					{taskName}
+				</div>
+			{/each}
 		</div>
 		<div>
 			{#if event.organizers.length > 1}
-				<span>Avec:</span>
+				<span class="text-base-content/60 me-2">Avec</span>
 				{#each event.organizers as organizer (organizer.id)}
 					<div
 						class="badge badge-soft badge-accent me-2 font-semibold {organizer.username ===
@@ -107,22 +100,24 @@
 					>Il n'y a pas d'autre organisateur·ice pour le moment</span
 				>
 			{/if}
-			{#if Array.isArray(event.tasks) && event.tasks.length > 1}
-				<UnassignedTasks {event} class="mt-2 ml-auto" />
-			{/if}
 		</div>
+		{#if Array.isArray(event.tasks) && event.tasks.length > 1}
+			<!-- <div class="divider my-1"></div> -->
+			<div class=""><UnassignedTasks {event} class="ml-auto" /></div>
+		{/if}
 	</div>
 
-	<div class="mt-auto flex justify-end gap-x-2 border-t px-3 py-1.5">
+	<div class="bg-base-200 mt-2 flex justify-end gap-x-2 border-t px-3 py-1.5">
 		{#if isCurrentUserSubscribed()}
 			<button
 				onclick={manageTasks}
-				class="btn btn-outline btn-compact {event.tasks.length > 1 ? 'btn-accent' : 'btn-error'}"
+				class="btn btn-compact btn-outline {event.tasks.length > 1 ? 'btn-accent' : 'btn-error'}"
 			>
-				<UserMinus class="mr-1 h-4 w-4" />
 				{#if event.tasks.length > 1}
+					<ListTodo size={18} />
 					vos tâches
 				{:else}
+					<UserMinus size={18} />
 					se désinscrire
 				{/if}
 			</button>

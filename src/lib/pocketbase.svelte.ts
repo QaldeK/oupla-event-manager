@@ -169,15 +169,19 @@ export const getOne = async <T extends RecordModel>(
 
 export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => {
 	try {
+		if (!eventData.recurrence || typeof eventData.recurrence !== "object") {
+			throw new Error("Données de récurrence invalides ou manquantes.");
+		}
+
 		// Créer le masterEvent
 		const masterEvent = {
 			...eventData,
 			isMasterRecurrent: true,
 			date_event: "", // on ne met pas de date à l'event master
 			space: getSpace.id,
-			created_by: pb.authStore.record.id,
+			created_by: pb.authStore.record?.id,
 			recurrence: {
-				...eventData.recurrence,
+				...(eventData.recurrence as object),
 				tasks: eventData.tasks
 			},
 			dateStart: null,
@@ -186,22 +190,24 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 
 		const masterRecord = await pb.collection("events").create({ ...masterEvent });
 		console.log("Master event créé:", masterRecord.id);
-		const recurrenceDates = eventData.recurrence.recurrenceDates;
+
+		// Vérifier et accéder aux dates de récurrence de manière sûre
+		const recurrenceDates = (eventData.recurrence.recurrenceDates as string[]) || [];
 
 		// Créer les occurrences
 		const batch = pb.createBatch();
-		recurrenceDates.forEach((date, index) => {
-			const dateStart = createDateFromString(date, eventData.time_start);
-			const dateEnd = createDateFromString(date, eventData.time_end);
+		recurrenceDates.forEach((date: string) => {
+			const dateStart = createDateFromString(date, eventData.time_start || "");
+			const dateEnd = createDateFromString(date, eventData.time_end || "");
 			const occurrenceData = {
 				...eventData,
 				space: getSpace.id,
-				created_by: pb.authStore.record.id,
+				created_by: pb.authStore.record?.id,
 				date_event: date,
 				masterRecurrentId: masterRecord.id,
 				isMasterRecurrent: false,
 				recurrence: {
-					...eventData.recurrence,
+					...(eventData.recurrence as object),
 					tasks: eventData.tasks
 				},
 				organizers: [], // XXX : les organisateurs des occurrences sont vide par default, et ne correspondent pas a la recurrenceTeam
@@ -212,7 +218,8 @@ export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => 
 			batch.collection("events").create(occurrenceData);
 		});
 
-		// ts-int:disable-next-line: no-unused-expression
+		// Commentaire corrigé
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const createOccurrences = await batch.send();
 		console.log("Création des événements récurrents terminée");
 	} catch (error) {
@@ -238,24 +245,25 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 		}
 
 		// Fonction utilitaire pour nettoyer les données avant l'envoi
-		const cleanEventData = (event) => {
+		const cleanEventData = (event: EventType) => {
 			// On crée une copie pour ne pas modifier l'original
 			const cleanedData = { ...event };
 			// Suppression des champs générés par PocketBase
-			delete cleanedData.id; // L'ID sera ajouté spécifiquement pour l'update
-			delete cleanedData.collectionId;
-			delete cleanedData.collectionName;
-			delete cleanedData.created;
-			delete cleanedData.updated;
-			delete cleanedData.expand; // Important de supprimer expand
+			// Utilisation du optional chaining pour éviter les erreurs TS
+			delete (cleanedData as any).id; // L'ID sera ajouté spécifiquement pour l'update
+			delete (cleanedData as any).collectionId;
+			delete (cleanedData as any).collectionName;
+			delete (cleanedData as any).created;
+			delete (cleanedData as any).updated;
+			delete (cleanedData as any).expand; // Important de supprimer expand
 			return cleanedData;
 		};
 
 		// 1. Mise à jour du master event
 		const masterUpdateData = cleanEventData({ ...masterEvent });
 		masterUpdateData.date_event = ""; // Master event n'a pas de date
-		masterUpdateData.dateStart = null;
-		masterUpdateData.dateEnd = null;
+		masterUpdateData.dateStart = ""; // Utiliser chaine vide au lieu de null
+		masterUpdateData.dateEnd = ""; // Utiliser chaine vide au lieu de null
 
 		// A faire directement dans le composant pour le check ZOD
 		// if (masterUpdateData.recurrence) {
@@ -271,20 +279,18 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 
 		console.log(`Récupération des occurrences pour le master ID: ${masterId}`);
 
-		const existingOccurrences = await pb.collection("events").getFullList<EventType>({
+		const existingOccurrences = await pb.collection("events").getFullList<EventsResponse>({
 			filter: `masterRecurrentId = '${masterId}'`
 		});
 
 		console.log(`Trouvé ${existingOccurrences.length} occurrences existantes.`);
 
-		const occurrencesMap = new Map(
-			existingOccurrences.map((occ: EventsResponse) => [occ.date_event, occ])
-		);
+		const occurrencesMap = new Map(existingOccurrences.map((occ) => [occ.date_event, occ]));
 
 		// Identification des actions nécessaires
 		const toDelete = existingOccurrences
-			.filter((occ: EventsResponse) => !recurrenceDates.includes(occ.date_event))
-			.map((occ: EventsResponse) => occ.id);
+			.filter((occ) => !recurrenceDates.includes(occ.date_event))
+			.map((occ) => occ.id);
 
 		const baseOccurrenceData = cleanEventData({ ...masterEvent });
 		// S'assurer que les champs spécifiques aux occurrences sont corrects
@@ -298,8 +304,8 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 				...baseOccurrenceData,
 				date_event: date,
 				organizers: [],
-				dateStart: createDateFromString(date, masterEvent.time_start).toISOString(),
-				dateEnd: createDateFromString(date, masterEvent.time_end).toISOString()
+				dateStart: createDateFromString(date, masterEvent.time_start ?? "").toISOString(),
+				dateEnd: createDateFromString(date, masterEvent.time_end ?? "").toISOString()
 			}));
 
 		const toUpdate = recurrenceDates
@@ -313,11 +319,13 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 				const occurrenceTasks = existingOccurrence.tasks || [];
 				// Utiliser une Map pour dédoublonner en gardant la première occurrence de chaque nom
 				const tasksMap = new Map<string, TaskType>();
-				[...masterTasks, ...occurrenceTasks].forEach((task) => {
-					if (task && task.name && !tasksMap.has(task.name)) {
-						tasksMap.set(task.name, task);
+				[...masterTasks, ...(Array.isArray(occurrenceTasks) ? occurrenceTasks : [])].forEach(
+					(task) => {
+						if (task && task.name && !tasksMap.has(task.name)) {
+							tasksMap.set(task.name, task);
+						}
 					}
-				});
+				);
 				const mergedTasks = Array.from(tasksMap.values());
 
 				return {
@@ -329,11 +337,11 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 					recurrence: {
 						...masterEvent.recurrence
 					},
-					dateStart: createDateFromString(date, masterEvent.time_start).toISOString(),
-					dateEnd: createDateFromString(date, masterEvent.time_end).toISOString()
+					dateStart: createDateFromString(date, masterEvent.time_start ?? "").toISOString(),
+					dateEnd: createDateFromString(date, masterEvent.time_end ?? "").toISOString()
 				};
 			})
-			.filter(Boolean); // Enlève les potentiels nulls si une occurrence disparaît entre get et map
+			.filter((item): item is NonNullable<typeof item> => item !== null); // Type guard pour éliminer les nulls
 
 		// $inspect('reccurenceDates', $state.snapshot(recurrenceDates));
 		// $inspect('toCreate', toCreate);
@@ -384,10 +392,13 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			try {
 				const updateBatch = pb.createBatch();
 				toUpdate.forEach((record) => {
-					const recordId = record.id;
-					const updateData = { ...record };
-					delete updateData.id; // On retire l'ID des données à mettre à jour
-					updateBatch.collection("events").update(recordId, updateData);
+					if (record && record.id) {
+						// Vérification supplémentaire
+						const recordId = record.id;
+						const updateData = { ...record };
+						delete (updateData as any).id; // On retire l'ID des données à mettre à jour
+						updateBatch.collection("events").update(recordId, updateData);
+					}
 				});
 				await updateBatch.send();
 				console.log(`${toUpdate.length} occurrences mises à jour`);
@@ -478,14 +489,9 @@ export const sendMessage = async (
 };
 
 // FIXIT ?
-export const updateMessage = async (
-	editContent: string,
-	message: MessagesResponse,
-	isEditing: boolean
-) => {
+export const updateMessage = async (editContent: string, message: MessagesResponse) => {
 	try {
 		if (!editContent.trim() || editContent === message.content) {
-			isEditing = false;
 			return;
 		}
 
@@ -640,21 +646,21 @@ export async function checkAndCleanLock(
 // XXX ? Dans $lib/types/notifications.ts ?
 export interface GenericEmailPayload {
 	subject: string;
-	htmlContent: string;
+	htmlContent?: string; // parfois géré par le hooks utils
 	textContent?: string; // Optionnel
 	recipients?: string[]; // Emails explicites
-	recipientGroups?: ("otherOrganizers" | "recurrenceTeam" | "spaceAdmins" | "systemAdmins")[]; // Mots-clés
-	fallbackRecipientGroups?: (
-		| "otherOrganizers"
-		| "recurrenceTeam"
-		| "spaceAdmins"
-		| "systemAdmins"
-	)[];
+	recipientGroups?: ("recurrenceTeam" | "spaceAdmins" | "systemAdmins")[]; // Mots-clés
+	fallbackRecipientGroups?: ("recurrenceTeam" | "spaceAdmins" | "systemAdmins")[];
 	context?: {
 		eventId?: string;
 		spaceId?: string;
 		excludeUserId?: string;
-		// Autres données contextuelles si nécessaire
+		notificationType: string;
+		taskName?: string;
+		userName?: string;
+		customMessage?: string;
+		noOrganizers?: boolean;
+		explicitOrganizerIds?: string[];
 	};
 }
 

@@ -5,7 +5,7 @@
 	import { pb } from "$lib/pocketbase.svelte";
 	import { showAlert } from "$lib/shared/states.svelte";
 	import { eventState, messageSheet, modalState } from "$lib/shared/states.svelte";
-	import { hasAuthorizations } from "$lib/shared/states.svelte";
+	import { hasAuthorizations } from "$lib/utils/recurrence";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
 	import {
@@ -24,7 +24,7 @@
 	const hasAuth = $derived(
 		hasAuthorizations({
 			isRecurrent: currentEvent.isRecurrent,
-			recurrenceTeam: currentEvent.recurrenceTeam,
+			recurrenceTeam: currentEvent.recurrence?.recurrenceTeam,
 			createdBy: currentEvent.created_by
 		})
 	);
@@ -120,7 +120,10 @@
 	class="bg-base-100 @container flex flex-wrap justify-end gap-x-4 gap-y-1 rounded-b-lg border-t p-2 text-right"
 >
 	<div class="mr-auto">
-		<button onclick={() => messageSheet.openMessages(currentEvent.id)} class="btn relative">
+		<button
+			onclick={() => messageSheet.openMessages(currentEvent.id, currentEvent.event_title)}
+			class="btn relative"
+		>
 			<MessageCircle />
 			<span class="@max-md:hidden">Discussion</span>
 		</button>

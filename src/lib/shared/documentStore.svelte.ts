@@ -1,7 +1,7 @@
-import { pb } from '../pocketbase.svelte';
-import { getSpace } from './spaceOptions.svelte';
-import type { RecordModel, RealtimeService } from 'pocketbase';
-import { SvelteMap } from 'svelte/reactivity';
+import { pb } from "../pocketbase.svelte";
+import { getSpace } from "./";
+import type { RecordModel, RealtimeService } from "pocketbase";
+import { SvelteMap } from "svelte/reactivity";
 
 const collectionData = new SvelteMap<string, RecordModel[]>();
 
@@ -26,7 +26,7 @@ export function subscribeToCollection<T extends RecordModel>(
 			console.log(`[${collection}] Initializing cache...`);
 			// Charger seulement les champs nécessaires pour la liste
 			const initialDocs = await pb.collection(collection).getFullList<T>(200 /* batch size */, {
-				sort: options.sort || '-created', // Garde un défaut si non fourni
+				sort: options.sort || "-created", // Garde un défaut si non fourni
 				filter: `space = '${getSpace.id}'`,
 				fields: options.initialFields || undefined // Utilise les champs fournis
 			});
@@ -54,7 +54,7 @@ export function subscribeToCollection<T extends RecordModel>(
 	}
 
 	// S'abonner aux événements PocketBase pour mettre à jour le cache en temps réel
-	unsubscribePromise = pb.collection(collection).subscribe('*', async (e) => {
+	unsubscribePromise = pb.collection(collection).subscribe("*", async (e) => {
 		if (initialLoadPromise) {
 			await initialLoadPromise;
 		}
@@ -70,14 +70,14 @@ export function subscribeToCollection<T extends RecordModel>(
 		let updatedList = [...currentList]; // Créer une copie pour la réactivité Svelte
 
 		switch (e.action) {
-			case 'create': {
+			case "create": {
 				// Ajouter le nouvel enregistrement (en début de liste si trié par -created)
 				updatedList.unshift(e.record as T);
 				console.log(`[${collection}] Added new record ${e.record.id} to cache.`);
 				break;
 			}
 
-			case 'update': {
+			case "update": {
 				// Mettre à jour l'enregistrement existant
 				const indexToUpdate = updatedList.findIndex((doc) => doc.id === e.record.id);
 				if (indexToUpdate !== -1) {
@@ -94,7 +94,7 @@ export function subscribeToCollection<T extends RecordModel>(
 				break;
 			}
 
-			case 'delete': {
+			case "delete": {
 				// Supprimer l'enregistrement
 				updatedList = updatedList.filter((doc) => doc.id !== e.record.id);
 				console.log(`[${collection}] Removed record ${e.record.id} from cache.`);
@@ -136,15 +136,18 @@ export async function loadDocuments<T extends RecordModel>(
 	options?: { sort?: string; fields?: string; expand?: string }
 ): Promise<T[]> {
 	try {
+		console.log(`Début du chargement des documents de ${collection}...`);
+		console.log(`Filter utilisé: space = '${getSpace.id}'`);
 		const documents = await pb.collection(collection).getFullList<T>({
-			sort: `${options?.sort ?? '-created'}`,
+			sort: `${options?.sort ?? "-created"}`,
 			filter: `space = '${getSpace.id}'`,
-			fields: `${options?.fields ?? 'undefined'}`
+			fields: `${options?.fields ?? undefined}`
 		});
 
+		console.log(`Documents reçus pour ${collection}:`, documents);
 		// Mettre à jour le cache
 		collectionData.set(collection, documents);
-
+		console.log(`Cache mis à jour pour ${collection}`);
 		return documents;
 	} catch (error) {
 		console.error(`Erreur lors du chargement des documents de ${collection}:`, error);

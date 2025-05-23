@@ -219,4 +219,3 @@
 		</div>
 	</dialog>
 {/if}
-<!-- {$inspect('usersOfSpace', usersOfSpace)} -->

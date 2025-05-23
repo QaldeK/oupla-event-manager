@@ -43,9 +43,8 @@
 
 @theme {
 	/* Tailles fluides pour les utilitaires */
-	--fluid-xs: clamp(0.875rem, 0.8rem + 0.375vw, 0.9375rem); /* ~14px */
-	--fluid-sm: clamp(0.9375rem, 0.85rem + 0.4375vw, 1rem); /* ~15px */
-	/* 👉 Base centered around 16px (1rem) */
+	--fluid-xs: clamp(0.8125rem, 0.7375rem + 0.375vw, 0.875rem); /* ~13px to ~14px */
+	--fluid-sm: clamp(0.875rem, 0.7875rem + 0.4375vw, 0.9375rem); /* ~14px to ~15px */
 	--fluid-base: clamp(1rem, 0.9rem + 0.5vw, 1.125rem); /* ~16px */
 	--fluid-lg: clamp(1.125rem, 1rem + 0.625vw, 1.25rem); /* ~18px */
 	--fluid-xl: clamp(1.25rem, 1.1rem + 0.75vw, 1.5rem); /* ~20px */
@@ -72,13 +71,13 @@
 
 	h3 {
 		font-size: var(--fluid-xl);
-		font-weight: 500;
+		font-weight: 700;
 		margin-bottom: 0.75rem;
 	}
 
 	h4 {
 		font-size: var(--fluid-lg);
-		font-weight: 500;
+		font-weight: 600;
 		margin-bottom: 0.5rem;
 	}
 
@@ -112,7 +111,7 @@
 
 		h3 {
 			font-size: var(--fluid-xl);
-			font-weight: 500;
+			font-weight: 800;
 			margin-bottom: 0.75rem;
 		}
 

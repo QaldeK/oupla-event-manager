@@ -4,7 +4,7 @@
 	import Info from "$lib/components/Info.svelte";
 	import TimePickRange from "$lib/components/TimePickRange.svelte";
 
-	import { eventState, getSpace } from "$lib/shared";
+	import { eventState, getSpace, showAlert } from "$lib/shared";
 	import type { DateProposedType, EventType } from "$lib/types/event";
 	import { addTime, isValidDate, lisibleDate, lisibleTime } from "$lib/utils";
 	import { fade } from "svelte/transition";
@@ -121,12 +121,11 @@
 			} catch (e) {
 				console.error("Error creating date proposal for:", dateStr, startTime, endTime, e);
 				invalidDateFound = true;
-				// TODO: Afficher une alerte à l'utilisateur pour la date invalide
+				showAlert("une erreur est survenue");
 			}
 		});
 		if (invalidDateFound) {
-			// Peut-être afficher une alerte générale
-			console.warn("Certaines dates n'ont pas pu être ajoutées car elles sont invalides.");
+			showAlert("Certaines dates n'ont pas pu être ajoutées car elles sont invalides.");
 		}
 
 		if (newProposals.length > 0) {
@@ -359,7 +358,7 @@
 					<button
 						class="btn btn-outline btn-xs btn-warning mt-2 ml-auto flex"
 						onclick={() => {
-							/* TODO: Implement proposeAllDates */
+							/* TODO! : Implement proposeAllDates */
 							console.warn("TODO: Implement proposeAllDates");
 						}}
 					>

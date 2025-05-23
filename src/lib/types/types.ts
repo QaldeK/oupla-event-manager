@@ -28,7 +28,10 @@ export type {
 	TaskType, // Le type d'une tâche pour un événement
 	DateProposedType,
 	ValidMaster,
-	ValidOccurrence
+	ValidOccurrence,
+	RecurrenceType, // Type pour les différentes options de récurrence (WEEKLY, BIWEEKLY, etc.)
+	RecurrenceSchemaType, // Type pour le schéma de récurrence complet
+	ValidRecurrence // Type pour une récurrence valide (non-null)
 } from "$lib/schemas/event.schema";
 
 export type {
