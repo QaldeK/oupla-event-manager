@@ -1,24 +1,30 @@
 <script lang="ts">
-	import { loadDocs, createPad } from "./padStore.svelte";
-	import type { PadResponse } from "$lib/types/pad/pad.types";
-	import { format } from "date-fns";
-	import { fr } from "date-fns/locale";
-	import { goto } from "$app/navigation";
+	// TODO : FIXIT ? : comparé a +page de site_page, harminiser et optimisé. Notamment pas de soupscription ici (boucle d'effect) → est ce un probleme ? ou est ce plutot superflux dans site_page ?
 
-	let pads = $state<PadResponse[]>([]);
+	import { loadDocs, createPad } from "./padStore.svelte";
+	import type { PadsResponse } from "$lib/types/pocketbase";
+	import { goto } from "$app/navigation";
+	import { lisibleDateTime } from "$lib/utils";
+
+	let pads = $state<PadsResponse[]>([]);
 	let isLoading = $state(true);
 	let newPadTitle = $state("");
 	let isCreating = $state(false);
 	let error = $state<string | null>(null);
 
+	// S'abonner aux mises à jour des pads
+
 	async function loadAllPads() {
 		isLoading = true;
 		error = null;
 		try {
+			console.log("Début du chargement des pads...");
 			pads = await loadDocs();
+			console.log("Pads chargés:", pads);
 		} catch (e) {
 			error = "Erreur lors du chargement des pads";
-			console.error(e);
+			console.error("Erreur détaillée:", e);
+			pads = [];
 		} finally {
 			isLoading = false;
 		}
@@ -34,7 +40,7 @@
 		error = null;
 
 		try {
-			const newPad = await createPad(newPadTitle, { collection: "pads" });
+			const newPad = await createPad(newPadTitle);
 			pads = [newPad, ...pads];
 			newPadTitle = "";
 			// Rediriger vers le pad nouvellement créé
@@ -51,10 +57,6 @@
 	$effect(() => {
 		loadAllPads();
 	});
-
-	function formatDate(dateString: string) {
-		return format(new Date(dateString), "dd MMMM yyyy à HH:mm", { locale: fr });
-	}
 </script>
 
 <div class="container mx-auto px-4 py-8">
@@ -62,7 +64,7 @@
 	<div class="card bg-base-200 mb-10 max-w-md p-4 shadow-md">
 		<div class="card-body p-4">
 			<h2 class="card-title text-fluid-xl mb-2">Créer un nouveau pad</h2>
-			<div class="flex gap-2">
+			<div class="flex flex-wrap gap-2">
 				<input
 					type="text"
 					class="input input-bordered w-full"
@@ -108,10 +110,10 @@
 					<div class="card-body">
 						<h2 class="card-title text-fluid-xl">{pad.title}</h2>
 						<p class="text-base-content/70 text-sm">
-							Créé le {formatDate(pad.created as string)}
+							Créé le {lisibleDateTime(pad.created as string)}
 						</p>
 						<p class="text-base-content/70 text-sm">
-							Dernière modification: {formatDate(pad.updated as string)}
+							Dernière modification: {lisibleDateTime(pad.updated as string)}
 						</p>
 						<div class="card-actions mt-4 justify-end">
 							<button class="btn btn-sm btn-outline">Ouvrir</button>

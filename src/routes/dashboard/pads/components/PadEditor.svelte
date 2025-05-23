@@ -1,20 +1,23 @@
 <script lang="ts">
-	import { Tipex, defaultExtensions } from '@friendofsvelte/tipex';
-	import { TextAlign } from '@tiptap/extension-text-align';
-	import type { TipexEditor } from '@friendofsvelte/tipex';
+	// FIXIT: responsiveness mobile
+	import { Tipex, defaultExtensions } from "@friendofsvelte/tipex";
+	import { TextAlign } from "@tiptap/extension-text-align";
+	import type { TipexEditor } from "@friendofsvelte/tipex";
 
-	import type { PadsResponse, SitePagesResponse, RecordModel } from '$lib/types/pocketbase';
-	import * as padStore from '../padStore.svelte';
-	import { createEditableDocumentStore } from '$lib/shared/editableDocumentStore.svelte';
-	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
+	import type { PadsResponse, SitePagesResponse, RecordModel } from "$lib/types/pocketbase";
+	import * as padStore from "../padStore.svelte";
+	import { createEditableDocumentStore } from "$lib/shared/editableDocumentStore.svelte";
+	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
 
-	import Save from 'lucide-svelte/icons/save';
-	import Pencil from 'lucide-svelte/icons/pencil';
-	import Info from 'lucide-svelte/icons/info';
+	import Save from "lucide-svelte/icons/save";
+	import Pencil from "lucide-svelte/icons/pencil";
+	import Info from "lucide-svelte/icons/info";
 
-	import '@friendofsvelte/tipex/styles/Tipex.css';
-	import '@friendofsvelte/tipex/styles/ProseMirror.css';
-	import '@friendofsvelte/tipex/styles/EditLink.css';
+	import "@friendofsvelte/tipex/styles/Tipex.css";
+	import "@friendofsvelte/tipex/styles/ProseMirror.css";
+	import "@friendofsvelte/tipex/styles/EditLink.css";
+	import { goto } from "$app/navigation";
+	import { SquareArrowLeft } from "lucide-svelte";
 
 	interface Props {
 		docId: string;
@@ -22,7 +25,7 @@
 	}
 
 	const { docId, initialEditMode = false }: Props = $props();
-	const collectionName = 'pads';
+	const collectionName = "pads";
 
 	// État de l'éditeur
 	let editor: TipexEditor | undefined = $state();
@@ -41,7 +44,7 @@
 		docId,
 		collectionName: collectionName, // Utilise la constante
 		actions: documentActions,
-		fieldsToSave: ['title', 'content'], // Champs à sauvegarder automatiquement
+		fieldsToSave: ["title", "content"], // Champs à sauvegarder automatiquement
 		initialEditMode: initialEditMode
 	});
 
@@ -61,7 +64,7 @@
 
 	const extensions = [
 		TextAlign.configure({
-			types: ['heading', 'paragraph']
+			types: ["heading", "paragraph"]
 		})
 	];
 	// --- Fonctions d'Interaction UI ---
@@ -70,65 +73,68 @@
 		const target = event.target as HTMLInputElement;
 		// 👉 Utiliser la méthode du store pour mettre à jour le champ 'title'
 		// Le type est correct car on sait que c'est une PadsResponse
-		editableDocStore.updateField('title', target.value);
+		editableDocStore.updateField("title", target.value);
 	}
 
 	function handleEditorUpdate() {
 		// 👉 Utiliser la méthode du store pour mettre à jour le champ 'content'
-		editableDocStore.updateField('content', editor?.getHTML() ?? '');
+		editableDocStore.updateField("content", editor?.getHTML() ?? "");
 	}
 
 	async function saveAndClose() {
 		if (!isEditing) return;
-		console.log('[PadEditor] Sauvegarde et fermeture demandés...');
+		console.log("[PadEditor] Sauvegarde et fermeture demandés...");
 		await editableDocStore.stopEditing(true); // true = save first
 	}
 
 	// --- Cycle de Vie ---
 
 	$effect(() => {
-		console.log('[PadEditor] Effet principal monté. Store initialisé pour Pad:', docId);
+		console.log("[PadEditor] Effet principal monté. Store initialisé pour Pad:", docId);
 
 		// Mise à jour Tipex si contenu externe change en mode lecture
 		if (!isEditing && editor && doc?.content !== editor.getHTML()) {
-			console.log('[PadEditor] Contenu externe changé (mode lecture), mise à jour Tipex.');
-			editor.commands.setContent(doc?.content ?? '', false);
+			console.log("[PadEditor] Contenu externe changé (mode lecture), mise à jour Tipex.");
+			editor.commands.setContent(doc?.content ?? "", false);
 		}
 
 		// Gestionnaire beforeunload (inchangé)
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
 			if (isEditing) {
 				event.preventDefault();
-				event.returnValue = '';
+				event.returnValue = "";
 			}
 		};
 
-		window.addEventListener('beforeunload', handleBeforeUnload);
+		window.addEventListener("beforeunload", handleBeforeUnload);
 
 		// --- Cleanup ---
 		return () => {
-			console.log('[PadEditor] Cleanup: Appel de editableDocStore.dispose() pour Pad:', docId);
-			window.removeEventListener('beforeunload', handleBeforeUnload);
+			console.log("[PadEditor] Cleanup: Appel de editableDocStore.dispose() pour Pad:", docId);
+			window.removeEventListener("beforeunload", handleBeforeUnload);
 			editableDocStore.dispose();
 		};
 	});
 </script>
 
-<!-- Le template est presque identique, mais on peut être plus sûr des types -->
-<div class="w-full max-w-4xl" role="region" aria-label="Éditeur de Pad" tabindex="0">
-	<div class="mb-4 flex items-center justify-between gap-4">
+<!-- tabindex="0" sur la premier div?  -->
+<div id="pad_component" class="flex h-full flex-col" role="region" aria-label="Éditeur de Pad">
+	<div id="header_pad" class="mb-4 flex flex-wrap items-center justify-between gap-4">
+		<button onclick={() => goto("/dashboard/pads")} class="btn btn-square">
+			<SquareArrowLeft size={24} />
+		</button>
 		<div class="flex flex-grow items-center gap-2">
 			{#if isEditing && editor}
 				<input
 					type="text"
 					class="input input-bordered text-fluid-lg w-full max-w-md font-bold"
 					placeholder="Titre du document"
-					value={doc?.title ?? ''}
+					value={doc?.title ?? ""}
 					oninput={handleTitleInput}
 					aria-label="Titre du document"
 				/>
 			{:else}
-				<div class="text-fluid-lg font-bold">{doc?.title || 'Chargement...'}</div>
+				<div class="text-fluid-lg font-bold">{doc?.title || "Chargement..."}</div>
 			{/if}
 		</div>
 
@@ -142,58 +148,63 @@
 					<span class="loading loading-spinner loading-xs"></span>
 					<span class="text-base-content/70 text-xs">Enreg...</span>
 				{:else if isLockedByOther}
-					<span
-						class="text-content-warning bg-warning/40 flex items-center gap-1 rounded-xl px-4 py-2 text-xs"
+					<div
+						class="text-content-warning bg-warning/40 flex flex-wrap items-center gap-2 rounded-xl px-4 py-2 text-xs"
 						title={lockStatusMessage ?? `Verrouillé par ${editorUsername}`}
 					>
 						<Info size={14} />
-						Edité par {editorUsername}
-					</span>
+						<span> Edition en cours par {editorUsername} </span>
+					</div>
 				{/if}
 			</div>
 
 			<!-- Bouton Enregistrer et Fermer -->
-			{#if isEditing}
-				<button
-					class="btn btn-primary"
-					onclick={saveAndClose}
-					disabled={isLoading || isSaving}
-					title="Enregistrer les modifications et passer en mode lecture"
-				>
-					<Save size={16} />
-					Enregistrer et fermer
-				</button>
-			{/if}
 
-			<!-- Tabs pour choisir le mode -->
-			<div role="tablist" class="tabs tabs-border">
-				<button
-					role="tab"
-					class="tab not-sm:hidden"
-					class:tab-active={!isEditing}
-					onclick={() => {
-						if (isEditing) editableDocStore.stopEditing(true);
-					}}
-					disabled={isLoading || isSaving}
-					aria-selected={!isEditing}
-					aria-controls="pad-content"
-				>
-					Lecture
-				</button>
-				<button
-					role="tab"
-					class="tab"
-					class:tab-active={isEditing}
-					onclick={() => {
-						if (!isEditing) editableDocStore.startEditing();
-					}}
-					disabled={isLockedByOther || isLoading || isSaving}
-					aria-selected={isEditing}
-					aria-controls="pad-editor"
-				>
-					<Pencil size={16} />
-					<span class="p-2 not-sm:hidden">Édition</span>
-				</button>
+			<div id="header_pad_btn" class="flex flex-wrap">
+				<div>
+					{#if isEditing}
+						<button
+							class="btn btn-primary"
+							onclick={saveAndClose}
+							disabled={isLoading || isSaving}
+							title="Enregistrer les modifications et passer en mode lecture"
+						>
+							<Save size={16} />
+							Enregistrer et fermer
+						</button>
+					{/if}
+				</div>
+
+				<!-- Tabs pour choisir le mode -->
+				<div role="tablist" class="tabs tabs-border">
+					<button
+						role="tab"
+						class="tab not-sm:hidden"
+						class:tab-active={!isEditing}
+						onclick={() => {
+							if (isEditing) editableDocStore.stopEditing(true);
+						}}
+						disabled={isLoading || isSaving}
+						aria-selected={!isEditing}
+						aria-controls="pad-content"
+					>
+						Lecture
+					</button>
+					<button
+						role="tab"
+						class="tab"
+						class:tab-active={isEditing}
+						onclick={() => {
+							if (!isEditing) editableDocStore.startEditing();
+						}}
+						disabled={isLockedByOther || isLoading || isSaving}
+						aria-selected={isEditing}
+						aria-controls="pad-editor"
+					>
+						<Pencil size={16} />
+						<span class="p-2 not-sm:hidden">Édition</span>
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -219,7 +230,7 @@
 	{/if}
 
 	<!-- Conteneur de l'éditeur -->
-	<div class="editor-wrapper bg-base-100 rounded-lg border shadow-md">
+	<div class="bg-base-100 h-full rounded-lg border shadow-md">
 		{#if isLoading && !doc}
 			<div class="flex items-center justify-center p-10">
 				<span class="loading loading-dots loading-lg"></span>
@@ -236,7 +247,7 @@
 				controls={false}
 				class=" flex-grow"
 				focal={false}
-				body={doc?.content ?? ''}
+				body={doc?.content ?? ""}
 				onupdate={handleEditorUpdate}
 				aria-label="Éditeur de texte principal"
 				id="pad-editor"
@@ -245,7 +256,7 @@
 			<!-- Mode Lecture -->
 			<div id="pad-content" role="document">
 				<div class="document-content prose max-w-none p-4">
-					{@html doc?.content || '<p><em>Ce document est vide.</em></p>'}
+					{@html doc?.content || "<p><em>Ce document est vide.</em></p>"}
 				</div>
 			</div>
 		{/if}
@@ -266,15 +277,6 @@
 </div>
 
 <style>
-	.editor-wrapper {
-		display: flex;
-		flex-direction: column;
-		min-height: 400px;
-		max-height: calc(100vh - 250px);
-		height: 60vh;
-		padding-bottom: 1rem;
-	}
-
 	:global(.tipex .ProseMirror) {
 		border-top-left-radius: 0;
 		border-top-right-radius: 0;
