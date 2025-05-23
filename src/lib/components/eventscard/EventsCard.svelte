@@ -5,16 +5,23 @@
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import { canEventBeValidated } from "$lib/services/eventActions";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { eventState, hasAuthorizations, modalState, showAlert } from "$lib/shared/states.svelte";
+	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
 	import type { DateProposedType, EventType, UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 	import { getContext } from "svelte";
 	import { fade } from "svelte/transition";
 
-	import { CalendarPlus, Info, UserCheck, UserPlus } from "lucide-svelte";
+	import TasksDisplay from "./TasksDisplay.svelte";
+	import OrganizersHeader from "./OrganizersHeader.svelte";
 
 	import ButtonAction from "./ButtonAction.svelte";
 	import TopAlert from "./TopAlert.svelte";
+	import {
+		formatRecurrence,
+		getRecurrenceLabel,
+		hasAuthorizations,
+		isInTeam
+	} from "$lib/utils/recurrence";
 
 	// ::: context & props
 	interface Props {
@@ -23,11 +30,10 @@
 
 	const { currentEvent }: Props = $props();
 
-	// FIXIT : don't use getContext
+	// FIXIT ? : don't use getContext
 	let currentUser: UserType = getContext("currentUser");
 
 	// ::: reactive variables
-	let showSondageDetails = $state(false);
 
 	const hasNoPropositions = $derived(
 		!currentEvent.date_event && currentEvent.dates_proposed?.length === 0
@@ -57,11 +63,15 @@
 		})
 	);
 
-	let organizersLabel = $derived.by(() => {
-		if (currentEvent.isSondage) return "Organisateur•ices - Sondage disponibilité";
-		else if (hasNoPropositions) return "Pas de dates proposées";
-		return "Organisateur•ices";
-	});
+	const notRecurrentOrUserInTeam = $derived.by(
+		() => !currentEvent.isRecurrent || (currentEvent.isRecurrent && isUserInRecurrenceTeam)
+	);
+
+	const isUserInRecurrenceTeam = $derived(
+		isInTeam(currentUser, currentEvent.recurrence?.recurrenceTeam)
+	);
+
+	// organizersLabel moved to OrganizersHeader.svelte
 
 	let oldDatesProposed: DateProposedType[] = $state([]);
 	let datesFutureProposed: DateProposedType[] = $state([]);
@@ -90,16 +100,14 @@
 	});
 
 	// --- functions ---
-	// Appelle requestTaskUpdate sans argument taskName pour ouvrir TaskDialog si plusieurs tâches
-	const handleGeneralTaskSubscription = () => {
+	const handleTaskSubscription = (taskName?: string) => {
 		if (!currentUser || currentEvent.canceled) return;
-		eventsStore.requestTaskUpdate({ event: currentEvent, user: currentUser });
-	};
 
-	// Appelle requestTaskUpdate AVEC taskName pour gérer l'inscription/désinscription spécifique
-	const handleSpecificTaskSubscription = (taskName: string) => {
-		if (!currentUser || currentEvent.canceled) return;
-		eventsStore.requestTaskUpdate({ event: currentEvent, user: currentUser, taskName: taskName });
+		eventsStore.requestTaskUpdate({
+			event: currentEvent,
+			user: currentUser,
+			taskName
+		});
 	};
 
 	// Calcule l'état du bouton général d'inscription/gestion
@@ -129,61 +137,15 @@
 		};
 	});
 
-	const toggleAllDetails = () => {
-		showSondageDetails = !showSondageDetails;
-	};
-
 	const openSondageModal = () => {
 		// if (!hasAuth) return; // Sécurité
 		eventState.is = { ...currentEvent }; // Passer une copie pour éviter modif directe
 		modalState.dateSondage = true;
 	};
 
-	const isUserSubscribedToTask = (task: string) => {
-		return currentEvent.organizers.some(
-			(org) => org.id === currentUser.id && org.tasks?.includes(task)
-		);
-	};
+	// isUserSubscribedToTask moved to TasksDisplay.svelte
 
-	const handleSondageSubscription = (
-		dateStart: string,
-		maybehereValue: "oui" | "non" | "peut-être"
-	) => {
-		if (!currentUser) return;
-
-		const updatedDatesProposed = (currentEvent.dates_proposed || []).map((dateProposed) => {
-			if (dateProposed.dateStart === dateStart) {
-				let updatedOrganizers = [...dateProposed.organizers];
-				const userIndex = updatedOrganizers.findIndex((org) => org.id === currentUser.id);
-
-				if (userIndex !== -1) {
-					// Mise à jour si l'utilisateur existe
-					updatedOrganizers[userIndex] = {
-						...updatedOrganizers[userIndex],
-						maybehere: maybehereValue
-					};
-					// Optionnel: retirer si vote 'non' ? Ou garder pour historique? Ici on garde.
-				} else {
-					// Ajout si l'utilisateur n'existe pas
-					updatedOrganizers.push({
-						id: currentUser.id,
-						username: currentUser.username, // S'assurer que username est dispo
-						tasks: [], // Pas de tâches spécifiques dans le sondage
-						maybehere: maybehereValue
-					});
-				}
-				return { ...dateProposed, organizers: updatedOrganizers };
-			}
-			return dateProposed;
-		});
-
-		updateEvent(currentEvent.id, { dates_proposed: updatedDatesProposed }).catch((err) => {
-			console.error("Erreur MàJ sondage:", err);
-			showAlert("Erreur lors de l'enregistrement de votre réponse.", "error");
-		});
-	};
-
-	// USELESS ? Keep It ?
+	// USELESS ? bestDate Keep It ?
 	// const bestDate = $derived.by(() => {
 	// 	if (!currentEvent.dates_proposed?.length) return null;
 
@@ -204,19 +166,22 @@
 
 <div transition:fade class="@container" id={currentEvent.id}>
 	<div
-		class="transition:fade mb-8 rounded-lg border bg-white shadow-md md:mb-4 {currentEvent.isConfirmed
+		class="transition:fade mb-8 rounded-lg border bg-white shadow-md @md:mb-4 {currentEvent.isConfirmed
 			? ''
 			: 'border-l-warning/80 border-l-4'}"
 	>
-		<TopAlert thisEvent={currentEvent} />
+		<!-- <TopAlert thisEvent={currentEvent} /> -->
 		<!-- <span>auth : {hasAuth}</span> -->
 		<div class="pb-4">
-			<div class="justify-between gap-2 md:flex">
+			<div id="Header-event" class="mb-4 justify-between gap-2 @md:flex @md:px-4 @md:py-2">
 				<!-- ::: date -->
-				<div id="Top_event_date" class="px-6 py-2 shadow-sm md:mt-2 md:rounded-l-xl {bgDateTime}">
+				<div
+					id="Top_event_date"
+					class="px-6 py-2 shadow-sm @md:mt-2 @md:min-w-42 @md:place-self-center @md:rounded-xl @md:align-top {bgDateTime}"
+				>
 					<!-- Container principal -->
 					<div
-						class="align-end flex flex-wrap items-baseline justify-center gap-x-4 md:flex-col md:items-end"
+						class="flex flex-wrap items-baseline justify-center gap-x-4 @md:flex-col @md:items-end"
 					>
 						<!-- Ligne 1 : Date + Time en mobile -->
 						{#if currentEvent.date_event}
@@ -257,16 +222,26 @@
 				</div>
 				<!-- ::: title -->
 
-				<div class="w-full px-4 py-2 md:order-first md:w-3/5">
-					<h2 class="mb-1">{currentEvent.event_title}</h2>
+				<div id="titleAndCat" class="w-full p-3 @max-md:text-center @md:order-first @md:w-3/5">
+					<p class="text-fluid-xl font-bold">{currentEvent.event_title}</p>
 					{#each currentEvent.categories as category, index (category)}
-						<span class="text-fluid-sm text-base-content font-bold uppercase">
+						<p class="font-semibold uppercase">
 							{category}{index < currentEvent.categories.length - 1 ? ", " : ""}
-						</span>
+						</p>
 					{/each}
 					{#if currentEvent.reportedFrom}
 						<div class="text-fluid-sm text-base-content/70 p-1">
 							Initialement prévu le {lisibleDate(currentEvent.reportedFrom)}
+						</div>
+					{/if}
+					{#if currentEvent.isRecurrent}
+						<div class="text-fluid-sm text-base-content/80 mt-1">
+							{formatRecurrence(currentEvent.recurrence)}
+							<span>• {getRecurrenceLabel(currentEvent.recurrence)}</span>
+
+							<!-- <span>
+								• Programmés jusqu'au {lisibleDate(new Date(currentEvent.recurrence.lastDate))}
+							</span> -->
 						</div>
 					{/if}
 				</div>
@@ -275,7 +250,7 @@
 			<!-- Contenu principal de la carte (description, orga, sondage etc) -->
 			<!-- TODO enhance condition with props  -->
 			{#if !currentEvent.canceled}
-				<div id="event_content" class="flex flex-col gap-y-4 md:p-4">
+				<div id="event_content" class="flex flex-col gap-y-6 @md:p-4">
 					<!-- ::: description -->
 					{#if currentEvent.description}
 						<ExpandableCard title="à propos..." text={currentEvent.description} />
@@ -291,51 +266,21 @@
 
 					<!-- ::: Organizers Card / sondage -->
 
-					<div id="organizers_card" class="bg-base-100 shadow-sm md:rounded-lg">
-						<div
-							class="text-fluid-sm flex w-full items-center justify-between p-1 font-semibold md:rounded-t-lg"
-						>
-							<div class="p-2">
-								{organizersLabel}
-							</div>
-							<div class="me-1">
-								{#if currentEvent.isSondage && hasAuth}
-									<button
-										onclick={openSondageModal}
-										class="btn btn-primary btn-outline btn-compact"
-									>
-										<CalendarPlus />
-										<span class="not-md:hidden">Modifier le sondage</span>
-									</button>
-								{:else if hasDate && currentEvent.tasks?.length === 1}
-									<button
-										class="btn btn-outline btn-compact {generalTaskButtonState.isSubscribed
-											? 'btn-error'
-											: 'btn-primary'}"
-										onclick={handleGeneralTaskSubscription}
-										disabled={generalTaskButtonState.disabled}
-									>
-										{#if generalTaskButtonState.isSubscribed}
-											<UserCheck />
-										{:else}
-											<UserPlus />
-										{/if}
-										{generalTaskButtonState.text}
-									</button>
-								{:else if hasNoPropositions && hasAuth}
-									<button
-										onclick={openSondageModal}
-										class="btn btn-compact btn-primary btn-outline"
-									>
-										<CalendarPlus />
-										<span class="not-md:hidden">Créer un sondage</span>
-									</button>
-								{/if}
-							</div>
-						</div>
+					<div id="organizers_card" class="bg-base-200 p-1 shadow-sm @md:rounded-lg">
+						<OrganizersHeader
+							event={currentEvent}
+							{hasAuth}
+							isSondage={currentEvent.isSondage}
+							{hasNoPropositions}
+							{hasDate}
+							{notRecurrentOrUserInTeam}
+							{generalTaskButtonState}
+							onSondageClick={openSondageModal}
+							onTaskSubscription={() => handleTaskSubscription()}
+						/>
 						<div class="@container">
 							<div class=" flex flex-col rounded-b-lg {currentEvent.isSondage ? 'mb-4 p-2' : ''} ">
-								<!--::: Cas 2:  sondage est en cours -->
+								<!--::: SI:  sondage est en cours -->
 								{#if currentEvent.isSondage}
 									<UserSondagesCard {currentEvent} {currentUser} dates={datesFutureProposed} />
 									{#if currentEvent.isSondage && oldDatesProposed.length > 0}
@@ -347,107 +292,45 @@
 										</div>
 									{/if}
 
-									<!--::: Cas 3: une date est déjà proposée -->
+									<!--::: SI: une date est déjà proposée -->
 								{:else if hasDate}
-									<!-- tasks card -->
-									{#if currentEvent.tasks && currentEvent.tasks.length > 1}
-										<div
-											class="@xl:grid @xl:grid-cols-2 @xl:justify-around @xl:gap-4 @xl:p-4 @3xl:grid-cols-3"
-										>
-											{#each currentEvent.tasks as task (currentEvent.id + "-task-" + task.name)}
-												{@const organizersForTask = currentEvent.organizers.filter(
-													(org) => org.tasks?.includes(task.name) ?? []
-												)}
-												{@const isUserInTask = isUserSubscribedToTask(task.name)}
-												<div
-													class="text-fluid-sm border bg-white font-semibold shadow-xs sm:rounded-lg"
-												>
-													<div
-														class="text-base-content mb-2 flex justify-items-center rounded-t-lg px-4 py-1 text-center {organizersForTask.length >
-														0
-															? 'text-base-content'
-															: 'text-error '}"
-													>
-														{task.name}
-														{#if task.description}
-															<div
-																class="tooltip tooltip-info ml-2 text-sm"
-																data-tip={task.description}
-															>
-																<Info size={18} />
-															</div>
-															<button
-																class="link ml-auto {isUserInTask ? 'link-error' : 'link-primary'}"
-																onclick={() => handleSpecificTaskSubscription(task.name)}
-															>
-																{isUserInTask ? "Se désinscrire" : "S'inscrire"}
-															</button>
-														{/if}
-													</div>
-
-													<!-- Organisateurs inscrits -->
-													<div class="mb-2 flex flex-wrap items-center gap-2 px-2">
-														{#if organizersForTask.length > 0}
-															{#each organizersForTask as organizer (currentEvent.id + "-org-" + organizer.id)}
-																<span
-																	transition:fade|local
-																	class="badge badge-accent badge-outline"
-																>
-																	{organizer.username}
-																</span>
-															{/each}
-														{/if}
-													</div>
-												</div>
-											{/each}
-										</div>
-									{:else}
-										<!-- Affichage tâche unique -->
-										<div class="flex flex-wrap gap-2">
-											{#if !currentEvent.organizers.length}
-												<span class=" text-fluid-sm text-base-content/70 p-2 italic">
-													personne pour le moment...
-												</span>
-											{:else}
-												<div class=" flex flex-wrap gap-2 p-3">
-													{#each currentEvent.organizers as organizer (currentEvent.id + "-org-name-" + organizer.id)}
-														<span
-															class="badge badge-outline badge-accent font-semibold
-																"
-														>
-															{organizer.username}
-														</span>
-													{/each}
-												</div>
-											{/if}
-										</div>
-									{/if}
+									<TasksDisplay
+										tasks={currentEvent.tasks}
+										organizers={currentEvent.organizers}
+										{currentUser}
+										onTaskSubscription={handleTaskSubscription}
+										isRecurrent={currentEvent.isRecurrent}
+										{isUserInRecurrenceTeam}
+										recurrenceTeam={currentEvent.recurrence?.recurrenceTeam}
+									/>
 								{/if}
 							</div>
 							<!-- ::: __ mandats a se répartir> -->
-							{#if !hasDate && currentEvent.isSondage && currentEvent.tasks && currentEvent.tasks.length > 1}
-								<div class=" text-base-content/70 p-2">
-									<p class="text-fluid-xs">
-										Mandats à se répartir pour la gestion de l'événement : <span class="italic">
-											{#each currentEvent.tasks as task, index (currentEvent.id + "mandat" + task.name)}
-												{task.name}{index < currentEvent.tasks.length - 1 ? ", " : ""}
-											{/each}
-										</span>
-									</p>
-									{#if currentEvent.isSondage}
+							{#if notRecurrentOrUserInTeam}
+								{#if !hasDate && currentEvent.isSondage && currentEvent.tasks && currentEvent.tasks.length > 1}
+									<div class=" text-base-content/70 p-2">
 										<p class="text-fluid-xs">
-											Le sondage de disponibilité ne concerne que la présence
+											Mandats à se répartir pour la gestion de l'événement : <span class="italic">
+												{#each currentEvent.tasks as task, index (currentEvent.id + "mandat" + task.name)}
+													{task.name}{index < currentEvent.tasks.length - 1 ? ", " : ""}
+												{/each}
+											</span>
 										</p>
-									{/if}
-								</div>
-							{:else if hasDate && currentEvent.tasks && currentEvent.tasks.length === 1}
-								<div class="text-fluid-xs text-base-content/70 p-2">
-									L'inscription concerne le mandat "{currentEvent.tasks[0].name}".
-									{#if currentEvent.tasks[0].description}
-										<br />{currentEvent.tasks[0].description}
-									{/if}
-									Il n'y a pas d'autre mandat à se répartir.
-								</div>
+										{#if currentEvent.isSondage}
+											<p class="text-fluid-xs">
+												Le sondage de disponibilité ne concerne que la présence
+											</p>
+										{/if}
+									</div>
+								{:else if hasDate && currentEvent.tasks && currentEvent.tasks.length === 1}
+									<div class="text-fluid-xs text-base-content/70 p-2">
+										L'inscription concerne le mandat "{currentEvent.tasks[0].name}".
+										<!-- {#if currentEvent.tasks[0].description}
+											<br />{currentEvent.tasks[0].description}
+										{/if} -->
+										Il n'y a pas d'autre mandat à se répartir.
+									</div>
+								{/if}
 							{/if}
 						</div>
 					</div>
