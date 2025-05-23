@@ -1,91 +1,129 @@
 <script lang="ts">
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { pb } from '$lib/pocketbase.svelte';
-	import { deleteMessage, updateMessage } from '$lib/pocketbase.svelte';
-	import type { MessagesResponse } from '$lib/types/pocketbase';
+	import { Textarea } from "$lib/components/ui/textarea";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { deleteMessage, updateMessage } from "$lib/pocketbase.svelte";
+	import type { MessagesResponse } from "$lib/types/pocketbase";
+	import { userDb } from "$lib/shared";
 
-	import { Edit2, Reply, Trash2 } from 'lucide-svelte';
+	import { ArrowUpRight, PencilLine, Reply, Trash2 } from "lucide-svelte";
 
 	interface Props {
 		message: MessagesResponse;
 		onReply: (id: string) => void;
+		scrollToReply?: (id: string) => void;
 	}
 
-	let { message, onReply }: Props = $props();
+	let { message, onReply, scrollToReply }: Props = $props();
 	let isEditing = $state(false);
 	let editContent = $state(message.content);
+	let isCurrentUser = $derived(message.user === pb.authStore.model?.id);
+	let hasReply = $derived(!!message.replyingTo);
+	let replyContent = $derived(message.expand?.replyingTo ? message.expand.replyingTo.content : "");
+	let replyUser = $derived(
+		message.expand?.replyingTo?.expand?.user
+			? message.expand.replyingTo.expand.user.username
+			: "Utilisateur"
+	);
 
 	const handleUpdateMessage = async () => {
-		await updateMessage(editContent, message, isEditing);
+		await updateMessage(editContent, message);
 		isEditing = false;
 	};
 
 	const handleDeleteMessage = async () => {
 		await deleteMessage(message);
 	};
+
+	const handleScrollToReply = () => {
+		if (message.replyingTo && scrollToReply) {
+			scrollToReply(message.replyingTo);
+		}
+	};
+
+	// Format de la date et heure pour le chat header
+	const formatDateTime = (dateString: string) => {
+		return new Intl.DateTimeFormat("fr-FR", {
+			dateStyle: "medium",
+			timeStyle: "short"
+		}).format(new Date(dateString));
+	};
 </script>
 
-<div class="group relative flex gap-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-	<!-- Avatar -->
-	<div class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-		{#if message.expand?.user?.avatar}
-			<img
-				src={pb.files.getUrl(message.expand.user, message.expand.user.avatar)}
-				alt={message.expand.user.username}
-				class="h-full w-full object-cover"
-			/>
+<div
+	class="chat {isCurrentUser ? 'chat-end' : 'chat-start'} group rounded-lg p-1 transition-colors"
+>
+	<!-- Header avec nom d'utilisateur et date/heure -->
+	<div class="chat-header">
+		<time class="text-xs opacity-50">{formatDateTime(message.created)}</time>
+		{#if message.isEdited}
+			<span class="text-xs opacity-50">(modifié)</span>
 		{/if}
 	</div>
-	<!-- Contenu -->
-	<div class="flex-1">
-		<div class="mb-1 flex items-center gap-2">
-			<span class="font-semibold">
-				{message.expand?.user?.username || 'Utilisateur'}
-			</span>
-			<span class="text-fluid-sm text-gray-500">
-				{new Intl.DateTimeFormat('fr-FR', {
-					dateStyle: 'medium',
-					timeStyle: 'short'
-				}).format(new Date(message.created))}
-			</span>
-			{#if message.isEdited}
-				<span class="text-fluid-sm text-gray-400">(modifié)</span>
-			{/if}
-		</div>
 
-		<div>
-			{#if isEditing}
-				<div class="space-y-2">
-					<Textarea bind:value={editContent} class="min-h-[80px]" />
-					<div class="flex gap-2">
-						<button class="btn btn-sm" onclick={handleUpdateMessage} disabled={!editContent.trim()}>
-							Enregistrer
-						</button>
-						<button class="btn btn-sm btn-sort btn-error" onclick={() => (isEditing = false)}
-							>Annuler</button
-						>
-					</div>
+	<!-- Avatar (optionnel) -->
+	{#if message.expand?.user?.avatar}
+		<div class="chat-image avatar">
+			<div class="w-10 rounded-full">
+				<img
+					src={pb.files.getUrl(message.expand.user, message.expand.user.avatar)}
+					alt={message.expand.user.username}
+					class="h-full w-full object-cover"
+				/>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Contenu du message -->
+	<div class="chat-bubble {isCurrentUser ? 'chat-bubble-primary' : ''}">
+		<div class="text-sm font-semibold">{message.expand?.user?.username || "Utilisateur"}</div>
+
+		{#if hasReply}
+			<div
+				class="bg-base-200/80 text-fluid-sm mb-2 cursor-pointer rounded-md p-2 text-left transition-colors"
+				onclick={handleScrollToReply}
+				onkeydown={(e) => e.key === "Enter" && handleScrollToReply()}
+				role="button"
+				tabindex="0"
+			>
+				<div class="text-base-content/70 flex items-center gap-1 text-sm">
+					<ArrowUpRight class="h-3 w-3" />
+					<span>Réponse à <span class="font-semibold">{replyUser}</span></span>
 				</div>
-			{:else}
-				<p class="text-gray-700 dark:text-gray-300">
-					{message.content}
+				<p class="text-base-content/90 line-clamp-2 text-sm">
+					{replyContent || "Message indisponible"}
 				</p>
-			{/if}
-		</div>
+			</div>
+		{/if}
 
-		<!-- Actions -->
-		<div class="mt-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-			<button variant="ghost" size="sm" onclick={() => onReply(message.id)}>
+		{#if isEditing}
+			<div class="space-y-2">
+				<Textarea bind:value={editContent} class="min-h-[80px]" />
+				<div class="float-end flex gap-2">
+					<button class="btn btn-sm" onclick={handleUpdateMessage} disabled={!editContent.trim()}>
+						Enregistrer
+					</button>
+					<button class="btn btn-sm btn-error" onclick={() => (isEditing = false)}>Annuler</button>
+				</div>
+			</div>
+		{:else}
+			{message.content}
+		{/if}
+	</div>
+
+	<!-- Footer avec les actions -->
+	<div class="chat-footer opacity-0 transition-opacity group-hover:opacity-100">
+		<div class="flex gap-2">
+			<button class="btn btn-ghost btn-xs" onclick={() => onReply(message.id)}>
 				<Reply class="mr-1 h-4 w-4" />
 				Répondre
 			</button>
 
-			{#if message.user === pb.authStore.record.id}
-				<button variant="ghost" size="sm" onclick={() => (isEditing = true)}>
-					<Edit2 class="mr-1 h-4 w-4" />
+			{#if message.user === userDb.current.id}
+				<button class="btn btn-ghost btn-xs" onclick={() => (isEditing = true)}>
+					<PencilLine class="mr-1 h-4 w-4" />
 					Modifier
 				</button>
-				<button class="btn btn-ghost btn-sm" onclick={handleDeleteMessage}>
+				<button class="btn btn-ghost btn-xs" onclick={handleDeleteMessage}>
 					<Trash2 class="mr-1 h-4 w-4" />
 					Supprimer
 				</button>
