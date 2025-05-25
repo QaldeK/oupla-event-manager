@@ -62,33 +62,31 @@
 	});
 </script>
 
-{#if hasMore || !hasMore}
-	<div bind:this={container} class="mt-8 text-center">
-		{#if hasMore}
-			{#if showButton}
-				<button
-					class="btn btn-outline btn-wide"
-					class:loading={isLoading}
-					onclick={handleLoadMore}
-					disabled={isLoading}
-				>
-					{#if isLoading}
-						<Loader2 size={16} class="animate-spin mr-2" />
-						{loadingText}
-					{:else}
-						{loadMoreText}
-					{/if}
-				</button>
-			{:else if autoLoad && isLoading}
-				<div class="flex items-center justify-center gap-2 text-base-content/70">
-					<Loader2 size={16} class="animate-spin" />
-					<span>{loadingText}</span>
-				</div>
-			{/if}
-		{:else}
-			<div class="text-base-content/50 text-sm">
-				{noMoreText}
+<div bind:this={container} class="mt-8 mb-2 text-center">
+	{#if hasMore}
+		{#if showButton}
+			<button
+				class="btn w-full"
+				class:loading={isLoading}
+				onclick={handleLoadMore}
+				disabled={isLoading}
+			>
+				{#if isLoading}
+					<Loader2 size={16} class="mr-2 animate-spin" />
+					{loadingText}
+				{:else}
+					{loadMoreText}
+				{/if}
+			</button>
+		{:else if autoLoad && isLoading}
+			<div class="text-base-content/70 flex items-center justify-center gap-2">
+				<Loader2 size={16} class="animate-spin" />
+				<span>{loadingText}</span>
 			</div>
 		{/if}
-	</div>
-{/if}
+	{:else}
+		<div class="text-base-content/50 text-sm">
+			{noMoreText}
+		</div>
+	{/if}
+</div>
