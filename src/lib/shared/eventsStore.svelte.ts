@@ -219,6 +219,50 @@ class EventsStore {
 		return this.#store.syncStore.get(id);
 	});
 
+	// 👉 Système de pagination simple pour optimiser les performances
+	#pagination = $state({
+		pageSize: 20,
+		currentPage: 1,
+		totalPages: 1,
+		totalItems: 0
+	});
+
+	get pagination() {
+		return this.#pagination;
+	}
+
+	// Version paginée des événements principaux pour optimiser l'affichage
+	paginatedAllEvents = $derived.by(() => {
+		const events = this.allEvents;
+		this.#pagination.totalItems = events.length;
+		this.#pagination.totalPages = Math.ceil(events.length / this.#pagination.pageSize);
+		
+		const startIndex = (this.#pagination.currentPage - 1) * this.#pagination.pageSize;
+		const endIndex = startIndex + this.#pagination.pageSize;
+		
+		return events.slice(startIndex, endIndex);
+	});
+
+	// Méthodes de navigation dans la pagination
+	setPage(page: number) {
+		if (page >= 1 && page <= this.#pagination.totalPages) {
+			this.#pagination.currentPage = page;
+		}
+	}
+
+	nextPage() {
+		this.setPage(this.#pagination.currentPage + 1);
+	}
+
+	previousPage() {
+		this.setPage(this.#pagination.currentPage - 1);
+	}
+
+	setPageSize(size: number) {
+		this.#pagination.pageSize = size;
+		this.#pagination.currentPage = 1; // Reset à la première page
+	}
+
 	// Récupère les événements où l'utilisateur est organisateur
 	userEvents = $derived(
 		this.allEvents.filter(
