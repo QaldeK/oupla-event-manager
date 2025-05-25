@@ -1,9 +1,10 @@
 // src/lib/services/eventActions.ts
 import { updateEvent } from "$lib/pocketbase.svelte";
-import { validateEvent, ValidationSchemaType } from "$lib/schemas/event.schema";
+import { validateEventStatic } from "$lib/validation/event-validator.svelte";
 import { notificationService } from "$lib/services/notificationService.svelte";
 import { modalState, showAlert, eventState } from "$lib/shared";
-import type { DateProposedType, EventType, UserType } from "$lib/types/types";
+import type { DateProposedType, UserType } from "$lib/types/types";
+import type { EventType } from "$lib/types/event.types";
 import {
 	filterAndConvertOrganizers,
 	formatDatePb,
@@ -11,6 +12,20 @@ import {
 	lisibleDate,
 	lisibleTime
 } from "$lib/utils";
+
+/**
+ * Calcule les tâches non assignées d'un événement
+ */
+export function getUnassignedTasks(event: EventType) {
+	console.log("unassignedTasks compute");
+	if (!Array.isArray(event.tasks) || !Array.isArray(event.organizers)) {
+		return [];
+	}
+	const assignedTasks = event.organizers.flatMap((org) => org.tasks || []);
+	console.log("unassignedTasks →→ " + assignedTasks);
+
+	return event.tasks.filter((task) => !assignedTasks.includes(task.name));
+}
 
 /**
  * Prépare les données de l'événement pour la validation d'une date
@@ -43,12 +58,6 @@ export function prepareDateValidationData(
 		isSondage: false,
 		organizers: updatedOrganizers
 	};
-}
-
-export function canEventBeValidated(event: EventType): boolean {
-	return Boolean(
-		event.date_event && event.time_start && event.time_end // FIXIT : manage Organizer Tasks ?
-	);
 }
 
 /**
@@ -142,7 +151,8 @@ export function handleDateValidationModal(
 		...prepareDateValidationData(currentEvent, dateProposal)
 	};
 
-	const { success: canBePublished } = validateEvent(simulatedEvent, ValidationSchemaType.PUBLISH);
+	const validation = validateEventStatic(simulatedEvent);
+	const canBePublished = validation.isValid;
 
 	const message = hasConfirmedOrganizers
 		? `Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(
@@ -205,18 +215,6 @@ export function handleDateValidationModal(
 	};
 }
 
-export const getUnassignedTasks = (event: EventType) => {
-	if (!Array.isArray(event.tasks) || !Array.isArray(event.organizers)) {
-		return [];
-	}
-
-	// Récupérer toutes les tâches assignées
-	const assignedTasks = event.organizers.flatMap((org) => org.tasks || []);
-
-	// Filtrer les tâches non assignées
-	return event.tasks.filter((task) => !assignedTasks.includes(task.name));
-};
-
 /**
  * Confirme un événement après validation du schéma et vérification des tâches
  */
@@ -225,65 +223,37 @@ export async function confirmEventAction(
 	currentUser: UserType,
 	notify: boolean = true
 ): Promise<void> {
-	// Vérifier la validité avec PublishEventSchema
-	const validationResult = validateEvent(event, ValidationSchemaType.PUBLISH);
+	const validation = validateEventStatic(event);
 
-	// Obtenir les tâches non assignées
-	const unassignedTasks = getUnassignedTasks(event);
-
-	// Si l'événement n'est pas valide, afficher un modal d'erreur
-	const validationCheck = await validationResult;
-	if (!validationCheck.success) {
-		const errorMessages = validationCheck.errors.issues
-			? validationCheck.errors.issues.map((error) => `- ${error.message}`).join("\n")
-			: "Erreur de validation inconnue";
+	// Si l'événement ne peut pas être confirmé, afficher les erreurs
+	if (!validation.isValid) {
+		const errorMessages = validation.getErrors();
 		modalState.confirm = {
 			isOpen: true,
 			data: {
-				title: "L'événement ne peut pas être confirmé",
-				variant: "danger",
-				message: `L'événement ne peut pas être confirmé car il manque des informations obligatoires: <br>\n${errorMessages} <br><br> Vous pouver modifier l'événement pour compléter les informations manquantes.`,
+				title: "Événement incomplet",
+				variant: "warning",
+				message: `Certaines informations doivent être renseignées avant de pouvoir de confirmer l'événements.<br/>${errorMessages.map((error) => `• ${error}`).join("<br/>")}`,
 				onConfirm: () => {
 					// Ouvrir le modal d'édition
 					eventState.is = event;
 					modalState.event = true;
 				},
-				confirmLabel: "Modifier l'événement"
-			}
-		};
-		return;
-	}
-
-	// S'il y a des tâches non assignées et que allTasksRequired est true
-	if (event.recurrence?.allTasksRequired && unassignedTasks.length > 0) {
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: "Tâches non assignées",
-				variant: "danger",
-				message: `Toutes les tâches doivent être assignées pour confirmer cet événement.<br>Tâches non assignées:\n${unassignedTasks
-					.map((task) => `- ${task.name}`)
-					.join("\n")} <br> Vous pouvez modifier l'événement pour assigner les tâches.`,
-				onConfirm: () => {
-					// Ouvrir le modal d'édition
-					eventState.is = event;
-					modalState.event = true;
-				},
-				confirmLabel: "Modifier l'événement"
+				confirmLabel: "Compléter l'événement"
 			}
 		};
 		return;
 	}
 
 	// S'il y a des tâches non assignées mais que ce n'est pas bloquant
-	if (unassignedTasks.length > 0) {
+	if (validation.hasUnassignedTasks) {
 		modalState.confirm = {
 			isOpen: true,
 			data: {
 				title: "Confirmer l'événement",
 				variant: "warning",
-				message: `Il reste des tâches non assignées:\n${unassignedTasks
-					.map((task) => `- ${task.name}`)
+				message: `Il reste des tâches non assignées:\n${validation.unassignedTasks
+					.map((task) => `• ${task.name}`)
 					.join("\n")}\n\nVoulez-vous quand même confirmer l'événement ?`,
 				showCheckbox: notify
 					? { checked: true, label: "Notifier les organisateur·ices" }

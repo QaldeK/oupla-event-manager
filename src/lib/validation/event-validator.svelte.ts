@@ -1,4 +1,6 @@
 import type { EventType } from "$lib/types/event.types";
+import type { TaskType } from "$lib/types/types";
+import { getUnassignedTasks } from "$lib/services/eventActions";
 
 // Types des règles de validation individuelles
 type ValidationRule =
@@ -26,55 +28,55 @@ type ValidationRule =
 export type ValidationProfile = "DRAFT" | "STANDARD_EVENT" | "RECURRENT_MASTER";
 
 interface ValidatorConfig {
-	profile?: ValidationProfile;
+	profile?: ValidationProfile | null;
 }
 
 type ValidatorFunction = (event: EventType) => string | undefined;
 
-export function createEventValidator(initialEvent: EventType, config: ValidatorConfig = {}) {
-	let event = $state<EventType>(initialEvent);
-	let activeProfile = $state<ValidationProfile>(config.profile || "STANDARD_EVENT"); // Profil par défaut
+const PROFILE_RULES: Record<ValidationProfile, ValidationRule[]> = {
+	DRAFT: ["title"],
+	STANDARD_EVENT: [
+		"title",
+		"categories",
+		"rooms",
+		"tasks",
+		"date",
+		"timeStart",
+		"timeEnd",
+		"organizers",
+		"price",
+		"mixite",
+		"age",
+		"publicDescription",
+		"publicStartTime",
+		"unassignedTasksCheck"
+	],
+	RECURRENT_MASTER: [
+		"title",
+		"categories",
+		"rooms",
+		"timeStart",
+		"timeEnd",
+		"price",
+		"mixite",
+		"age",
+		"publicDescription",
+		"publicStartTime",
+		"recurrenceFirstDate",
+		"recurrenceLastDate",
+		"recurrenceOccurrences",
+		"recurrenceTeam",
+		"recurrenceTasks"
+	]
+};
 
-	// Définition centralisée des règles pour chaque profil
-	const profileRules: Record<ValidationProfile, ValidationRule[]> = {
-		DRAFT: ["title"],
-		STANDARD_EVENT: [
-			"title",
-			"categories",
-			"rooms",
-			"tasks",
-			"date",
-			"timeStart",
-			"timeEnd",
-			"organizers",
-			"price",
-			"mixite",
-			"age",
-			"publicDescription",
-			"publicStartTime",
-			"unassignedTasksCheck"
-		],
-		RECURRENT_MASTER: [
-			"title",
-			"categories",
-			"rooms",
-			"timeStart",
-			"timeEnd",
-			"price",
-			"mixite",
-			"age",
-			"publicDescription",
-			"publicStartTime",
-			"recurrenceFirstDate",
-			"recurrenceLastDate",
-			"recurrenceOccurrences",
-			"recurrenceTeam",
-			"recurrenceTasks"
-		]
-	};
+const VALIDATORS_CACHE = createValidators();
 
-	// Validateurs individuels
-	const validators: Record<ValidationRule, ValidatorFunction> = {
+// 👉 Validators functions (extraites pour réutilisation)
+function createValidators(): Record<ValidationRule, ValidatorFunction> {
+	console.log("createValidators called");
+
+	return {
 		title: (e) => {
 			const title = e.event_title?.trim();
 			if (!title) return "Le titre de l'événement est requis";
@@ -90,7 +92,7 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 		},
 		rooms: (e) => {
 			if (!e.rooms || e.rooms.length === 0) {
-				return "Sélectionnez au moins une salle pour confirmer l'événement";
+				return "Sélectionnez au moins une salle pour pouvoir confirmer l'événement";
 			}
 			return undefined;
 		},
@@ -122,11 +124,11 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 			if (e.isRecurrent && e.recurrence) {
 				const minRequired = e.recurrence.minOrganizersRequired ?? 1;
 				if ((e.organizers?.length || 0) < minRequired) {
-					return `Au moins ${minRequired} organisateur${minRequired > 1 ? "s sont requis" : " est requis"}`;
+					return `Définissez au moins ${minRequired} organisateur•ice${minRequired > 1 ? "s" : " pour confirmer l'événement"}`;
 				}
 			} else {
 				if ((e.organizers?.length || 0) < 1) {
-					return "Au moins un organisateur est requis pour confirmer l'événement";
+					return "Définissez au moins un·e organisateur·ice pour confirmer l'événement";
 				}
 			}
 			return undefined;
@@ -163,13 +165,18 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 		},
 
 		unassignedTasksCheck: (e) => {
-			if (e.recurrence?.allTasksRequired && hasUnassignedTasks()) {
-				// hasUnassignedTasks() est $derived
-				return `Toutes les tâches doivent être assignées : ${unassignedTasks
-					.map((task) => task.name)
-					.join(", ")}`;
+			if (!e.recurrence?.allTasksRequired) {
+				return undefined; // 👉 Sortie rapide - pas de calcul
 			}
-			return undefined;
+
+			const unassignedTasks = getUnassignedTasks(e);
+			if (unassignedTasks.length === 0) {
+				return undefined;
+			}
+
+			return `Toutes les tâches doivent être assignées (non assignées:  ${unassignedTasks
+				.map((task) => task.name)
+				.join(", ")})`;
 		},
 
 		recurrenceFirstDate: (e) => {
@@ -208,30 +215,88 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 			return undefined;
 		}
 	};
+}
 
-	// Calcul des tâches non assignées
-	const unassignedTasks = $derived.by(() => {
-		if (!Array.isArray(event.tasks) || !Array.isArray(event.organizers)) {
-			return [];
+// 👉 fonction statique pour validation one-shot
+
+export function validateEventStatic(
+	event: EventType,
+	profile: ValidationProfile = "STANDARD_EVENT"
+) {
+	const rulesForProfile = PROFILE_RULES[profile];
+	const errors: Partial<Record<ValidationRule, string>> = {};
+
+	// Validation de chaque règle
+	rulesForProfile.forEach((rule) => {
+		const error = VALIDATORS_CACHE[rule]?.(event); // 👉 Cache global !
+		if (error) {
+			errors[rule] = error;
 		}
-		const assignedTasks = event.organizers.flatMap((org) => org.tasks || []);
-		return event.tasks.filter((task) => !assignedTasks.includes(task.name));
 	});
-	const hasUnassignedTasks = $derived(() => unassignedTasks.length > 0);
 
-	// Erreurs pour le profil ACTIF (calculées réactivement)
+	let unassignedTasks = [];
+	let hasUnassignedTasks = false;
+
+	if (profile === "STANDARD_EVENT" && event.recurrence?.allTasksRequired) {
+		unassignedTasks = getUnassignedTasks(event);
+		hasUnassignedTasks = unassignedTasks.length > 0;
+	}
+	const hasRuleErrors = Object.keys(errors).length > 0;
+	const unassignedBlock =
+		profile === "STANDARD_EVENT" && event.recurrence?.allTasksRequired && hasUnassignedTasks;
+
+	return {
+		isValid: !hasRuleErrors && !unassignedBlock,
+		errors,
+		unassignedTasks,
+		hasUnassignedTasks,
+		getErrors(): string[] {
+			const errorMessages = Object.values(errors).filter(Boolean) as string[];
+
+			return errorMessages;
+		}
+	};
+}
+
+// 👉 Validateur réactif
+export function createEventValidator(initialEvent: EventType, config: ValidatorConfig = {}) {
+	console.log("createEventValidator");
+
+	let event = $state<EventType>(initialEvent);
+	let activeProfile = $state<ValidationProfile | null>(config.profile || null);
+
 	const activeProfileErrors = $derived.by(() => {
+		if (!activeProfile) return {};
 		const result: Partial<Record<ValidationRule, string>> = {};
-		const rulesForCurrentProfile = profileRules[activeProfile];
+		const rulesForCurrentProfile = PROFILE_RULES[activeProfile];
 
 		rulesForCurrentProfile.forEach((rule) => {
-			const error = validators[rule](event);
+			const error = VALIDATORS_CACHE[rule](event); // 👉 Cache global
 			if (error) {
 				result[rule] = error;
 			}
 		});
 		return result;
 	});
+
+	console.log("error", activeProfileErrors);
+
+	// 👉 Calculs des tache non assignées quand nécessaire
+	const unassignedTasks = $derived.by(() => {
+		if (!activeProfile) return [];
+		const rulesForCurrentProfile = PROFILE_RULES[activeProfile];
+		if (!rulesForCurrentProfile.includes("unassignedTasksCheck")) {
+			return [];
+		}
+
+		if (!event.recurrence?.allTasksRequired) {
+			return [];
+		}
+
+		return getUnassignedTasks(event);
+	});
+
+	const hasUnassignedTasks = $derived(unassignedTasks.length > 0);
 
 	return {
 		updateEvent: (newEvent: EventType) => {
@@ -246,30 +311,27 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 		get errors() {
 			return activeProfileErrors;
 		},
+		get hasActiveProfile() {
+			return activeProfile !== null;
+		},
+
 		isValid: (profile?: ValidationProfile): boolean => {
-			const profileToValidate = profile || activeProfile;
-			const rulesToValidate = profileRules[profileToValidate];
-
-			const hasRuleErrors = rulesToValidate.some((rule) => validators[rule](event) !== undefined);
-
-			return !hasRuleErrors;
+			// 👉 Délègue à la fonction statique !
+			const result = validateEventStatic(event, profile || activeProfile);
+			return result.isValid;
 		},
 
 		getErrors: (profile?: ValidationProfile): string[] => {
-			const profileToQuery = profile || activeProfile;
-			const rulesForProfile = profileRules[profileToQuery];
-
-			const errorMessages = rulesForProfile
-				.map((rule) => validators[rule](event))
-				.filter(Boolean) as string[];
-			return errorMessages;
+			// 👉 Délègue à la fonction statique !
+			const result = validateEventStatic(event, profile || activeProfile);
+			return result.getErrors();
 		},
 
 		get unassignedTasks() {
 			return unassignedTasks;
 		},
 		get hasUnassignedTasks() {
-			return hasUnassignedTasks();
+			return hasUnassignedTasks;
 		}
 	};
 }
