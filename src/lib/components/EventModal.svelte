@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { debounce } from "$lib/actions/debounce";
 	import Checkbox from "$lib/components/Checkbox.svelte";
+	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import Frame from "$lib/components/Frame.svelte";
 	import GroupCheckBox from "$lib/components/GroupCheckBox.svelte";
 	import Info from "$lib/components/Info.svelte";
@@ -20,16 +21,13 @@
 		updateEvent
 	} from "$lib/pocketbase.svelte";
 	import {
-		ValidationSchemaType,
 		getDefaultRecurrence,
 		getNewEvent,
-		validateEvent,
 		type DateProposedType,
-		type EventType,
 		type RequiredRecurrenceType,
 		type TaskType
 	} from "$lib/schemas/event.schema";
-	import { canEventBeValidated } from "$lib/services/eventActions";
+	import type { EventType } from "$lib/types/event.types";
 	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import {
 		eventState,
@@ -49,9 +47,13 @@
 	import { slide } from "svelte/transition";
 
 	import { UserPlus } from "lucide-svelte";
-	import EventValidationStatus from "./EventValidationStatus.svelte";
+	// import EventValidationStatus from "./EventValidationStatus.svelte";
 	import TimeReservation from "./forModal/TimeReservation.svelte";
 	import OtherSetting from "./forModal/OtherSetting.svelte";
+	import {
+		createEventValidator,
+		type ValidationProfile
+	} from "$lib/validation/event-validator.svelte";
 
 	type EventMode =
 		| "NEW_SINGLE" // Création événement unique
@@ -60,7 +62,7 @@
 		| "EDIT_RECURRENT_ONE" // Modification occurrence unique
 		| "EDIT_RECURRENT_ALL"; // Modification toutes occurrences
 
-	let isAlertDialogOpen = $state<boolean>(false);
+	let isAlertSaveMasterOpen = $state<boolean>(false);
 	let eventMode: EventMode = $derived.by(() => {
 		if (!eventData.id) {
 			return eventData.isRecurrent ? "NEW_RECURRENT" : "NEW_SINGLE";
@@ -73,8 +75,37 @@
 		return "EDIT_SINGLE";
 	});
 
-	let errors = $state<Record<string, string[] | undefined>>({});
-	let formattedErrors = $state<any>({});
+	// ::: Data et Etat réactif
+	let eventData = $state<EventType>({ ...eventState.is } as EventType);
+
+	// ::: Gestion de la validation :::
+	/* Enclanche la validation standard pour les modification d'event (event.id), sinon, déclanché lors du handleSave | handleConfirm grace à hasTriggeredValidation, avec le setProfile adéquat. */
+	let hasTriggeredValidation = $state(false);
+	let validator = $state<ReturnType<typeof createEventValidator> | null>(null);
+	const getInitialProfile = (): ValidationProfile | null => {
+		if (eventData.id) {
+			return "STANDARD_EVENT";
+		}
+		return null;
+	};
+	$effect(() => {
+		if (eventData.id || hasTriggeredValidation) {
+			if (!validator) {
+				const initialProfile = getInitialProfile();
+				validator = createEventValidator(eventData, {
+					profile: initialProfile
+				});
+			} else {
+				validator.updateEvent(eventData);
+			}
+		}
+	});
+
+	// 👉 Erreurs calculées seulement si validateur existe
+	let errorsMap = $derived.by(() => {
+		if (!validator || !validator.hasActiveProfile) return {};
+		return validator.errors;
+	});
 
 	// :::_ Event Mode & dynamics props
 	type DisplayMode = "DATE" | "SONDAGE" | "RECURRENT";
@@ -88,14 +119,10 @@
 		}
 		return "DATE";
 	});
-
-	// ::: Data et Etat réactif
-	let eventData = $state<EventType>({ ...eventState.is });
 	let rooms: string[] = getSpace.rooms;
 	let categories: string[] = getSpace.categories;
 	let spaceMembers = $derived(getOrganizersPossibles());
 	let showAddTaskForm = $state(false);
-	const missingForConfirmation = $derived(canEventBeValidated(eventData));
 
 	let organizersPossibles = $derived.by(() => {
 		// Commencez avec les membres de l'espace par défaut
@@ -246,11 +273,11 @@
 	});
 
 	// Check PublishValidation if canBeValidated, only on load
-	$effect(() => {
-		if (missingForConfirmation) {
-			validateCurrentEvent(ValidationSchemaType.PUBLISH);
-		}
-	});
+	// $effect(() => {
+	// 	if (missingForConfirmation) {
+	// 		validateCurrentEvent(ValidationSchemaType.PUBLISH);
+	// 	}
+	// });
 
 	$effect(() => {
 		if (eventData.date_event && eventData.time_start && eventData.time_end) {
@@ -334,8 +361,8 @@
 			data: {
 				title: "Cloture du sondage",
 				message: isConfirmed
-					? `Vous avez valider la date du ${lisibleDate(eventData.dateStart)} et cloturé le sondage. Les participants au sondage seront notifié par email de la date choisie`
-					: `Vous avez valider la date (${lisibleDate(eventData.dateStart)}) et cloturé le sondage, Si les différents champs obligatoires sont renseignés, et les mandats attribués, vous pouvez confirmer l'événement (s'il s'agit d'un événement public, il sera publié sur le site et diffusable sur la newsletter). Les participant·es au sondage seront notifiés par email.`,
+					? `Vous avez validé la date du ${lisibleDate(eventData.dateStart)} et cloturé le sondage. Les participants au sondage seront notifié par email de la date choisie`
+					: `Vous avez validé la date (${lisibleDate(eventData.dateStart)}) et cloturé le sondage, Si les différents champs obligatoires sont renseignés, et les mandats attribués, vous pouvez confirmer l'événement (s'il s'agit d'un événement public, il sera publié sur le site et diffusable sur la newsletter). Les participant·es au sondage seront notifiés par email.`,
 				variant: isConfirmed ? "info" : "warning",
 				onConfirm: () => {
 					submitForm();
@@ -401,38 +428,25 @@
 
 	// ::: Form Validation and Submission
 
-	function validateCurrentEvent(schemaType: ValidationSchemaType): boolean {
-		// Préparation des données pour la validation (ex: tâches de récurrence)
-		if (
-			(eventMode === "EDIT_RECURRENT_ALL" || eventMode === "NEW_RECURRENT") &&
-			eventData.recurrence
-		) {
-			eventData.recurrence.tasks = eventData.tasks || [];
-		}
-
-		const validationResult = validateEvent(eventData, schemaType);
-
-		if (!validationResult.success && validationResult.errors) {
-			errors = validationResult.errors.flatten().fieldErrors;
-			formattedErrors = validationResult.errors.format();
-
-			return false;
-		}
-
-		// Réinitialiser les erreurs si la validation réussit
-		errors = {};
-		formattedErrors = {};
-		return true;
-	}
-
 	const confirmSubmit = async () => {
-		isAlertDialogOpen = false;
+		isAlertSaveMasterOpen = false;
 		await submitForm();
 	};
 
+	/* Bouton confirmer → enclanche la validation STANDARD, affiche l'alert si besoin et déclanche l'affichage des erreurs dans le formulaire; ou bien confirme et enregistre l'evenement */
 	const handleConfirm = async () => {
-		if (!validateCurrentEvent(ValidationSchemaType.PUBLISH)) {
-			showAlert("L'événement ne peut être confirmé : vérifiez les champs mal renseignés.", "error");
+		hasTriggeredValidation = true;
+
+		if (!validator) {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		}
+		validator?.setProfile("STANDARD_EVENT");
+		if (!validator?.isValid("STANDARD_EVENT")) {
+			showAlert(
+				`L'événement ne peut être confirmé: veuillez compléter les champs obligatoires.`,
+				"error"
+			);
+			console.warn("errors: ", validator?.errors);
 			return;
 		}
 
@@ -441,28 +455,40 @@
 	};
 
 	const handleSave = async () => {
-		const schemaType = (() => {
-			if (eventData.isConfirmed) return ValidationSchemaType.PUBLISH;
-			switch (eventMode) {
-				case "NEW_SINGLE":
-				case "EDIT_SINGLE":
-				case "EDIT_RECURRENT_ONE":
-					return ValidationSchemaType.SAVE;
-				case "EDIT_RECURRENT_ALL":
-				case "NEW_RECURRENT":
-					return ValidationSchemaType.SAVE_RECURRENT_MASTER;
-				default:
-					return ValidationSchemaType.DEFAULT; // Fallback
-			}
-		})();
+		let profileToUse: ValidationProfile;
+		if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
+			profileToUse = "RECURRENT_MASTER";
+		} else if (eventData.isConfirmed) {
+			profileToUse = "STANDARD_EVENT";
+		} else {
+			// Pour une sauvegarde simple (brouillon) avant confirmation/publication.
+			profileToUse = "DRAFT";
+		}
 
-		if (!validateCurrentEvent(schemaType)) {
-			return; // La validation a échoué, message déjà affiché
+		console.log("profileToUse : ", profileToUse);
+
+		hasTriggeredValidation = true;
+
+		if (!validator) {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		}
+
+		validator?.setProfile(profileToUse);
+
+		if (!validator?.isValid(profileToUse)) {
+			showAlert(
+				`L'événement ne peut être sauvegardé: veuillez compléter les champs obligatoires.`,
+				"error"
+			);
+
+			console.warn("errors: ", validator?.errors);
+
+			return;
 		}
 
 		// Si c'est une modification globale, ouvrir la modale de confirmation
 		if (eventMode === "EDIT_RECURRENT_ALL") {
-			isAlertDialogOpen = true;
+			isAlertSaveMasterOpen = true;
 			// Le submitForm sera appelé via confirmSubmit après confirmation dans la modale
 		} else if (hasSondageValidation && !eventData.isSondage) {
 			confirmNotifSondageClosed(false);
@@ -510,16 +536,10 @@
 	const closeModal = () => {
 		modalState.event = false;
 		eventState.is = { ...getNewEvent() };
-		errors = {};
-		formattedErrors = {};
-		isAlertDialogOpen = false;
+		isAlertSaveMasterOpen = false;
 	};
 </script>
 
-<!-- {$inspect('eventData', eventData)} -->
-{$inspect("eventMode", eventMode)}
-{$inspect("eventData", eventData)}
-<!-- {$inspect('organizersPossibles', organizersPossibles)} -->
 <!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
 <!-- {$inspect('eOrg', eventData.organizers)} -->
 <!-- {$inspect('activeTabDate', activeTabDate)} -->
@@ -543,8 +563,8 @@
 			</button>
 		</div> -->
 		<form class="space-y-10">
-			<div class="flex flex-wrap items-center space-y-2 md:mx-4">
-				<div class="w-full items-center space-y-2 md:w-1/2">
+			<div class="flex flex-wrap items-center">
+				<div class="mx-4 w-full items-center space-y-1 md:w-1/2">
 					<label for="event_title" class="text-fluid-sm">Nom de l'événement</label>
 					<input
 						use:debounce={{
@@ -556,11 +576,9 @@
 						name="event_title"
 						class="input block w-full"
 					/>
-					{#if errors.event_title}
-						<p class="text-fluid-sm text-error italic">{errors.event_title[0]}</p>
-					{/if}
+					<ErrorMessage error={errorsMap?.title} />
 				</div>
-				<div class="w-min-fit flex flex-wrap items-center pt-2 md:ms-2">
+				<div class="w-min-fit mt-2 flex flex-wrap gap-4 self-start p-4">
 					<div class="">
 						<Checkbox
 							label="Evénement public"
@@ -607,11 +625,11 @@
 								<RecurrentTab
 									bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
 									isExistingMaster={eventMode === "EDIT_RECURRENT_ALL"}
-									localErrors={formattedErrors?.recurrence}
+									errors={errorsMap}
 								/>
 							</div>
 							<div>
-								<TimeReservation localErrors={errors} bind:eventData />
+								<TimeReservation errors={errorsMap} bind:eventData />
 							</div>
 						{:else if displayMode === "SONDAGE"}
 							<div>
@@ -624,9 +642,7 @@
 									}}
 									onValidateDate={handleFormDateValidation}
 									onUpdateIsSondage={() => (eventData.isSondage = false)}
-									localErrors={formattedErrors?.dates_proposed?._errors
-										? { dates_proposed: formattedErrors.dates_proposed._errors }
-										: null}
+									errors={errorsMap}
 								/>
 							</div>
 						{:else}
@@ -657,7 +673,7 @@
 									</Info>
 								{/if}
 
-								<DateUniq bind:eventData {startDateObject} {endDateObject} localErrors={errors} />
+								<DateUniq {startDateObject} {endDateObject} bind:eventData errors={errorsMap} />
 							</div>
 						{/if}
 					</div>
@@ -733,7 +749,7 @@
 					</button>
 					{#if eventData.isPublic && (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL")}
 						<div class="form-control">
-							<label class="label cursor-pointer">
+							<label class="label flex cursor-pointer">
 								<span class="label-text"
 									>Empécher la confirmation de l'événement même si toutes les tâches ne sont pas
 									assignées</span
@@ -758,9 +774,8 @@
 						hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
 					/>
 
-					{#if errors.organizers}
-						<p class="text-fluid-sm text-error p-2 italic">{errors.organizers[0]}</p>
-					{/if}
+					<ErrorMessage error={errorsMap?.organizers} />
+					<ErrorMessage error={errorsMap?.unassignedTasksCheck} />
 				</Frame>
 				<!-- Cas 2 : Si MasterEvent d'un événement récurrent -->
 			{:else}
@@ -780,18 +795,14 @@
 							class="btn btn-outline btn-primary btn-compact mt-4"
 							onclick={() => {
 								if (eventData.recurrence) {
-									eventData.recurrence.recurrenceTeam = organizersPossibles;
+									eventData.recurrence.recurrenceTeam = [...organizersPossibles]; // Destructurer ?
 								}
 							}}
 						>
 							→ ajoutez tout le monde
 						</button>
 					{/if}
-					{#if formattedErrors?.recurrence?.recurrenceTeam._errors}
-						<p class="text-fluid-sm text-error p-2 italic">
-							{formattedErrors.recurrence.recurrenceTeam._errors[0]}
-						</p>
-					{/if}
+					<ErrorMessage error={errorsMap?.recurrenceTeam} />
 				</Frame>
 
 				<OtherSetting bind:data={eventData.recurrence} />
@@ -811,9 +822,7 @@
 									bind:value={eventData.prix}
 								/>
 							</label>
-							{#if errors.prix}
-								<p class="text-fluid-sm text-error p-2 italic">{errors.prix[0]}</p>
-							{/if}
+							<ErrorMessage error={errorsMap?.price} />
 						{/if}
 					</div>
 					<div class="flex flex-1 flex-col gap-1">
@@ -828,9 +837,7 @@
 									placeholder="Décrivez le type de mixité"
 								/>
 							</label>
-							{#if errors.mixite}
-								<p class="text-fluid-sm text-error p-2 italic">{errors.mixite[0]}</p>
-							{/if}
+							<ErrorMessage error={errorsMap?.mixite} />
 						{/if}
 					</div>
 					<div class="flex flex-1 flex-col gap-1">
@@ -850,9 +857,7 @@
 									min="0"
 								/>
 							</label>
-							{#if errors.age_advice}
-								<p class="text-fluid-sm text-error p-2 italic">{errors.age_advice[0]}</p>
-							{/if}
+							<ErrorMessage error={errorsMap?.age} />
 						{/if}
 					</div>
 				</div>
@@ -867,9 +872,7 @@
 							classLabel="w-full"
 						/>
 					</div>
-					{#if errors.rooms}
-						<p class="text-fluid-sm text-error p-2 italic">{errors.rooms[0]}</p>
-					{/if}
+					<ErrorMessage error={errorsMap?.rooms} />
 				</Frame>
 
 				<!-- ::: catégories -->
@@ -882,9 +885,7 @@
 							classLabel="w-full md:w-fit"
 						/>
 					</div>
-					{#if errors.categories}
-						<p class="text-fluid-sm text-error p-2 italic">{errors.categories[0]}</p>
-					{/if}
+					<ErrorMessage error={errorsMap?.categories} />
 				</Frame>
 			</div>
 			<!-- ::: description -->
@@ -920,14 +921,12 @@
 				<div>
 					<Quill bind:html={eventData.desc_public} />
 				</div>
-				{#if errors.desc_public}<p class="text-fluid-sm text-error p-2 italic">
-						{errors.desc_public[0]}
-					</p>{/if}
+				<ErrorMessage error={errorsMap?.publicDescription} />
 			</Frame>
 
-			<div>
+			<!-- <div>
 				<EventValidationStatus event={eventData} {missingForConfirmation} />
-			</div>
+			</div> -->
 		</form>
 		<div
 			class="bottom-0 left-0 mt-2 flex w-full flex-wrap justify-end gap-x-4 gap-y-2 border-t bg-white p-2 md:sticky"
@@ -935,10 +934,14 @@
 			<button type="button" class="btn block w-full font-bold sm:w-fit" onclick={closeModal}
 				>Fermer sans enregistrer</button
 			>
-			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage && !eventData.isConfirmed)}
+			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage && !eventData.isConfirmed) || (eventMode === "EDIT_RECURRENT_ONE" && !eventData.isSondage && !eventData.isConfirmed)}
 				<button
 					type="button"
-					class="btn btn-accent block w-full font-bold sm:w-fit"
+					class="btn btn-accent block w-full font-bold sm:w-fit {validator?.isValid(
+						'STANDARD_EVENT'
+					)
+						? ''
+						: 'opacity-50'}"
 					onclick={handleConfirm}>Enregistrer et Confirmer l'événement</button
 				>
 			{/if}
@@ -951,7 +954,7 @@
 	</div>
 
 	<!-- AlertDialog pour la confirmation de modification de toutes les occurrences -->
-	<dialog id="confirm_recurrence_modal" class="modal" open={isAlertDialogOpen}>
+	<dialog id="confirm_recurrence_modal" class="modal" open={isAlertSaveMasterOpen}>
 		<div class="modal-box">
 			<h3 class="text-lg font-bold">Modifier toutes les occurrences ?</h3>
 			<p class="py-4">
@@ -961,7 +964,9 @@
 			</p>
 			<div class="modal-action">
 				<form method="dialog">
-					<button class="btn btn-ghost" onclick={() => (isAlertDialogOpen = false)}>Annuler</button>
+					<button class="btn btn-ghost" onclick={() => (isAlertSaveMasterOpen = false)}
+						>Annuler</button
+					>
 					<button class="btn btn-primary" onclick={confirmSubmit}
 						>Confirmer la modification globale</button
 					>

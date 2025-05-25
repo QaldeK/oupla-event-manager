@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DatePicker from "$lib/components/forModal/DatePicker.svelte";
+	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import GroupRadioButton from "$lib/components/GroupRadioButton.svelte";
 	import Info from "$lib/components/Info.svelte";
 	import TimePickRange from "$lib/components/TimePickRange.svelte";
@@ -16,7 +17,7 @@
 		onUpdateDatesProposed: (dates: DateProposedType[]) => void;
 		onValidateDate: (date: DateProposedType) => void;
 		onUpdateIsSondage: () => void;
-		localErrors?: Record<string, string[] | undefined> | null;
+		errors?: Partial<Record<string, string>>;
 	}
 
 	let {
@@ -24,7 +25,7 @@
 		onUpdateDatesProposed,
 		onValidateDate,
 		onUpdateIsSondage,
-		localErrors = null
+		errors = {}
 	}: Props = $props();
 
 	// States
@@ -428,9 +429,7 @@
 		</div>
 	{/if}
 </div>
-{#if localErrors?.dates_proposed}
-	<p class="text-fluid-sm text-error p-2 italic">{localErrors.dates_proposed[0]}</p>
-{/if}
+<ErrorMessage error={errors.datesProposed} />
 
 <!-- Modal Dialog pour la sélection des organisateurs (intégré) -->
 <dialog class="modal" class:modal-open={isOrganizerModalOpen}>

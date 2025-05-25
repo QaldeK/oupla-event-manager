@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import TimePickRange from "$lib/components/TimePickRange.svelte";
 	import { addTime } from "$lib/utils";
 	import { showAlert } from "$lib/shared/states.svelte";
@@ -6,7 +7,7 @@
 	import "tippy.js/dist/tippy.css";
 
 	let {
-		localErrors,
+		errors = {},
 		eventData = $bindable({
 			time_start: "",
 			time_end: "",
@@ -15,7 +16,6 @@
 		})
 	} = $props();
 
-	let isLoading: boolean = true;
 	let alertMsg = $state("");
 
 	$effect(() => {
@@ -91,11 +91,7 @@
 			/>
 		</div>
 		<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires de réservation du lieu</p>
-		{#if localErrors.time_start || localErrors.time_end}
-			<p class="text-fluid-xs text-error pt-1 italic">
-				{localErrors.time_start || localErrors.time_end}
-			</p>
-		{/if}
+		<ErrorMessage error={errors?.timeStart || errors?.timeEnd} />
 	</div>
 
 	<div class="flex flex-col">
@@ -114,9 +110,7 @@
 			/>
 		</div>
 		<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires annoncées au public</p>
-		{#if localErrors.start_public}
-			<p class="text-fluid-sm text-error italic">{localErrors.start_public}</p>
-		{/if}
+		<ErrorMessage error={errors?.publicStartTime} />
 	</div>
 </div>
 

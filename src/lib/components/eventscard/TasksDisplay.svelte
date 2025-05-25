@@ -10,7 +10,7 @@
 		isUserInRecurrenceTeam: boolean;
 		onTaskSubscription: (taskName?: string) => void;
 		isRecurrent?: boolean;
-		recurrenceTeam?: string[];
+		recurrenceTeam?: OrganizerType[];
 	}
 
 	const {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
+	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import Info from "$lib/components/Info.svelte";
 	import { type EventType } from "$lib/types/event";
 	import { lisibleDate } from "$lib/utils";
@@ -12,16 +13,16 @@
 	import TimeReservation from "./TimeReservation.svelte";
 
 	interface Props {
-		localErrors: unknown;
 		eventData: EventType;
 		startDateObject: Date | null;
 		endDateObject: Date | null;
+		errors?: Partial<Record<string, string>>;
 	}
 	let {
-		localErrors,
 		eventData = $bindable<EventType>({} as EventType),
 		startDateObject,
-		endDateObject
+		endDateObject,
+		errors = {}
 	}: Props = $props();
 
 	// Fonction de transition vers le mode sondage
@@ -54,7 +55,6 @@
 			}
 		};
 	};
-	// $inspect('localErrors', localErrors);
 </script>
 
 <div class="space-y-6">
@@ -85,9 +85,7 @@
 				label="Date de l'événement"
 			/>
 
-			{#if localErrors && localErrors.date_event}
-				<p class="text-fluid-sm text-error p-2 italic">{localErrors.date_event}</p>
-			{/if}
+			<ErrorMessage error={errors.date} />
 		</div>
 	{:else}
 		<Info>
@@ -117,7 +115,7 @@
 		</Info>
 	{/if}
 
-	<TimeReservation {localErrors} bind:eventData />
+	<TimeReservation {errors} bind:eventData />
 	{#if startDateObject && endDateObject}
 		<ConflictAlert
 			eventId={eventData.id}

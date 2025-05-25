@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DatePicker from "$lib/components/forModal/DatePicker.svelte";
+	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import MultiSelect from "./MultiSelect.svelte";
 	import {
 		getRecurrenceLabel,
@@ -27,13 +28,13 @@
 	interface RecurrentTabProps {
 		recurrence: RequiredRecurrenceType;
 		isExistingMaster: boolean;
-		localErrors: Record<string, { _errors: string[] }> | undefined;
+		errors?: Partial<Record<string, string>>;
 	}
 
 	let {
 		recurrence = $bindable<RequiredRecurrenceType>(),
-		localErrors,
-		isExistingMaster = false
+		isExistingMaster = false,
+		errors = {}
 	}: RecurrentTabProps = $props();
 
 	// Utilisation des valeurs importées directement depuis le schéma
@@ -276,14 +277,12 @@
 			{#if !isExistingMaster && (!recurrence.firstDate || isAfter(parse(recurrence.firstDate, "yyyy-MM-dd", new Date()), new Date()))}
 				<div class="min-w-54">
 					<DatePicker
-						initialValue={recurrence.firstDate}
-						onChange={(value) => (recurrence.firstDate = value)}
+						initialValue={recurrence.firstDate as string}
+						onChange={(value) => (recurrence.firstDate = value as string)}
 						label="Première date"
 					/>
 				</div>
-				{#if localErrors?.firstDate?._errors?.length}
-					<p class="text-fluid-xs text-error italic">{localErrors.firstDate._errors[0]}</p>
-				{/if}
+				<ErrorMessage error={errors.recurrenceFirstDate} />
 			{:else}
 				<div class="flex flex-col gap-2">
 					<p class="text-fluid-sm">Première date</p>
@@ -298,14 +297,12 @@
 		<div class="min-w-fit">
 			<div class="min-w-54">
 				<DatePicker
-					initialValue={recurrence.lastDate}
-					onChange={(value) => (recurrence.lastDate = value)}
+					initialValue={recurrence.lastDate as string}
+					onChange={(value) => (recurrence.lastDate = value as string)}
 					label="Jusqu'au..."
 				/>
 			</div>
-			{#if localErrors?.lastDate?._errors?.length}
-				<p class="text-fluid-xs text-error italic">{localErrors.lastDate._errors[0]}</p>
-			{/if}
+			<ErrorMessage error={errors.recurrenceLastDate} />
 		</div>
 	</div>
 
@@ -325,13 +322,7 @@
 				<option value={recurrenceChoice.MONTHLY_BY_DATE}>Mensuel (même date)</option>
 				<option value={recurrenceChoice.MONTHLY_BY_DAY}>Mensuel (même jour de la semaine)</option>
 			</select>
-			<div>
-				{#if localErrors?.recurrenceType?._errors?.length}
-					<p class="text-fluid-xs text-error pt-1 italic">
-						{localErrors.recurrenceType._errors[0]}
-					</p>
-				{/if}
-			</div>
+			<ErrorMessage error={errors.recurrenceOccurrences} />
 		</div>
 
 		{#if recurrence?.recurrenceType === recurrenceChoice.MONTHLY_BY_DAY}
@@ -346,11 +337,7 @@
 				]}
 				placeholder={`Tous les ${labelOfOcurrence} du mois`}
 			/>
-			{#if localErrors?.monthlyByDayOccurrences?._errors?.length}
-				<p class="text-fluid-xs text-error italic">
-					{localErrors.monthlyByDayOccurrences._errors[0]}
-				</p>
-			{/if}
+			<ErrorMessage error={errors.recurrenceOccurrences} />
 		{/if}
 	</div>
 
@@ -387,12 +374,6 @@
 					<span class="self-center p-1 text-sm">... et {allGeneratedDates.length - 54} autres</span>
 				{/if}
 			</div>
-			<!-- 👉 Affichage d'erreur spécifique à recurrenceDates -->
-			{#if localErrors?.recurrenceDates?._errors?.length}
-				<p class="text-fluid-xs text-error pt-2 italic">
-					{localErrors.recurrenceDates._errors[0]}
-				</p>
-			{/if}
 		</div>
 	{:else if recurrence.firstDate && recurrence.lastDate && recurrence.recurrenceType}
 		<p class="text-info mt-4">
