@@ -31,7 +31,7 @@
 	} = $props<{
 		currentEvent: EventType;
 		currentUser: UserType | null;
-		dates: Date[];
+		dates: DateProposedType[];
 		bg?: string;
 		showHeader?: boolean;
 	}>();

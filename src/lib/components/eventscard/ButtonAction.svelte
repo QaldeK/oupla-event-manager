@@ -1,11 +1,12 @@
 <script lang="ts">
 	import DropDownModEvent from "$lib/components/DropDownModEvent.svelte";
-	import { type EventType } from "$lib/types/event";
+	import type { EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
 	import { pb } from "$lib/pocketbase.svelte";
-	import { showAlert } from "$lib/shared/states.svelte";
-	import { eventState, messageSheet, modalState } from "$lib/shared/states.svelte";
+	import { showAlert, userDb } from "$lib/shared";
+	import { eventState, messageSheet, modalState } from "$lib/shared";
 	import { hasAuthorizations } from "$lib/utils/recurrence";
+	import { confirmEventAction } from "$lib/services/eventActions";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
 	import {
@@ -60,16 +61,8 @@
 		modalState.report = true;
 	}
 
-	async function confirmEvent() {
-		try {
-			await pb.collection("events").update(currentEvent.id, { isConfirmed: true });
-			showAlert(
-				"L'événement a bien été confirmé. Il est maintenant visible sur le site publique, et vous pouvez l'ajouter à la newsletter.",
-				"info"
-			);
-		} catch (error) {
-			console.error("Error updating event:", error);
-		}
+	async function handleConfirmEvent() {
+		await confirmEventAction(currentEvent, userDb.current, true);
 	}
 
 	async function cancelEvent() {
@@ -136,9 +129,13 @@
 	{/if}
 
 	{#if !currentEvent.canceled}
-		{#if !currentEvent.isConfirmed && currentEvent.date_event && currentEvent.organizers?.length > 0 && currentEvent.time_start && currentEvent.time_end && hasAuth}
-			<button class="btn" onclick={() => confirmEvent()}> confirmer </button>
+		{#if !currentEvent.isConfirmed}
+			<button class="btn" onclick={handleConfirmEvent}>
+				<CalendarCheck />
+				Confirmer
+			</button>
 		{/if}
+
 		{#if currentEvent.isRecurrent}
 			<div class={!hasAuth ? "cursor-default opacity-50" : ""}>
 				<DropDownModEvent {currentEvent} {hasAuth} />

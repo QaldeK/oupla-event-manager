@@ -1,11 +1,8 @@
 <script lang="ts">
-	import EventValidationStatus from "$lib/components/EventValidationStatus.svelte";
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
-	import { updateEvent } from "$lib/pocketbase.svelte";
-	import { canEventBeValidated } from "$lib/services/eventActions";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
+	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { DateProposedType, EventType, UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 	import { getContext } from "svelte";
@@ -15,7 +12,6 @@
 	import OrganizersHeader from "./OrganizersHeader.svelte";
 
 	import ButtonAction from "./ButtonAction.svelte";
-	import TopAlert from "./TopAlert.svelte";
 	import {
 		formatRecurrence,
 		getRecurrenceLabel,
@@ -60,15 +56,15 @@
 			isRecurrent: currentEvent.isRecurrent,
 			recurrenceTeam: currentEvent.recurrence?.recurrenceTeam,
 			createdBy: currentEvent.created_by
-		})
-	);
-
-	const notRecurrentOrUserInTeam = $derived.by(
-		() => !currentEvent.isRecurrent || (currentEvent.isRecurrent && isUserInRecurrenceTeam)
+		}) as boolean
 	);
 
 	const isUserInRecurrenceTeam = $derived(
-		isInTeam(currentUser, currentEvent.recurrence?.recurrenceTeam)
+		Boolean(isInTeam(currentUser, currentEvent.recurrence?.recurrenceTeam))
+	);
+
+	const notRecurrentOrUserInTeam = $derived.by(
+		() => Boolean(!currentEvent.isRecurrent || (currentEvent.isRecurrent && isUserInRecurrenceTeam))
 	);
 
 	// organizersLabel moved to OrganizersHeader.svelte
@@ -82,7 +78,7 @@
 		else return "bg-warning/20";
 	});
 
-	const canBeValidated = $derived(canEventBeValidated(currentEvent));
+
 
 	// --- effect ---
 
@@ -295,11 +291,11 @@
 									<!--::: SI: une date est déjà proposée -->
 								{:else if hasDate}
 									<TasksDisplay
-										tasks={currentEvent.tasks}
-										organizers={currentEvent.organizers}
+										tasks={currentEvent.tasks ?? []}
+										organizers={currentEvent.organizers ?? []}
 										{currentUser}
 										onTaskSubscription={handleTaskSubscription}
-										isRecurrent={currentEvent.isRecurrent}
+										isRecurrent={currentEvent.isRecurrent ?? false}
 										{isUserInRecurrenceTeam}
 										recurrenceTeam={currentEvent.recurrence?.recurrenceTeam}
 									/>
@@ -337,9 +333,6 @@
 				</div>
 			{/if}
 		</div>
-		{#if canBeValidated}
-			<EventValidationStatus event={currentEvent} showButton={true} {canBeValidated} />
-		{/if}
 		<ButtonAction thisEvent={currentEvent} />
 	</div>
 </div>
