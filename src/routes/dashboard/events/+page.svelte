@@ -7,7 +7,6 @@
 
 	// Configuration du lazy loading
 	const ITEMS_PER_PAGE = 20;
-	const LARGE_DATASET_THRESHOLD = 50;
 
 	let currentPage = $state(1);
 	let isLoadingMore = $state(false);
@@ -104,13 +103,13 @@
 
 <div>
 	<!-- En-tête avec titre et contrôles -->
-	<div class="mb-6 flex items-center justify-between">
-		<h1 class="text-2xl font-semibold">{eventsPageTitle}</h1>
-		<div class="text-base-content/70 mt-1 text-sm">
+	<div class="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-2">
+		<div class="text-2xl font-semibold">{eventsPageTitle}</div>
+		<div class="text-base-content/70">
 			{#if displayStats.total === 0}
 				Aucun événement trouvé
 			{:else}
-				{displayStats.showing} / {displayStats.total} événements
+				• {displayStats.total} événements •
 			{/if}
 		</div>
 	</div>
