@@ -94,6 +94,11 @@ export const lisibleDate = (date: Date | string | undefined) => {
 	if (!date) return "";
 	return format(new Date(date), "EEEE d MMMM", { locale: fr });
 };
+
+export const lisibleDateShort = (date: Date | string | undefined) => {
+	if (!date) return "";
+	return format(new Date(date), "EE d MMM", { locale: fr });
+};
 export const lisibleTime = (date: Date | string | undefined) => {
 	if (!date) return "";
 	return format(new Date(date), "kk:mm", { locale: fr });
