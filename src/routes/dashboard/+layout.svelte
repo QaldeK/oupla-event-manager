@@ -14,9 +14,10 @@
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { messageStore } from "$lib/shared/messageStore.svelte";
 	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
-	import { messageSheet, modalState } from "$lib/shared/states.svelte";
+	import { loadingState, messageSheet, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { CurrentUser } from "$lib/types/types";
+	import LoadingOverlay from "$lib/components/ui/loading/LoadingOverlay.svelte";
 
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
@@ -551,7 +552,7 @@
 		</div>
 	{/await}
 </div>
-
+<LoadingOverlay isLoading={loadingState.is} />
 <!-- <style lang="postcss">
   @reference "tailwindcss";
 	.active {
