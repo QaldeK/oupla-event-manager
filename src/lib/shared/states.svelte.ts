@@ -166,3 +166,8 @@ export const messageSheet = $state({
 		this.isOpen = true;
 	}
 });
+
+// ::: État de loading global pour les transitions et lazy loading
+export const loadingState = $state({
+	is: false
+});
