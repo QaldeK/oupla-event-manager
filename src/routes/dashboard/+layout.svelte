@@ -42,6 +42,7 @@
 		UserPlus,
 		Users
 	} from "lucide-svelte";
+	import { fade } from "svelte/transition";
 
 	let { children } = $props();
 
@@ -552,7 +553,11 @@
 		</div>
 	{/await}
 </div>
-<LoadingOverlay isLoading={loadingState.is} />
+{#if loadingState.is}
+	<div transition:fade class="absolute inset-0 z-50 flex items-center justify-center bg-black/80">
+		<span class="loading loading-spinner loading-lg"></span>
+	</div>
+{/if}
 <!-- <style lang="postcss">
   @reference "tailwindcss";
 	.active {
