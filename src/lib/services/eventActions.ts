@@ -17,12 +17,12 @@ import {
  * Calcule les tâches non assignées d'un événement
  */
 export function getUnassignedTasks(event: EventType) {
-	console.log("unassignedTasks compute");
+	// console.log("{DEBUG] unassignedTasks compute");
 	if (!Array.isArray(event.tasks) || !Array.isArray(event.organizers)) {
 		return [];
 	}
 	const assignedTasks = event.organizers.flatMap((org) => org.tasks || []);
-	console.log("unassignedTasks →→ " + assignedTasks);
+	// console.log("[DEBUG: unassignedTasks → " + assignedTasks);
 
 	return event.tasks.filter((task) => !assignedTasks.includes(task.name));
 }

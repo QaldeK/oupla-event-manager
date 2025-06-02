@@ -4,6 +4,7 @@
 	import DateSondageModal from "$lib/components/DateSondageModal.svelte";
 	import EventModal from "$lib/components/EventModal.svelte";
 	import MessageSheet from "$lib/components/MessageSheet.svelte";
+	import NotificationBell from "$lib/components/NotificationBell.svelte";
 	// import ReportEvent from '$lib/components/ReportEvent.svelte';
 	import TaskDialog from "$lib/components/TaskDialog.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
@@ -13,11 +14,11 @@
 	import { pb } from "$lib/pocketbase.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { messageStore } from "$lib/shared/messageStore.svelte";
+	import { loadNotifications, clearNotifications } from "$lib/utils/notificationsAndLogs";
 	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
 	import { loadingState, messageSheet, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { CurrentUser } from "$lib/types/types";
-	import LoadingOverlay from "$lib/components/ui/loading/LoadingOverlay.svelte";
 
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
@@ -59,20 +60,22 @@
 
 	let initPromise = $state<Promise<void>>();
 	let error = $state<Error | null>(null);
-	let currentSpace = $state();
-	let currentUser: CurrentUser = $state({}) as CurrentUser;
-
-	let displayState = $state({
-		isMobile: window.innerWidth < 640 // Initialisation basée sur la largeur initiale
-	});
-
-	let space = $state<{
+	let currentSpace = $state<{
 		id: string;
 		name: string;
 		role: string;
 		description?: string;
 		since?: string;
 	} | null>(null);
+	let currentUser = $state<CurrentUser>({
+		id: "",
+		username: "",
+		role: ""
+	});
+
+	let displayState = $state({
+		isMobile: window.innerWidth < 640 // Initialisation basée sur la largeur initiale
+	});
 
 	let sidebarState = $state({
 		isOpen: window.innerWidth >= 640,
@@ -86,25 +89,25 @@
 
 		try {
 			// 1. Initialiser les données utilisateur
-			const userData = await userDb.initializeUserData();
+			await userDb.initializeUserData();
 
-			currentSpace = userDb.currentSpace;
-			if (!currentSpace?.id) {
+			const spaceData = userDb.currentSpace;
+			if (!spaceData || typeof spaceData === "string") {
 				throw new Error("Vous êtes inscrit à aucun espace");
 			}
+			currentSpace = spaceData;
 
-			// Initialiser les stores en parallèle
+			// Initialiser les stores principaux en parallèle
 			await Promise.all([
 				loadSpaceOptions(currentSpace.id),
-				eventsStore.init({ spaceId: currentSpace.id }),
-				messageStore.init(currentSpace.id)
+				eventsStore.init({ spaceId: currentSpace.id })
 			]);
 
 			// Initialiser le contexte
 			currentUser = {
-				id: pb.authStore.record?.id,
-				username: pb.authStore.record?.username,
-				role: pb.authStore.record?.role
+				id: pb.authStore.record?.id || "",
+				username: pb.authStore.record?.username || "",
+				role: pb.authStore.record?.role || ""
 			};
 			isInitialized = true;
 		} catch (err) {
@@ -115,6 +118,20 @@
 			throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
 		}
 	}
+
+	// Chargement différé des stores secondaires après l'initialisation principale
+	$effect(() => {
+		if (isInitialized && currentSpace?.id) {
+			// Délai de 1 seconde pour ne pas impacter l'expérience utilisateur
+			setTimeout(() => {
+				// Chargement différé du messageStore et des notifications
+				if (currentSpace?.id) {
+					messageStore.init(currentSpace.id);
+					loadNotifications(currentSpace.id);
+				}
+			}, 1000);
+		}
+	});
 
 	// ::: effect
 	// Lancer l'initialisation
@@ -207,11 +224,18 @@
 			// 1. Détruire tous les stores
 			await Promise.all([eventsStore.clearAndDestroy(), messageStore.clearAndDestroy()]);
 
+			// Nettoyer les notifications
+			clearNotifications();
+
 			// 2. Réinitialiser les états locaux
 			isInitialized = false;
 			isInitializing = false;
 			currentSpace = null;
-			currentUser = {} as CurrentUser;
+			currentUser = {
+				id: "",
+				username: "",
+				role: ""
+			};
 			error = null;
 
 			// 4. Nettoyer l'authentification
@@ -268,11 +292,13 @@
 
 						<div class="flex flex-1 justify-center">
 							<a href="/dashboard" class="text-lg"
-								>Oupla - {currentSpace.name} - {currentUser.username}</a
+								>Oupla - {currentSpace?.name} - {currentUser.username}</a
 							>
 						</div>
 
-						<div class="flex-none gap-2">
+						<div class="flex gap-2">
+							<!-- 👉 Composant de notification -->
+							<NotificationBell />
 							<DropdownMenu.Root>
 								<DropdownMenu.Trigger>
 									<button class="btn btn-outline"
@@ -554,7 +580,7 @@
 	{/await}
 </div>
 {#if loadingState.is}
-	<div transition:fade class="absolute inset-0 z-50 flex items-center justify-center bg-black/80">
+	<div transition:fade class="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
 		<span class="loading loading-spinner loading-lg"></span>
 	</div>
 {/if}

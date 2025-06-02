@@ -122,7 +122,7 @@
 	});
 
 	function handleLoadMore() {
-		if (loadingState.is || !lazyConfig.hasMore) return;
+		if (loadingState.is || !lazyConfig.hasMore) return; // XXX Pourquoi loadingState ici ?
 
 		loadingState.is = true;
 
