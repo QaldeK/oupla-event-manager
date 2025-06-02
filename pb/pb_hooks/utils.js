@@ -21,7 +21,46 @@ function getActorId(e, fallback = "system_operation") {
 	return fallback;
 }
 
-module.exports = { getActorId };
+/**
+ * Récupère le titre d'un événement à partir de son ID.
+ * @param {string} eventId - L'ID de l'événement.
+ * @returns {string} - Le titre de l'événement ou une valeur par défaut.
+ */
+function getEventTitle(eventId) {
+	try {
+		const event = $app.findRecordById("events", eventId);
+		return event.getString("event_title") || "Événement";
+	} catch (error) {
+		console.log("[ERROR] Failed to retrieve event title for ID:", eventId, error);
+		return "Événement";
+	}
+}
+
+/**
+ * Fonction utilitaire de formatage de date.
+ * @param {string | undefined | null} dateString
+ * @returns {string} Date formatée ou 'Date inconnue'
+ */
+function formatDate(dateString) {
+	if (!dateString) return "Date inconnue";
+	try {
+		const date = new Date(dateString);
+		// Format manuel pour la cohérence (évite les dépendances locales du serveur)
+		const year = date.getFullYear();
+		const month = (date.getMonth() + 1).toString().padStart(2, "0");
+		const day = date.getDate().toString().padStart(2, "0");
+		// Optionnel: ajouter l'heure si nécessaire
+		// const hours = date.getHours().toString().padStart(2, '0');
+		// const minutes = date.getMinutes().toString().padStart(2, '0');
+		// return `${day}/${month}/${year} ${hours}:${minutes}`;
+		return `${day}/${month}/${year}`; // Format JJ/MM/AAAA
+	} catch (e) {
+		console.error("Error formatting date:", dateString, e);
+		return dateString; // Retourner la chaîne originale en cas d'erreur
+	}
+}
+
+module.exports = { getActorId, getEventTitle, formatDate };
 
 /*
 # LOADING MODULES

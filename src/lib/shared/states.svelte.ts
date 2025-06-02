@@ -4,7 +4,8 @@
 
 import { getNewEvent, type TaskType } from "$lib/schemas/event.schema";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
-import type { UserType } from "$lib/types/types";
+
+import type { LogsResponse, UsersResponse } from "$lib/types/pocketbase";
 
 export interface ConfirmModalData {
 	title: string;
@@ -112,14 +113,14 @@ export const eventState = $state({
   Récupère les membres de l'espace, et reorganise les données pour correspondre au type organizers
 */
 const organizersPossibles = $derived.by(() => {
-	const transformUsers = (users) =>
+	const transformUsers = (users: Array<{ id: string; email: string; username: string }>) =>
 		users.map((user) => ({
 			id: user.id,
 			email: user.email,
 			username: user.username,
 			tasks: [] // Initialisation avec un tableau vide
 		}));
-	return transformUsers(getSpace.members);
+	return transformUsers(getSpace.members || []);
 });
 export const getOrganizersPossibles = () => organizersPossibles;
 
@@ -170,4 +171,14 @@ export const messageSheet = $state({
 // ::: État de loading global pour les transitions et lazy loading
 export const loadingState = $state({
 	is: false
+});
+
+// ::: Store de notifications
+export type NotificationLogRecord = LogsResponse<unknown, { user_actor_id?: UsersResponse }>;
+
+export const notificationState = $state({
+	logs: [] as NotificationLogRecord[],
+	unreadCount: 0,
+	isInitialized: false,
+	subscription: null as (() => void) | null
 });

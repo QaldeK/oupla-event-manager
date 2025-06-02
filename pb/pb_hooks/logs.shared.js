@@ -17,7 +17,7 @@ function createLogEntry({
 	collection_target,
 	record_target_id,
 	user_actor_id,
-	space_id,<<<<
+	space_id,
 	users_concerned = [],
 	details
 }) {
@@ -38,7 +38,7 @@ function createLogEntry({
 
 		if (details) logRecord.set("details", details);
 
-		$app.saveRecord(logRecord); // Utiliser $app.saveRecord() pour sauvegarder
+		$app.save(logRecord); 
 	} catch (err) {
 		console.error(`Failed to create log entry (action: ${action}): ${JSON.stringify(err)}`);
 	}

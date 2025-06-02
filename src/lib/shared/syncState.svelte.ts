@@ -111,7 +111,7 @@ export class SyncStore<T extends StoreRecord> {
 	}
 
 	constructor(private config: StoreConfig<T>) {
-		console.log("🚀 Création du store:", config.name);
+		// console.log("🚀 Création du store:", config.name);
 		this.config = this.normalizeConfig(config);
 		this.initPromise = this.initDb();
 	}
@@ -526,12 +526,12 @@ export class SyncStore<T extends StoreRecord> {
 	// ---  Initialisation et Configuration
 	public async init(collectionName: Collections): Promise<void> {
 		try {
-			console.log(
-				`\n🚀 Initialisation du store "${this.config.name}" (collection: ${collectionName})`
-			);
+			// console.log(
+			// 	`\n🚀 Initialisation du store "${this.config.name}" (collection: ${collectionName})`
+			// );
 
 			// 1. Initialiser IndexedDB
-			console.log(`👉 ${this.config.name}: Initialisation de la base de données locale`);
+			// console.log(`👉 ${this.config.name}: Initialisation de la base de données locale`);
 			await this.initPromise;
 
 			if (!this.db) {
@@ -539,12 +539,12 @@ export class SyncStore<T extends StoreRecord> {
 			}
 
 			// 2. Charger lastSync
-			console.log(`👉 ${this.config.name}: Chargement de lastSync`);
+			// console.log(`👉 ${this.config.name}: Chargement de lastSync`);
 			this.loadLastSync();
-			console.log(`📅 ${this.config.name}: Dernière synchro:`, this.store.lastSync);
+			// console.log(`📅 ${this.config.name}: Dernière synchro:`, this.store.lastSync);
 
 			// 3. Configurer la collection PocketBase
-			console.log(`👉 ${this.config.name}: Configuration de la collection PocketBase`);
+			// console.log(`👉 ${this.config.name}: Configuration de la collection PocketBase`);
 			this.collection = {
 				getList: (page, perPage, options) => getList(collectionName, page, perPage, options),
 				getFirstListItem: (filter, options) => getFirstListItem(collectionName, filter, options),
@@ -555,29 +555,27 @@ export class SyncStore<T extends StoreRecord> {
 			} as Collection;
 
 			// 4. Charger les données depuis IndexedDB
-			console.log(`📦 ${this.config.name}: Chargement des données depuis IndexedDB`);
+			// console.log(`📦 ${this.config.name}: Chargement des données depuis IndexedDB`);
 			await this.loadFromIndexedDb();
 			console.log(`📊 ${this.config.name}: ${this.store.byId.size} enregistrements chargés`);
 
 			// 5. Configurer la synchronisation en temps réel si nécessaire
 			if (this.config.sync?.mode === "realtime") {
-				console.log(`🔄 ${this.config.name}: Configuration du mode temps réel`);
+				// console.log(`🔄 ${this.config.name}: Configuration du mode temps réel`);
 				await this.setupRealtimeSync();
-				console.log(`✅ ${this.config.name}: Mode temps réel activé`);
+				// console.log(`✅ ${this.config.name}: Mode temps réel activé`);
 			} else if (this.config.sync?.mode === "interval") {
-				console.log(
-					`⏱️ ${this.config.name}: Configuration du mode intervalle (${this.config.sync.interval}ms)`
-				);
+				// console.log(`⏱️ ${this.config.name}: Configuration du mode intervalle (${this.config.sync.interval}ms)`);
 				this.setupIntervalSync();
 			}
 
 			this.store.isInitialized = true;
 
 			// 6. Première synchronisation
-			console.log(`↔️ ${this.config.name}: Première synchronisation avec PocketBase`);
+			// console.log(`↔️ ${this.config.name}: Première synchronisation avec PocketBase`);
 			await this.syncWithPocketBase();
 
-			console.log(`✅ ${this.config.name}: Initialisation terminée\n`);
+			// console.log(`✅ ${this.config.name}: Initialisation terminée\n`);
 		} catch (error) {
 			console.error(`⚠️ ${this.config.name}: Erreur d'initialisation:`, error);
 			throw error;
@@ -589,8 +587,8 @@ export class SyncStore<T extends StoreRecord> {
 	private async setupRealtimeSync(): Promise<void> {
 		if (!this.collection) return;
 
-		console.log(`👉 ${this.config.name}: Configuration des événements temps réel`);
-		console.log(`📡 ${this.config.name}: Filtre:`, this.config.sync?.filter);
+		// console.log(`👉 ${this.config.name}: Configuration des événements temps réel`);
+		// console.log(`📡 ${this.config.name}: Filtre:`, this.config.sync?.filter);
 
 		// Subscribe to all events
 		this.collection.subscribe(
@@ -598,11 +596,11 @@ export class SyncStore<T extends StoreRecord> {
 			((data: RecordSubscription<T>) => {
 				if (["create", "update", "delete"].includes(data.action)) {
 					const typedData = data as unknown as PocketBaseEventData<T>;
-					console.log(
-						`📥 ${this.config.name}: Événement reçu:`,
-						typedData.action,
-						typedData.record?.id
-					);
+					// console.log(
+					// 	`📥 ${this.config.name}: Événement reçu:`,
+					// 	typedData.action,
+					// 	typedData.record?.id
+					// );
 					switch (typedData.action) {
 						case "create":
 						case "update":
@@ -622,7 +620,7 @@ export class SyncStore<T extends StoreRecord> {
 
 		// Store the unsubscribe function that will be called on cleanup
 		this.unsubscribe = () => {
-			console.log(`🧹 ${this.config.name}: Nettoyage des souscriptions`);
+			// console.log(`🧹 ${this.config.name}: Nettoyage des souscriptions`);
 			if (this.collection) {
 				this.collection.unsubscribe();
 			}
@@ -644,7 +642,7 @@ export class SyncStore<T extends StoreRecord> {
 
 			// Appliquer la stratégie de cache si nécessaire
 			await this.enforceCacheLimit();
-			console.log("Record update complete"); // Debug log
+			// console.log("Record update complete");
 		} catch (error) {
 			this.handleError(error, "Erreur lors de la mise à jour du record");
 		}
@@ -675,17 +673,17 @@ export class SyncStore<T extends StoreRecord> {
 
 		this.store.isSyncing = true;
 		try {
-			console.log(`\n🔄 ${this.config.name}: Début de la synchronisation`);
+			// console.log(`\n🔄 ${this.config.name}: Début de la synchronisation`);
 			const filter = this.buildSyncFilter();
 			const sort = this.buildSortString();
 			const expand = this.config.sync?.expand;
 
-			console.log(`📋 ${this.config.name}: Paramètres de requête:`, {
-				filter,
-				sort,
-				lastSync: this.store.lastSync,
-				expand
-			});
+			// console.log(`📋 ${this.config.name}: Paramètres de requête:`, {
+			// 	filter,
+			// 	sort,
+			// 	lastSync: this.store.lastSync,
+			// 	expand
+			// });
 
 			const records = await this.collection.getFullList({
 				filter,
@@ -717,7 +715,7 @@ export class SyncStore<T extends StoreRecord> {
 	// ---  IndexedDB
 	private async initDb(): Promise<void> {
 		if (this.db) {
-			console.log(`📦 ${this.config.name}: IndexedDB déjà initialisé`);
+			// console.log(`📦 ${this.config.name}: IndexedDB déjà initialisé`);
 			return;
 		}
 
@@ -727,9 +725,9 @@ export class SyncStore<T extends StoreRecord> {
 		while (retries < maxRetries) {
 			try {
 				await new Promise<void>((resolve, reject) => {
-					console.log(
-						`🗄️ ${this.config.name}: Initialisation IndexedDB (tentative ${retries + 1})...`
-					);
+					// console.log(
+					// 	`🗄️ ${this.config.name}: Initialisation IndexedDB (tentative ${retries + 1})...`
+					// );
 
 					const dbName = this.config.dbName || this.config.name;
 					const request = indexedDB.open(dbName, this.config.version);
@@ -760,12 +758,12 @@ export class SyncStore<T extends StoreRecord> {
 							return;
 						}
 
-						console.log(`✅ ${this.config.name}: IndexedDB initialisé avec succès`);
+						// console.log(`✅ ${this.config.name}: IndexedDB initialisé avec succès`);
 						resolve();
 					};
 
 					request.onupgradeneeded = (event) => {
-						console.log(`🔄 ${this.config.name}: Mise à jour/création du schéma IndexedDB`);
+						// console.log(`🔄 ${this.config.name}: Mise à jour/création du schéma IndexedDB`);
 						const db = (event.target as IDBOpenDBRequest).result;
 
 						// Supprimer l'ancien store s'il existe
@@ -774,7 +772,7 @@ export class SyncStore<T extends StoreRecord> {
 						}
 
 						// Créer le nouveau store
-						console.log(`📝 ${this.config.name}: Création du store`);
+						// console.log(`📝 ${this.config.name}: Création du store`);
 						const store = db.createObjectStore(this.config.name, {
 							keyPath: this.config.primaryKey as string
 						});
@@ -907,12 +905,12 @@ export class SyncStore<T extends StoreRecord> {
 		}
 
 		// Debug logs
-		console.log(`🔍 ${this.config.name}: Construction du filtre:`, {
-			baseFilter: this.config.sync?.filter,
-			hasCache: this.store.byId.size > 0,
-			lastSync: this.store.lastSync,
-			finalFilter: filters.filter(Boolean).join(" && ") || ""
-		});
+		// console.log(`🔍 ${this.config.name}: Construction du filtre:`, {
+		// 	baseFilter: this.config.sync?.filter,
+		// 	hasCache: this.store.byId.size > 0,
+		// 	lastSync: this.store.lastSync,
+		// 	finalFilter: filters.filter(Boolean).join(" && ") || ""
+		// });
 
 		return filters.filter(Boolean).join(" && ") || "";
 	}
@@ -956,7 +954,7 @@ export class SyncStore<T extends StoreRecord> {
 			await this.init(this.collection?.collectionName as Collections);
 		}
 
-		console.log(`🔄 ${this.config.name}: Démarrage du forceRefresh`);
+		// console.log(`🔄 ${this.config.name}: Démarrage du forceRefresh`);
 
 		try {
 			this.store.isSyncing = true;
