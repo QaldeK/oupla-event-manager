@@ -38,7 +38,7 @@ class NotificationService {
 	 */
 	async sendTaskUnsubscriptionNotification(params: {
 		event: EventType;
-		user: UserType;
+		user: { id: string; username: string };
 		task?: string;
 		options?: NotificationOptions;
 	}): Promise<boolean> {
@@ -237,8 +237,8 @@ class NotificationService {
 	 */
 	async sendNotification(
 		type: NotificationType,
-		params: any,
-		options?: NotificationOptions
+		params: any
+		// options?: NotificationOptions
 	): Promise<boolean> {
 		switch (type) {
 			case NotificationType.TASK_UNSUBSCRIPTION:

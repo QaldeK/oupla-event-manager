@@ -1,6 +1,6 @@
-import type { TaskType } from '$lib/schemas/event.schema';
+import type { TaskType } from "$lib/types/event.types";
 
-export type { TaskType } from '$lib/schemas/event.schema';
+export type { TaskType } from "$lib/types/event.types";
 
 export interface SpaceConfig {
 	id: string;

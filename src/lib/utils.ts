@@ -1,17 +1,14 @@
-import { type ClassValue, clsx } from "clsx";
-// ::: Date-fns :::
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 import { addMinutes, format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { twMerge } from "tailwind-merge";
-// ::: Tippy :::
 import tippy from "tippy.js";
 import "tippy.js/dist/tippy.css";
 import { getSpace } from "$lib/shared/";
 import { cubicOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
 
-import { updateEvent } from "./pocketbase.svelte";
-import type { EventType, OrganizerType } from "./schemas/event.schema";
+import type { OrganizerType } from "./types/event.types";
 import type { UserType } from "./types/types";
 
 export function cn(...inputs: ClassValue[]) {
@@ -117,95 +114,7 @@ export const formatTimePb = (date: Date | string) => {
 	return format(new Date(date), "HH:mm");
 };
 
-// ::: Other
-
-export const tooltip = (node: HTMLElement, options: any) => {
-	const instance = tippy(node, options);
-
-	return {
-		update(newOptions: any) {
-			instance.setProps(newOptions);
-		},
-		destroy() {
-			instance.destroy();
-		}
-	};
-};
-
-// :::___ Click-outside :::
-// Usage :
-// <div use:clickOutside={() => {console.log('Clicked outside')}}> ... </div>
-// Warn : insert class 'click-inside' on the child element if you want to exclude it (exemple: for multi-select component)
-export function clickOutside(node: HTMLElement, callback: () => void) {
-	function handleClick(event: MouseEvent) {
-		const target = event.target as Node;
-		const htmlTarget = event.target as HTMLElement;
-		if (node && !node.contains(target) && !htmlTarget?.closest?.(".click-inside") && callback) {
-			callback();
-		}
-	}
-
-	document.addEventListener("click", handleClick);
-
-	return {
-		destroy() {
-			document.removeEventListener("click", handleClick);
-		}
-	};
-}
-
-// debounce // USELESS :plutot avec effect dans /utils/debounce.svelte.ts
-
-export function createDebounce<T extends (...args: any[]) => any>(
-	func: T,
-	wait: number = 250,
-	options: {
-		leading?: boolean;
-		maxWait?: number;
-	} = {}
-) {
-	let timeoutId: ReturnType<typeof setTimeout> | undefined;
-	let lastArgs: Parameters<T> | undefined;
-	let lastTime: number = 0;
-
-	return {
-		call: (...args: Parameters<T>) => {
-			const now = Date.now();
-			lastArgs = args;
-
-			// Exécution immédiate si leading est true et qu'aucun timeout n'est en cours
-			if (options.leading && !timeoutId) {
-				func(...args);
-				lastTime = now;
-				return;
-			}
-
-			// Clear le timeout existant
-			if (timeoutId) {
-				clearTimeout(timeoutId);
-			}
-
-			// Création du nouveau timeout
-			timeoutId = setTimeout(() => {
-				if (lastArgs) {
-					func(...lastArgs);
-					lastTime = Date.now();
-					timeoutId = undefined;
-					lastArgs = undefined;
-				}
-			}, wait);
-		},
-		cancel: () => {
-			if (timeoutId) {
-				clearTimeout(timeoutId);
-				timeoutId = undefined;
-			}
-			lastArgs = undefined;
-		}
-	};
-}
-
-export const userToOrganizerFmt = (user: User, tasks?: string[] | string) => ({
+export const userToOrganizerFmt = (user: UserType, tasks?: string[] | string) => ({
 	id: user.id,
 	username: user.username,
 	tasks: tasks || []

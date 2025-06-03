@@ -25,13 +25,13 @@
 
 	// Liste des utilisateurs disponibles (non sélectionnés)
 	let availableUsers = $derived.by(() =>
-		organizersPossibles.filter((user) => !organizers.some((org) => org.id === user.id))
+		organizersPossibles.filter((user: UserType) => !organizers.some((org: OrganizerType) => org.id === user.id))
 	);
 
 	// liste des utilisateur de l'espace non présent dans organizers
 	let usersOfSpace = $derived.by(() => {
 		const usersToInvite = getSpace.members.filter(
-			(member) => !organizers.some((org) => org.id === member.id)
+			(member) => !organizers.some((org: OrganizerType) => org.id === member.id)
 		);
 		return usersToInvite;
 	});
@@ -47,7 +47,7 @@
 		if (!hasMultipleTasksDefined) {
 			// Si l'utilisateur existe déjà, on le supprime
 			if (isExistingOrganizer) {
-				organizers = organizers.filter((org) => org.id !== user.id);
+				organizers = organizers.filter((org: OrganizerType) => org.id !== user.id);
 			} else {
 				// Sinon on l'ajoute avec la tâche unique
 				organizers = [
@@ -69,13 +69,15 @@
 				selectedTaskNames: currentSelectedTaskNames,
 				eventIsConfirmed: false, // On est dans l'éditeur, l'état de confirmation importe peu ici
 				// eventId: eventData.id, // On n'a pas l'ID de l'event ici, pas grave pour ce callback
-				onSubmit: (resultTaskNames: string[], notifyOthers?: boolean) => {
+				onSubmit: (resultTaskNames: string[]) => {
 					// 👉 Mettre à jour la prop `organizers` (état local de EventModal)
-					const index = organizers.findIndex((org) => org.id === user.id);
+					const index = organizers.findIndex((org: OrganizerType) => org.id === user.id);
 					const updatedOrganizerData = {
 						id: user.id,
 						username: user.username,
-						tasks: resultTaskNames
+						tasks: resultTaskNames,
+						role: "",
+						maybehere: null
 					};
 
 					let newOrganizers = [...organizers];
@@ -107,14 +109,16 @@
 	const inviteUsers = () => {
 		if (selectedUsersToInvite.length === 0) return;
 
-		const newOrganizersToAdd: OrganizerType[] = selectedUsersToInvite.map((user) => ({
+		const newOrganizersToAdd: OrganizerType[] = selectedUsersToInvite.map((user: UserType) => ({
 			id: user.id,
 			username: user.username,
-			tasks: defaultTaskName ? [defaultTaskName] : [] // Ajouter la tâche par défaut si elle existe
+			tasks: defaultTaskName ? [defaultTaskName] : [], // Ajouter la tâche par défaut si elle existe
+			role: "",
+			maybehere: null
 		}));
 
 		// Ajouter les nouveaux sans dupliquer
-		const currentIds = new Set(organizers.map((org) => org.id));
+		const currentIds = new Set(organizers.map((org: OrganizerType) => org.id));
 		const filteredNewOrganizers = newOrganizersToAdd.filter(
 			(newUser) => !currentIds.has(newUser.id)
 		);
@@ -179,7 +183,7 @@
 					<button
 						class={cn(
 							"btn  btn-compact btn-dash",
-							organizers?.some((org) => org.id === user.id) && "border-4 border-green-500 font-bold"
+							organizers?.some((org: OrganizerType) => org.id === user.id) && "border-4 border-green-500 font-bold"
 						)}
 						onclick={() => handleOrganizer(user)}
 					>

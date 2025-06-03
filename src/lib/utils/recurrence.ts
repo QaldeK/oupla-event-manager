@@ -2,11 +2,7 @@ import { format, startOfMonth, endOfMonth, addDays, getDay, addWeeks, parse } fr
 import { fr } from "date-fns/locale";
 
 // Types depuis event.schema
-import {
-	type EventType,
-	type RecurrenceType,
-	type RequiredRecurrenceType
-} from "$lib/schemas/event.schema";
+import type { EventType, RecurrenceType, RecurrenceConfigType } from "$lib/types/event.types";
 
 export function getNthDayOfMonth(date: Date, dayOfWeek: number, occurrence: number) {
 	let currentDay = startOfMonth(date);
@@ -112,7 +108,7 @@ export const formatRecurrence = (recurrence: NonNullable<EventType["recurrence"]
  * @param recurrence - L'objet de récurrence à décrire
  * @returns Une chaîne décrivant la récurrence de manière lisible
  */
-export function getRecurrenceLabel(recurrence: RequiredRecurrenceType): string {
+export function getRecurrenceLabel(recurrence: RecurrenceConfigType): string {
 	if (!recurrence.firstDate || !recurrence.recurrenceType) return "";
 
 	try {
@@ -159,7 +155,7 @@ export function getRecurrenceLabel(recurrence: RequiredRecurrenceType): string {
 }
 
 // Fonction de rétrocompatibilité - maintenue pour éviter les régressions
-export function getMonthlyRecurrenceLabel(recurrence: RequiredRecurrenceType): string {
+export function getMonthlyRecurrenceLabel(recurrence: RecurrenceConfigType): string {
 	if (recurrence.recurrenceType !== "MONTHLY_BY_DAY") {
 		// Utiliser la nouvelle fonction pour les autres types
 		return getRecurrenceLabel(recurrence);

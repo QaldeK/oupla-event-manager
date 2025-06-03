@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { clickOutside } from '$lib/utils';
+	import { clickOutside } from "$lib/actions/clickOutside";
 
-	import { slide } from 'svelte/transition';
+	import { slide } from "svelte/transition";
 
 	let {
 		selectedValues = $bindable([]),
 		options = $bindable([]),
-		placeholder = 'Sélectionner des options'
+		placeholder = "Sélectionner des options"
 	} = $props<{
 		selectedValues?: (number | string)[];
 		options?: Option[];
@@ -33,18 +33,18 @@
 		if (!isOpen) return;
 
 		switch (e.key) {
-			case 'ArrowDown':
+			case "ArrowDown":
 				e.preventDefault();
 				selectedIndex = Math.min(selectedIndex + 1, options.length - 1);
 				optionRefs[selectedIndex]?.focus();
 				break;
-			case 'ArrowUp':
+			case "ArrowUp":
 				e.preventDefault();
 				selectedIndex = Math.max(selectedIndex - 1, 0);
 				optionRefs[selectedIndex]?.focus();
 				break;
 
-			case 'Escape':
+			case "Escape":
 				e.preventDefault();
 				isOpen = false;
 				break;
@@ -65,20 +65,20 @@
 
 	$effect(() => {
 		if (isOpen) {
-			document.addEventListener('keydown', handleKeydown);
+			document.addEventListener("keydown", handleKeydown);
 		} else {
-			document.removeEventListener('keydown', handleKeydown);
+			document.removeEventListener("keydown", handleKeydown);
 		}
 
 		return () => {
-			document.removeEventListener('keydown', handleKeydown);
+			document.removeEventListener("keydown", handleKeydown);
 		};
 	});
 
 	// Fonction pour obtenir le label à partir de la valeur
 	function getLabelForValue(value: number | string): string {
 		const option = options.find((opt) => opt.value === value);
-		return option ? option.label : '';
+		return option ? option.label : "";
 	}
 </script>
 
@@ -92,7 +92,7 @@
 		class="input flex h-full w-full flex-wrap gap-2 rounded-md sm:w-96"
 		onclick={toggleDropdown}
 		onkeydown={(e) => {
-			if (e.key === 'Enter' || e.key === ' ') {
+			if (e.key === "Enter" || e.key === " ") {
 				toggleDropdown();
 			}
 		}}
@@ -130,7 +130,7 @@
 					class:bg-blue-50={selectedValues.includes(option.value)}
 					onclick={() => toggleOption(option.value)}
 					onkeydown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
+						if (e.key === "Enter" || e.key === " ") {
 							e.preventDefault();
 							toggleOption(option.value);
 						}

@@ -4,7 +4,7 @@
 	import { TextAlign } from "@tiptap/extension-text-align";
 	import type { TipexEditor } from "@friendofsvelte/tipex";
 
-	import type { PadsResponse, SitePagesResponse, RecordModel } from "$lib/types/pocketbase";
+	import type { PadsResponse } from "$lib/types/pocketbase";
 	import * as padStore from "../padStore.svelte";
 	import { createEditableDocumentStore } from "$lib/shared/editableDocumentStore.svelte";
 	import TipexToolbar from "$lib/components/TipexToolbar.svelte";

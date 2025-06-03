@@ -1,24 +1,24 @@
 <script lang="ts">
-	import { tooltip } from '$lib/utils';
+	import { tooltip } from "$lib/actions/tooltip";
 
-	import { BadgeHelp, Minus, ThumbsDown, ThumbsUp } from 'lucide-svelte';
+	import { BadgeHelp, Minus, ThumbsDown, ThumbsUp } from "lucide-svelte";
 
 	interface Props {
-		value?: 'oui' | 'non' | 'peut-être' | '';
-		onChange?: (value: 'oui' | 'non' | 'peut-être' | '') => void;
+		value?: "oui" | "non" | "peut-être" | "";
+		onChange?: (value: "oui" | "non" | "peut-être" | "") => void;
 	}
 
-	let { value, onChange, size = 'btn-sm', variant = '' } = $props();
+	let { value, onChange, size = "btn-sm", variant = "" } = $props();
 
 	const getActiveVariant = (buttonValue: string) => {
 		if (value === buttonValue) {
 			switch (buttonValue) {
-				case 'oui':
-					return 'bg-success/20';
-				case 'peut-être':
-					return 'bg-warning/20';
-				case 'non':
-					return 'bg-error/20';
+				case "oui":
+					return "bg-success/20";
+				case "peut-être":
+					return "bg-warning/20";
+				case "non":
+					return "bg-error/20";
 				default:
 					return variant;
 			}
@@ -28,10 +28,10 @@
 </script>
 
 <div class="bg-background inline-flex items-center rounded-md border">
-	<div use:tooltip={{ content: 'Je serais présent·e' }}>
+	<div use:tooltip={{ content: "Je serais présent·e" }}>
 		<button
 			onclick={() => {
-				value = 'oui';
+				value = "oui";
 				onChange?.(value);
 			}}
 			aria-label="Oui"
@@ -41,10 +41,10 @@
 		</button>
 	</div>
 
-	<div use:tooltip={{ content: 'Je ne serais pas présent·e' }}>
+	<div use:tooltip={{ content: "Je ne serais pas présent·e" }}>
 		<button
 			onclick={() => {
-				value = 'non';
+				value = "non";
 				onChange?.(value);
 			}}
 			aria-label="Non"
@@ -57,7 +57,7 @@
 	<div use:tooltip={{ content: "Je ne suis pas certain·e d'être présent·e" }}>
 		<button
 			onclick={() => {
-				value = 'peut-être';
+				value = "peut-être";
 				onChange?.(value);
 			}}
 			aria-label="Peut-être"

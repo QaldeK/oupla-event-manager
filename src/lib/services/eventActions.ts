@@ -4,7 +4,7 @@ import { validateEventStatic } from "$lib/validation/event-validator.svelte";
 import { notificationService } from "$lib/services/notificationService.svelte";
 import { modalState, showAlert, eventState } from "$lib/shared";
 import type { DateProposedType, UserType } from "$lib/types/types";
-import type { EventType } from "$lib/types/event.types";
+import type { EventType, RecurrenceType, RecurrenceConfigType } from "$lib/types/event.types";
 import {
 	filterAndConvertOrganizers,
 	formatDatePb,
@@ -12,6 +12,118 @@ import {
 	lisibleDate,
 	lisibleTime
 } from "$lib/utils";
+
+// ::: FONCTION UTILITAIRE POUR CRÉER UN NOUVEL ÉVÉNEMENT :::
+// Cette fonction crée un nouvel événement avec des valeurs par défaut
+// No Zod changes needed here
+export function getNewEvent(): Partial<EventType> {
+	return {
+		event_title: "",
+		date_event: "",
+		time_start: "",
+		time_end: "",
+		start_public: "",
+		start_event: "",
+		categories: [],
+		rooms: [],
+		tasks: [], // Consider if default tasks should be added, e.g. based on TaskSchema
+		description: "",
+		desc_public: "",
+		is_prix_libre: true,
+		isMixiteChoisie: false,
+		is_age_no_restriction: true,
+		isConfirmed: false,
+		isPublic: true,
+		isPublished: false,
+		isSendToNewsletter: false,
+		canceled: false,
+		isRecurrent: false,
+		isMasterRecurrent: false,
+		isSondage: false,
+		organizers: [],
+		dates_proposed: [],
+		other_date_query: []
+		// space: '', // À remplir par l'application
+		// external_proposal: {
+		// 	period_preference: '',
+		// 	proposals: []
+		// }
+	};
+}
+
+// No Zod changes needed here
+export function getDefaultRecurrence(): Omit<RecurrenceConfigType, "recurrenceType"> & {
+	recurrenceType: RecurrenceType; // This ensures recurrenceType is one of the enum values
+} {
+	return {
+		firstDate: "",
+		lastDate: "",
+		recurrenceDates: [],
+		recurrenceType: "WEEKLY", // Default valid enum value
+		monthlyByDayOccurrences: [],
+		recurrenceTeam: [],
+		tasks: [], // Consider if default tasks should be added
+		autoConfirm: false,
+		autoConfirmMin: 1,
+		notifyNoOrganizer: false,
+		notifyNoOrganizerDays: 3,
+		notifyNotConfirmed: false,
+		notifyNotConfirmedDays: 7,
+		minOrganizersRequired: 1,
+		allTasksRequired: false
+	};
+}
+// LEGACY
+// Factory pour créer un nouvel événement avec valeurs par défaut
+// export function createNewEvent(spaceId: string, userId: string): Partial<EventType> {
+// 	return {
+// 		event_title: "",
+// 		created_by: userId,
+// 		space: spaceId,
+// 		categories: [],
+// 		rooms: [],
+// 		tasks: [],
+// 		organizers: [],
+// 		description: "",
+// 		desc_public: "",
+// 		isConfirmed: false,
+// 		isPublic: true,
+// 		isPublished: false,
+// 		isSendToNewsletter: false,
+// 		canceled: false,
+// 		isRecurrent: false,
+// 		isMasterRecurrent: false,
+// 		isSondage: false,
+// 		is_prix_libre: true,
+// 		isMixiteChoisie: false,
+// 		is_age_no_restriction: true,
+// 		dates_proposed: [],
+// 		recurrence: null,
+// 		external_proposal: null,
+// 		other_date_query: null
+// 	};
+// }
+
+// Factory pour créer une nouvelle récurrence avec valeurs par défaut // LEGACY
+// export function createNewRecurrence(): RecurrenceConfigType {
+// 	return {
+// 		firstDate: "",
+// 		lastDate: "",
+// 		recurrenceType: "WEEKLY",
+// 		recurrenceDates: [],
+// 		monthlyByDayOccurrences: [],
+// 		recurrenceTeam: [],
+// 		tasks: [],
+// 		autoConfirm: false,
+// 		autoConfirmMin: 1,
+// 		notifyNoOrganizer: false,
+// 		notifyNoOrganizerDays: 3,
+// 		notifyNotConfirmed: false,
+// 		notifyNotConfirmedDays: 7,
+// 		minOrganizersRequired: 1,
+// 		allTasksRequired: false
+// 	};
+// }
 
 /**
  * Calcule les tâches non assignées d'un événement

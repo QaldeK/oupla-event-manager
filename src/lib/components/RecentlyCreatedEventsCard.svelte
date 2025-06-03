@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EventType } from "$lib/schemas/event.schema";
+	import type { EventType } from "$lib/types/event.types";
 	import { formatDistance } from "date-fns";
 	import { fr } from "date-fns/locale";
 	import { eventState, modalState } from "$lib/shared/states.svelte";

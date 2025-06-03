@@ -1,7 +1,14 @@
-import { format, parse } from 'date-fns';
-import type { OrganizerType } from '$lib/schemas/event.schema';
+import { format, parse } from "date-fns";
+import type { EventType, OrganizerType } from "$lib/types/event.types";
 
 // --- Types Definition ---
+
+export type ConflictType =
+	| "confirmed"
+	| "unconfirmed"
+	| "sondage"
+	| "close-confirmed"
+	| "close-unconfirmed";
 
 /**
  * Type interne utilisé pour les calculs de conflits.
@@ -13,13 +20,29 @@ export interface EventTimeInfo {
 	organizers: OrganizerType[];
 	rooms: string[];
 	/** Type de base de l'événement (confirmé, non confirmé, sondage) */
-	baseType: 'confirmed' | 'unconfirmed' | 'sondage';
+	baseType: "confirmed" | "unconfirmed" | "sondage";
 	/** Date de début précise (peut inclure l'heure) */
 	dateTimeStart: Date;
 	/** Date de fin précise (peut inclure l'heure) */
 	dateTimeEnd: Date;
 	/** Indique si l'événement original couvrait toute la journée (pas d'heure spécifiée) */
 	isAllDay: boolean;
+}
+
+/**
+ * Interface compatible avec le composant ConflictsEvents
+ */
+export interface EventConflictInfo {
+	id: string;
+	event_title: string;
+	organizers: OrganizerType[];
+	rooms: string[];
+	conflictType: ConflictType;
+	date_event?: string;
+	dateStart?: string;
+	dateEnd?: string;
+	time_start: string;
+	time_end: string;
 }
 
 /**
@@ -34,7 +57,7 @@ export interface Conflict {
 	time_end: string;
 	rooms: string[];
 	/** Type de conflit (chevauchement direct, proche, sondage) */
-	conflictType: 'confirmed' | 'unconfirmed' | 'sondage' | 'close-confirmed' | 'close-unconfirmed';
+	conflictType: ConflictType;
 	/** Indique si le conflit partage au moins une salle avec l'événement cible */
 	hasSameRoom: boolean;
 	/** Événement source (celui pour lequel on cherche des conflits) */
@@ -112,10 +135,10 @@ function formatConflict(
 	const eventStart = event.dateTimeStart.getTime();
 	const eventEnd = event.dateTimeEnd.getTime();
 
-	let calculatedConflictType: Conflict['conflictType'] = event.baseType;
+	let calculatedConflictType: Conflict["conflictType"] = event.baseType;
 
 	// Vérifier si c'est un conflit direct ou proche (uniquement si ce n'est pas un sondage)
-	if (event.baseType !== 'sondage') {
+	if (event.baseType !== "sondage") {
 		const isDirectOverlap = checkTimeOverlap(targetStart, targetEnd, eventStart, eventEnd);
 
 		if (!isDirectOverlap) {
@@ -124,7 +147,7 @@ function formatConflict(
 
 			if (isClose) {
 				calculatedConflictType =
-					event.baseType === 'confirmed' ? 'close-confirmed' : 'close-unconfirmed';
+					event.baseType === "confirmed" ? "close-confirmed" : "close-unconfirmed";
 			} else {
 				// Ce cas ne devrait pas arriver si findOverlappingEvents filtre correctement,
 				// mais par sécurité, on retourne le type de base.
@@ -138,13 +161,13 @@ function formatConflict(
 	return {
 		id: event.id,
 		event_title: event.event_title,
-		time_start: format(event.dateTimeStart, 'HH:mm'),
-		time_end: format(event.dateTimeEnd, 'HH:mm'),
+		time_start: format(event.dateTimeStart, "HH:mm"),
+		time_end: format(event.dateTimeEnd, "HH:mm"),
 		rooms: event.rooms,
 		conflictType: calculatedConflictType,
 		hasSameRoom: hasSameRoomCheck(targetRooms, event.rooms),
 		sourceEventId: sourceEventId,
-		date_event: format(event.dateTimeStart, 'yyyy-MM-dd') // Utiliser dateTimeStart pour la date
+		date_event: format(event.dateTimeStart, "yyyy-MM-dd") // Utiliser dateTimeStart pour la date
 	};
 }
 
@@ -177,7 +200,7 @@ export function findConflictsForEvent(
 	const targetEnd = targetDateTimeEnd.getTime();
 
 	if (isNaN(targetStart) || isNaN(targetEnd)) {
-		console.error('Invalid target dates provided to findConflictsForEvent');
+		console.error("Invalid target dates provided to findConflictsForEvent");
 		return [];
 	}
 
@@ -305,19 +328,8 @@ export function findOverlappingGroupsOnDate(eventsOnDate: EventTimeInfo[]): Even
  * @returns Un objet EventTimeInfo, ou null si les dates/heures sont invalides.
  */
 export function createEventTimeInfo(
-	event: {
-		id: string;
-		event_title: string;
-		organizers: OrganizerType[];
-		rooms: string[];
-		dateStart?: string | null;
-		dateEnd?: string | null;
-		date_event?: string | null; // Format YYYY-MM-DD
-		time_start?: string | null; // Format HH:mm
-		time_end?: string | null; // Format HH:mm
-	},
-	baseType: 'confirmed' | 'unconfirmed' | 'sondage',
-	defaultDate: Date = new Date() // Utilisé seulement si aucune date fournie
+	event: EventType,
+	baseType: "confirmed" | "unconfirmed" | "sondage"
 ): EventTimeInfo | null {
 	let startDate: Date | null = null;
 	let endDate: Date | null = null;
@@ -335,8 +347,8 @@ export function createEventTimeInfo(
 			const baseDateStr = event.date_event; // "YYYY-MM-DD"
 			if (event.time_start && event.time_end) {
 				// Combiner date et heure
-				startDate = parse(`${baseDateStr} ${event.time_start}`, 'yyyy-MM-dd HH:mm', new Date());
-				endDate = parse(`${baseDateStr} ${event.time_end}`, 'yyyy-MM-dd HH:mm', new Date());
+				startDate = parse(`${baseDateStr} ${event.time_start}`, "yyyy-MM-dd HH:mm", new Date());
+				endDate = parse(`${baseDateStr} ${event.time_end}`, "yyyy-MM-dd HH:mm", new Date());
 				// Gérer le cas où l'heure de fin est avant l'heure de début (événement sur 2 jours via HH:mm ?)
 				// Pour l'instant, on suppose que c'est sur le même jour. date-fns gère ça correctement.
 				if (endDate < startDate) {
@@ -347,7 +359,7 @@ export function createEventTimeInfo(
 			} else {
 				// Journée entière
 				isAllDay = true;
-				startDate = parse(baseDateStr, 'yyyy-MM-dd', new Date());
+				startDate = parse(baseDateStr, "yyyy-MM-dd", new Date());
 				startDate.setHours(0, 0, 0, 0); // Début de journée
 				endDate = new Date(startDate);
 				endDate.setHours(23, 59, 59, 999); // Fin de journée
@@ -394,21 +406,7 @@ export function createEventTimeInfo(
  * @param rawEvents Liste d'événements bruts (type attendu similaire à SyncEventRecord).
  * @returns Une Map où les clés sont des dates (YYYY-MM-DD) et les valeurs des tableaux d'EventTimeInfo pour ce jour.
  */
-export function buildEventTimeInfoMap(
-	rawEvents: Array<{
-		id: string;
-		event_title: string;
-		organizers: OrganizerType[];
-		rooms: string[];
-		isConfirmed: boolean;
-		dateStart?: string | null;
-		dateEnd?: string | null;
-		date_event?: string | null;
-		time_start?: string | null;
-		time_end?: string | null;
-		dates_proposed?: Array<{ dateStart?: string; dateEnd?: string }> | null;
-	}>
-): Map<string, EventTimeInfo[]> {
+export function buildEventTimeInfoMap(rawEvents: EventType[]): Map<string, EventTimeInfo[]> {
 	const eventsByDateMap = new Map<string, EventTimeInfo[]>();
 
 	function addEventToMap(dateKey: string, eventInfo: EventTimeInfo) {
@@ -432,11 +430,11 @@ export function buildEventTimeInfoMap(
 
 	for (const event of rawEvents) {
 		// 1. Traiter la date principale de l'événement
-		const baseType = event.isConfirmed ? 'confirmed' : 'unconfirmed';
+		const baseType = event.isConfirmed ? "confirmed" : "unconfirmed";
 		const mainEventInfo = createEventTimeInfo(event, baseType);
 
 		if (mainEventInfo) {
-			const dateKey = format(mainEventInfo.dateTimeStart, 'yyyy-MM-dd');
+			const dateKey = format(mainEventInfo.dateTimeStart, "yyyy-MM-dd");
 			addEventToMap(dateKey, mainEventInfo);
 		}
 
@@ -449,14 +447,14 @@ export function buildEventTimeInfoMap(
 						...event, // Copie les infos de base (titre, salles, orgas...)
 						dateStart: proposed.dateStart,
 						dateEnd: proposed.dateEnd,
-						date_event: null, // Ignorer date_event si dateStart/End sont là
-						time_start: null,
-						time_end: null
+						date_event: "", // Ignorer date_event si dateStart/End sont là
+						time_start: "",
+						time_end: ""
 					};
-					const sondageEventInfo = createEventTimeInfo(proposedEventData, 'sondage');
+					const sondageEventInfo = createEventTimeInfo(proposedEventData, "sondage");
 
 					if (sondageEventInfo) {
-						const dateKey = format(sondageEventInfo.dateTimeStart, 'yyyy-MM-dd');
+						const dateKey = format(sondageEventInfo.dateTimeStart, "yyyy-MM-dd");
 						addEventToMap(dateKey, sondageEventInfo);
 					}
 				}
@@ -465,4 +463,47 @@ export function buildEventTimeInfoMap(
 	}
 
 	return eventsByDateMap;
+}
+
+/**
+ * Convertit EventTimeInfo vers EventConflictInfo
+ */
+function convertToEventConflictInfo(eventTimeInfo: EventTimeInfo): EventConflictInfo {
+	const timeStart = eventTimeInfo.isAllDay ? "00:00" : format(eventTimeInfo.dateTimeStart, "HH:mm");
+	const timeEnd = eventTimeInfo.isAllDay ? "23:59" : format(eventTimeInfo.dateTimeEnd, "HH:mm");
+	const dateEvent = format(eventTimeInfo.dateTimeStart, "yyyy-MM-dd");
+
+	return {
+		id: eventTimeInfo.id,
+		event_title: eventTimeInfo.event_title,
+		organizers: eventTimeInfo.organizers,
+		rooms: eventTimeInfo.rooms,
+		conflictType: eventTimeInfo.baseType,
+		date_event: dateEvent,
+		time_start: timeStart,
+		time_end: timeEnd
+	};
+}
+
+/**
+ * Fonction principale pour obtenir tous les groupes d'événements en conflit
+ * Compatible avec l'interface utilisée par ConflictsEvents.svelte
+ */
+export function getOverlappingEventGroups(rawEvents: EventType[]): Map<string, EventConflictInfo[][]> {
+	const eventsByDateMap = buildEventTimeInfoMap(rawEvents);
+	const overlappingByDate = new Map<string, EventConflictInfo[][]>();
+
+	for (const [date, eventsOnDate] of eventsByDateMap.entries()) {
+		const overlappingGroups = findOverlappingGroupsOnDate(eventsOnDate);
+		
+		if (overlappingGroups.length > 0) {
+			// Convertir les groupes d'EventTimeInfo en EventConflictInfo
+			const convertedGroups = overlappingGroups.map(group => 
+				group.map(event => convertToEventConflictInfo(event))
+			);
+			overlappingByDate.set(date, convertedGroups);
+		}
+	}
+
+	return overlappingByDate;
 }

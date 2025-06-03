@@ -1,27 +1,28 @@
 <script lang="ts">
-	import Checkbox from '$lib/components/Checkbox.svelte';
-	import Frame from '$lib/components/Frame.svelte';
-	import GroupCheckBox from '$lib/components/GroupCheckBox.svelte';
-	import Info from '$lib/components/Info.svelte';
-	import Quill from '$lib/components/Quill.svelte';
-	import TimePickRange from '$lib/components/TimePickRange.svelte';
-	import DatePickerProposal from '$lib/components/forModal/DatePickerProposal.svelte';
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { getNewEvent } from '$lib/schemas/event.schema';
-	import { pb } from '$lib/pocketbase.svelte';
-	import { PropositionFormSchema } from '$lib/schemas/event.schema';
-	import { z } from 'zod';
-	import { slide } from 'svelte/transition';
-	import { UserPlus, LogIn } from 'lucide-svelte';
-	import { showAlert } from '$lib/shared/states.svelte';
-	import { publicStore } from '$lib/shared/publicStore.svelte';
+	import Checkbox from "$lib/components/Checkbox.svelte";
+	import Frame from "$lib/components/Frame.svelte";
+	import GroupCheckBox from "$lib/components/GroupCheckBox.svelte";
+	import Info from "$lib/components/Info.svelte";
+	import Quill from "$lib/components/Quill.svelte";
+	import TimePickRange from "$lib/components/TimePickRange.svelte";
+	import DatePickerProposal from "$lib/components/forModal/DatePickerProposal.svelte";
+	import { Textarea } from "$lib/components/ui/textarea";
+	import { getNewEvent } from "$lib/services/eventActions";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { PropositionFormSchema } from "$lib/types/event.types";
+	import { z } from "zod";
+	import { slide } from "svelte/transition";
+	import { UserPlus, LogIn } from "lucide-svelte";
+	import { showAlert } from "$lib/shared/states.svelte";
+	import { publicStore } from "$lib/shared/publicStore.svelte";
+	import { userDb } from "$lib/shared";
 
 	const formSchema = PropositionFormSchema;
 
 	const spaceInfo = $derived(publicStore.spaceInfo);
 
 	// Utilisation des données de l'espace depuis getSpace
-	const spaceName = $derived(spaceInfo?.name ?? '');
+	const spaceName = $derived(spaceInfo?.name ?? "");
 	const spaceId = $derived(spaceInfo?.id);
 	const categories = $derived(spaceInfo?.categories ?? []);
 
@@ -32,15 +33,15 @@
 		is_prix_libre: true,
 		isPublic: true,
 		is_age_no_restriction: true,
-		duree: '01:30',
+		duree: "01:30",
 		external_proposal: {
-			period_preference: '',
+			period_preference: "",
 			proposals: [
 				{
-					date_event: '',
-					time_start: '',
-					time_end: '',
-					start_event: '',
+					date_event: "",
+					time_start: "",
+					time_end: "",
+					start_event: "",
 					selected: false
 				}
 			]
@@ -52,18 +53,18 @@
 
 	// État d'authentification
 	let isAuthenticated = $state(pb.authStore.isValid);
-	let username = $state('');
-	let email = $state('***REMOVED***');
-	let password = $state('***REMOVED***');
-	let passwordConfirm = $state('***REMOVED***');
-	let authError = $state('');
+	let username = $state("");
+	let email = $state("***REMOVED***");
+	let password = $state("***REMOVED***");
+	let passwordConfirm = $state("***REMOVED***");
+	let authError = $state("");
 
 	// Validation du mot de passe uniquement pour la correspondance
-	let passwordError = $derived(() => {
+	let passwordError = $derived.by(() => {
 		if (passwordConfirm && password !== passwordConfirm) {
-			return 'Les mots de passe ne correspondent pas';
+			return "Les mots de passe ne correspondent pas";
 		}
-		return '';
+		return "";
 	});
 
 	// Initialisation de space dans un $effect
@@ -74,44 +75,44 @@
 		}
 	});
 
-	let activeTab = $state('register'); // 'register' ou 'login'
+	let activeTab = $state("register"); // 'register' ou 'login'
 
 	// Séparation des handlers pour plus de clarté
 	async function handleRegister(e: SubmitEvent) {
 		e.preventDefault();
-		authError = '';
+		authError = "";
 
 		try {
 			// Création du compte et connexion automatique
 			const user = await userDb.register(username, email, password);
 
 			// Création du membre externe
-			await pb.collection('spaceMembers').create({
+			await pb.collection("spaceMembers").create({
 				user: user.id,
 				space: spaceId,
-				role: 'external'
+				role: "external"
 			});
 
 			isAuthenticated = true;
-			authError = '';
-			showAlert('Connexion réussie', 'success');
+			authError = "";
+			showAlert("Connexion réussie", "success");
 		} catch (error) {
-			console.error('Register error:', error);
+			console.error("Register error:", error);
 			authError = error instanceof Error ? error.message : "Erreur d'inscription";
 		}
 	}
 
 	async function handleLogin(e: SubmitEvent) {
 		e.preventDefault();
-		authError = '';
+		authError = "";
 
 		try {
 			await userDb.login(email, password);
 			isAuthenticated = true;
-			authError = '';
-			showAlert('Connexion réussie', 'success');
+			authError = "";
+			showAlert("Connexion réussie", "success");
 		} catch (error) {
-			console.error('Login error:', error);
+			console.error("Login error:", error);
 			authError = error instanceof Error ? error.message : "Erreur d'authentification";
 		}
 	}
@@ -126,18 +127,18 @@
 			};
 
 			try {
-				const result = await pb.collection('events').create(eventData);
+				const result = await pb.collection("events").create(eventData);
 				submitted = true;
 				formError = null;
 			} catch (pbError) {
-				console.error('Erreur PocketBase:', pbError);
+				console.error("Erreur PocketBase:", pbError);
 				throw pbError;
 			}
 		} catch (e) {
 			console.error("Type d'erreur:", e.constructor.name);
-			console.error('Erreur complète:', e);
+			console.error("Erreur complète:", e);
 			if (e instanceof z.ZodError) {
-				console.error('Erreurs de validation Zod:', e.errors);
+				console.error("Erreurs de validation Zod:", e.errors);
 				formError = e.errors[0].message;
 			} else {
 				formError = e.message || "Une erreur s'est produite lors de l'envoi du formulaire";
@@ -150,10 +151,10 @@
 		formData.external_proposal.proposals = [
 			...formData.external_proposal.proposals,
 			{
-				date_event: '',
-				time_start: '',
-				time_end: '',
-				start_event: '',
+				date_event: "",
+				time_start: "",
+				time_end: "",
+				start_event: "",
 				selected: false
 			}
 		];
@@ -170,7 +171,7 @@
 		const minutes = (i + 1) * 30;
 		const hours = Math.floor(minutes / 60);
 		const mins = minutes % 60;
-		const value = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+		const value = `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;
 		const label = mins === 0 ? `${hours}h` : `${hours}h${mins}`;
 		return { value, label };
 	});
@@ -179,8 +180,8 @@
 	$effect(() => {
 		formData.external_proposal.proposals.forEach((proposal) => {
 			if (proposal.time_start && formData.duree) {
-				const [startHours, startMinutes] = proposal.time_start.split(':').map(Number);
-				const [durationHours, durationMinutes] = formData.duree.split(':').map(Number);
+				const [startHours, startMinutes] = proposal.time_start.split(":").map(Number);
+				const [durationHours, durationMinutes] = formData.duree.split(":").map(Number);
 
 				let totalMinutes = startMinutes + durationMinutes;
 				let totalHours = startHours + durationHours + Math.floor(totalMinutes / 60);
@@ -188,7 +189,7 @@
 
 				if (totalHours >= 24) totalHours = totalHours - 24;
 
-				proposal.time_end = `${totalHours.toString().padStart(2, '0')}:${totalMinutes.toString().padStart(2, '0')}`;
+				proposal.time_end = `${totalHours.toString().padStart(2, "0")}:${totalMinutes.toString().padStart(2, "0")}`;
 			}
 		});
 	});
@@ -216,8 +217,8 @@
 						<input
 							type="radio"
 							name="auth_tabs"
-							checked={activeTab === 'register'}
-							onchange={() => (activeTab = 'register')}
+							checked={activeTab === "register"}
+							onchange={() => (activeTab = "register")}
 						/>
 						<UserPlus class="me-2 size-4" />
 						Créer un compte
@@ -301,8 +302,8 @@
 						<input
 							type="radio"
 							name="auth_tabs"
-							checked={activeTab === 'login'}
-							onchange={() => (activeTab = 'login')}
+							checked={activeTab === "login"}
+							onchange={() => (activeTab = "login")}
 						/>
 						<LogIn class="me-2 size-4" />
 						S'identifier
@@ -543,7 +544,7 @@
 						bind:value={formData.duree}
 						class="focus:border-primary-500 w-32 rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-700 shadow-sm focus:outline-none"
 					>
-						{#each dureeOptions as option}
+						{#each dureeOptions as option (option)}
 							<option value={option.value}>{option.label}</option>
 						{/each}
 					</select>

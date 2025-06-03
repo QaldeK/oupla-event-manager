@@ -1,82 +1,51 @@
-import type { EventType, OrganizerType } from "$lib/schemas/event.schema";
+import type { EventType, OrganizerType } from "$lib/types/event.types";
+import type { UserType } from "$lib/types/types";
 import { SyncStore } from "$lib/shared/syncState.svelte";
 import { Collections } from "$lib/types/pocketbase";
-import type { EventsRecord, UsersResponse } from "$lib/types/pocketbase.ts";
-import type { StoreConfig } from "$lib/types/syncState.types";
 import {
+	getOverlappingEventGroups,
 	buildEventTimeInfoMap,
-	type EventTimeInfo // Importe le type si besoin
-} from "$lib/utils/eventConflicts";
-import { format, parse } from "date-fns";
+	type EventConflictInfo,
+	type EventTimeInfo
+} from "$lib/services/eventConflicts";
 
-import { updateEvent } from "$lib/pocketbase.svelte";
-import type { UserType } from "$lib/types/types";
-
-import { modalState, openTaskModal, showAlert } from "$lib/shared/states.svelte";
-import { userDb } from "./userDb.svelte";
-
-// Ajouter ces types au début du fichier
-export interface EventConflict {
-	id: string;
-	event_title: string;
-	time_start: string;
-	time_end: string;
-	rooms: string[];
-	conflictType: "confirmed" | "unconfirmed" | "sondage" | "close-confirmed" | "close-unconfirmed";
-	hasSameRoom: boolean;
-	date_event: string;
-	isConfirmed: boolean;
-	organizers: OrganizerType[];
-	sourceEventId?: string; // Propriété temporaire pour la déduplication
-}
-
-type ConflictType = "confirmed" | "unconfirmed" | "sondage";
-
-export interface EventConflictInfo {
-	id: string;
-	event_title: string;
-	organizers: OrganizerType[];
-	rooms: string[];
-	conflictType: ConflictType;
-	date_event?: string;
-	dateStart?: string;
-	dateEnd?: string;
-	time_start: string;
-	time_end: string;
-}
-
-export interface ConflictMap {
-	confirmed: EventConflict[];
-	unconfirmed: EventConflict[];
-	sondage: EventConflict[];
-	"close-confirmed": EventConflict[];
-	"close-unconfirmed": EventConflict[];
-}
-
-// Type helper qui combine EventsRecord et StoreRecord
-export type SyncEventRecord = EventsRecord & {
+// Type compatible avec StoreRecord pour SyncStore
+type EventStoreRecord = {
 	id: string;
 	created: string;
 	updated: string;
 	collectionId: string;
-	collectionName: Collections;
-	expand?: {
-		created_by?: UsersResponse;
-	};
+	collectionName: string;
+	[key: string]: unknown;
 };
+import { format } from "date-fns";
+
+import { updateEvent } from "$lib/pocketbase.svelte";
+
+import { modalState, openTaskModal, showAlert } from "$lib/shared/states.svelte";
+import { userDb } from "./userDb.svelte";
+
+// Types exportés depuis le service
+export type { EventConflictInfo } from "$lib/services/eventConflicts";
+
+// Interface pour l'initialisation du store
+export interface EventsStoreInitConfig {
+	spaceId: string;
+	mode: "internal" | "external";
+}
 
 const userId = $derived(userDb?.current?.id);
 
 class EventsStore {
 	#store = $state({
-		syncStore: null as SyncStore<SyncEventRecord> | null,
+		syncStore: null as SyncStore<EventStoreRecord> | null,
 		isInitialized: false,
 		error: null as Error | null,
 		initPromise: null as Promise<void> | null,
 		mode: null as "internal" | "external" | null
 	});
 
-	async init({ spaceId, mode }: StoreConfig) {
+	async init({ spaceId, mode }: EventsStoreInitConfig) {
 		if (this.#store.initPromise) return this.#store.initPromise;
 
 		this.#store.initPromise = (async () => {
@@ -84,7 +53,7 @@ class EventsStore {
 
 			const filter = `space = '${spaceId}' && (date_event = "" || date_event >= '${new Date().toISOString().split("T")[0]}')`;
 
-			const syncStore = new SyncStore<SyncEventRecord>({
+			const syncStore = new SyncStore<EventStoreRecord>({
 				name: "eventsStore",
 				version: 1,
 				dbName,
@@ -105,9 +74,9 @@ class EventsStore {
 				this.#store.syncStore = syncStore;
 				this.#store.mode = mode;
 				this.#store.isInitialized = true;
-			} catch (err: any) {
+			} catch (err: unknown) {
 				console.error("Erreur initialisation SyncStore:", err);
-				this.#store.error = err;
+				this.#store.error = err instanceof Error ? err : new Error(String(err));
 				this.#store.isInitialized = false; // Marquer comme non initialisé en cas d'erreur
 				throw err; // Renvoyer l'erreur
 			}
@@ -153,13 +122,12 @@ class EventsStore {
 
 	// :::  getters
 
-	allEvents = $derived.by<SyncEventRecord[]>(() => {
+	allEvents = $derived.by<EventType[]>(() => {
 		if (!this.#store.syncStore) return [];
 
-		return this.#store.syncStore
-			.getAll()
+		return (this.#store.syncStore.getAll() as EventType[])
 			.filter((e) => !e.isMasterRecurrent)
-			.sort((a: SyncEventRecord, b: SyncEventRecord) => {
+			.sort((a: EventType, b: EventType) => {
 				const dateA = a.dateStart || a.date_event;
 				const dateB = b.dateStart || b.date_event;
 				if (!dateA && !dateB) return 0;
@@ -174,49 +142,45 @@ class EventsStore {
 			});
 	});
 
-	allMasterEvents = $derived.by<SyncEventRecord[]>(() => {
+	allMasterEvents = $derived.by<EventType[]>(() => {
 		if (!this.#store.syncStore) return [];
 
-		return this.#store.syncStore.getAll().filter((e) => e.isMasterRecurrent);
+		return (this.#store.syncStore.getAll() as EventType[]).filter((e) => e.isMasterRecurrent);
 	});
 
-	eventsWithDate = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => e.date_event));
+	eventsWithDate = $derived.by(() => this.allEvents.filter((e) => e.date_event));
 
-	eventsWithoutDate = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => !e.date_event));
+	eventsWithoutDate = $derived.by(() => this.allEvents.filter((e) => !e.date_event));
 
-	confirmedEvents = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => e.isConfirmed));
+	confirmedEvents = $derived<EventType[]>(this.allEvents.filter((e) => e.isConfirmed));
 
-	unconfirmedEvents = $derived<SyncEventRecord[]>(this.allEvents.filter((e) => !e.isConfirmed));
+	unconfirmedEvents = $derived<EventType[]>(this.allEvents.filter((e) => !e.isConfirmed));
 
-	confirmableEvents = $derived<SyncEventRecord[]>(
-		this.eventsWithDate.filter((e) => !e.isConfirmed)
-	);
+	confirmableEvents = $derived<EventType[]>(this.eventsWithDate.filter((e) => !e.isConfirmed));
 
-	eventsWithSondage = $derived<SyncEventRecord[]>(
+	eventsWithSondage = $derived<EventType[]>(
 		this.eventsWithoutDate.filter(
 			(e) => Array.isArray(e.dates_proposed) && (e.dates_proposed?.length ?? 0) > 0
 		)
 	);
 
-	eventsWithoutDateProposition = $derived<SyncEventRecord[]>(
+	eventsWithoutDateProposition = $derived<EventType[]>(
 		this.eventsWithoutDate.filter(
 			(e) => Array.isArray(e.dates_proposed) && e.dates_proposed?.length === 0
 		)
 	);
 
-	eventsWithoutOrganizers = $derived<SyncEventRecord[]>(
+	eventsWithoutOrganizers = $derived<EventType[]>(
 		this.allEvents.filter((e) => {
 			return Array.isArray(e.organizers) && e.organizers.length === 0;
 		})
 	);
 
-	getEventsOccurences = $derived<SyncEventRecord[]>(
-		this.eventsWithDate.filter((e) => e.isRecurrent)
-	);
+	getEventsOccurences = $derived<EventType[]>(this.eventsWithDate.filter((e) => e.isRecurrent));
 
-	getEventById = $derived.by(() => (id: string): SyncEventRecord | undefined => {
+	getEventById = $derived.by(() => (id: string): EventType | undefined => {
 		if (!this.#store.syncStore) return undefined;
-		return this.#store.syncStore.get(id);
+		return this.#store.syncStore.get(id) as EventType | undefined;
 	});
 
 	// 👉 Système de pagination simple pour optimiser les performances
@@ -292,7 +256,7 @@ class EventsStore {
 	// Récupère les autres sondages actuels (où l'utilisateur n'a pas répondu)
 	otherSondageEvents = $derived(() => {
 		if (!userId) return [];
-		const responded = new Set(this.userSondageEvents(userId).map((e) => e.id));
+		const responded = new Set(this.userSondageEvents.map((e) => e.id));
 		return this.eventsWithSondage.filter((event) => !responded.has(event.id));
 	});
 
@@ -357,8 +321,8 @@ class EventsStore {
 	};
 
 	// USELESS
-	getEventsByDate = $derived.by<Map<string, SyncEventRecord[]>>(() => {
-		const eventsByDateMap = new Map<string, SyncEventRecord[]>();
+	getEventsByDate = $derived.by<Map<string, EventType[]>>(() => {
+		const eventsByDateMap = new Map<string, EventType[]>();
 		for (const event of this.allEvents) {
 			if (event.date_event) {
 				if (!eventsByDateMap.has(event.date_event)) {
@@ -381,7 +345,7 @@ class EventsStore {
 		for (const event of this.allEvents) {
 			// Fonction utilitaire pour créer l'objet d'information
 			const createEventInfo = (
-				event: SyncEventRecord,
+				event: EventType,
 				dateStart?: string,
 				dateEnd?: string
 			): EventConflictInfo => {
@@ -406,14 +370,14 @@ class EventsStore {
 				return {
 					id: event.id,
 					event_title: event.event_title,
-					organizers: event.organizers,
-					rooms: event.rooms,
+					organizers: event.organizers || [],
+					rooms: event.rooms || [],
 					conflictType: event.isConfirmed ? "confirmed" : "unconfirmed",
-					date_event: event.date_event,
+					date_event: event.date_event || "",
 					dateStart: dateStart || event.dateStart,
 					dateEnd: dateEnd || event.dateEnd,
-					time_start: timeStart,
-					time_end: timeEnd
+					time_start: timeStart || "",
+					time_end: timeEnd || ""
 				};
 			};
 
@@ -483,6 +447,7 @@ class EventsStore {
 	});
 
 	eventTimeInfoMap = $derived.by<Map<string, EventTimeInfo[]>>(() => {
+		if (!this.#store.isInitialized) return new Map();
 		// Assure-toi que allEvents contient bien les champs nécessaires
 		// (id, title, rooms, organizers, isConfirmed, dateStart, dateEnd, date_event, time_start, time_end, dates_proposed)
 		return buildEventTimeInfoMap(this.allEvents);
@@ -496,136 +461,19 @@ class EventsStore {
 		return this.#store.error;
 	}
 
-	// ::: Utilitaires partagés
-	private timeUtils = {
-		parseTimeToMinutes: (time: string): number => {
-			const [hours, minutes] = time.split(":").map(Number);
-			return hours * 60 + minutes;
-		},
-
-		parseDateTime: (dateTimeStr: string, format: string) =>
-			parse(dateTimeStr, format, new Date()).getTime(),
-
-		checkTimeOverlap: (start1: number, end1: number, start2: number, end2: number): boolean =>
-			start1 < end2 && end1 > start2,
-
-		isTimeClose: (time1: number, time2: number, threshold = 2 * 60 * 60 * 1000): boolean =>
-			Math.abs(time1 - time2) < threshold
-	};
-
-	// Méthode centrale de détection des chevauchements
-	private findOverlappingEvents(
-		targetStart: number,
-		targetEnd: number,
-		events: EventConflictInfo[],
-		options: {
-			excludeEventId?: string;
-			checkCloseEvents?: boolean;
-			rooms?: string[];
-		} = {}
-	) {
-		const getDefaultTime = (date: string, isStart: boolean) => {
-			const baseDate = new Date(date);
-			if (isStart) {
-				baseDate.setHours(0, 0, 0, 0);
-			} else {
-				baseDate.setHours(23, 59, 59, 999);
-			}
-			return baseDate.getTime();
-		};
-
-		const overlappingEvents = events.filter((event) => {
-			if (options.excludeEventId && event.id === options.excludeEventId) return false;
-
-			let eventStartTime: number;
-			let eventEndTime: number;
-
-			if (event.date_event && (!event.time_start || !event.time_end)) {
-				// Événement avec date mais sans horaire : occupe toute la journée
-				eventStartTime = getDefaultTime(event.date_event, true);
-				eventEndTime = getDefaultTime(event.date_event, false);
-			} else {
-				eventStartTime = event.dateStart
-					? new Date(event.dateStart).getTime()
-					: this.parseTimeToDate(event.time_start, new Date()).getTime();
-				eventEndTime = event.dateEnd
-					? new Date(event.dateEnd).getTime()
-					: this.parseTimeToDate(event.time_end, new Date()).getTime();
-			}
-
-			if (isNaN(eventStartTime) || isNaN(eventEndTime)) return false;
-
-			const hasTimeOverlap = this.timeUtils.checkTimeOverlap(
-				targetStart,
-				targetEnd,
-				eventStartTime,
-				eventEndTime
-			);
-
-			const isClose =
-				options.checkCloseEvents &&
-				(this.timeUtils.isTimeClose(targetEnd, eventStartTime) ||
-					this.timeUtils.isTimeClose(targetStart, eventEndTime));
-
-			return hasTimeOverlap || isClose;
-		});
-
-		if (options.rooms) {
-			return overlappingEvents.map((event) =>
-				this.formatConflict(event, options.rooms, targetStart, targetEnd)
-			);
-		}
-
-		return overlappingEvents;
-	}
 
 	/**
 	 * Trouve tous les groupes d'événements qui se chevauchent pour chaque date
 	 * @returns Une Map avec des clés au format "date_groupe" et des tableaux d'événements en conflit
 	 */
 	getOverlappingEventGroups = $derived.by<Map<string, EventConflictInfo[][]>>(() => {
-		const overlappingByDate = new Map<string, EventConflictInfo[][]>();
-
-		for (const [date, events] of this.getEventsByDateTime.entries()) {
-			if (events.length < 2) continue;
-
-			const groups: EventConflictInfo[][] = [];
-			const processed = new Set<string>();
-
-			for (const event of events) {
-				if (processed.has(event.id)) continue;
-
-				const eventStart = event.dateStart
-					? new Date(event.dateStart).getTime()
-					: this.parseTimeToDate(event.time_start, new Date(date)).getTime();
-				const eventEnd = event.dateEnd
-					? new Date(event.dateEnd).getTime()
-					: this.parseTimeToDate(event.time_end, new Date(date)).getTime();
-
-				const overlapping = this.findOverlappingEvents(eventStart, eventEnd, events);
-
-				if (overlapping.length > 1) {
-					groups.push(overlapping);
-					overlapping.forEach((e) => processed.add(e.id));
-				}
-			}
-
-			if (groups.length > 0) {
-				overlappingByDate.set(date, groups);
-			}
-		}
-
-		return overlappingByDate;
+		if (!this.#store.isInitialized) return new Map();
+		
+		const allEvents = this.allEvents;
+		return getOverlappingEventGroups(allEvents);
 	});
 
-	private parseTimeToDate(timeString: string, baseDate: Date): Date {
-		{
-			const [hours, minutes] = timeString.split(":").map(Number);
-			const date = new Date(baseDate);
-			date.setHours(hours, minutes, 0, 0);
-			return date;
-		}
-	}
+
 
 	/**
 	 * Fonction privée pour exécuter la mise à jour réelle dans PocketBase et envoyer les notifications.
@@ -633,7 +481,7 @@ class EventsStore {
 	async #executeTaskUpdate(
 		eventId: string,
 		userId: string,
-		username: string, // Nécessaire pour les messages/notifications
+		username: string,
 		newTasks: string[],
 		options: { notifyOthers?: boolean; customMessage?: string; taskBeingLeft?: string } = {}
 	): Promise<void> {
@@ -667,7 +515,7 @@ class EventsStore {
 			// Ajouter le nouvel utilisateur (cas d'inscription)
 			finalOrganizers = [
 				...currentOrganizers,
-				{ id: userId, username: username, tasks: newTasks } // Ajouter email/role si nécessaire/disponible
+				{ id: userId, username: username, tasks: newTasks, role: "", maybehere: null } // Ajouter email/role si nécessaire/disponible
 			];
 		} else {
 			// Cas: utilisateur non trouvé ET pas de nouvelles tâches -> ne rien faire
@@ -824,7 +672,7 @@ class EventsStore {
 						} else {
 							showAlert("Vos tâches ont été mises à jour.", "success");
 						}
-					} catch (error) {
+					} catch {
 						/* Erreur déjà gérée par #executeTaskUpdate */
 					}
 				}
@@ -838,7 +686,7 @@ class EventsStore {
 			try {
 				await this.#executeTaskUpdate(event.id, user.id, user.username, newTasks);
 				showAlert(`Inscrit à la tâche "${targetTask}".`, "success");
-			} catch (error) {
+			} catch {
 				/* Erreur déjà gérée par #executeTaskUpdate */
 			}
 			return;
@@ -882,15 +730,13 @@ class EventsStore {
 						// showCancelEventButton: isLastOverall ? { ... } : undefined, // Ajouter logique annulation si besoin
 						onConfirm: async (notifyOthers?: boolean, customMessage?: string) => {
 							try {
-								await this.#executeTaskUpdate(
-									event.id,
-									user.id,
-									user.username,
-									newTasks, // Les tâches restantes (potentiellement [])
-									{ notifyOthers, customMessage, taskBeingLeft: targetTask }
-								);
+								await this.#executeTaskUpdate(event.id, user.id, user.username, newTasks, {
+									notifyOthers,
+									customMessage,
+									taskBeingLeft: targetTask
+								});
 								showAlert(`Désinscrit de la tâche "${targetTask}".`, "success");
-							} catch (error) {
+							} catch {
 								/* Erreur déjà gérée par #executeTaskUpdate */
 							}
 						}
@@ -903,7 +749,7 @@ class EventsStore {
 						taskBeingLeft: targetTask
 					});
 					showAlert(`Désinscrit de la tâche "${targetTask}".`, "success");
-				} catch (error) {
+				} catch {
 					/* Erreur déjà gérée par #executeTaskUpdate */
 				}
 			}

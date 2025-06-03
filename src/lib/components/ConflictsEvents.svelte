@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { EventsResponse, EventType, EventConflict } from "$lib/types/types";
+	import type { ConflictType, EventConflictInfo } from "$lib/services/eventConflicts";
+	import type { OrganizerType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
 	import { Pencil } from "lucide-svelte";
 	import Info from "./Info.svelte";
@@ -8,7 +9,7 @@
 	// Propriétés optionnelles
 
 	// État local
-	let overlappingGroups = $state<Map<string, EventConflict[][]>>(new Map());
+	let overlappingGroups = $state<Map<string, EventConflictInfo[][]>>(new Map());
 	let hasConflicts = $state<boolean>(false);
 
 	$effect(() => {
@@ -19,14 +20,14 @@
 	});
 
 	function editEvent(id: string) {
-		const event: EventType = eventsStore.getEventById(id);
-		eventState.is = event;
+		const event = eventsStore.getEventById(id);
+		eventState.is = event as unknown as typeof eventState.is;
 		modalState.event = true;
 	}
 
 	// Fonction pour déterminer la couleur du badge en fonction du type de conflit
 	function getBadgeVariant(
-		conflictType: EventConflict["conflictType"]
+		conflictType: ConflictType
 	): "badge-warning" | "badge-error" | "badge-outline" {
 		switch (conflictType) {
 			case "confirmed":
@@ -44,7 +45,7 @@
 	}
 
 	// Fonction pour obtenir le label lisible du type de conflit
-	function getConflictLabel(conflictType: EventConflict["conflictType"]): string {
+	function getConflictLabel(conflictType: ConflictType): string {
 		switch (conflictType) {
 			case "confirmed":
 				return "événement confirmé";
@@ -128,7 +129,7 @@
 											{#if conflict.organizers.length > 0}
 												<div class="text-base-content/60 text-sm font-medium">
 													Organisateur·ices: {conflict.organizers
-														.map((org) => org.username)
+														.map((org: OrganizerType) => org.username)
 														.join(", ")}
 												</div>
 											{/if}

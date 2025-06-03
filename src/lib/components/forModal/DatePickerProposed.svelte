@@ -6,7 +6,7 @@
 	import TimePickRange from "$lib/components/TimePickRange.svelte";
 
 	import { eventState, getSpace, showAlert } from "$lib/shared";
-	import type { DateProposedType, EventType } from "$lib/types/event";
+	import type { DateProposedType, EventType } from "$lib/types/event.types";
 	import { addTime, isValidDate, lisibleDate, lisibleTime } from "$lib/utils";
 	import { fade } from "svelte/transition";
 

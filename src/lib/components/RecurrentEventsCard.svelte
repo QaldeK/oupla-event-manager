@@ -3,12 +3,10 @@
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { confirmEventAction } from "$lib/services/eventActions";
 	import type {
-		EventType,
-		UserType,
 		ValidMaster,
-		ValidOccurrence,
-		RecurrenceType
-	} from "$lib/types/types";
+		ValidOccurrence
+	} from "$lib/types/event.types";
+	import type { UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
 
@@ -33,7 +31,7 @@
 
 	const handleSubscriptionClick = (occurrence: ValidOccurrence) => {
 		if (!currentUser) return;
-		eventsStore.requestTaskUpdate({ event: occurrence, user: currentUser });
+		eventsStore.requestTaskUpdate({ event: occurrence as unknown as Parameters<typeof eventsStore.requestTaskUpdate>[0]['event'], user: currentUser });
 	};
 
 	const handleConfirmClick = async (occurrence: ValidOccurrence) => {

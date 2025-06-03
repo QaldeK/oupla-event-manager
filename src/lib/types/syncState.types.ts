@@ -1,6 +1,4 @@
-import type { ListResult, RecordModel, RecordSubscription } from 'pocketbase';
-
-import type { Collections } from './pocketbase';
+import type { ListResult, RecordModel, RecordSubscription } from "pocketbase";
 
 // Type de base pour les records stockés - aligné avec PocketBase
 export interface StoreRecord extends RecordModel {
@@ -13,13 +11,13 @@ export interface StoreRecord extends RecordModel {
 // Interface pour la configuration de l'index
 export interface IndexConfig {
 	path: string | string[];
-	type?: 'single' | 'array';
+	type?: "single" | "array";
 	transform?: (record: any) => any[];
 }
 
 // Configuration des options de synchronisation
 export interface SyncOptions {
-	mode: 'manual' | 'realtime' | 'interval';
+	mode: "manual" | "realtime" | "interval";
 	filter?: string;
 	interval?: number;
 	sort?: string | string[];
@@ -29,7 +27,7 @@ export interface SyncOptions {
 // Configuration du cache
 export interface CacheOptions {
 	maxRecords?: number;
-	strategy?: 'lru' | 'fifo';
+	strategy?: "lru" | "fifo";
 }
 
 // Configuration principale du store
@@ -37,7 +35,7 @@ export interface StoreConfig<T extends StoreRecord> {
 	name: string;
 	version: number;
 	dbName?: string; // Ajout de la propriété dbName optionnelle
-	primaryKey?: keyof T | 'id';
+	primaryKey?: keyof T | "id";
 	indexes?: Record<string, IndexConfig>;
 	sync?: SyncOptions;
 	trackUpdates?: boolean;
@@ -96,8 +94,8 @@ export type PathsToStringProps<T> = T extends string | number | boolean | Date
 
 // Type pour les EventData de PocketBase
 export interface PocketBaseEventData<T extends StoreRecord = StoreRecord>
-	extends Omit<RecordSubscription<T>, 'action'> {
-	action: 'create' | 'update' | 'delete';
+	extends Omit<RecordSubscription<T>, "action"> {
+	action: "create" | "update" | "delete";
 	record: T;
 }
 

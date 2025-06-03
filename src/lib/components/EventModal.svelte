@@ -21,13 +21,12 @@
 		updateEvent
 	} from "$lib/pocketbase.svelte";
 	import {
-		getDefaultRecurrence,
-		getNewEvent,
 		type DateProposedType,
-		type RequiredRecurrenceType,
+		type RecurrenceConfigType,
 		type TaskType
-	} from "$lib/schemas/event.schema";
+	} from "$lib/types/event.types";
 	import type { EventType } from "$lib/types/event.types";
+	import { getDefaultRecurrence, getNewEvent } from "$lib/services/eventActions";
 	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import {
 		eventState,
@@ -76,7 +75,11 @@
 	});
 
 	// ::: Data et Etat réactif
-	let eventData = $state<EventType>({ ...eventState.is } as EventType);
+	let eventData = $state<EventType>({
+		...eventState.is,
+
+		recurrence: eventState.is.recurrence ?? null
+	} as EventType);
 
 	// ::: Gestion de la validation :::
 	/* Enclanche la validation standard pour les modification d'event (event.id), sinon, déclanché lors du handleSave | handleConfirm grace à hasTriggeredValidation, avec le setProfile adéquat. */
@@ -146,8 +149,16 @@
 
 			possible = [
 				...possible,
-				...(eventData.organizers || []),
-				...(eventData.recurrence?.recurrenceTeam || [])
+				...(eventData.organizers || []).map((org) => ({
+					id: org.id,
+					username: org.username,
+					tasks: []
+				})),
+				...(eventData.recurrence?.recurrenceTeam || []).map((member) => ({
+					id: member.id,
+					username: member.username,
+					tasks: []
+				}))
 			];
 
 			// Éliminer les doublons basés sur l'ID
@@ -195,7 +206,7 @@
 	// ::: tasks & organizers
 
 	let tasksPossibles = $derived.by(() => {
-		let potentialTasks: any[] = [];
+		let potentialTasks: TaskType[] = [];
 
 		potentialTasks = [...(getSpace.tasks || [])];
 
@@ -459,7 +470,8 @@
 		if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
 			profileToUse = "RECURRENT_MASTER";
 			if (eventData.recurrence) {
-			eventData.recurrence.tasks = eventData.tasks || []; }
+				eventData.recurrence.tasks = eventData.tasks || [];
+			}
 		} else if (eventData.isConfirmed) {
 			profileToUse = "STANDARD_EVENT";
 		} else {
@@ -626,7 +638,7 @@
 						{#if displayMode === "RECURRENT"}
 							<div class="mb-8">
 								<RecurrentTab
-									bind:recurrence={eventData.recurrence as RequiredRecurrenceType}
+									bind:recurrence={eventData.recurrence as RecurrenceConfigType}
 									isExistingMaster={eventMode === "EDIT_RECURRENT_ALL"}
 									errors={errorsMap}
 								/>
@@ -692,7 +704,7 @@
 					<ButtonGroupSelect
 						options={tasks}
 						{isDisabled}
-						bind:selectedItems={eventData.tasks}
+						bind:selectedItems={eventData.tasks!}
 						optionsLabel="name"
 					/>
 				</div>
@@ -760,7 +772,7 @@
 								<input
 									type="checkbox"
 									class="toggle toggle-warning"
-									bind:checked={eventData.recurrence.allTasksRequired}
+									bind:checked={eventData.recurrence!.allTasksRequired}
 								/>
 							</label>
 						</div>
@@ -772,9 +784,9 @@
 				<Frame title="Organisateur·ices">
 					<OrganizersAndTasksSelect
 						{organizersPossibles}
-						tasks={eventData.tasks}
-						bind:organizers={eventData.organizers}
-						hasMultipleTasks={!!eventData.tasks && eventData.tasks.length > 1}
+						tasks={eventData.tasks ?? []}
+						bind:organizers={eventData.organizers!}
+						hasMultipleTasks={(eventData.tasks ?? []).length > 1}
 					/>
 
 					<ErrorMessage error={errorsMap?.organizers} />
@@ -790,7 +802,7 @@
 					{#if eventData.recurrence}
 						<ButtonGroupSelect
 							options={organizersPossibles}
-							bind:selectedItems={eventData.recurrence.recurrenceTeam}
+							bind:selectedItems={eventData.recurrence!.recurrenceTeam}
 							optionsLabel="username"
 							Icon={UserPlus}
 						/>
@@ -802,7 +814,7 @@
 								}
 							}}
 						>
-							→ ajoutez tout le monde
+							ajouter tous les organisateur·ices possibles
 						</button>
 					{/if}
 					<ErrorMessage error={errorsMap?.recurrenceTeam} />
@@ -871,7 +883,7 @@
 					<div id="rooms" class="">
 						<GroupCheckBox
 							groupItems={rooms}
-							bind:eventDataGroup={eventData.rooms}
+							bind:eventDataGroup={eventData.rooms!}
 							classLabel="w-full"
 						/>
 					</div>
@@ -884,7 +896,7 @@
 					<div id="categories" class="">
 						<GroupCheckBox
 							groupItems={categories}
-							bind:eventDataGroup={eventData.categories}
+							bind:eventDataGroup={eventData.categories!}
 							classLabel="w-full md:w-fit"
 						/>
 					</div>

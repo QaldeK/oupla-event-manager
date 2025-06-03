@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import flatpickr from 'flatpickr';
-	import 'flatpickr/dist/flatpickr.css';
-	import { French } from 'flatpickr/dist/l10n/fr.js';
-	import tippy from 'tippy.js';
-	import 'tippy.js/dist/tippy.css';
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import flatpickr from "flatpickr";
+	import "flatpickr/dist/flatpickr.css";
+	import { French } from "flatpickr/dist/l10n/fr.js";
+	import tippy from "tippy.js";
+	import "tippy.js/dist/tippy.css";
+	import { type EventConflictInfo } from "$lib/types/types";
 
-	let { value = $bindable(), label = '', placeholder = 'Selectionnez une date' } = $props();
+	let { value = $bindable(), label = "", placeholder = "Selectionnez une date" } = $props();
 
 	// Génération automatique d'un ID unique
 	const uniqueId = `datepicker-${Math.random().toString(36).substr(2, 9)}`;
@@ -17,26 +18,26 @@
 
 	$effect(() => {
 		fp = flatpickr(dateInput, {
-			dateFormat: 'l j F Y',
+			dateFormat: "l j F Y",
 			locale: French,
-			minDate: 'today',
-			mode: 'single',
+			minDate: "today",
+			mode: "single",
 			onDayCreate: (dObj, dStr, fp, dayElem) => {
-				const dateStr = fp.formatDate(dayElem.dateObj, 'Y-m-d');
+				const dateStr = fp.formatDate(dayElem.dateObj, "Y-m-d");
 				const eventsForDate = eventsByDateTime.get(dateStr);
 
 				// Filtrer uniquement les événements confirmés
-				const confirmedEvents = eventsForDate?.filter((event) => event.isConfirmed) || [];
+				const confirmedEvents = eventsForDate?.filter((event) => event.conflictType === "confirmed") || [];
 
 				if (confirmedEvents.length) {
-					dayElem.setAttribute('data-tippy-content', createTooltipContent(confirmedEvents));
-					dayElem.classList.add('has-confirmed');
+					dayElem.setAttribute("data-tippy-content", createTooltipContent(confirmedEvents));
+					dayElem.classList.add("has-confirmed");
 
-					const markersContainer = document.createElement('div');
-					markersContainer.classList.add('event-markers-container');
+					const markersContainer = document.createElement("div");
+					markersContainer.classList.add("event-markers-container");
 
-					const marker = document.createElement('span');
-					marker.classList.add('event-marker', 'confirmed');
+					const marker = document.createElement("span");
+					marker.classList.add("event-marker", "confirmed");
 					markersContainer.appendChild(marker);
 
 					dayElem.appendChild(markersContainer);
@@ -44,7 +45,7 @@
 			},
 			onChange: (selectedDates) => {
 				if (selectedDates.length > 0) {
-					value = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+					value = flatpickr.formatDate(selectedDates[0], "Y-m-d");
 				}
 			},
 			onMonthChange: () => {
@@ -65,7 +66,7 @@
 	});
 
 	function setupTooltips() {
-		tippy('[data-tippy-content]', {
+		tippy("[data-tippy-content]", {
 			zIndex: 1000000,
 			allowHTML: true
 		});
@@ -74,12 +75,12 @@
 	function createTooltipContent(events: EventConflictInfo[]) {
 		return events
 			.map((event) => {
-				const organizers = event.organizers.map((org) => org.username).join(', ');
+				const organizers = event.organizers.map((org) => org.username).join(", ");
 				return `• ${event.event_title} (${organizers})
                     ${event.time_start}-${event.time_end}
-                    ${event.rooms.join(', ')}`;
+                    ${event.rooms.join(", ")}`;
 			})
-			.join('<br>');
+			.join("<br>");
 	}
 </script>
 

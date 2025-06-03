@@ -2,7 +2,8 @@
 
 // export const eventsList = $state();
 
-import { getNewEvent, type TaskType } from "$lib/schemas/event.schema";
+import { type TaskType } from "$lib/types/event.types";
+import { getNewEvent } from "$lib/services/eventActions";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
 
 import type { LogsResponse, UsersResponse } from "$lib/types/pocketbase";
@@ -113,10 +114,9 @@ export const eventState = $state({
   Récupère les membres de l'espace, et reorganise les données pour correspondre au type organizers
 */
 const organizersPossibles = $derived.by(() => {
-	const transformUsers = (users: Array<{ id: string; email: string; username: string }>) =>
+	const transformUsers = (users: Array<{ id: string; username: string }>) =>
 		users.map((user) => ({
 			id: user.id,
-			email: user.email,
 			username: user.username,
 			tasks: [] // Initialisation avec un tableau vide
 		}));

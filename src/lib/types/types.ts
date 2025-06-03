@@ -29,15 +29,20 @@ export type {
 	DateProposedType,
 	ValidMaster,
 	ValidOccurrence,
-	RecurrenceType, // Type pour les différentes options de récurrence (WEEKLY, BIWEEKLY, etc.)
-	RecurrenceSchemaType, // Type pour le schéma de récurrence complet
-	ValidRecurrence // Type pour une récurrence valide (non-null)
-} from "$lib/schemas/event.schema";
+	RecurrenceTeamType,
+	RecurrenceType // Type pour les différentes options de récurrence (WEEKLY, BIWEEKLY, etc.)
+	// RecurrenceSchemaType, // Type pour le schéma de récurrence complet
+	// ValidRecurrence // Type pour une récurrence valide (non-null)
+} from "$lib/types/event.types";
 
 export type {
-	EventConflict, // Le type complet d'un conflit d'événement
 	EventConflictInfo // Le type complet d'un conflit d'événement
 } from "$lib/shared/eventsStore.svelte";
+
+export type {
+	Conflict as EventConflict, // Le type complet d'un conflit d'événement (legacy)
+	ConflictType // Types de conflits
+} from "$lib/services/eventConflicts";
 
 export type {
 	ConfirmModalData, // Données pour le modal de confirmation
@@ -50,7 +55,7 @@ export type {
 } from "$lib/shared/publicStore.svelte";
 
 export * from "./pocketbase";
-// export * from '$lib/schemas/event.schema';
+// export * from '$lib/types/event.types';
 
 export interface UserType {
 	id: string;

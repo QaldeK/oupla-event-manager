@@ -1,5 +1,5 @@
 import { getFirstListItem, getFullList, getList, getOne, pb } from "$lib/pocketbase.svelte";
-import type { Collections, TypedPocketBase } from "$lib/types/pocketbase";
+import type { Collections } from "$lib/types/pocketbase";
 import type {
 	Collection,
 	IndexConfig,

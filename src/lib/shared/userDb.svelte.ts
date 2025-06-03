@@ -55,10 +55,10 @@ class UserDB {
 	}
 
 	get currentRole() {
-		if (!this.userData?.currentSpace) return null;
+		if (!this.userData!.currentSpace) return null;
 		return (
-			this.userData.memberOf?.find((space) => space.id === this.userData?.currentSpace.id)?.role ||
-			null
+			this.userData!.memberOf?.find((space) => space.id === this.userData!.currentSpace!.id)
+				?.role || null
 		);
 	}
 	get memberOf() {
@@ -73,7 +73,7 @@ class UserDB {
 
 	private async buildFullUserInfo(baseUserRecord: any): Promise<UserType> {
 		const memberOfResponse = await pb.collection("spaceMembers").getFullList({
-			filter: `user = "${baseUserRecord.id}"`,
+			filter: `user = "${baseUserRecord!.id}"`,
 			expand: "space"
 		});
 
@@ -89,7 +89,7 @@ class UserDB {
 					role: space.role
 				};
 			}),
-			currentSpace: memberOfResponse[0]?.expand?.space || null,
+			currentSpace: memberOfResponse[0]?.expand?.space,
 			currentRole: memberOfResponse[0]?.role
 		};
 	}
@@ -100,14 +100,16 @@ class UserDB {
 		return userInfo;
 	}
 
-	private setToStorage(data: UserType | null) {
-		if (data) {
+	private setToStorage(userInfo: UserType) {
+		if (userInfo) {
 			// S'assurer que toutes les données nécessaires sont incluses
 			const currentAuth = {
-				...data,
-				memberOf: data.memberOf || [],
-				currentSpace: data.currentSpace || null,
-				currentRole: data.currentRole || null
+				...userInfo,
+				memberOf: userInfo.memberOf,
+				currentSpace: userInfo.currentSpace,
+				currentRole: userInfo.currentRole,
+				collectionName: "users",
+				collectionId: ""
 			};
 			const token = pb.authStore.token;
 			pb.authStore.save(token, currentAuth);
@@ -164,7 +166,7 @@ class UserDB {
 			return;
 		}
 
-		const authData = await pb.collection("users").authRefresh();
+		await pb.collection("users").authRefresh();
 
 		if (pb.authStore.record) {
 			const userInfo = await this.buildFullUserInfo(pb.authStore.record);

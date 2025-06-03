@@ -32,14 +32,12 @@
 	// ::: reactive variables
 
 	const hasNoPropositions = $derived(
-		!currentEvent.date_event && currentEvent.dates_proposed?.length === 0
+		!currentEvent.date_event && (currentEvent.dates_proposed?.length ?? 0) === 0
 	);
 
-	const hasDate = $derived(currentEvent.date_event);
+	const hasDate = $derived(!!currentEvent.date_event);
 	const hasTime = $derived(!!currentEvent.time_start && !!currentEvent.time_end);
-	const hasRooms = $derived(
-		currentEvent.rooms?.some((room) => room && room.trim() !== "") ?? false
-	);
+	const hasRooms = $derived((currentEvent.rooms ?? []).some((room) => room && room.trim() !== ""));
 	const timeDisplay = $derived(
 		hasTime ? `${currentEvent.time_start} - ${currentEvent.time_end}` : ""
 	);
@@ -107,12 +105,7 @@
 
 	// Calcule l'état du bouton général d'inscription/gestion
 	const generalTaskButtonState = $derived.by(() => {
-		if (
-			!currentUser ||
-			currentEvent.canceled ||
-			!Array.isArray(currentEvent.tasks) ||
-			currentEvent.tasks.length === 0
-		) {
+		if (!currentUser || currentEvent.canceled || !(currentEvent.tasks ?? []).length) {
 			return {
 				text: "Inscription Indisponible",
 				disabled: true,
@@ -121,7 +114,7 @@
 			};
 		}
 
-		const isSubscribed = currentEvent.organizers?.some((org) => org.id === currentUser.id);
+		const isSubscribed = (currentEvent.organizers ?? []).some((org) => org.id === currentUser.id);
 
 		const btnText = isSubscribed ? "Se désinscrire" : "S'inscrire";
 		return {
@@ -200,11 +193,11 @@
 						{#if hasRooms}
 							<div class="text-base-content/70 text-fluid-sm font-medium">
 								<span>salle·s :</span>
-								{#each currentEvent.rooms as room, index (room)}
+								{#each currentEvent.rooms ?? [] as room, index (room)}
 									{#if room && room.trim() !== ""}
 										<span class="text-md text-base-content">
 											{room}{index <
-											currentEvent.rooms.filter((r) => r && r.trim() !== "").length - 1
+											(currentEvent.rooms ?? []).filter((r) => r && r.trim() !== "").length - 1
 												? ", "
 												: ""}
 										</span>
@@ -218,9 +211,9 @@
 
 				<div id="titleAndCat" class="w-full p-3 @max-md:text-center @md:order-first @md:w-3/5">
 					<p class="text-fluid-xl font-bold">{currentEvent.event_title}</p>
-					{#each currentEvent.categories as category, index (category)}
+					{#each currentEvent.categories ?? [] as category, index (category)}
 						<p class="font-semibold uppercase">
-							{category}{index < currentEvent.categories.length - 1 ? ", " : ""}
+							{category}{index < (currentEvent.categories ?? []).length - 1 ? ", " : ""}
 						</p>
 					{/each}
 					{#if currentEvent.reportedFrom}
@@ -228,7 +221,7 @@
 							Initialement prévu le {lisibleDate(currentEvent.reportedFrom)}
 						</div>
 					{/if}
-					{#if currentEvent.isRecurrent}
+					{#if currentEvent.isRecurrent && currentEvent.recurrence}
 						<div class="text-fluid-sm text-base-content/80 mt-1">
 							{formatRecurrence(currentEvent.recurrence)}
 							<span>• {getRecurrenceLabel(currentEvent.recurrence)}</span>
@@ -293,20 +286,20 @@
 										organizers={currentEvent.organizers ?? []}
 										{currentUser}
 										onTaskSubscription={handleTaskSubscription}
-										isRecurrent={currentEvent.isRecurrent ?? false}
+										isRecurrent={Boolean(currentEvent.isRecurrent)}
 										{isUserInRecurrenceTeam}
-										recurrenceTeam={currentEvent.recurrence?.recurrenceTeam}
+										recurrenceTeam={currentEvent.recurrence?.recurrenceTeam ?? []}
 									/>
 								{/if}
 							</div>
 							<!-- ::: __ mandats a se répartir> -->
 							{#if notRecurrentOrUserInTeam}
-								{#if !hasDate && currentEvent.isSondage && currentEvent.tasks && currentEvent.tasks.length > 1}
+								{#if !hasDate && currentEvent.isSondage && (currentEvent.tasks ?? []).length > 1}
 									<div class=" text-base-content/70 p-2">
 										<p class="text-fluid-xs">
 											Mandats à se répartir pour la gestion de l'événement : <span class="italic">
-												{#each currentEvent.tasks as task, index (currentEvent.id + "mandat" + task.name)}
-													{task.name}{index < currentEvent.tasks.length - 1 ? ", " : ""}
+												{#each currentEvent.tasks ?? [] as task, index (currentEvent.id + "mandat" + task.name)}
+													{task.name}{index < (currentEvent.tasks ?? []).length - 1 ? ", " : ""}
 												{/each}
 											</span>
 										</p>
@@ -316,9 +309,9 @@
 											</p>
 										{/if}
 									</div>
-								{:else if hasDate && currentEvent.tasks && currentEvent.tasks.length === 1}
+								{:else if hasDate && (currentEvent.tasks ?? []).length === 1}
 									<div class="text-fluid-xs text-base-content/70 p-2">
-										L'inscription concerne le mandat "{currentEvent.tasks[0].name}".
+										L'inscription concerne le mandat "{(currentEvent.tasks ?? [])[0]?.name}".
 										<!-- {#if currentEvent.tasks[0].description}
 											<br />{currentEvent.tasks[0].description}
 										{/if} -->

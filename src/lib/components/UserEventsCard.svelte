@@ -1,6 +1,6 @@
 <script lang="ts">
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
-	import type { EventType } from "$lib/schemas/event.schema";
+	import type { EventType } from "$lib/types/event.types";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
@@ -15,7 +15,7 @@
 	let currentUser: UserType | null = userDb.current;
 
 	const isCurrentUserSubscribed = $derived(() => {
-		return event.organizers?.some((org) => org.id === currentUser?.id);
+		return event.organizers?.some((org: { id: string; username: string }) => org.id === currentUser?.id);
 	});
 
 	const eventStatus = $derived.by(() => {
@@ -41,7 +41,7 @@
 
 	// 👉 Helper pour lister les tâches de l'utilisateur actuel
 	const currentUserTasks = $derived(
-		event.organizers?.find((org) => org.id === currentUser?.id)?.tasks ?? []
+		event.organizers?.find((org: { id: string; username: string; tasks?: string[] }) => org.id === currentUser?.id)?.tasks ?? []
 	);
 </script>
 

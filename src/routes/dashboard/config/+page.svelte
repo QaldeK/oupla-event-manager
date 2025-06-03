@@ -2,11 +2,10 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import { getSpace } from "$lib/shared";
 	import { showAlert } from "$lib/shared/states.svelte";
-	import { fade, slide } from "svelte/transition";
+	import { slide } from "svelte/transition";
 
 	import { X } from "lucide-svelte";
-	import type { TaskType } from "$lib/schemas/event.schema";
-	import { collab } from "@tiptap/pm/collab";
+	import type { TaskType } from "$lib/types/event.types";
 
 	let initialConfig = JSON.parse(JSON.stringify(getSpace.config));
 	let spaceConfig = $state({ ...initialConfig });
@@ -305,9 +304,9 @@
 {/if}
 
 <style>
-	label {
+	/* label {
 		display: block;
 		margin-bottom: 0.5rem;
 		font-weight: 500;
-	}
+	} */
 </style>

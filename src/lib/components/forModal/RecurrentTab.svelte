@@ -9,7 +9,7 @@
 		getNthDayOfMonth
 	} from "$lib/utils/recurrence";
 
-	import { type RequiredRecurrenceType, RecurrenceTypeValues } from "$lib/schemas/event.schema";
+	import { type RecurrenceConfigType, RecurrenceTypeEnum } from "$lib/types/event.types";
 	import {
 		addMonths,
 		addWeeks,
@@ -26,19 +26,19 @@
 	import { lisibleDate } from "$lib/utils";
 
 	interface RecurrentTabProps {
-		recurrence: RequiredRecurrenceType;
+		recurrence: RecurrenceConfigType;
 		isExistingMaster: boolean;
 		errors?: Partial<Record<string, string>>;
 	}
 
 	let {
-		recurrence = $bindable<RequiredRecurrenceType>(),
+		recurrence = $bindable<RecurrenceConfigType>(),
 		isExistingMaster = false,
 		errors = {}
 	}: RecurrentTabProps = $props();
 
 	// Utilisation des valeurs importées directement depuis le schéma
-	const recurrenceChoice = RecurrenceTypeValues;
+	const recurrenceChoice = RecurrenceTypeEnum;
 
 	let isMounted = $state(false);
 

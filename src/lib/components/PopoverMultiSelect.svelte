@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { Checkbox } from '$lib/components/ui/checkbox';
-	import * as Popover from '$lib/components/ui/popover';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import { clickOutside } from '$lib/utils';
-	import { cn, tooltip } from '$lib/utils';
-	import { el } from 'date-fns/locale';
+	import { Badge } from "$lib/components/ui/badge";
+	import { Checkbox } from "$lib/components/ui/checkbox";
+	import * as Popover from "$lib/components/ui/popover";
+	import { ScrollArea } from "$lib/components/ui/scroll-area";
+	import { clickOutside } from "$lib/actions/clickOutside";
+	import { tooltip } from "$lib/actions/tooltip";
 
-	import { ChevronsUpDown } from 'lucide-svelte';
+	import { cn } from "$lib/utils";
+
+	import { ChevronsUpDown } from "lucide-svelte";
 
 	let {
 		items,
@@ -15,16 +16,16 @@
 		toggleItem,
 		triggerIcon: TriggerIcon,
 		disabled = false,
-		size = 'default',
-		label = 'élément',
-		labelEmpty = 'Séléctionnez'
+		size = "default",
+		label = "élément",
+		labelEmpty = "Séléctionnez"
 	} = $props<{
 		items: any[]; // Les items peuvent être des objets
 		selectedItems: any[];
 		toggleItem: (item: any) => void;
 		triggerIcon?: any;
 		disabled?: boolean;
-		size?: 'default' | 'sm';
+		size?: "default" | "sm";
 		label?: string;
 		labelEmpty?: string;
 	}>();
@@ -38,8 +39,8 @@
 	let placeholder = $state(labelEmpty);
 
 	$effect(() => {
-		if (selectedCount > 1 && label !== '') {
-			element = label + 's';
+		if (selectedCount > 1 && label !== "") {
+			element = label + "s";
 		}
 	});
 
@@ -58,21 +59,21 @@
 		if (!open) return;
 		event.stopPropagation();
 		switch (event.key) {
-			case 'ArrowDown':
+			case "ArrowDown":
 				event.preventDefault();
 				focusedIndex = Math.min(focusedIndex + 1, items.length - 1);
 				break;
-			case 'ArrowUp':
+			case "ArrowUp":
 				event.preventDefault();
 				focusedIndex = Math.max(focusedIndex - 1, 0);
 				break;
-			case 'Enter':
+			case "Enter":
 				event.preventDefault();
 				if (focusedIndex >= 0 && focusedIndex < items.length) {
 					toggleItem(items[focusedIndex]);
 				}
 				break;
-			case 'Escape':
+			case "Escape":
 				event.preventDefault();
 				open = false;
 				break;
@@ -96,9 +97,9 @@
 	<Popover.Root bind:open>
 		<Popover.Trigger
 			class={cn(
-				' border-input bg-background ring-offset-background placeholder:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-ring text-fluid-sm flex items-center justify-between rounded-md border px-3 py-2 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50',
-				open && 'ring-ring ring-2 ring-offset-2',
-				size === 'sm' && 'h-8'
+				" border-input bg-background ring-offset-background placeholder:text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:ring-ring text-fluid-sm flex items-center justify-between rounded-md border px-3 py-2 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+				open && "ring-ring ring-2 ring-offset-2",
+				size === "sm" && "h-8"
 			)}
 		>
 			<span class="flex items-center gap-1 truncate">
@@ -120,17 +121,17 @@
 						class="text-fluid-sm text-muted-foreground hover:text-accent-foreground"
 						onclick={handleSelectAll}
 					>
-						{selectAll ? 'tout déselectionner' : 'tout sélectionner'}
+						{selectAll ? "tout déselectionner" : "tout sélectionner"}
 					</button>
 				{/if}
 				<ScrollArea class="max-h-80">
-					{#each items as item}
+					{#each items as item (item)}
 						<button
 							type="button"
 							class={cn(
-								'group hover:bg-accent hover:text-accent-foreground text-fluid-sm flex w-full cursor-pointer space-x-2 rounded-sm p-1.5 focus:outline-hidden disabled:pointer-events-none',
-								focusedIndex === items.indexOf(item) ? 'bg-accent text-accent-foreground' : '',
-								disabled && 'cursor-not-allowed opacity-80'
+								"group hover:bg-accent hover:text-accent-foreground text-fluid-sm flex w-full cursor-pointer space-x-2 rounded-sm p-1.5 focus:outline-hidden disabled:pointer-events-none",
+								focusedIndex === items.indexOf(item) ? "bg-accent text-accent-foreground" : "",
+								disabled && "cursor-not-allowed opacity-80"
 							)}
 							onclick={() => toggleItem(item)}
 						>
@@ -142,8 +143,8 @@
 							<label
 								for={item}
 								class={cn(
-									'group-hover:text-accent-foreground cursor-pointer font-normal peer-disabled:opacity-70',
-									disabled && 'cursor-not-allowed'
+									"group-hover:text-accent-foreground cursor-pointer font-normal peer-disabled:opacity-70",
+									disabled && "cursor-not-allowed"
 								)}
 							>
 								{item}

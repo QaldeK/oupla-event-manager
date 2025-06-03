@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { findConflictsForEvent, type Conflict } from "$lib/utils/eventConflicts";
+	import { findConflictsForEvent, type Conflict } from "$lib/services/eventConflicts";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { isValidDate } from "$lib/utils";
 	import { format } from "date-fns";

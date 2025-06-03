@@ -26,24 +26,23 @@
 -->
 
 <script>
-	import { tooltip } from '$lib/utils';
-	import { breakpoint } from '$lib/shared/breakpoints';
+	import { breakpoint } from "$lib/shared/breakpoints";
 
-	import { CircleHelp } from 'lucide-svelte';
+	import { CircleHelp } from "lucide-svelte";
 
 	let {
-		label = '',
+		label = "",
 		id,
 		checked = $bindable(false),
 		onToggle = () => {},
-		help = '',
-		classLabel = 'text-fluid-sm font-medium'
+		help = "",
+		classLabel = "text-fluid-sm font-medium"
 	} = $props();
-	let helpContent = $state('');
+	let helpContent = $state("");
 
 	$effect(() => {
-		if ($breakpoint === 'sm') {
-			helpContent = '';
+		if ($breakpoint === "sm") {
+			helpContent = "";
 		} else {
 			helpContent = help;
 		}
@@ -63,7 +62,7 @@
 		ontoggle={() => onToggle}
 	/>
 	<span class="ml-2 cursor-pointer text-gray-600 {classLabel}">{label}</span>
-	{#if helpContent !== ''}
+	{#if helpContent !== ""}
 		<div class="tooltip" data-tip={helpContent}>
 			<CircleHelp size="14" class="ms-2 mb-2 text-gray-700" />
 		</div>

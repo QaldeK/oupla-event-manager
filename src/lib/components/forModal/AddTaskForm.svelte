@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TaskType, TasktypeType } from '$lib/schemas/event.schema'; // Assurez-vous que TaskType et TaskExecutionTime sont correctement exportés
+	import type { TaskType, TaskTypeType } from "$lib/types/event.types"; // Assurez-vous que TaskType et TaskExecutionTime sont correctement exportés
 
 	interface Props {
 		onAddTask: (task: TaskType) => void; // Callback pour ajouter la tâche
@@ -9,10 +9,10 @@
 	let { onAddTask, onCancel }: Props = $props();
 
 	// États locaux pour les champs du formulaire
-	let taskName = $state('');
-	let taskDescription = $state('');
+	let taskName = $state("");
+	let taskDescription = $state("");
 	// 👉 Initialise le type à 'onEvent' par défaut
-	let taskType = $state<TasktypeType>('onEvent');
+	let taskType = $state<TaskTypeType>("onEvent");
 	let nameError = $state<string | null>(null);
 
 	function handleSubmit() {
@@ -20,7 +20,7 @@
 		const trimmedName = taskName.trim();
 
 		if (!trimmedName) {
-			nameError = 'Le nom de la tâche est requis.';
+			nameError = "Le nom de la tâche est requis.";
 			return;
 		}
 
@@ -41,9 +41,9 @@
 	}
 
 	function resetForm() {
-		taskName = '';
-		taskDescription = '';
-		taskType = 'onEvent';
+		taskName = "";
+		taskDescription = "";
+		taskType = "onEvent";
 		nameError = null;
 	}
 
@@ -52,7 +52,7 @@
 		beforeEvent: "À réaliser en amont de l'événement",
 		onEvent: "Pendant l'événement",
 		afterEvent: "À réaliser après l'événement",
-		none: 'Non défini' // Ajoutez 'none' si c'est une valeur possible
+		none: "Non défini" // Ajoutez 'none' si c'est une valeur possible
 	};
 </script>
 
@@ -97,7 +97,7 @@
 		<span class="label-text mb-1">Quand réaliser la tâche ?</span>
 		<div class="flex flex-wrap gap-x-4 gap-y-2">
 			{#each Object.entries(typeLabels) as [value, label] (value)}
-				{#if value !== 'none'}
+				{#if value !== "none"}
 					<label class="label-text flex cursor-pointer items-center gap-2">
 						<input
 							type="radio"

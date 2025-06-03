@@ -1,4 +1,16 @@
-import type { EventsRecord } from "./pocketbase";
+import type { EventsResponse } from "./pocketbase";
+
+// Type principal basé sur EventsResponse avec types spécifiques pour les champs JSON
+export type EventType = EventsResponse<
+	string[], // categories
+	DateProposedType[], // dates_proposed
+	ExternalProposalType, // external_proposal
+	OrganizerType[], // organizers
+	string[], // other_date_query
+	RecurrenceConfigType, // recurrence
+	string[], // rooms
+	TaskType[] // tasks
+>;
 
 // Types pour les énumérations
 export const RecurrenceTypeEnum = {
@@ -31,10 +43,14 @@ export interface TaskType {
 export interface OrganizerType {
 	id: string;
 	username: string;
-	email?: string;
-	tasks?: string[];
-	role?: string;
+	tasks: string[];
+	role: string;
 	maybehere?: string | null;
+}
+
+export interface RecurrenceTeamType {
+	username: string;
+	id: string;
 }
 
 export interface RecurrenceConfigType {
@@ -43,10 +59,7 @@ export interface RecurrenceConfigType {
 	recurrenceType: RecurrenceType;
 	recurrenceDates: string[];
 	monthlyByDayOccurrences: number[];
-	recurrenceTeam: Array<{
-		username: string;
-		id: string;
-	}>;
+	recurrenceTeam: RecurrenceTeamType[];
 	tasks: TaskType[];
 	autoConfirm: boolean;
 	autoConfirmMin: number;
@@ -77,76 +90,6 @@ export interface ExternalProposalType {
 	proposals?: ProposalType[];
 }
 
-// Type principal pour un événement avec types métier stricts
-export interface EventType {
-	// Champs système PocketBase
-	id: string;
-	created: string;
-	updated: string;
-	collectionId: string;
-	collectionName: string;
-
-	// Champs métier obligatoires
-	event_title: string;
-	created_by: string;
-	space: string;
-	categories: string[];
-	rooms: string[];
-	tasks: TaskType[];
-	organizers: OrganizerType[];
-
-	// Champs métier optionnels avec valeurs par défaut
-	date_event?: string;
-	time_start?: string;
-	time_end?: string;
-	start_public?: string;
-	start_event?: string;
-	dateStart?: string;
-	dateEnd?: string;
-
-	description?: string;
-	desc_public?: string;
-	duree?: string;
-	link?: string;
-	image?: string[];
-
-	// Flags booléens avec valeurs par défaut
-	isConfirmed: boolean;
-	isPublic: boolean;
-	isPublished: boolean;
-	isSendToNewsletter: boolean;
-	canceled: boolean;
-	isRecurrent: boolean;
-	isMasterRecurrent: boolean;
-	isSondage: boolean;
-	is_prix_libre: boolean;
-	isMixiteChoisie: boolean;
-	is_age_no_restriction: boolean;
-
-	// Champs conditionnels
-	prix?: string;
-	mixite?: string;
-	age_advice?: number;
-
-	// Récurrence et relations
-	masterRecurrentId?: string;
-	recurrence?: RecurrenceConfigType;
-
-	// Sondage et propositions
-	dates_proposed?: DateProposedType[];
-	external_proposal?: ExternalProposalType;
-	other_date_query?: string[];
-
-	// Conflits et rapports
-	inConflictWith?: string[];
-	reportedTo?: string;
-	reportedFrom?: string;
-
-	// Notifications
-	noOrganizerNotificationSent?: boolean;
-	notConfirmedNotificationSent?: boolean;
-}
-
 // Types pour les différents modes de validation
 export type EventMode =
 	| "NEW_SINGLE"
@@ -172,50 +115,21 @@ export interface EventConflict {
 	sourceEventId?: string;
 }
 
-// Factory pour créer un nouvel événement avec valeurs par défaut
-export function createNewEvent(spaceId: string, userId: string): Partial<EventType> {
-	return {
-		event_title: "",
-		created_by: userId,
-		space: spaceId,
-		categories: [],
-		rooms: [],
-		tasks: [],
-		organizers: [],
-		description: "",
-		desc_public: "",
-		isConfirmed: false,
-		isPublic: true,
-		isPublished: false,
-		isSendToNewsletter: false,
-		canceled: false,
-		isRecurrent: false,
-		isMasterRecurrent: false,
-		isSondage: false,
-		is_prix_libre: true,
-		isMixiteChoisie: false,
-		is_age_no_restriction: true,
-		dates_proposed: []
-	};
+// Types pour les événements récurrents validés
+export interface ValidMaster extends EventType {
+	id: string;
+	recurrence: RecurrenceConfigType;
 }
 
-// Factory pour créer une nouvelle récurrence avec valeurs par défaut
-export function createNewRecurrence(): RecurrenceConfigType {
-	return {
-		firstDate: "",
-		lastDate: "",
-		recurrenceType: "WEEKLY",
-		recurrenceDates: [],
-		monthlyByDayOccurrences: [],
-		recurrenceTeam: [],
-		tasks: [],
-		autoConfirm: false,
-		autoConfirmMin: 1,
-		notifyNoOrganizer: false,
-		notifyNoOrganizerDays: 3,
-		notifyNotConfirmed: false,
-		notifyNotConfirmedDays: 7,
-		minOrganizersRequired: 1,
-		allTasksRequired: false
-	};
-}
+export type ValidOccurrence = EventType & {
+	id: string;
+	date_event: string;
+	masterRecurrentId: string;
+	categories: string[];
+	rooms: string[];
+	tasks: TaskType[];
+	organizers: OrganizerType[];
+	dates_proposed: DateProposedType[];
+	external_proposal: ExternalProposalType;
+	other_date_query: string[];
+};

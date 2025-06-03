@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { clickOutside } from '$lib/utils';
-	import { Check } from 'lucide-svelte';
+	import { clickOutside } from "$lib/actions/clickOutside";
+	import { Check } from "lucide-svelte";
 
 	// Props
 	interface Props {
@@ -11,20 +11,20 @@
 		disabled?: boolean;
 		required?: boolean;
 		id?: string;
-		mode?: 'background' | 'text';
+		mode?: "background" | "text";
 		complementaryColor?: string;
 	}
 
 	let {
 		options = [],
 		value = $bindable(),
-		label = '',
-		helperText = '',
+		label = "",
+		helperText = "",
 		disabled = false,
 		required = false,
 		id = crypto.randomUUID(),
-		mode = 'background', // Par défaut, on affiche des couleurs de fond
-		complementaryColor = mode === 'background' ? 'text-base-content' : 'bg-base-100'
+		mode = "background", // Par défaut, on affiche des couleurs de fond
+		complementaryColor = mode === "background" ? "text-base-content" : "bg-base-100"
 	}: Props = $props();
 
 	// État local
@@ -49,7 +49,7 @@
 
 	// Générer les classes pour l'aperçu combiné
 	function getPreviewClasses(optionValue: string): string {
-		if (mode === 'background') {
+		if (mode === "background") {
 			// Pour les fonds, on utilise la classe bg- et on ajoute la couleur de texte complémentaire
 			return `${optionValue} ${complementaryColor}`;
 		} else {
@@ -82,7 +82,7 @@
 		>
 			<div class="flex items-center gap-2">
 				{#if value}
-					{#if mode === 'background'}
+					{#if mode === "background"}
 						<!-- Aperçu pour couleur de fond -->
 						<div
 							class="flex h-5 w-5 items-center justify-center rounded-full {getPreviewClasses(
@@ -104,7 +104,7 @@
 				{/if}
 				<span
 					>{options.find((option) => option.value === value)?.label ||
-						'Sélectionnez une couleur'}</span
+						"Sélectionnez une couleur"}</span
 				>
 			</div>
 		</button>
@@ -124,7 +124,7 @@
 							role="option"
 							aria-selected={value === option.value}
 							onclick={() => selectOption(option.value)}
-							onkeydown={(e) => e.key === 'Enter' && selectOption(option.value)}
+							onkeydown={(e) => e.key === "Enter" && selectOption(option.value)}
 							tabindex="0"
 						>
 							<div class="flex items-center justify-between">

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { fade } from "svelte/transition";
 	import { Info } from "lucide-svelte";
-	import type { TaskType, OrganizerType, UserType } from "$lib/types/types";
+	import type { OrganizerType, TaskType, UserType, RecurrenceTeamType } from "$lib/types/types";
 
 	interface Props {
 		tasks: TaskType[];
@@ -10,7 +10,7 @@
 		isUserInRecurrenceTeam: boolean;
 		onTaskSubscription: (taskName?: string) => void;
 		isRecurrent?: boolean;
-		recurrenceTeam?: OrganizerType[];
+		recurrenceTeam?: RecurrenceTeamType[];
 	}
 
 	const {
@@ -21,10 +21,12 @@
 		isUserInRecurrenceTeam,
 		isRecurrent = false,
 		recurrenceTeam = []
-	} = $props<Props>();
+	}: Props = $props();
 
 	const isUserSubscribedToTask = (task: string) => {
-		return organizers.some((org) => org.id === currentUser.id && org.tasks?.includes(task));
+		return organizers.some(
+			(org: OrganizerType) => org.id === currentUser.id && org.tasks?.includes(task)
+		);
 	};
 
 	const shouldShowTaskDetails = $derived(isUserInRecurrenceTeam && tasks.length > 1);
@@ -44,7 +46,9 @@
 	<!-- Affichage détaillé des tâches pour les membres de recurrenceTeam -->
 	<div class="@xl:grid @xl:grid-cols-2 @xl:justify-around @xl:gap-4 @xl:p-4 @3xl:grid-cols-3">
 		{#each tasks as task (task.name)}
-			{@const organizersForTask = organizers.filter((org) => org.tasks?.includes(task.name) ?? [])}
+			{@const organizersForTask = organizers.filter(
+				(org: OrganizerType) => org.tasks?.includes(task.name) ?? []
+			)}
 			{@const isUserInTask = isUserSubscribedToTask(task.name)}
 			<div class="text-fluid-sm border bg-white font-semibold shadow-xs sm:rounded-lg">
 				<div

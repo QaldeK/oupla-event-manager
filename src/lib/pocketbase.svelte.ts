@@ -1,5 +1,5 @@
-import { type TaskType } from "$lib/schemas/event.schema";
-import { getSpace } from "$lib/shared/spaceOptions.svelte";
+import { type TaskType } from "$lib/types/event.types";
+import { getSpace, userDb } from "$lib/shared/";
 import type {
 	Collections,
 	EventsRecord,
@@ -7,9 +7,9 @@ import type {
 	MessagesResponse
 } from "$lib/types/pocketbase";
 import { createDateFromString } from "$lib/utils";
-import type { ListOptions, ListResult, RecordModel, SubscribeOptions } from "pocketbase";
+import type { ListOptions, ListResult, RecordModel } from "pocketbase";
 
-import type { EventType } from "./types/event";
+import type { EventType } from "./types/event.types";
 
 type GetOneOptions = {
 	expand?: string;
@@ -71,7 +71,7 @@ export const createEvent = async (data: Partial<EventsRecord>) => {
 		// S'assurer que created_by est toujours défini avec l'utilisateur actuel
 		const eventData = {
 			...data,
-			created_by: pb.authStore.record.id,
+			created_by: userDb.id,
 			space: getSpace.id
 		};
 
@@ -87,7 +87,7 @@ export const createEvent = async (data: Partial<EventsRecord>) => {
 export const subscribe = <T extends RecordModel>(
 	collectionName: Collections,
 	callback: (data: T) => void,
-	options?: SubscribeOptions
+	options?: ListOptions
 ) => {
 	pb.collection(collectionName).subscribe(
 		"*",
@@ -167,7 +167,7 @@ export const getOne = async <T extends RecordModel>(
 	}
 };
 
-export const createRecurrentEvent = async (eventData: Partial<EventsRecord>) => {
+export const createRecurrentEvent = async (eventData: Partial<EventType>) => {
 	try {
 		if (!eventData.recurrence || typeof eventData.recurrence !== "object") {
 			throw new Error("Données de récurrence invalides ou manquantes.");
@@ -661,6 +661,14 @@ export interface GenericEmailPayload {
 		customMessage?: string;
 		noOrganizers?: boolean;
 		explicitOrganizerIds?: string[];
+		dateStart?: string;
+		dateEnd?: string;
+		confirmedOrganizers?: string[];
+		willBeConfirmed?: boolean;
+		eventTitle?: string;
+		dateEvent?: string;
+		timeStart?: string;
+		timeEnd?: string;
 	};
 }
 
