@@ -158,7 +158,6 @@ export type EventMode =
 export type ValidationContext = "SAVE" | "PUBLISH" | "RECURRENT_MASTER";
 
 // Types utilitaires
-
 export interface EventConflict {
 	id: string;
 	event_title: string;

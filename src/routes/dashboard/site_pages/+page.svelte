@@ -864,7 +864,7 @@
 		</div>
 	{/snippet}
 	<div transition:fade>
-		<div class="container mx-auto px-4 py-8" data-theme={getCurrentTheme()}>
+		<div class="container mx-auto px-4 py-8">
 			<h1 class="mb-6 text-3xl font-bold">Configuration du site public</h1>
 
 			<!-- --- Section de configuration du thème général --- -->
@@ -975,6 +975,7 @@
                 Layout Colonne simple pour les écrans petits (par défaut)
             -->
 					<div
+						data-theme={getCurrentTheme()}
 						class="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr_280px] lg:grid-rows-[auto_1fr_auto]"
 					>
 						<!-- Header -->
@@ -1275,7 +1276,10 @@
 				</div>
 
 				<div class="mb-4 flex items-center justify-between"></div>
-				<div class="{theme.layoutSections.mainBackgroundClass}  rounded-lg p-8">
+				<div
+					class="{theme.layoutSections.mainBackgroundClass}  rounded-lg p-8"
+					data-theme={getCurrentTheme()}
+				>
 					<!-- FIXIT image exemple -->
 					<PublicEventCard
 						event={sampleEvent}
