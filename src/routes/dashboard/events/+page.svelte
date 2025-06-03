@@ -211,7 +211,7 @@
 	});
 </script>
 
-<div class="flex min-h-screen gap-6">
+<div class="flex min-h-screen gap-y-6">
 	<!-- Contenu principal -->
 	<div class="flex-1 lg:pr-80">
 		<!-- En-tête avec titre et contrôles -->

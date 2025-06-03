@@ -458,6 +458,8 @@
 		let profileToUse: ValidationProfile;
 		if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
 			profileToUse = "RECURRENT_MASTER";
+			if (eventData.recurrence) {
+			eventData.recurrence.tasks = eventData.tasks || []; }
 		} else if (eventData.isConfirmed) {
 			profileToUse = "STANDARD_EVENT";
 		} else {
@@ -465,7 +467,7 @@
 			profileToUse = "DRAFT";
 		}
 
-		console.log("profileToUse : ", profileToUse);
+		console.log("[DEBUG] profileToUse : ", profileToUse);
 
 		hasTriggeredValidation = true;
 
@@ -544,6 +546,7 @@
 <!-- {$inspect('eOrg', eventData.organizers)} -->
 <!-- {$inspect('activeTabDate', activeTabDate)} -->
 <!-- {$inspect('activeSondageTab', activeSondageTab)} -->
+{$inspect("eventData", eventData)}
 
 <Modal padding={false}>
 	<!-- {$inspect('recurrenceDates', recurrenceDates)} -->

@@ -20,14 +20,14 @@
 
 	const eventStatus = $derived.by(() => {
 		if (event.isConfirmed && !event.cancelled) {
-			return { label: "confirmé", labelColor: "text-success", bg: "bg-success/20" };
+			return { label: "confirmé", labelColor: "text-success", bg: "bg-success/10" };
 		} else if (event.cancelled) {
-			return { label: "annulé", labelColor: "text-error", bg: "bg-error/20" };
+			return { label: "annulé", labelColor: "text-error", bg: "bg-error/10" };
 		} else if (!event.isConfirmed) {
 			return {
 				label: "en attente de confirmation",
 				labelColor: "text-warning",
-				bg: "bg-warning/20"
+				bg: "bg-warning/10"
 			};
 		}
 		// 👉 Retourne un objet par défaut si aucune condition n'est remplie

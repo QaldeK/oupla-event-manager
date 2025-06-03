@@ -51,20 +51,21 @@
 		return "";
 	});
 
-	const hasAuth = $derived.by(() =>
-		hasAuthorizations({
-			isRecurrent: currentEvent.isRecurrent,
-			recurrenceTeam: currentEvent.recurrence?.recurrenceTeam,
-			createdBy: currentEvent.created_by
-		}) as boolean
+	const hasAuth = $derived.by(
+		() =>
+			hasAuthorizations({
+				isRecurrent: currentEvent.isRecurrent,
+				recurrenceTeam: currentEvent.recurrence?.recurrenceTeam,
+				createdBy: currentEvent.created_by
+			}) as boolean
 	);
 
 	const isUserInRecurrenceTeam = $derived(
 		Boolean(isInTeam(currentUser, currentEvent.recurrence?.recurrenceTeam))
 	);
 
-	const notRecurrentOrUserInTeam = $derived.by(
-		() => Boolean(!currentEvent.isRecurrent || (currentEvent.isRecurrent && isUserInRecurrenceTeam))
+	const notRecurrentOrUserInTeam = $derived.by(() =>
+		Boolean(!currentEvent.isRecurrent || (currentEvent.isRecurrent && isUserInRecurrenceTeam))
 	);
 
 	// organizersLabel moved to OrganizersHeader.svelte
@@ -77,8 +78,6 @@
 		else if (currentEvent.isConfirmed) return "bg-success/20";
 		else return "bg-warning/20";
 	});
-
-
 
 	// --- effect ---
 
@@ -170,14 +169,13 @@
 		<!-- <span>auth : {hasAuth}</span> -->
 		<div class="pb-4">
 			<div id="Header-event" class="mb-4 justify-between gap-2 @md:flex @md:px-4 @md:py-2">
-				<!-- ::: date -->
+				<!-- ::: date time rooms :::-->
 				<div
 					id="Top_event_date"
-					class="px-6 py-2 shadow-sm @md:mt-2 @md:min-w-42 @md:place-self-center @md:rounded-xl @md:align-top {bgDateTime}"
+					class="px-6 py-2 shadow-sm @md:mt-2 @md:place-self-start @md:rounded-xl @md:align-top {bgDateTime}"
 				>
-					<!-- Container principal -->
 					<div
-						class="flex flex-wrap items-baseline justify-center gap-x-4 @md:flex-col @md:items-end"
+						class="flex flex-wrap items-baseline justify-center gap-x-4 @md:flex-col @md:items-end @md:text-end"
 					>
 						<!-- Ligne 1 : Date + Time en mobile -->
 						{#if currentEvent.date_event}
