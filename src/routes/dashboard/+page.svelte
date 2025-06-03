@@ -1,29 +1,19 @@
 <script lang="ts">
 	import ConflictsEvents from "$lib/components/ConflictsEvents.svelte";
 	import RecurrentEventsCard from "$lib/components/RecurrentEventsCard.svelte";
+	import RecentlyCreatedEventsCard from "$lib/components/RecentlyCreatedEventsCard.svelte";
 	import UserEventsCard from "$lib/components/UserEventsCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
-	import type { EventsRecord, EventsResponse } from "$lib/types/pocketbase";
-	import type { EventType, SyncEventRecord } from "$lib/types/event";
-	import { updateEvent } from "$lib/pocketbase.svelte";
 	import type { UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
 
 	let userEvents = $derived(eventsStore.userEvents);
 	let userRecurrentEvents = $derived(eventsStore.userRecurrentEvents);
 	let userSondageEvents = $derived(eventsStore.userSondageEvents);
-	let otherSondagesCount = $derived(eventsStore.otherSondageEvents.length);
+	let recentlyCreatedEvents = $derived(eventsStore.recentlyCreatedEvents);
 
 	let currentUser = $derived<UserType | null>(userDb.current);
-
-	const confirmEvent = async (id: string) => {
-		try {
-			await updateEvent(id, { isConfirmed: true });
-		} catch (error) {
-			console.error("Erreur lors de la confirmation de l'événement:", error);
-		}
-	};
 </script>
 
 <div>
@@ -32,12 +22,18 @@
 		<div class="flex flex-col gap-8">
 			<ConflictsEvents />
 
+			{#if recentlyCreatedEvents.length > 0}
+				<section class="my-8">
+					<RecentlyCreatedEventsCard events={recentlyCreatedEvents as any} />
+				</section>
+			{/if}
+
 			{#if userEvents.length > 0}
 				<section class="my-8">
 					<h2 class="text-fluid-xl font-bold">Vos prochains événements</h2>
 					<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 						{#each userEvents as event (event.id)}
-							<div><UserEventsCard {event} /></div>
+							<div><UserEventsCard event={event as any} /></div>
 						{/each}
 					</div>
 				</section>
@@ -50,11 +46,11 @@
 						<!-- FIXIT : manage oldDates exclusion -->
 						{#each userSondageEvents as currentEvent (currentEvent.id)}
 							<UserSondagesCard
-								{currentEvent}
+								currentEvent={currentEvent as any}
 								{currentUser}
 								bg="bg-base-100"
 								showHeader={true}
-								dates={currentEvent.dates_proposed}
+								dates={currentEvent.dates_proposed as any}
 							/>
 						{/each}
 					</div>
@@ -74,7 +70,6 @@
 								<RecurrentEventsCard
 									master={master as ValidMaster}
 									occurrences={occurrences as ValidOccurrence[]}
-									onConfirm={confirmEvent}
 								/>
 							{/if}
 						{/each}

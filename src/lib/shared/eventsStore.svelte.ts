@@ -236,10 +236,10 @@ class EventsStore {
 		const events = this.allEvents;
 		this.#pagination.totalItems = events.length;
 		this.#pagination.totalPages = Math.ceil(events.length / this.#pagination.pageSize);
-		
+
 		const startIndex = (this.#pagination.currentPage - 1) * this.#pagination.pageSize;
 		const endIndex = startIndex + this.#pagination.pageSize;
-		
+
 		return events.slice(startIndex, endIndex);
 	});
 
@@ -295,6 +295,66 @@ class EventsStore {
 		const responded = new Set(this.userSondageEvents(userId).map((e) => e.id));
 		return this.eventsWithSondage.filter((event) => !responded.has(event.id));
 	});
+
+	// État pour la pagination des événements récents
+	#recentEventsState = $state({
+		pageSize: 6,
+		currentPage: 1
+	});
+
+	// Récupère tous les événements récents triés par date de création
+	#allRecentEvents = $derived.by(() => {
+		if (!this.#store.syncStore) return [];
+
+		return this.#store.syncStore
+			.getAll()
+			.filter((e) => !e.isRecurrent || (e.isRecurrent && e.isMasterRecurrent))
+			.sort((a, b) => {
+				const dateA = new Date(a.created!);
+				const dateB = new Date(b.created!);
+				return dateB.getTime() - dateA.getTime(); // Plus récent en premier
+			});
+	});
+
+	// Récupère les derniers événements créés avec pagination
+	recentlyCreatedEvents = $derived.by(() => {
+		const oneMonthAgo = new Date();
+		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+		// Prendre les événements du dernier mois en priorité
+		const recentEvents = this.#allRecentEvents.filter((event) => {
+			const createdDate = new Date(event.created!);
+			return createdDate >= oneMonthAgo;
+		});
+
+		// Si moins d'événements du dernier mois que demandé, compléter avec tous les événements
+		const eventsToShow =
+			recentEvents.length >= this.#recentEventsState.pageSize
+				? recentEvents
+				: this.#allRecentEvents;
+
+		const startIndex = 0;
+		const endIndex = this.#recentEventsState.pageSize * this.#recentEventsState.currentPage;
+
+		return eventsToShow.slice(startIndex, endIndex);
+	});
+
+	// Indique s'il y a plus d'événements à charger
+	hasMoreRecentEvents = $derived.by(() => {
+		const totalEvents = this.#allRecentEvents.length;
+		const currentlyShown = this.#recentEventsState.pageSize * this.#recentEventsState.currentPage;
+		return currentlyShown < totalEvents;
+	});
+
+	// Fonction pour charger plus d'événements récents
+	loadMoreRecentEvents = () => {
+		this.#recentEventsState.currentPage += 1;
+	};
+
+	// Fonction pour réinitialiser la pagination des événements récents
+	resetRecentEventsPagination = () => {
+		this.#recentEventsState.currentPage = 1;
+	};
 
 	// USELESS
 	getEventsByDate = $derived.by<Map<string, SyncEventRecord[]>>(() => {
