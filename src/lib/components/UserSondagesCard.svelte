@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
-	import type { DateProposedType, EventType } from "$lib/types/types";
+	import type { DateProposedType, EventType, OrganizerType } from "$lib/types/types";
 
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import {
@@ -62,7 +62,8 @@
 						id: currentUser.id,
 						username: currentUser.username,
 						tasks: [],
-						maybehere: maybehereValue
+						maybehere: maybehereValue,
+						role: ""
 					});
 				}
 				return { ...dateProposed, organizers: updatedOrganizers };
@@ -140,10 +141,15 @@
 		</button>
 		<div class="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
 			{#each dates as dateProposal (dateProposal.dateStart)}
-				{@const oui = dateProposal.organizers?.filter((org) => org.maybehere === "oui").length ?? 0}
+				{@const oui =
+					dateProposal.organizers?.filter((org: OrganizerType) => org.maybehere === "oui").length ??
+					0}
 				{@const peutetre =
-					dateProposal.organizers?.filter((org) => org.maybehere === "peut-être").length ?? 0}
-				{@const non = dateProposal.organizers?.filter((org) => org.maybehere === "non").length ?? 0}
+					dateProposal.organizers?.filter((org: OrganizerType) => org.maybehere === "peut-être")
+						.length ?? 0}
+				{@const non =
+					dateProposal.organizers?.filter((org: OrganizerType) => org.maybehere === "non").length ??
+					0}
 				{@const userResponse = dateProposal.organizers?.find(
 					(org) => org.id === currentUser.id
 				)?.maybehere}
@@ -230,21 +236,21 @@
 
 										<div class="grid grid-cols-3 gap-1">
 											<div class="flex flex-wrap gap-2">
-												{#each dateProposal.organizers.filter((org) => org.maybehere === "oui") as org (org.id)}
+												{#each dateProposal.organizers.filter((org: OrganizerType) => org.maybehere === "oui") as org (org.id)}
 													<div class="badge bg-success/20">
 														{org.username}
 													</div>
 												{/each}
 											</div>
 											<div class="flex flex-wrap gap-2">
-												{#each dateProposal.organizers.filter((org) => org.maybehere === "peut-être") as org (org.id)}
+												{#each dateProposal.organizers.filter((org: OrganizerType) => org.maybehere === "peut-être") as org (org.id)}
 													<div class="badge bg-warning/20">
 														{org.username}
 													</div>
 												{/each}
 											</div>
 											<div class="flex flex-wrap gap-2">
-												{#each dateProposal.organizers.filter((org) => org.maybehere === "non") as org (org.id)}
+												{#each dateProposal.organizers.filter((org: OrganizerType) => org.maybehere === "non") as org (org.id)}
 													<div class="badge bg-error/20">
 														{org.username}
 													</div>

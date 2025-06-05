@@ -1,15 +1,15 @@
 <script>
-	import flatpickr from 'flatpickr';
+	import flatpickr from "flatpickr";
 
-	import { Clock } from 'lucide-svelte';
+	import { Clock } from "lucide-svelte";
 
 	let {
 		value = $bindable(),
-		initial = '17:00',
-		classAdd = '',
-		label = '',
-		placeholder = 'HH:MM',
-		minTime = '06:00'
+		initial = "17:00",
+		classAdd = "",
+		label = "",
+		placeholder = "HH:MM"
+		// minTime = '06:00'
 	} = $props();
 
 	let fpid = `time-picker-${crypto.randomUUID()}`;
@@ -23,9 +23,9 @@
 			minuteIncrement: 10,
 			defaultDate: value,
 			time_24hr: true,
-			minTime: minTime,
-			maxTime: '23:59',
-			dateFormat: 'H:i',
+			// minTime: minTime,
+			// maxTime: "23:59",
+			dateFormat: "H:i",
 			static: true,
 			onClose: (selectedDates, dateStr) => {
 				value = dateStr;
@@ -52,11 +52,11 @@
 	});
 
 	// Mettre à jour minTime lorsque la prop change
-	$effect(() => {
-		if (fpInstance) {
-			fpInstance.set('minTime', minTime);
-		}
-	});
+	// $effect(() => {
+	// 	if (fpInstance) {
+	// 		fpInstance.set("minTime", minTime);
+	// 	}
+	// });
 </script>
 
 <div class="grid">

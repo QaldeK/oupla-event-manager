@@ -6,7 +6,7 @@
 	interface Props {
 		tasks: TaskType[];
 		organizers: OrganizerType[];
-		currentUser: UserType;
+		currentUser: UserType | null;
 		isUserInRecurrenceTeam: boolean;
 		onTaskSubscription: (taskName?: string) => void;
 		isRecurrent?: boolean;

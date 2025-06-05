@@ -73,7 +73,7 @@
 	};
 </script>
 
-<div class="card bg-base-100 @container shadow-xl">
+<div class="card bg-base-100 @container max-w-2xl shadow-xl">
 	<div class="@lg:card-body px-2 py-4">
 		<div class="card-title text-fluid-xl">
 			<Clock />

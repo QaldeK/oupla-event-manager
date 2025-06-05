@@ -1,6 +1,6 @@
 import type { EventType } from "$lib/types/event.types";
-import type { TaskType } from "$lib/types/types";
 import { getUnassignedTasks } from "$lib/services/eventActions";
+import type { TaskType } from "$lib/types/event.types";
 
 // Types des règles de validation individuelles
 type ValidationRule =
@@ -159,7 +159,7 @@ function createValidators(): Record<ValidationRule, ValidatorFunction> {
 		},
 		publicStartTime: (e) => {
 			if (e.isPublic && (!e.start_public || e.start_public.trim() === "")) {
-				return "L'horaire d'ouverture du lieu est requis pour pouvoir confirmer un événement public";
+				return "L'horaire d'ouverture du lieu est requise pour pouvoir confirmer un événement public";
 			}
 			return undefined;
 		},
@@ -219,6 +219,21 @@ function createValidators(): Record<ValidationRule, ValidatorFunction> {
 
 // 👉 fonction statique pour validation one-shot
 
+// 👉 Fonction pour déterminer le profil de validation basé sur l'événement
+export function determineValidationProfile(event: EventType): ValidationProfile {
+	// Événement existant
+	if (event.id) {
+		if (event.isMasterRecurrent) return "RECURRENT_MASTER";
+		if (!event.isConfirmed) return "DRAFT";
+		return "STANDARD_EVENT";
+	}
+
+	// Nouvel événement
+	if (event.isMasterRecurrent) return "RECURRENT_MASTER";
+	if (!event.isConfirmed) return "DRAFT";
+	return "STANDARD_EVENT";
+}
+
 export function validateEventStatic(
 	event: EventType,
 	profile: ValidationProfile = "STANDARD_EVENT"
@@ -234,11 +249,11 @@ export function validateEventStatic(
 		}
 	});
 
-	let unassignedTasks = [];
+	let unassignedTasks: TaskType[] = [];
 	let hasUnassignedTasks = false;
 
 	if (profile === "STANDARD_EVENT" && event.recurrence?.allTasksRequired) {
-		unassignedTasks = getUnassignedTasks(event);
+		unassignedTasks = getUnassignedTasks({ ...event });
 		hasUnassignedTasks = unassignedTasks.length > 0;
 	}
 	const hasRuleErrors = Object.keys(errors).length > 0;
@@ -282,7 +297,7 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 	console.log("error", activeProfileErrors);
 
 	// 👉 Calculs des tache non assignées quand nécessaire
-	const unassignedTasks = $derived.by(() => {
+	const unassignedTasks = $derived.by((): TaskType[] => {
 		if (!activeProfile) return [];
 		const rulesForCurrentProfile = PROFILE_RULES[activeProfile];
 		if (!rulesForCurrentProfile.includes("unassignedTasksCheck")) {
@@ -317,13 +332,13 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 
 		isValid: (profile?: ValidationProfile): boolean => {
 			// 👉 Délègue à la fonction statique !
-			const result = validateEventStatic(event, profile || activeProfile);
+			const result = validateEventStatic(event, profile || activeProfile || "STANDARD_EVENT");
 			return result.isValid;
 		},
 
 		getErrors: (profile?: ValidationProfile): string[] => {
 			// 👉 Délègue à la fonction statique !
-			const result = validateEventStatic(event, profile || activeProfile);
+			const result = validateEventStatic(event, profile || activeProfile || "STANDARD_EVENT");
 			return result.getErrors();
 		},
 

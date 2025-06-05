@@ -1,87 +1,153 @@
 <script lang="ts">
-	import { findConflictsForEvent, type Conflict } from "$lib/services/eventConflicts";
+	import {
+		calculateConflicts,
+		type ConflictResult,
+		ConflictCalculator
+	} from "$lib/services/conflictService.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { isValidDate } from "$lib/utils";
 	import { format } from "date-fns";
 	import { fr } from "date-fns/locale";
+	import { isValidDate } from "$lib/utils";
+	import type { EventType } from "$lib/types/event.types";
 
-	let { eventId, startDate, endDate, rooms } = $props<{
+	// 👉 Props pour les deux modes
+	let {
+		// Mode "realtime" (EventModal)
+		eventId,
+		startDate,
+		endDate,
+		rooms,
+		conflictCalculator,
+
+		// Mode "cached" (EventCard, Dashboard)
+		currentEvent,
+		mode = "realtime"
+	} = $props<{
+		// Mode realtime
 		eventId?: string;
-		startDate: Date | null;
-		endDate: Date | null;
-		rooms: string[];
+		startDate?: Date | null;
+		endDate?: Date | null;
+		rooms?: string[];
+		conflictCalculator?: ConflictCalculator;
+
+		// Mode cached
+		currentEvent?: EventType;
+		mode?: "realtime" | "cached";
 	}>();
 
 	let isExpanded = $state(false);
 
-	const conflicts = $derived.by<Conflict[]>(() => {
-		// 1. Vérifier que les dates d'entrée sont des objets Date valides
-		if (
-			!startDate ||
-			!endDate ||
-			!isValidDate(startDate) ||
-			!isValidDate(endDate) ||
-			!eventsStore.isInitialized
-		) {
-			return [];
-		}
-
-		// 3. Obtenir la clé de date (YYYY-MM-DD) pour la map (utilise l'objet Date reçu)
-		let dateKey: string;
-		try {
-			dateKey = format(startDate, "yyyy-MM-dd");
-		} catch {
-			console.error("ConflictAlert: Error formatting dateKey from startDate", { startDate });
-			return [];
-		}
-
-		// 4. Récupérer les EventTimeInfo pour cette date depuis le store
-		const eventsOnDate = eventsStore.eventTimeInfoMap.get(dateKey) || [];
-
-		// 5. Appeler le service de détection de conflits (utilise les objets Date directement)
-		try {
-			return findConflictsForEvent(
-				startDate, // Objet Date direct
-				endDate, // Objet Date direct
-				rooms,
-				eventsOnDate,
-				{
-					excludeEventId: eventId,
-					includeCloseEvents: true
-				}
-			);
-		} catch (error) {
-			console.error("ConflictAlert: Error calling findConflictsForEvent", error);
-			return [];
+	$effect(() => {
+		if (mode === "realtime" && conflictCalculator) {
+			conflictCalculator.updateOptions({
+				eventId,
+				startDate,
+				endDate,
+				rooms: rooms || [],
+				includeCloseEvents: true
+			});
 		}
 	});
 
-	// Filtrer les conflits réels (directs ou avec même salle)
-	const realConflicts = $derived(
-		conflicts.filter(
-			(conflict) =>
-				// Conflits directs
-				conflict.conflictType === "confirmed" && conflict.hasSameRoom
-		)
-	);
+	// 👉 Logique selon le mode
+	const conflictResult = $derived.by(() => {
+		if (mode === "cached" && currentEvent?.inConflictWith?.length) {
+			// Mode cached : utiliser inConflictWith
+			return getCachedConflicts(currentEvent);
+		} else if (mode === "realtime" && conflictCalculator) {
+			return conflictCalculator.result;
+		}
+		// Pas de conflits
+		return {
+			conflicts: [],
+			hasConfirmedConflicts: false,
+			confirmedConflicts: [],
+			realConflicts: [],
+			conflictIds: []
+		};
+	});
 
+	// 👉 Fonction pour récupérer les conflits cachés
+	function getCachedConflicts(event: EventType): ConflictResult {
+		if (!event.inConflictWith?.length || !eventsStore.isInitialized) {
+			return {
+				conflicts: [],
+				hasConfirmedConflicts: false,
+				confirmedConflicts: [],
+				realConflicts: [],
+				conflictIds: []
+			};
+		}
+
+		// Récupérer les événements en conflit depuis le store
+		const conflictEvents = event.inConflictWith
+			.map((id) => eventsStore.getEventById(id))
+			.filter((e) => e != null);
+
+		// Convertir en format Conflict pour l'affichage
+		const conflicts = conflictEvents.map((conflictEvent) => ({
+			id: conflictEvent.id,
+			event_title: conflictEvent.event_title,
+			time_start: conflictEvent.time_start || "??:??",
+			time_end: conflictEvent.time_end || "??:??",
+			rooms: conflictEvent.rooms || [],
+			conflictType: conflictEvent.isConfirmed ? "confirmed" : "unconfirmed",
+			hasSameRoom: hasSharedRoom(event.rooms || [], conflictEvent.rooms || []),
+			date_event: conflictEvent.date_event || "",
+			isConfirmed: conflictEvent.isConfirmed || false,
+			organizers: conflictEvent.organizers || [],
+			sourceEventId: event.id
+		}));
+
+		const confirmedConflicts = conflicts.filter((c) => c.conflictType === "confirmed");
+		const realConflicts = conflicts.filter((c) => c.conflictType === "confirmed" && c.hasSameRoom);
+
+		return {
+			conflicts,
+			hasConfirmedConflicts: confirmedConflicts.length > 0,
+			confirmedConflicts,
+			realConflicts,
+			conflictIds: conflicts.map((c) => c.id)
+		};
+	}
+
+	function hasSharedRoom(rooms1: string[], rooms2: string[]): boolean {
+		return rooms1.some((room) => rooms2.includes(room));
+	}
+
+	// Dérivations pour l'affichage
+	const conflicts = $derived(conflictResult.conflicts);
+	const realConflicts = $derived(conflictResult.realConflicts);
 	const hasRealConflict = $derived({
 		value: realConflicts.length > 0,
 		type: realConflicts[0]?.conflictType
 	});
 
-	const formatDateForDisplay = (dateObj: Date | null) => {
-		if (dateObj && isValidDate(dateObj)) {
+	const formatDateForDisplay = (dateObj: Date | string | null) => {
+		let date: Date | null = null;
+
+		if (typeof dateObj === "string") {
+			date = new Date(dateObj);
+		} else if (dateObj instanceof Date) {
+			date = dateObj;
+		}
+
+		if (date && isValidDate(date)) {
 			try {
-				return format(dateObj, "EEE d MMMM", { locale: fr });
+				return format(date, "EEE d MMMM", { locale: fr });
 			} catch {
 				return "date invalide";
 			}
 		}
-		return "date inconnue"; // Fallback
+		return "date inconnue";
 	};
 
-	const dateOfConflict = formatDateForDisplay(startDate);
+	const dateOfConflict = $derived.by(() => {
+		if (mode === "cached" && currentEvent?.date_event) {
+			return formatDateForDisplay(currentEvent.date_event);
+		}
+		return formatDateForDisplay(startDate);
+	});
 
 	const getConflictColor = (conflictType: string) => {
 		switch (conflictType) {
@@ -133,7 +199,7 @@
 
 {#if conflicts.length > 0}
 	<div
-		class="bg-warning/20 text-fluid-sm cursor-pointer items-center gap-1 rounded-xl p-2 px-4 text-gray-500 hover:text-gray-700"
+		class="bg-warning/20 border-warning text-fluid-sm cursor-pointer items-center gap-1 rounded-xl border-2 p-2 px-4 text-gray-500 hover:text-gray-700"
 		onclick={() => (isExpanded = !isExpanded)}
 		onkeydown={(e) => e.key === "Enter" && (isExpanded = !isExpanded)}
 		role="button"

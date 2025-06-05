@@ -6,7 +6,7 @@ import type {
 	EventsResponse,
 	MessagesResponse
 } from "$lib/types/pocketbase";
-import { createDateFromString } from "$lib/utils";
+import { createEventDates } from "$lib/utils";
 import type { ListOptions, ListResult, RecordModel } from "pocketbase";
 
 import type { EventType } from "./types/event.types";
@@ -59,7 +59,26 @@ export async function loadPublicEvents(spaceId: string) {
 
 export const updateEvent = async (eventID: string, data: Partial<EventsRecord>) => {
 	try {
-		await pb.collection("events").update(eventID, data);
+		// Créer l'objet complet pour la validation (merger avec les données existantes si nécessaire)
+		// const eventData = {
+		// 	...data,
+		// 	id: eventID
+		// } as EventType;
+
+		// // 👉 Validation obligatoire
+		// const profile = determineValidationProfile(eventData);
+		// const validationResult = validateEventStatic(eventData, profile);
+
+		// console.log("pbError", validationResult.errors);
+
+		// // Si validation échoue, throw error
+		// if (!validationResult.isValid) {
+		// 	throw new Error("Validation failed");
+		// }
+
+		const record = await pb.collection("events").update(eventID, data);
+
+		return record;
 	} catch (error) {
 		console.error(error);
 		throw error;
@@ -73,6 +92,42 @@ export const createEvent = async (data: Partial<EventsRecord>) => {
 			...data,
 			created_by: userDb.id,
 			space: getSpace.id
+		} as EventType;
+
+		const record = await pb.collection("events").create(eventData);
+
+		return record;
+	} catch (error) {
+		console.error(error);
+		throw error;
+	}
+};
+
+/**
+ * Version spéciale de createEvent pour les tests d'intégration
+ * Utilise des valeurs par défaut de test si l'authentification n'est pas disponible
+ */
+export const createEventForTest = async (data: EventType, userId?: string, spaceId?: string) => {
+	try {
+		// Utiliser les valeurs par défaut de test si non fournies
+		const defaultUserId = "o48pvotsdr2o7gt"; // aldek
+		const defaultSpaceId = "xl69b9bu7yjbaj7"; // MOFO space
+
+		// Nettoyer les champs en lecture seule qui ne doivent pas être envoyés à PocketBase
+		const {
+			id: _id,
+			created: _created,
+			updated: _updated,
+			collectionId: _collectionId,
+			collectionName: _collectionName,
+			expand: _expand,
+			...cleanData
+		} = data;
+
+		const eventData = {
+			...cleanData,
+			created_by: userId || userDb.id || defaultUserId,
+			space: spaceId || getSpace.id || defaultSpaceId
 		};
 
 		const record = await pb.collection("events").create(eventData);
@@ -184,9 +239,9 @@ export const createRecurrentEvent = async (eventData: Partial<EventType>) => {
 				...(eventData.recurrence as object),
 				tasks: eventData.tasks
 			},
-			dateStart: null,
-			dateEnd: null
-		};
+			dateStart: "",
+			dateEnd: ""
+		} as EventType;
 
 		const masterRecord = await pb.collection("events").create({ ...masterEvent });
 		console.log("Master event créé:", masterRecord.id);
@@ -197,8 +252,12 @@ export const createRecurrentEvent = async (eventData: Partial<EventType>) => {
 		// Créer les occurrences
 		const batch = pb.createBatch();
 		recurrenceDates.forEach((date: string) => {
-			const dateStart = createDateFromString(date, eventData.time_start || "");
-			const dateEnd = createDateFromString(date, eventData.time_end || "");
+			// 👉 Utilisation de createEventDates pour gérer les événements multi-jours
+			const { dateStart, dateEnd } = createEventDates(
+				date,
+				eventData.time_start || "",
+				eventData.time_end || ""
+			);
 			const occurrenceData = {
 				...eventData,
 				space: getSpace.id,
@@ -304,8 +363,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 				...baseOccurrenceData,
 				date_event: date,
 				organizers: [],
-				dateStart: createDateFromString(date, masterEvent.time_start ?? "").toISOString(),
-				dateEnd: createDateFromString(date, masterEvent.time_end ?? "").toISOString()
+				...createEventDates(date, masterEvent.time_start ?? "", masterEvent.time_end ?? "")
 			}));
 
 		const toUpdate = recurrenceDates
@@ -337,8 +395,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 					recurrence: {
 						...masterEvent.recurrence
 					},
-					dateStart: createDateFromString(date, masterEvent.time_start ?? "").toISOString(),
-					dateEnd: createDateFromString(date, masterEvent.time_end ?? "").toISOString()
+					...createEventDates(date, masterEvent.time_start ?? "", masterEvent.time_end ?? "")
 				};
 			})
 			.filter((item): item is NonNullable<typeof item> => item !== null); // Type guard pour éliminer les nulls
@@ -692,5 +749,45 @@ export async function sendGenericEmail(payload: GenericEmailPayload): Promise<vo
 		}
 		// Gérer l'erreur (Sentry, toast, etc.)
 		throw error; // Propager
+	}
+}
+
+/**
+ * Met à jour les conflits réciproques pour tous les événements impliqués
+ * @param eventId - L'ID de l'événement qui vient d'être sauvé
+ * @param conflictIds - Les IDs des événements en conflit
+ */
+export async function updateReciprocalConflicts(
+	eventId: string,
+	conflictIds: string[]
+): Promise<void> {
+	try {
+		// Pour chaque événement en conflit, ajouter l'ID de l'événement actuel à son inConflictWith
+		for (const conflictId of conflictIds) {
+			try {
+				// Récupérer l'événement en conflit
+				const conflictEvent = await pb.collection("events").getOne(conflictId);
+
+				// Ajouter l'ID de l'événement actuel s'il n'y est pas déjà
+				const currentConflicts = conflictEvent.inConflictWith || [];
+				if (!currentConflicts.includes(eventId)) {
+					const updatedConflicts = [...currentConflicts, eventId];
+
+					// Mettre à jour l'événement en conflit
+					await pb.collection("events").update(conflictId, {
+						inConflictWith: updatedConflicts
+					});
+				}
+			} catch (error) {
+				console.warn(
+					`Impossible de mettre à jour les conflits pour l'événement ${conflictId}:`,
+					error
+				);
+				// Continuer avec les autres événements même si un échoue
+			}
+		}
+	} catch (error) {
+		console.error("Erreur lors de la mise à jour des conflits réciproques:", error);
+		throw error;
 	}
 }

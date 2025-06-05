@@ -47,11 +47,6 @@
 
 	let { children } = $props();
 
-	// initialisé dans $effect après isInitialized
-	setContext("currentSpace", null);
-	setContext("currentUser", null);
-	setContext("tasks", null);
-
 	// ::: states
 
 	// XXX :  passer currentUser et currentSpace en simple let non reactive ?

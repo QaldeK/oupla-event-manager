@@ -73,57 +73,6 @@ export function getDefaultRecurrence(): Omit<RecurrenceConfigType, "recurrenceTy
 		allTasksRequired: false
 	};
 }
-// LEGACY
-// Factory pour créer un nouvel événement avec valeurs par défaut
-// export function createNewEvent(spaceId: string, userId: string): Partial<EventType> {
-// 	return {
-// 		event_title: "",
-// 		created_by: userId,
-// 		space: spaceId,
-// 		categories: [],
-// 		rooms: [],
-// 		tasks: [],
-// 		organizers: [],
-// 		description: "",
-// 		desc_public: "",
-// 		isConfirmed: false,
-// 		isPublic: true,
-// 		isPublished: false,
-// 		isSendToNewsletter: false,
-// 		canceled: false,
-// 		isRecurrent: false,
-// 		isMasterRecurrent: false,
-// 		isSondage: false,
-// 		is_prix_libre: true,
-// 		isMixiteChoisie: false,
-// 		is_age_no_restriction: true,
-// 		dates_proposed: [],
-// 		recurrence: null,
-// 		external_proposal: null,
-// 		other_date_query: null
-// 	};
-// }
-
-// Factory pour créer une nouvelle récurrence avec valeurs par défaut // LEGACY
-// export function createNewRecurrence(): RecurrenceConfigType {
-// 	return {
-// 		firstDate: "",
-// 		lastDate: "",
-// 		recurrenceType: "WEEKLY",
-// 		recurrenceDates: [],
-// 		monthlyByDayOccurrences: [],
-// 		recurrenceTeam: [],
-// 		tasks: [],
-// 		autoConfirm: false,
-// 		autoConfirmMin: 1,
-// 		notifyNoOrganizer: false,
-// 		notifyNoOrganizerDays: 3,
-// 		notifyNotConfirmed: false,
-// 		notifyNotConfirmedDays: 7,
-// 		minOrganizersRequired: 1,
-// 		allTasksRequired: false
-// 	};
-// }
 
 /**
  * Calcule les tâches non assignées d'un événement
@@ -413,4 +362,146 @@ export async function confirmEventAction(
 			}
 		}
 	};
+}
+
+// --- Refactoring  ---
+
+/**
+ * Vérifie si une validation de sondage est nécessaire
+ */
+export function checkSondageValidation(eventData: EventType, hasSondageValidation: boolean): {
+	needsValidation: boolean;
+	message?: string;
+	variant?: "info" | "warning";
+	canBeConfirmed?: boolean;
+	showCompleteButton?: boolean;
+} {
+	// Logique pour déterminer si on a besoin de validation sondage
+	if (hasSondageValidation && !eventData.isSondage) {
+		const canBeConfirmed = validateEventStatic(eventData).isValid;
+		return {
+			needsValidation: true,
+			message: canBeConfirmed
+				? `Vous avez validé la date et cloturé le sondage : les participants seront notifiés. L'événement peut être confirmé afin d'être publié et ajouté à la newsletter.`
+				: `Vous avez validé la date et cloturé le sondage. Les participants seront notifiés. Si vous souhaitez confirmer l'événement (publication en ligne), vous devez d'abord compléter certaines informations manquantes.`,
+			variant: canBeConfirmed ? "info" : "warning",
+			canBeConfirmed,
+			showCompleteButton: !canBeConfirmed // Afficher le bouton "Compléter" si l'événement n'est pas prêt
+		};
+	}
+	return { needsValidation: false };
+}
+
+/**
+ * Vérifie les conflits d'événements
+ */
+export function checkEventConflicts(conflictCalculator: {
+	hasConfirmedConflicts: boolean;
+	conflictIds: string[];
+	confirmedConflicts: Array<{
+		event_title: string;
+		time_start: string;
+		time_end: string;
+		hasSameRoom?: boolean;
+	}>;
+}): {
+	hasConflicts: boolean;
+	message?: string;
+	canProceed?: boolean;
+} {
+	const conflicts = conflictCalculator;
+
+	if (!conflicts.hasConfirmedConflicts) {
+		return {
+			hasConflicts: conflicts.conflictIds.length > 0,
+			canProceed: true
+		};
+	}
+
+	const conflictDetails = conflicts.confirmedConflicts
+		.map(
+			(c: {
+				event_title: string;
+				time_start: string;
+				time_end: string;
+				hasSameRoom?: boolean;
+			}) =>
+				`• ${c.event_title} (${c.time_start}-${c.time_end}${c.hasSameRoom ? ", même salle" : ""})`
+		)
+		.join("\n");
+
+	return {
+		hasConflicts: true,
+		message: `⚠️ Conflit détecté avec des événements confirmés :\n\n${conflictDetails}\n\nVoulez-vous enregistrer malgré ce conflit ?`,
+		canProceed: false // Nécessite confirmation utilisateur
+	};
+}
+
+/**
+ * Prépare et affiche un modal de confirmation pour la soumission d'événement
+ */
+export function handleEventSubmissionConfirmation(
+	eventData: EventType,
+	options: {
+		conflictCheck?: ReturnType<typeof checkEventConflicts>;
+		sondageCheck?: ReturnType<typeof checkSondageValidation>;
+		onConfirm: (shouldConfirm?: boolean) => Promise<void>;
+		onCancel?: () => void;
+		onComplete?: () => void; // 👉 Nouvelle action pour "Compléter"
+	}
+) {
+	const { conflictCheck, sondageCheck, onConfirm, onComplete } = options;
+
+	// Construire le message combiné
+	const messages: string[] = [];
+	let variant: "info" | "warning" | "danger" = "info";
+	const additionalButtons: Array<{
+		label: string;
+		variant: "error" | "success" | "warning" | "primary" | "secondary" | "accent" | "ghost";
+		onClick: () => void;
+	}> = [];
+
+	// Ajouter message de conflit si nécessaire
+	if (conflictCheck?.hasConflicts && conflictCheck.message) {
+		messages.push(conflictCheck.message);
+		variant = "warning";
+	}
+
+	// Ajouter message de sondage si nécessaire
+	if (sondageCheck?.needsValidation && sondageCheck.message) {
+		messages.push(sondageCheck.message);
+
+		// Bouton pour confirmer l'événement si possible
+		if (sondageCheck.canBeConfirmed) {
+			additionalButtons.push({
+				label: "Confirmer l'événement",
+				variant: "success",
+				onClick: () => onConfirm(true)
+			});
+		}
+		// 👉 Bouton pour compléter les informations manquantes
+		else if (sondageCheck.showCompleteButton && onComplete) {
+			additionalButtons.push({
+				label: "Compléter l'événement",
+				variant: "warning",
+				onClick: onComplete
+			});
+		}
+	}
+
+	// Si pas de message spécifique, message par défaut
+	if (messages.length === 0) {
+		messages.push("Voulez-vous enregistrer cet événement ?");
+	}
+
+	modalState.confirm = {
+	isOpen: true,
+	data: {
+		title: "Enregistrer l'événement",
+		message: messages.join("\n\n"),
+		variant,
+		onConfirm: () => onConfirm(false),
+		additionalButton: additionalButtons[0] // Pour l'instant, un seul bouton additionnel
+	}
+};
 }
