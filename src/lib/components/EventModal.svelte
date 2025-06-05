@@ -20,13 +20,20 @@
 		updateAllOccurrences,
 		updateEvent
 	} from "$lib/pocketbase.svelte";
+	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import {
 		type DateProposedType,
 		type RecurrenceConfigType,
 		type TaskType
 	} from "$lib/types/event.types";
 	import type { EventType } from "$lib/types/event.types";
-	import { getDefaultRecurrence, getNewEvent } from "$lib/services/eventActions";
+	import {
+		getDefaultRecurrence,
+		getNewEvent,
+		checkSondageValidation,
+		checkEventConflicts,
+		handleEventSubmissionConfirmation
+	} from "$lib/services/eventActions";
 	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import {
 		eventState,
@@ -35,7 +42,7 @@
 		showAlert
 	} from "$lib/shared/states.svelte";
 	import {
-		createDateFromString,
+		createEventDates,
 		filterAndConvertOrganizers,
 		formatDatePb,
 		formatTimePb,
@@ -44,7 +51,6 @@
 	} from "$lib/utils";
 
 	import { slide } from "svelte/transition";
-
 	import { UserPlus } from "lucide-svelte";
 	// import EventValidationStatus from "./EventValidationStatus.svelte";
 	import TimeReservation from "./forModal/TimeReservation.svelte";
@@ -61,7 +67,6 @@
 		| "EDIT_RECURRENT_ONE" // Modification occurrence unique
 		| "EDIT_RECURRENT_ALL"; // Modification toutes occurrences
 
-	let isAlertSaveMasterOpen = $state<boolean>(false);
 	let eventMode: EventMode = $derived.by(() => {
 		if (!eventData.id) {
 			return eventData.isRecurrent ? "NEW_RECURRENT" : "NEW_SINGLE";
@@ -81,28 +86,7 @@
 		recurrence: eventState.is.recurrence ?? null
 	} as EventType);
 
-	// ::: Gestion de la validation :::
-	/* Enclanche la validation standard pour les modification d'event (event.id), sinon, déclanché lors du handleSave | handleConfirm grace à hasTriggeredValidation, avec le setProfile adéquat. */
-	let hasTriggeredValidation = $state(false);
-	let validator = $state<ReturnType<typeof createEventValidator> | null>(null);
-	const getInitialProfile = (): ValidationProfile | null => {
-		if (eventData.id) {
-			return "STANDARD_EVENT";
-		}
-		return null;
-	};
-	$effect(() => {
-		if (eventData.id || hasTriggeredValidation) {
-			if (!validator) {
-				const initialProfile = getInitialProfile();
-				validator = createEventValidator(eventData, {
-					profile: initialProfile
-				});
-			} else {
-				validator.updateEvent(eventData);
-			}
-		}
-	});
+	const defaultTask = getSpace.defaultTask as TaskType;
 
 	// 👉 Erreurs calculées seulement si validateur existe
 	let errorsMap = $derived.by(() => {
@@ -273,6 +257,11 @@
 
 	let hasSondageValidation = $state(false);
 
+	// instance unique de calcul des conflit pour ce modal
+	const conflictCalculator = new ConflictCalculator();
+	// Calcul des conflits d'événements Réactif
+	const currentConflicts = $derived(conflictCalculator.result);
+
 	// ::: $effect
 
 	$effect.pre(() => {
@@ -283,21 +272,34 @@
 		}
 	});
 
-	// Check PublishValidation if canBeValidated, only on load
-	// $effect(() => {
-	// 	if (missingForConfirmation) {
-	// 		validateCurrentEvent(ValidationSchemaType.PUBLISH);
-	// 	}
-	// });
+	// Définir comme MasterRecurrent
+	$effect(() => {
+		if (eventMode === "NEW_RECURRENT") {
+			eventData.isMasterRecurrent = true;
+		}
+	});
 
+	/*
+	 * Mise à jour des dates de début et de fin de l'événement
+	 * en fonction de la date et des heures saisies.
+	 * Utilise createEventDates pour gérer les événements multi-jours.
+	 */
 	$effect(() => {
 		if (eventData.date_event && eventData.time_start && eventData.time_end) {
 			try {
-				const startDate = createDateFromString(eventData.date_event, eventData.time_start);
-				const endDate = createDateFromString(eventData.date_event, eventData.time_end);
+				// 👉 Utilisation de createEventDates qui gère les événements multi-jours
+				const { dateStart, dateEnd } = createEventDates(
+					eventData.date_event,
+					eventData.time_start,
+					eventData.time_end
+				);
+
+				const startDate = new Date(dateStart);
+				const endDate = new Date(dateEnd);
+
 				if (isValidDate(startDate) && isValidDate(endDate)) {
-					eventData.dateStart = startDate.toISOString();
-					eventData.dateEnd = endDate.toISOString();
+					eventData.dateStart = dateStart;
+					eventData.dateEnd = dateEnd;
 					startDateObject = startDate;
 					endDateObject = endDate;
 				} else {
@@ -321,17 +323,22 @@
 		}
 	});
 
-	// defaultTask est ajouté dès qu'il n'y a plus de tache
+	// Si defaultTask existe et tasks est vide ou undefined, initialiser avec defaultTask
 	$effect(() => {
-		const defaultTask = getSpace.defaultTask as TaskType;
-
-		// Si defaultTask existe et tasks est vide ou undefined, initialiser avec defaultTask
 		if (defaultTask && (!eventData.tasks || eventData.tasks.length === 0)) {
 			eventData.tasks = [defaultTask];
 		}
 	});
 
-	// ::: functions utilities
+	// 👉 Synchroniser tasks avec recurrence.tasks pour les événements récurrents
+	$effect(() => {
+		if (eventData.isMasterRecurrent && eventData.recurrence && eventData.tasks) {
+			// Copier les tâches de l'événement vers la récurrence
+			eventData.recurrence.tasks = [...eventData.tasks];
+		}
+	});
+
+	// ::: functions utilities :::
 
 	function handleFormDateValidation(dateProposal: DateProposedType) {
 		const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
@@ -366,27 +373,6 @@
 		}
 	}
 
-	function confirmNotifSondageClosed(isConfirmed: boolean) {
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: "Cloture du sondage",
-				message: isConfirmed
-					? `Vous avez validé la date du ${lisibleDate(eventData.dateStart)} et cloturé le sondage. Les participants au sondage seront notifié par email de la date choisie`
-					: `Vous avez validé la date (${lisibleDate(eventData.dateStart)}) et cloturé le sondage, Si les différents champs obligatoires sont renseignés, et les mandats attribués, vous pouvez confirmer l'événement (s'il s'agit d'un événement public, il sera publié sur le site et diffusable sur la newsletter). Les participant·es au sondage seront notifiés par email.`,
-				variant: isConfirmed ? "info" : "warning",
-				onConfirm: () => {
-					submitForm();
-				},
-				additionalButton: {
-					label: "Confirmer l'événement",
-					variant: "success",
-					onClick: () => handleConfirm()
-				}
-			}
-		};
-	}
-
 	//  gérer l'ajout depuis AddTaskForm
 	function handleAddTask(newTask: TaskType) {
 		if (!eventData.tasks) {
@@ -414,16 +400,16 @@
 
 		// Conversion des propositions en format DateProposed
 		const newDatesProposed = selectedProposals.map((proposal) => {
-			const [year, month, day] = proposal.date_event.split("-");
-			const [hourStart, minuteStart] = proposal.time_start.split(":");
-			const [hourEnd, minuteEnd] = proposal.time_end.split(":");
-
-			const dateStart = new Date(`${year}-${month}-${day}T${hourStart}:${minuteStart}`);
-			const dateEnd = new Date(`${year}-${month}-${day}T${hourEnd}:${minuteEnd}`);
+			// 👉 Utilisation de createEventDates pour gérer les événements multi-jours
+			const { dateStart, dateEnd } = createEventDates(
+				proposal.date_event,
+				proposal.time_start,
+				proposal.time_end
+			);
 
 			return {
-				dateStart: dateStart.toISOString(),
-				dateEnd: dateEnd.toISOString(),
+				dateStart,
+				dateEnd,
 				organizers: []
 			};
 		});
@@ -437,128 +423,183 @@
 		eventData.isSondage = true;
 	}
 
-	// ::: Form Validation and Submission
+	// ::: Form Validation and Submission :::
 
-	const confirmSubmit = async () => {
-		isAlertSaveMasterOpen = false;
-		await submitForm();
-	};
-
-	/* Bouton confirmer → enclanche la validation STANDARD, affiche l'alert si besoin et déclanche l'affichage des erreurs dans le formulaire; ou bien confirme et enregistre l'evenement */
-	const handleConfirm = async () => {
-		hasTriggeredValidation = true;
-
-		if (!validator) {
-			await new Promise((resolve) => setTimeout(resolve, 0));
-		}
-		validator?.setProfile("STANDARD_EVENT");
-		if (!validator?.isValid("STANDARD_EVENT")) {
-			showAlert(
-				`L'événement ne peut être confirmé: veuillez compléter les champs obligatoires.`,
-				"error"
-			);
-			console.warn("errors: ", validator?.errors);
-			return;
-		}
-
-		eventData.isConfirmed = true;
-		await submitForm();
-	};
-
-	const handleSave = async () => {
-		let profileToUse: ValidationProfile;
+	const determineValidationProfile = (shouldConfirm?: boolean) => {
 		if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
-			profileToUse = "RECURRENT_MASTER";
-			if (eventData.recurrence) {
-				eventData.recurrence.tasks = eventData.tasks || [];
-			}
-		} else if (eventData.isConfirmed) {
-			profileToUse = "STANDARD_EVENT";
+			return "RECURRENT_MASTER";
+		} else if (eventData.isConfirmed || shouldConfirm) {
+			return "STANDARD_EVENT";
 		} else {
-			// Pour une sauvegarde simple (brouillon) avant confirmation/publication.
-			profileToUse = "DRAFT";
+			return "DRAFT";
 		}
+	};
+	// ::: Gestion de la validation :::
 
-		console.log("[DEBUG] profileToUse : ", profileToUse);
+	let hasTriggeredValidation = $state(false);
+	let validator = $state<ReturnType<typeof createEventValidator> | null>(null);
+
+	const getInitialProfile = (): ValidationProfile | null => {
+		if (eventData.id) {
+			console.log("validation profile: STANDARD_EVENT");
+			return "STANDARD_EVENT";
+		}
+		console.log("validation profile: DRAFT");
+
+		return "DRAFT";
+	};
+	$effect(() => {
+		if (eventData.id || hasTriggeredValidation) {
+			if (!validator) {
+				const initialProfile = getInitialProfile();
+				validator = createEventValidator(eventData, {
+					profile: initialProfile
+				});
+			} else {
+				validator.updateEvent(eventData);
+			}
+		}
+	});
+
+	const submitForm = async (e?: SubmitEvent, shouldConfirm: boolean = false) => {
+		if (e) e.preventDefault();
 
 		hasTriggeredValidation = true;
 
-		if (!validator) {
-			await new Promise((resolve) => setTimeout(resolve, 0));
-		}
-
-		validator?.setProfile(profileToUse);
-
-		if (!validator?.isValid(profileToUse)) {
-			showAlert(
-				`L'événement ne peut être sauvegardé: veuillez compléter les champs obligatoires.`,
-				"error"
-			);
-
-			console.warn("errors: ", validator?.errors);
-
-			return;
-		}
-
-		// Si c'est une modification globale, ouvrir la modale de confirmation
-		if (eventMode === "EDIT_RECURRENT_ALL") {
-			isAlertSaveMasterOpen = true;
-			// Le submitForm sera appelé via confirmSubmit après confirmation dans la modale
-		} else if (hasSondageValidation && !eventData.isSondage) {
-			confirmNotifSondageClosed(false);
-		} else {
-			// Sinon, soumettre directement
-			await submitForm();
-		}
-	};
-
-	const submitForm = async () => {
 		try {
-			if (eventData.date_event && eventData.time_start && eventData.time_end) {
-				const startDate = createDateFromString(eventData.date_event, eventData.time_start);
-				const endDate = createDateFromString(eventData.date_event, eventData.time_end);
+			// Validation initiale
+			if (!validator) {
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
+			validator?.setProfile(determineValidationProfile(shouldConfirm));
 
-				eventData.dateStart = startDate.toISOString();
-				eventData.dateEnd = endDate.toISOString();
+			if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
+				showAlert(
+					`L'événement ne peut être sauvegardé: veuillez compléter les champs obligatoires.`,
+					"error"
+				);
+				console.warn("errors: ", validator?.errors);
+				return;
 			}
 
-			switch (eventMode) {
-				case "NEW_SINGLE":
-					await createEvent(eventData);
-					break;
+			// 👉 Vérification des conflits et sondage via les services
+			const conflictCheck = checkEventConflicts(currentConflicts);
+			const sondageCheck = checkSondageValidation(eventData, hasSondageValidation);
 
-				case "NEW_RECURRENT": {
-					await createRecurrentEvent(eventData);
-					break;
+			// Si besoin de confirmation, utiliser le service centralisé
+			if (
+				(conflictCheck.hasConflicts && !conflictCheck.canProceed) ||
+				sondageCheck.needsValidation
+			) {
+				// Gestion spéciale pour les récurrences globales
+				if (
+					eventMode === "EDIT_RECURRENT_ALL" &&
+					!conflictCheck.hasConflicts &&
+					!sondageCheck.needsValidation
+				) {
+					modalState.confirm = {
+						isOpen: true,
+						data: {
+							title: "Modifier toutes les occurrences ?",
+							message:
+								"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
+							variant: "warning",
+							onConfirm: async () => {
+								await proceedWithSave(false, { hasConflicts: false, canProceed: true });
+							}
+						}
+					};
+					return;
 				}
-				case "EDIT_SINGLE":
-				case "EDIT_RECURRENT_ONE":
-					await updateEvent(eventData.id, eventData);
-					break;
 
-				case "EDIT_RECURRENT_ALL":
-					await updateAllOccurrences(eventData);
-					break;
+				handleEventSubmissionConfirmation(eventData, {
+					conflictCheck: conflictCheck.hasConflicts ? conflictCheck : undefined,
+					sondageCheck: sondageCheck.needsValidation ? sondageCheck : undefined,
+					onConfirm: async (confirm) => {
+						await proceedWithSave(confirm || shouldConfirm, conflictCheck);
+					},
+					onComplete: () => {
+						// Ok: la validation est déjà enclenché pour la modification d'événement
+					}
+				});
+				return;
 			}
-			closeModal();
+
+			// Gestion spéciale pour les récurrences globales sans conflit/sondage
+			if (eventMode === "EDIT_RECURRENT_ALL") {
+				modalState.confirm = {
+					isOpen: true,
+					data: {
+						title: "Modifier toutes les occurrences ?",
+						message:
+							"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
+						variant: "warning",
+						onConfirm: async () => {
+							await proceedWithSave(false, { hasConflicts: false, canProceed: true });
+						}
+					}
+				};
+				return;
+			}
+
+			// Pas besoin de confirmation, procéder directement
+			await proceedWithSave(shouldConfirm, conflictCheck);
 		} catch (error) {
 			console.error(error);
 			showAlert("Erreur lors de l'enregistrement de l'événement.", "error");
 		}
 	};
 
+	// 👉 Fonction séparée pour la logique de sauvegarde
+	const proceedWithSave = async (
+		shouldConfirm: boolean,
+		conflictCheck: ReturnType<typeof checkEventConflicts>
+	) => {
+		// Appliquer les conflits si acceptés
+		if (conflictCheck.hasConflicts && conflictCheck.canProceed) {
+			eventData.inConflictWith = currentConflicts.conflictIds;
+		}
+
+		// Confirmer l'événement si demandé
+		if (shouldConfirm) {
+			eventData.isConfirmed = true;
+		}
+
+		// Sauvegarde selon le mode
+		switch (eventMode) {
+			case "NEW_SINGLE": {
+				await createEvent(eventData);
+				break;
+			}
+			case "NEW_RECURRENT": {
+				await createRecurrentEvent(eventData);
+				break;
+			}
+			case "EDIT_SINGLE":
+			case "EDIT_RECURRENT_ONE": {
+				await updateEvent(eventData.id, eventData);
+				break;
+			}
+			case "EDIT_RECURRENT_ALL": {
+				await updateAllOccurrences(eventData);
+				break;
+			}
+		}
+
+		closeModal();
+	};
+
 	const closeModal = () => {
 		modalState.event = false;
-		eventState.is = { ...getNewEvent() };
-		isAlertSaveMasterOpen = false;
+		eventState.is = getNewEvent();
 	};
 </script>
 
+{$inspect("eventData", eventData)}
 <!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
 <!-- {$inspect('eOrg', eventData.organizers)} -->
 <!-- {$inspect('activeTabDate', activeTabDate)} -->
 <!-- {$inspect('activeSondageTab', activeSondageTab)} -->
-{$inspect("eventData", eventData)}
 
 <Modal padding={false}>
 	<!-- {$inspect('recurrenceDates', recurrenceDates)} -->
@@ -688,7 +729,13 @@
 									</Info>
 								{/if}
 
-								<DateUniq {startDateObject} {endDateObject} bind:eventData errors={errorsMap} />
+								<DateUniq
+									{startDateObject}
+									{endDateObject}
+									bind:eventData
+									errors={errorsMap}
+									{conflictCalculator}
+								/>
 							</div>
 						{/if}
 					</div>
@@ -952,43 +999,21 @@
 			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage && !eventData.isConfirmed) || (eventMode === "EDIT_RECURRENT_ONE" && !eventData.isSondage && !eventData.isConfirmed)}
 				<button
 					type="button"
-					class="btn btn-accent block w-full font-bold sm:w-fit {validator?.isValid(
-						'STANDARD_EVENT'
-					)
+					class="btn btn-accent block w-full font-bold sm:w-fit {validator?.isValid
 						? ''
 						: 'opacity-50'}"
-					onclick={handleConfirm}>Enregistrer et Confirmer l'événement</button
+					onclick={() => submitForm(undefined, true)}>Enregistrer et Confirmer l'événement</button
 				>
 			{/if}
 			<button
 				class="btn btn-primary block w-full font-bold sm:w-fit"
 				type="button"
-				onclick={handleSave}>Enregistrer</button
+				onclick={() => submitForm()}>Enregistrer</button
 			>
 		</div>
 	</div>
 
-	<!-- AlertDialog pour la confirmation de modification de toutes les occurrences -->
-	<dialog id="confirm_recurrence_modal" class="modal" open={isAlertSaveMasterOpen}>
-		<div class="modal-box">
-			<h3 class="text-lg font-bold">Modifier toutes les occurrences ?</h3>
-			<p class="py-4">
-				<!-- TODO : préciser les implications→ donnée écrasées/préserver des occurrences + suppréssions des occurrences hors dates -->
-				Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous
-				sûr de vouloir continuer ?
-			</p>
-			<div class="modal-action">
-				<form method="dialog">
-					<button class="btn btn-ghost" onclick={() => (isAlertSaveMasterOpen = false)}
-						>Annuler</button
-					>
-					<button class="btn btn-primary" onclick={confirmSubmit}
-						>Confirmer la modification globale</button
-					>
-				</form>
-			</div>
-		</div>
-	</dialog>
+	<!-- 👉 Modal de confirmation des récurrences maintenant gérée par modalState.confirm -->
 </Modal>
 
 <style>
