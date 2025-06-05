@@ -1,13 +1,12 @@
 <script lang="ts">
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
-	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { eventsStore, userDb } from "$lib/shared";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { DateProposedType, EventType, UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
-	import { getContext } from "svelte";
 	import { fade } from "svelte/transition";
-
+	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 	import TasksDisplay from "./TasksDisplay.svelte";
 	import OrganizersHeader from "./OrganizersHeader.svelte";
 
@@ -26,8 +25,7 @@
 
 	const { currentEvent }: Props = $props();
 
-	// FIXIT ? : don't use getContext
-	let currentUser: UserType = getContext("currentUser");
+	let currentUser: UserType | null = userDb.current;
 
 	// ::: reactive variables
 
@@ -321,6 +319,9 @@
 							{/if}
 						</div>
 					</div>
+					{#if currentEvent.inConflictWith?.length}
+						<ConflictAlert {currentEvent} mode="cached" />
+					{/if}
 				</div>
 			{/if}
 		</div>
