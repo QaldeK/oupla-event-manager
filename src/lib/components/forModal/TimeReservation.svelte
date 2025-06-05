@@ -36,36 +36,57 @@
 			? parseInt(eventData.start_event.replace(":", ""))
 			: null;
 
-		const isTimeEndBeforeStart = timeEnd <= timeStart;
-		const isTimeEndAfter00 = timeEnd >= 600 && timeEnd <= timeStart;
-		const isStartPublicValid = startPublic && startPublic >= timeStart && startPublic <= timeEnd;
-		const isStartEventValid =
-			startEvent && startEvent >= (startPublic || timeStart) && startEvent <= timeEnd;
+		// Vérifier la cohérence des heures pour ouverture au public
+		if (startPublic) {
+			// Si l'événement se termine le lendemain (timeEnd < timeStart)
+			const isMultiDay = timeEnd < timeStart;
 
-		if (isTimeEndAfter00) {
-			alertMsg = "L'heure de fin ne peut pas être après 23:59";
-			eventData.time_end = "23:59";
-		} else if (isTimeEndBeforeStart) {
-			alertMsg = "L'heure de fin doit être apres l'heure de debut...";
-			eventData.time_end = addTime(eventData.time_start, 180);
-		} else if (startPublic && !isStartPublicValid) {
-			if (startPublic < timeStart) {
-				alertMsg = "L'ouverture au public ne peut pas être avant l'heure de début de réservation.";
-				eventData.start_public = eventData.time_start;
-			} else if (startPublic > timeEnd) {
-				alertMsg = "L'ouverture au public ne peut pas être après l'heure de fin de réservation.";
-				eventData.start_public = eventData.time_end;
+			if (!isMultiDay) {
+				// Événement le même jour : logique classique
+				if (startPublic < timeStart || startPublic > timeEnd) {
+					if (startPublic < timeStart) {
+						alertMsg =
+							"L'ouverture au public ne peut pas être avant l'heure de début de réservation.";
+						eventData.start_public = eventData.time_start;
+					} else {
+						alertMsg =
+							"L'ouverture au public ne peut pas être après l'heure de fin de réservation.";
+						eventData.start_public = eventData.time_end;
+					}
+				}
+			} else {
+				// Événement multi-jour : startPublic doit être >= timeStart OU <= timeEnd
+				if (startPublic < timeStart && startPublic > timeEnd) {
+					alertMsg = "L'ouverture au public doit être dans la plage horaire de réservation.";
+					eventData.start_public = eventData.time_start;
+				}
 			}
 		}
 
-		if (startEvent && !isStartEventValid && !isTimeEndAfter00) {
-			if (startEvent < (startPublic || timeStart)) {
-				alertMsg =
-					"Le début de l'événement ne peut pas être avant l'heure de début de réservation.";
-				eventData.start_event = startPublic ? eventData.start_public : eventData.time_start;
-			} else if (startEvent > timeEnd) {
-				alertMsg = "Le début de l'événement ne peut pas être après l'heure de fin de réservation.";
-				eventData.start_event = eventData.time_end;
+		// Vérifier la cohérence des heures pour début d'événement
+		if (startEvent) {
+			const effectiveStart = startPublic || timeStart;
+			const isMultiDay = timeEnd < timeStart;
+
+			if (!isMultiDay) {
+				// Événement le même jour
+				if (startEvent < effectiveStart || startEvent > timeEnd) {
+					if (startEvent < effectiveStart) {
+						alertMsg =
+							"Le début de l'événement ne peut pas être avant l'heure de début de réservation.";
+						eventData.start_event = startPublic ? eventData.start_public : eventData.time_start;
+					} else {
+						alertMsg =
+							"Le début de l'événement ne peut pas être après l'heure de fin de réservation.";
+						eventData.start_event = eventData.time_end;
+					}
+				}
+			} else {
+				// Événement multi-jour : startEvent doit être >= effectiveStart OU <= timeEnd
+				if (startEvent < effectiveStart && startEvent > timeEnd) {
+					alertMsg = "Le début de l'événement doit être dans la plage horaire de réservation.";
+					eventData.start_event = startPublic ? eventData.start_public : eventData.time_start;
+				}
 			}
 		}
 	});
@@ -110,7 +131,7 @@
 			/>
 		</div>
 		<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires annoncées au public</p>
-		<ErrorMessage error={errors?.publicStartTime} />
+		<div class="max-w-96"><ErrorMessage error={errors?.publicStartTime} /></div>
 	</div>
 </div>
 

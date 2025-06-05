@@ -71,7 +71,29 @@ export const createDateFromString = (dateStr: string, timeStr: string): Date => 
 	return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes));
 };
 
-export function isValidDate(d: any): d is Date {
+/**
+ * Crée les dates de début et fin pour un événement en gérant les cas multi-jours
+ * @param dateStr Date au format "YYYY-MM-DD"
+ * @param timeStart Heure de début au format "HH:MM"
+ * @param timeEnd Heure de fin au format "HH:MM"
+ * @returns Objet avec dateStart et dateEnd en ISO strings
+ */
+export const createEventDates = (dateStr: string, timeStart: string, timeEnd: string) => {
+	const startDate = createDateFromString(dateStr, timeStart);
+	const endDate = createDateFromString(dateStr, timeEnd);
+	
+	// Si l'heure de fin est avant l'heure de début, l'événement se termine le lendemain
+	if (endDate < startDate) {
+		endDate.setDate(endDate.getDate() + 1);
+	}
+	
+	return {
+		dateStart: startDate.toISOString(),
+		dateEnd: endDate.toISOString()
+	};
+};
+
+export function isValidDate(d: unknown): d is Date {
 	return d instanceof Date && !isNaN(d.getTime());
 }
 

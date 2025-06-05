@@ -1,8 +1,9 @@
 <script lang="ts">
 	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
+	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import Info from "$lib/components/Info.svelte";
-	import { type EventType } from "$lib/types/event";
+	import { type EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
 	import { modifyRecord } from "$lib/pocketbase.svelte";
 	import { modalState } from "$lib/shared/states.svelte";
@@ -17,12 +18,14 @@
 		startDateObject: Date | null;
 		endDateObject: Date | null;
 		errors?: Partial<Record<string, string>>;
+		conflictCalculator: ConflictCalculator;
 	}
 	let {
 		eventData = $bindable<EventType>({} as EventType),
 		startDateObject,
 		endDateObject,
-		errors = {}
+		errors = {},
+		conflictCalculator
 	}: Props = $props();
 
 	// Fonction de transition vers le mode sondage
@@ -122,6 +125,8 @@
 			startDate={startDateObject}
 			endDate={endDateObject}
 			rooms={eventData.rooms || []}
+			{conflictCalculator}
+			mode="realtime"
 		/>
 	{/if}
 </div>

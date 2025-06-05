@@ -1,5 +1,7 @@
 import { format, parse } from "date-fns";
 import type { EventType, OrganizerType } from "$lib/types/event.types";
+import { eventsStore } from "$lib/shared";
+import { updateEvent } from "$lib/pocketbase.svelte";
 
 // --- Types Definition ---
 
@@ -429,6 +431,31 @@ export function buildEventTimeInfoMap(rawEvents: EventType[]): Map<string, Event
 	}
 
 	for (const event of rawEvents) {
+		// 👉 Ignorer les événements qui ne doivent pas être analysés pour les conflits
+		if (event.isMasterRecurrent || (event.isSondage && !event.date_event)) {
+			// Les masters récurrents n'ont pas de date spécifique
+			// Les sondages purs (sans date_event) seront traités via dates_proposed
+			if (Array.isArray(event.dates_proposed) && !event.date_event) {
+				// Traiter seulement les dates proposées
+				for (const proposed of event.dates_proposed) {
+					if (proposed.dateStart && proposed.dateEnd) {
+						const proposedEventData = {
+							...event,
+							dateStart: proposed.dateStart,
+							dateEnd: proposed.dateEnd,
+							date_event: ""
+						};
+						const proposedEventInfo = createEventTimeInfo(proposedEventData, "sondage");
+						if (proposedEventInfo) {
+							const dateKey = format(proposedEventInfo.dateTimeStart, "yyyy-MM-dd");
+							addEventToMap(dateKey, proposedEventInfo);
+						}
+					}
+				}
+			}
+			// FIXIT :  géré les événement externalProposal !
+			continue; // Passer au prochain événement
+		}
 		// 1. Traiter la date principale de l'événement
 		const baseType = event.isConfirmed ? "confirmed" : "unconfirmed";
 		const mainEventInfo = createEventTimeInfo(event, baseType);
@@ -489,17 +516,19 @@ function convertToEventConflictInfo(eventTimeInfo: EventTimeInfo): EventConflict
  * Fonction principale pour obtenir tous les groupes d'événements en conflit
  * Compatible avec l'interface utilisée par ConflictsEvents.svelte
  */
-export function getOverlappingEventGroups(rawEvents: EventType[]): Map<string, EventConflictInfo[][]> {
+export function getOverlappingEventGroups(
+	rawEvents: EventType[]
+): Map<string, EventConflictInfo[][]> {
 	const eventsByDateMap = buildEventTimeInfoMap(rawEvents);
 	const overlappingByDate = new Map<string, EventConflictInfo[][]>();
 
 	for (const [date, eventsOnDate] of eventsByDateMap.entries()) {
 		const overlappingGroups = findOverlappingGroupsOnDate(eventsOnDate);
-		
+
 		if (overlappingGroups.length > 0) {
 			// Convertir les groupes d'EventTimeInfo en EventConflictInfo
-			const convertedGroups = overlappingGroups.map(group => 
-				group.map(event => convertToEventConflictInfo(event))
+			const convertedGroups = overlappingGroups.map((group) =>
+				group.map((event) => convertToEventConflictInfo(event))
 			);
 			overlappingByDate.set(date, convertedGroups);
 		}
@@ -507,3 +536,22 @@ export function getOverlappingEventGroups(rawEvents: EventType[]): Map<string, E
 
 	return overlappingByDate;
 }
+
+// FIXIT : Doit être géré dans un hook, car on n'a pas l'id de l'event actuellement crée.
+export const updateReciprocalConflicts = async (eventId: string, conflictIds: string[]) => {
+	try {
+		for (const conflictId of conflictIds) {
+			const conflictEvent = eventsStore.getEventById(conflictId);
+			if (conflictEvent) {
+				const existingConflicts = conflictEvent.inConflictWith || [];
+				if (!existingConflicts.includes(eventId)) {
+					await updateEvent(conflictId, {
+						inConflictWith: [...existingConflicts, eventId]
+					});
+				}
+			}
+		}
+	} catch (error) {
+		console.error("Erreur lors de la mise à jour réciproque des conflits:", error);
+	}
+};
