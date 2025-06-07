@@ -1,9 +1,6 @@
 <script lang="ts">
 	import PadEditor from "../components/PadEditor.svelte";
-	import { SquareArrowLeft } from "lucide-svelte";
 	import type { PageData } from "./$types";
-
-	import { goto } from "$app/navigation";
 
 	export let data: PageData;
 </script>

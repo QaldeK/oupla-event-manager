@@ -14,5 +14,5 @@ export interface PadRecord {
 export type PadResponse = PadRecord & {
 	collectionId: string;
 	collectionName: string;
-	expand?: Record<string, any>;
+	expand?: Record<string, unknown>;
 };
