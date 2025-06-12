@@ -7,7 +7,7 @@
 	import { eventState, messageSheet, modalState } from "$lib/shared";
 	import { hasAuthorizations } from "$lib/utils/recurrence";
 	import { confirmEventAction } from "$lib/services/eventActions";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import Dropdown from "$lib/components/ui/Dropdown.svelte";
 
 	import {
 		CalendarPlus,
@@ -40,6 +40,8 @@
 
 		return hasConfirmedActions || hasReportAction || hasRedoAction || hasPublishAction;
 	});
+
+	let isMenuOpen = $state(false);
 
 	// ::: functions
 
@@ -152,38 +154,81 @@
 	{/if}
 
 	{#if hasMenuItems}
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				<button class="btn btn-ghost btn-square">
-					<Menu class="h-5 w-5" />
-				</button>
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content class="bg-base-200">
-				{#if !currentEvent.canceled && currentEvent.isConfirmed}
-					{#if !currentEvent.isPublished}
-						<DropdownMenu.Item onclick={publishEvent}>
-							<CalendarPlus class="mr-2 h-4 w-4" />
-							Publier l'événement
-						</DropdownMenu.Item>
-					{/if}
-					<DropdownMenu.Item onclick={cancelEvent} class="text-error">
-						<CalendarX class="mr-2 h-4 w-4" />
-						Annuler l'événement
-					</DropdownMenu.Item>
-					{#if !currentEvent.reportedTo}
-						<DropdownMenu.Item onclick={() => handleReportEvent(currentEvent)}>
-							<CalendarPlus class="mr-2 h-4 w-4" />
-							Reporter
-						</DropdownMenu.Item>
-					{/if}
-				{/if}
-				{#if currentEvent.canceled && !currentEvent.reportedTo}
-					<DropdownMenu.Item onclick={redoEvent}>
-						<CalendarCheck class="mr-2 h-4 w-4" />
-						Rétablir l'événement
-					</DropdownMenu.Item>
-				{/if}
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
+		<Dropdown
+			bind:isOpen={isMenuOpen}
+			position="bottom"
+			align="right"
+			width="w-64"
+			triggerClass="btn btn-ghost btn-square"
+			contentClass="bg-base-200"
+			showCloseButton={false}
+		>
+			{#snippet trigger()}
+				<Menu class="h-5 w-5" />
+			{/snippet}
+
+			{#snippet content()}
+				<div class="menu p-2">
+					<ul>
+						{#if !currentEvent.canceled && currentEvent.isConfirmed}
+							{#if !currentEvent.isPublished}
+								<li>
+									<button
+										onclick={() => {
+											publishEvent();
+											isMenuOpen = false;
+										}}
+										class="flex items-center gap-2"
+									>
+										<CalendarPlus class="h-4 w-4" />
+										Publier l'événement
+									</button>
+								</li>
+							{/if}
+							<li>
+								<button
+									onclick={() => {
+										cancelEvent();
+										isMenuOpen = false;
+									}}
+									class="text-error flex items-center gap-2"
+								>
+									<CalendarX class="h-4 w-4" />
+									Annuler l'événement
+								</button>
+							</li>
+							{#if !currentEvent.reportedTo}
+								<li>
+									<button
+										onclick={() => {
+											handleReportEvent(currentEvent);
+											isMenuOpen = false;
+										}}
+										class="flex items-center gap-2"
+									>
+										<CalendarPlus class="h-4 w-4" />
+										Reporter
+									</button>
+								</li>
+							{/if}
+						{/if}
+						{#if currentEvent.canceled && !currentEvent.reportedTo}
+							<li>
+								<button
+									onclick={() => {
+										redoEvent();
+										isMenuOpen = false;
+									}}
+									class="flex items-center gap-2"
+								>
+									<CalendarCheck class="h-4 w-4" />
+									Rétablir l'événement
+								</button>
+							</li>
+						{/if}
+					</ul>
+				</div>
+			{/snippet}
+		</Dropdown>
 	{/if}
 </div>

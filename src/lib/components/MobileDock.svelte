@@ -1,7 +1,7 @@
 <script lang="ts">
 	import NotificationBellMobile from "$lib/components/NotificationBellMobile.svelte";
-	import UserMenu from "$lib/components/UserMenu.svelte";
-	import { CircleUserRound, Menu } from "lucide-svelte";
+	import UserMenuMobile from "$lib/components/UserMenuMobile.svelte";
+	import { Menu } from "lucide-svelte";
 
 	interface Props {
 		onToggleSidebar: () => void;
@@ -22,5 +22,5 @@
 	<NotificationBellMobile />
 
 	<!-- Menu utilisateur intégré dans le dock -->
-	<UserMenu {onRefresh} {onLogout} dropdownPosition="top"></UserMenu>
+	<UserMenuMobile {onRefresh} {onLogout} />
 </div>

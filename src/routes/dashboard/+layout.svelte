@@ -4,13 +4,18 @@
 	import DateSondageModal from "$lib/components/DateSondageModal.svelte";
 	import EventModal from "$lib/components/EventModal.svelte";
 	import MessageSheet from "$lib/components/MessageSheet.svelte";
-	import NotificationBell from "$lib/components/NotificationBell.svelte";
 	// import ReportEvent from '$lib/components/ReportEvent.svelte';
 	import TaskDialog from "$lib/components/TaskDialog.svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	// store
 	import Alert from "$lib/components/Alert.svelte";
 	import InviteUserModal from "$lib/components/InviteUserModal.svelte";
+	// 👉 Nouveaux composants refactorisés
+	import HeaderBar from "$lib/components/HeaderBar.svelte";
+	import Sidebar from "$lib/components/Sidebar.svelte";
+	import MobileDock from "$lib/components/MobileDock.svelte";
+	import MobileDrawer from "$lib/components/MobileDrawer.svelte";
+	// 👉 Utilitaire pour la détection d'écran
+	import { screenDetector } from "$lib/utils/screen.svelte";
 	import { pb } from "$lib/pocketbase.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { messageStore } from "$lib/shared/messageStore.svelte";
@@ -21,28 +26,9 @@
 	import type { CurrentUser } from "$lib/types/types";
 
 	import { goto } from "$app/navigation";
-	import { page } from "$app/state";
 
 	import { setContext } from "svelte";
 
-	// Icônes pour la sidebar
-	import {
-		AlertTriangle,
-		Calendar,
-		CalendarPlus,
-		CalendarSearch,
-		CircleUserRound,
-		Clock,
-		Globe,
-		LogOut,
-		Mail,
-		Menu,
-		PanelLeftClose,
-		RefreshCw,
-		Settings,
-		UserPlus,
-		Users
-	} from "lucide-svelte";
 	import { fade } from "svelte/transition";
 
 	let { children } = $props();
@@ -68,14 +54,16 @@
 		role: ""
 	});
 
-	let displayState = $state({
-		isMobile: window.innerWidth < 640 // Initialisation basée sur la largeur initiale
-	});
+	let isMobile = $derived(screenDetector.isMobile);
+	let isMedium = $derived(screenDetector.isMedium);
+	let isLarge = $derived(screenDetector.isLarge);
 
 	let sidebarState = $state({
-		isOpen: window.innerWidth >= 640,
 		isCompact: false
 	});
+
+	// 👉 State pour le drawer mobile
+	let mobileDrawerOpen = $state(false);
 
 	// Fonction d'initialisation
 	async function initializeApp() {
@@ -95,7 +83,7 @@
 			// Initialiser les stores principaux en parallèle
 			await Promise.all([
 				loadSpaceOptions(currentSpace.id),
-				eventsStore.init({ spaceId: currentSpace.id })
+				eventsStore.init({ spaceId: currentSpace.id, mode: "internal" })
 			]);
 
 			// Initialiser le contexte
@@ -149,33 +137,11 @@
 
 	// Effet pour initialiser et mettre à jour la sidebar en fonction de la taille de l'écran
 	$effect(() => {
-		const updateSidebarState = () => {
-			const isMobile = window.matchMedia("(max-width: 639px)").matches;
-			const isMedium = window.matchMedia("(min-width: 640px) and (max-width: 1023px)").matches;
-			const isLarge = window.matchMedia("(min-width: 1024px)").matches;
-
-			if (isMobile) {
-				sidebarState.isOpen = false;
-				sidebarState.isCompact = false;
-			} else if (isMedium) {
-				sidebarState.isOpen = true;
-				sidebarState.isCompact = true;
-			} else if (isLarge) {
-				sidebarState.isOpen = true;
-				sidebarState.isCompact = false;
-			}
-		};
-
-		// Initialisation
-		updateSidebarState();
-
-		// Écouter les changements de taille d'écran
-		window.addEventListener("resize", updateSidebarState);
-
-		// Retourne une fonction de nettoyage
-		return () => {
-			window.removeEventListener("resize", updateSidebarState);
-		};
+		if (isMedium) {
+			sidebarState.isCompact = true;
+		} else if (isLarge) {
+			sidebarState.isCompact = false;
+		}
 	});
 
 	// ::: function
@@ -190,29 +156,23 @@
 			console.error("Erreur lors du refresh:", error);
 		}
 	}
-	// Méthodes pour manipuler la sidebar
+	// 👉 Méthodes pour manipuler la sidebar avec gestion mobile
 	let sidebarActions = {
 		toggle() {
-			if (window.matchMedia("(max-width: 639px)").matches) {
-				// mobile : bascule ouvert/fermé
-				sidebarState.isOpen = !sidebarState.isOpen;
-				sidebarState.isCompact = false;
+			if (isMobile) {
+				// Mobile : bascule le drawer
+				mobileDrawerOpen = !mobileDrawerOpen;
 			} else {
-				// Sur desktop : bascule entre compact et large
+				// Desktop : bascule entre compact et large
 				sidebarState.isCompact = !sidebarState.isCompact;
-				sidebarState.isOpen = true;
+			}
+		},
+		close() {
+			if (isMobile) {
+				mobileDrawerOpen = false;
 			}
 		}
 	};
-
-	// Helper pour construire les URLs avec les filtres
-	function getFilterUrl(filters: { status?: string }) {
-		const url = new URL("/dashboard/events", window.location.origin);
-		Object.entries(filters).forEach(([key, value]) => {
-			if (value) url.searchParams.set(key, value);
-		});
-		return url.toString();
-	}
 
 	async function handleLogout() {
 		try {
@@ -247,6 +207,11 @@
 			goto("/login");
 		}
 	}
+
+	// 👉 Fonctions helper pour les actions du header/dock
+	function handleToggleSidebar() {
+		sidebarActions.toggle();
+	}
 </script>
 
 <div data-theme="my-corporate">
@@ -271,294 +236,70 @@
 						</div>
 					</div>
 				{:else}
-					<!-- Top nav -->
-					<header
-						class="navbar bg-neutral text-base-300 fixed top-0 right-0 left-0 z-50 min-h-0 shadow-sm"
-					>
-						<div class="flex-none">
-							<button class="btn btn-square btn-ghost" onclick={sidebarActions.toggle}>
-								{#if sidebarState.isOpen && !sidebarState.isCompact}
-									<PanelLeftClose size={24} />
-								{:else}
-									<Menu size={24} />
-								{/if}
-							</button>
-						</div>
+					{#if !isMobile}
+						<HeaderBar
+							{sidebarState}
+							onToggleSidebar={handleToggleSidebar}
+							onRefresh={handleRefresh}
+							onLogout={handleLogout}
+						/>
+					{:else}
+						<MobileDock
+							onToggleSidebar={handleToggleSidebar}
+							onRefresh={handleRefresh}
+							onLogout={handleLogout}
+						/>
+						<MobileDrawer
+							bind:isOpen={mobileDrawerOpen}
+							onClose={() => {
+								mobileDrawerOpen = false;
+							}}
+						/>
+					{/if}
 
-						<div class="flex flex-1 justify-center">
-							<a href="/dashboard" class="text-lg"
-								>Oupla - {currentSpace?.name} - {currentUser.username}</a
-							>
-						</div>
-
-						<div class="flex gap-2">
-							<!-- 👉 Composant de notification -->
-							<NotificationBell />
-							<DropdownMenu.Root>
-								<DropdownMenu.Trigger>
-									<button class="btn btn-outline"
-										><CircleUserRound />
-										{currentUser.username}
-									</button>
-								</DropdownMenu.Trigger>
-								<DropdownMenu.Content class="menu bg-base-200 rounded-box w-56">
-									<DropdownMenu.Label class="menu-title">Mon compte</DropdownMenu.Label>
-									<DropdownMenu.Separator />
-									<DropdownMenu.Group>
-										<DropdownMenu.Item onclick={() => goto("/dashboard/config")} class="menu-item">
-											<Settings class="mr-2 h-4 w-4" />
-											<span>Paramètres</span>
-										</DropdownMenu.Item>
-										<DropdownMenu.Item onclick={handleRefresh} class="menu-item">
-											<RefreshCw class="mr-2 h-4 w-4" />
-											<span>Forcer le rafraîchissement</span>
-										</DropdownMenu.Item>
-									</DropdownMenu.Group>
-									<DropdownMenu.Separator />
-									{#if userDb.current?.memberOf && userDb.current.memberOf.length > 1}
-										<DropdownMenu.Sub>
-											<DropdownMenu.SubTrigger>
-												<Users class="mr-2 h-4 w-4" />
-												<span>Changer d'espace</span>
-											</DropdownMenu.SubTrigger>
-											<DropdownMenu.SubContent>
-												{#each userDb.memberOf as space (space.id)}
-													<DropdownMenu.Item>
-														{space.name}
-													</DropdownMenu.Item>
-												{/each}
-											</DropdownMenu.SubContent>
-										</DropdownMenu.Sub>
-										<DropdownMenu.Separator />
-									{/if}
-									<DropdownMenu.Item onclick={handleLogout} class="text-red-600">
-										<LogOut class="mr-2 h-4 w-4" />
-										<span>Déconnexion</span>
-									</DropdownMenu.Item>
-								</DropdownMenu.Content>
-							</DropdownMenu.Root>
-						</div>
-					</header>
-
-					<div class="flex min-h-screen pt-16">
-						<!-- Responsive sidebar -->
-
-						<aside
-							id="logo-sidebar"
-							class="bg-base-200 fixed top-0 left-0 z-40 h-[calc(100vh-4rem)] overflow-hidden overflow-x-hidden transition-all duration-300
-					{sidebarState.isOpen ? 'translate-x-0' : '-translate-x-full'}
-					{!displayState.isMobile && sidebarState.isCompact ? 'w-20' : 'w-64 '}
-					"
-							aria-label="Sidebar"
-						>
-							<div class="mt-24 flex h-full flex-col overflow-y-auto p-1">
-								<button
-									onclick={() => (modalState.event = true)}
-									class="btn btn-primary mb-4 w-full {sidebarState.isCompact ? 'btn-square' : ''}"
-								>
-									{#if sidebarState.isCompact}
-										<CalendarPlus size={24} />
-									{:else}
-										Ajouter un événement
-									{/if}
-								</button>
-
-								<ul class="menu menu-lg rounded-box bg-base-100 gap-3">
-									<li>
-										<a
-											href="/dashboard/events"
-											class:bg-primary-content={!page.url.searchParams.has("status")}
-											class="flex items-center gap-2"
-										>
-											<Calendar size={24} />
-											<span class:hidden={sidebarState.isCompact}>Événements</span>
-										</a>
-									</li>
-
-									<li>
-										<a
-											href={getFilterUrl({ status: "confirmed" })}
-											class:bg-primary-content={page.url.searchParams.get("status") === "confirmed"}
-										>
-											<Clock size={24} />
-											<span class:hidden={sidebarState.isCompact}>Programmés</span>
-										</a>
-									</li>
-
-									<!-- Section en attente avec style spécial -->
-									<li>
-										<a
-											href={getFilterUrl({ status: "pending" })}
-											class:bg-primary-content={page.url.searchParams.get("status") === "pending"}
-										>
-											<Clock size={24} class="text-warning" />
-											<span class:hidden={sidebarState.isCompact}>En attentes</span>
-										</a>
-										<ul class:hidden={sidebarState.isCompact}>
-											<li>
-												<a
-													href={getFilterUrl({ status: "eventsWithoutDate" })}
-													class:bg-primary-content={page.url.searchParams.get("status") ===
-														"eventsWithoutDate"}
-												>
-													<Calendar size={24} class="text-error" />
-													<span class:hidden={sidebarState.isCompact}>Sans date</span>
-												</a>
-											</li>
-											<li>
-												<a
-													href={getFilterUrl({ status: "eventsWithoutOrganizers" })}
-													class:bg-primary-content={page.url.searchParams.get("status") ===
-														"eventsWithoutOrganizers"}
-												>
-													<Users size={24} class="text-error" />
-													<span class:hidden={sidebarState.isCompact}>Sans organisateur·ices</span>
-												</a>
-											</li>
-											<li>
-												<a
-													href={getFilterUrl({ status: "eventsWithSondage" })}
-													class:bg-primary-content={page.url.searchParams.get("status") ===
-														"eventsWithSondage"}
-												>
-													<CalendarSearch size={24} class="text-primary" />
-													<span class:hidden={sidebarState.isCompact}>Sondages en cours</span>
-												</a>
-											</li>
-										</ul>
-									</li>
-
-									<li>
-										<a
-											href={getFilterUrl({ status: "conflicts" })}
-											class:bg-primary-content={page.url.searchParams.get("status") === "conflicts"}
-										>
-											<AlertTriangle size={24} class="text-error" />
-											<span class:hidden={sidebarState.isCompact}>En conflits</span>
-										</a>
-									</li>
-
-									<li>
-										<a
-											href="/dashboard/events/recurrent"
-											class:bg-primary-content={page.url.pathname === "/dashboard/events/recurrent"}
-										>
-											<RefreshCw size={24} />
-											<span class:hidden={sidebarState.isCompact}>Récurrents</span>
-										</a>
-									</li>
-
-									<li>
-										<a
-											href="/dashboard/newsletter"
-											class:bg-primary-content={page.url.pathname === "/dashboard/newsletter"}
-										>
-											<Mail size={24} />
-											<span class:hidden={sidebarState.isCompact}>Newsletter</span>
-										</a>
-									</li>
-									<li>
-										<a
-											href="/dashboard/site_pages"
-											class:bg-primary-content={page.url.pathname.startsWith(
-												"/dashboard/site_pages"
-											)}
-											><Globe size={24} />
-											<span class:hidden={sidebarState.isCompact}>Site public</span>
-										</a>
-									</li>
-									<li>
-										<a
-											href="/dashboard/pads"
-											class:bg-primary-content={page.url.pathname.startsWith("/dashboard/pads")}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												width="24"
-												height="24"
-												viewBox="0 0 24 24"
-												fill="none"
-												stroke="currentColor"
-												stroke-width="2"
-												stroke-linecap="round"
-												stroke-linejoin="round"
-											>
-												<path
-													d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"
-												/>
-												<polyline points="14 2 14 8 20 8" />
-												<path d="M10.4 12.6a1 1 0 0 1 3.2 0" />
-												<path d="M9 11h.01" />
-												<path d="M15 11h.01" />
-											</svg>
-											<span class:hidden={sidebarState.isCompact}>Documents</span>
-										</a>
-									</li>
-								</ul>
-
-								<!-- Section du bas -->
-								<ul class="menu menu-lg rounded-box bg-base-100 mt-4">
-									<li>
-										<button onclick={() => (modalState.inviteUser = true)}>
-											<UserPlus size={24} />
-											<span class:hidden={sidebarState.isCompact}>Inviter</span>
-										</button>
-									</li>
-									<li>
-										<a
-											href="/dashboard/config"
-											class:bg-primary-content={page.url.pathname === "/dashboard/config"}
-										>
-											<Settings size={24} />
-											<span class:hidden={sidebarState.isCompact}>Paramètres</span>
-										</a>
-									</li>
-								</ul>
-							</div>
-						</aside>
-
-						<!-- Content -->
+					<!-- Mode desktop avec sidebar classique -->
+					<div id="global-app" class="flex min-h-screen {isMobile ? 'pb-20' : 'pt-16'}">
+						<!-- Sidebar desktop -->
+						{#if !isMobile}
+							<Sidebar {sidebarState} />
+						{/if}
+						<!-- Contenu principal -->
 						<main
-							class="mt-2 flex-1 overflow-y-auto p-2 transition-all duration-300 md:p-4
-					{sidebarState.isOpen && !sidebarState.isCompact ? 'ml-72' : ''}
-					{sidebarState.isOpen && sidebarState.isCompact ? 'ml-20' : ''}"
+							class={[
+								sidebarState.isCompact && !isMobile && "ml-20",
+								!sidebarState.isCompact && !isMobile && "ml-64"
+							]}
 						>
-							<div class="4xl:w-3/5 mx-auto xl:mx-10">
+							<div class="container mx-auto xl:mx-10 {isMobile ? 'p-2 pt-4' : 'p-10'}">
 								{@render children()}
 							</div>
-							<!--
-		{#if $benevoleModal}
-		<CreateBenevole />
-		{/if} -->
-							{#if modalState.event}
-								<EventModal />
-							{/if}
-							{#if modalState.report}
-								<!-- <Modal>
-						<ReportEvent />
-					</Modal> -->
-							{/if}
-
-							{#if modalState.dateSondage}
-								<DateSondageModal />
-							{/if}
-
-							{#if modalState.tasks.isOpen}
-								<TaskDialog />
-							{/if}
-							{#if modalState.inviteUser}
-								<InviteUserModal />
-							{/if}
-							{#if modalState.confirm.isOpen}
-								<ConfirmDialog />
-							{/if}
-							{#if messageSheet.isOpen}
-								<MessageSheet />
-							{/if}
-
-							<Alert />
 						</main>
 					</div>
+
+					<!-- Modales -->
+					{#if modalState.event}
+						<EventModal />
+					{/if}
+					{#if modalState.report}
+						<!-- <ReportEvent /> -->
+					{/if}
+					{#if modalState.dateSondage}
+						<DateSondageModal />
+					{/if}
+					{#if modalState.tasks.isOpen}
+						<TaskDialog />
+					{/if}
+					{#if modalState.inviteUser}
+						<InviteUserModal />
+					{/if}
+					{#if modalState.confirm.isOpen}
+						<ConfirmDialog />
+					{/if}
+					{#if messageSheet.isOpen}
+						<MessageSheet />
+					{/if}
+
+					<Alert />
 				{/if}
 			</div>
 		{/if}
@@ -579,9 +320,3 @@
 		<span class="loading loading-spinner loading-lg"></span>
 	</div>
 {/if}
-<!-- <style lang="postcss">
-  @reference "tailwindcss";
-	.active {
-		 "bg-base-300";
-	}
-</style> -->
