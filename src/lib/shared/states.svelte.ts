@@ -107,7 +107,8 @@ export const openTaskModal = (params: {
 
 // Evenement en cours de modification (pour EventModal...)
 export const eventState = $state({
-	is: getNewEvent()
+	is: getNewEvent(),
+	pendingSondageValidation: false // Flag pour indiquer qu'une validation de sondage vient d'avoir lieu
 });
 
 /* ::: Organisateurs possibles (membres de l'espace)

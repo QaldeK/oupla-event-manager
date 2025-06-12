@@ -1,6 +1,6 @@
-import { pb } from '$lib/pocketbase.svelte';
-import { showAlert } from '$lib/shared/states.svelte';
-import type { RecordModel } from 'pocketbase';
+import { pb } from "$lib/pocketbase.svelte";
+import { showAlert } from "$lib/shared/states.svelte";
+import type { RecordModel } from "pocketbase";
 
 // --- Constantes ---
 const HEARTBEAT_INTERVAL_MS = 60 * 1000; // 1 minute
@@ -47,11 +47,11 @@ export function createEditableDocumentStore<T extends RecordModel>({
 	docId,
 	collectionName,
 	actions,
-	fieldsToSave = ['title', 'content'] as Array<keyof T>, // Default fields
+	fieldsToSave = ["title", "content"] as Array<keyof T>, // Default fields
 	initialEditMode = false
 }: EditableDocumentOptions<T>) {
 	// --- État Réactif Svelte 5 ---
-	let state = $state<EditableDocumentState<T>>({
+	const state = $state<EditableDocumentState<T>>({
 		doc: null,
 		isLoading: true,
 		isEditing: false,
@@ -70,6 +70,7 @@ export function createEditableDocumentStore<T extends RecordModel>({
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 	let inactivityTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 	let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+
 	let unsubscribe: (() => void) | null = null;
 	const currentUserId = pb.authStore.model?.id;
 
@@ -78,6 +79,7 @@ export function createEditableDocumentStore<T extends RecordModel>({
 	function cleanupTimers() {
 		clearInterval(heartbeatInterval);
 		heartbeatInterval = undefined;
+
 		clearTimeout(inactivityTimer);
 		inactivityTimer = undefined;
 		clearTimeout(debounceTimer);
@@ -101,7 +103,7 @@ export function createEditableDocumentStore<T extends RecordModel>({
 
 		if (state.isLockedByOther) {
 			// @ts-ignore // Supposant l'existence de expand.editingUser.username
-			state.editorUsername = docData.expand?.editingUser?.username || 'un autre utilisateur';
+			state.editorUsername = docData.expand?.editingUser?.username || "un autre utilisateur";
 			state.lockStatusMessage = `Document édité par ${state.editorUsername}. Mode lecture seule.`;
 			// console.log(`[EditableStore ${docId}] Verrouillé par ${state.editorUsername} (${editorId})`);
 
@@ -136,7 +138,7 @@ export function createEditableDocumentStore<T extends RecordModel>({
 			inactivityTimer = setTimeout(async () => {
 				console.log(`[EditableStore ${docId}] Inactivité détectée, libération du verrou...`);
 				await stopEditing(true); // Appel de la méthode exposée
-				showAlert("Vous avez été déconnecté de l'édition pour inactivité.", 'warning');
+				showAlert("Vous avez été déconnecté de l'édition pour inactivité.", "warning");
 			}, INACTIVITY_TIMEOUT_MS);
 		}
 	}
@@ -170,7 +172,7 @@ export function createEditableDocumentStore<T extends RecordModel>({
 			} catch (e) {
 				console.error(`[EditableStore ${docId}] Erreur heartbeat:`, e);
 				if (Date.now() - lastSuccess > HEARTBEAT_INTERVAL_MS * 2) {
-					forceStopEditingInternal('Connexion perdue. Mode lecture forcé.');
+					forceStopEditingInternal("Connexion perdue. Mode lecture forcé.");
 				}
 			}
 		};
@@ -195,18 +197,33 @@ export function createEditableDocumentStore<T extends RecordModel>({
 
 			updateLockStatusInternal(initialDoc);
 
-			// TODO: Ajouter l'appel API checkAndCleanLock si nécessaire (pourrait être dans acquireLock?)
-
 			// S'abonner aux changements spécifiques à ce document
 			unsubscribe = await pb.collection(collectionName).subscribe(docId, ({ action, record }) => {
 				console.log(`[EditableStore ${docId}] Subscription event: ${action}`, record);
 				const updatedRecord = record as T;
 
-				if (action === 'update') {
-					// Mettre à jour l'état de verrouillage basé sur les données reçues
-					updateLockStatusInternal(updatedRecord);
+				if (action === "update") {
+					// 👉 Toujours mettre à jour les champs de verrouillage même en mode édition
+					if (state.doc) {
+						// Mettre à jour les champs de verrouillage
+						const lockFields = ["isEditing", "editingUser", "lastEditHeartbeat"];
+						for (const field of lockFields) {
+							if (field in updatedRecord) {
+								// @ts-ignore
+								state.doc[field] = updatedRecord[field];
+							}
+						}
+						// Mettre à jour aussi les expand si présents (pour le nom d'utilisateur)
+						if (updatedRecord.expand) {
+							// @ts-ignore
+							state.doc.expand = updatedRecord.expand;
+						}
+					}
 
-					// Si on est PAS en train d'éditer, mettre à jour le contenu local
+					// Mettre à jour l'état de verrouillage basé sur les données reçues
+					updateLockStatusInternal(state.doc || updatedRecord);
+
+					// Si on est PAS en train d'éditer, mettre à jour tout le contenu local
 					if (!state.isEditing) {
 						if (state.doc) {
 							let changed = false;
@@ -238,10 +255,10 @@ export function createEditableDocumentStore<T extends RecordModel>({
 							);
 						}
 					}
-				} else if (action === 'delete') {
-					state.error = 'Le document a été supprimé.';
+				} else if (action === "delete") {
+					state.error = "Le document a été supprimé.";
 					state.doc = null;
-					forceStopEditingInternal('Document supprimé');
+					forceStopEditingInternal("Document supprimé");
 					if (unsubscribe) unsubscribe(); // Se désabonner
 					unsubscribe = null;
 				}
@@ -275,6 +292,7 @@ export function createEditableDocumentStore<T extends RecordModel>({
 				state.isEditing = true;
 				state.doc = lockedDoc; // Mettre à jour avec la version verrouillée
 				lastSavedDoc = { ...lockedDoc }; // Mettre à jour la référence
+
 				console.log(`[EditableStore ${docId}] Verrou acquis, mode édition activé.`);
 				startHeartbeatInternal();
 				resetInactivityTimerInternal();
@@ -377,7 +395,8 @@ export function createEditableDocumentStore<T extends RecordModel>({
 			// Forcer la sortie locale pour éviter incohérence, mais avertir.
 			state.isEditing = false;
 			cleanupTimers();
-			showAlert("Erreur lors de la libération du verrou. Sortie forcée de l'édition.", 'error');
+
+			showAlert("Erreur lors de la libération du verrou. Sortie forcée de l'édition.", "error");
 		} finally {
 			state.isLoading = false;
 		}

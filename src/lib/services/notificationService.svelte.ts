@@ -30,18 +30,41 @@ export interface NotificationOptions {
 }
 
 /**
+ * Types de paramètres pour différents types de notifications
+ */
+type TaskUnsubscriptionParams = {
+	event: EventType;
+	user: { id: string; username: string };
+	task?: string;
+	options?: NotificationOptions;
+};
+
+type SondageValidationParams = {
+	event: EventType;
+	dateProposal: DateProposedType;
+	user: UserType;
+	options?: NotificationOptions;
+};
+
+type EventConfirmationParams = {
+	event: EventType;
+	user: UserType;
+	options?: NotificationOptions;
+};
+
+type NotificationParams =
+	| TaskUnsubscriptionParams
+	| SondageValidationParams
+	| EventConfirmationParams;
+
+/**
  * Service centralisé pour gérer l'envoi de notifications
  */
 class NotificationService {
 	/**
 	 * Envoie une notification pour une désinscription de tâche
 	 */
-	async sendTaskUnsubscriptionNotification(params: {
-		event: EventType;
-		user: { id: string; username: string };
-		task?: string;
-		options?: NotificationOptions;
-	}): Promise<boolean> {
+	async sendTaskUnsubscriptionNotification(params: TaskUnsubscriptionParams): Promise<boolean> {
 		const { event, user, task, options = {} } = params;
 		const {
 			notifyOthers = true,
@@ -104,12 +127,7 @@ class NotificationService {
 	 * Envoie une notification pour une validation de date de sondage
 	 * avec gestion des cas de confirmation simultanée
 	 */
-	async sendSondageValidationNotification(params: {
-		event: EventType;
-		dateProposal: DateProposedType;
-		user: UserType;
-		options?: NotificationOptions;
-	}): Promise<boolean> {
+	async sendSondageValidationNotification(params: SondageValidationParams): Promise<boolean> {
 		const { event, dateProposal, user, options = {} } = params;
 		const { showUserFeedback = true, willBeConfirmed = false } = options;
 
@@ -170,13 +188,9 @@ class NotificationService {
 	}
 
 	/**
-	 * Envoie une notification pour un événement confirmé
+	 * Envoie une notification pour une confirmation d'événement
 	 */
-	async sendEventConfirmationNotification(params: {
-		event: EventType;
-		user: UserType;
-		options?: NotificationOptions;
-	}): Promise<boolean> {
+	async sendEventConfirmationNotification(params: EventConfirmationParams): Promise<boolean> {
 		const { event, user, options = {} } = params;
 		const { showUserFeedback = true } = options;
 
@@ -237,19 +251,19 @@ class NotificationService {
 	 */
 	async sendNotification(
 		type: NotificationType,
-		params: any
+		params: NotificationParams
 		// options?: NotificationOptions
 	): Promise<boolean> {
 		switch (type) {
 			case NotificationType.TASK_UNSUBSCRIPTION:
-				return this.sendTaskUnsubscriptionNotification(params);
+				return this.sendTaskUnsubscriptionNotification(params as TaskUnsubscriptionParams);
 
 			case NotificationType.SONDAGE_VALIDATION:
 			case NotificationType.SONDAGE_VALIDATION_WITH_CONFIRMATION:
-				return this.sendSondageValidationNotification(params);
+				return this.sendSondageValidationNotification(params as SondageValidationParams);
 
 			case NotificationType.EVENT_CONFIRMATION:
-				return this.sendEventConfirmationNotification(params);
+				return this.sendEventConfirmationNotification(params as EventConfirmationParams);
 
 			// Ajouter les autres types au besoin
 

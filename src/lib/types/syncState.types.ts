@@ -5,14 +5,14 @@ export interface StoreRecord extends RecordModel {
 	id: string;
 	created: string;
 	updated: string;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 // Interface pour la configuration de l'index
 export interface IndexConfig {
 	path: string | string[];
 	type?: "single" | "array";
-	transform?: (record: any) => any[];
+	transform?: (record: unknown) => unknown[];
 }
 
 // Configuration des options de synchronisation
@@ -58,7 +58,7 @@ export interface ListOptions {
 	skipTotal?: boolean;
 	page?: number;
 	perPage?: number;
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 // Interface pour les méthodes de collection PocketBase
@@ -68,13 +68,13 @@ export interface Collection {
 		perPage?: number,
 		options?: ListOptions
 	) => Promise<ListResult<T>>;
-	getFirstListItem: <T extends StoreRecord>(filter: string, options?: any) => Promise<T>;
+	getFirstListItem: <T extends StoreRecord>(filter: string, options?: Record<string, unknown>) => Promise<T>;
 	getFullList: <T extends StoreRecord>(options?: ListOptions) => Promise<T[]>;
-	getOne: <T extends StoreRecord>(id: string, options?: any) => Promise<T>;
+	getOne: <T extends StoreRecord>(id: string, options?: Record<string, unknown>) => Promise<T>;
 	subscribe: (
 		topic: string,
-		callback: (data: RecordSubscription<any>) => void,
-		options?: any
+		callback: (data: RecordSubscription<StoreRecord>) => void,
+		options?: Record<string, unknown>
 	) => void;
 	unsubscribe: (topic: string) => void;
 }
