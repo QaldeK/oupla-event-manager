@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
-	import { fade, fly } from "svelte/transition";
+	import { fly } from "svelte/transition";
 	import { X } from "lucide-svelte";
 
 	interface Props {
@@ -26,14 +26,10 @@
 		onOpen?: () => void;
 		/** Callback lors de la fermeture */
 		onClose?: () => void;
-		/** Forcer l'état ouvert/fermé */
+		/** État ouvert/fermé */
 		isOpen?: boolean;
 		/** Permettre la fermeture au clic extérieur */
 		closeOnOutsideClick?: boolean;
-		/** Animation d'entrée */
-		animation?: "fly" | "fade" | "scale";
-		/** Utiliser position fixed pour sortir du conteneur parent (utile pour header) */
-		portal?: boolean;
 		/** Slot pour le bouton déclencheur */
 		trigger: import("svelte").Snippet;
 		/** Slot pour le contenu principal */
@@ -58,55 +54,21 @@
 		onClose,
 		isOpen = $bindable(false),
 		closeOnOutsideClick = true,
-		animation = "fly",
-		portal = false,
 		trigger,
 		content,
 		header,
 		footer
 	}: Props = $props();
 
-	let dropdownElement: HTMLDivElement;
-	let triggerElement: HTMLButtonElement;
-	let dropdownPosition = $state({ top: 0, left: 0 });
+	let containerElement: HTMLDivElement;
 
 	function toggleDropdown() {
 		isOpen = !isOpen;
 		if (isOpen) {
-			if (portal && triggerElement) {
-				updateDropdownPosition();
-			}
 			onOpen?.();
 		} else {
 			onClose?.();
 		}
-	}
-
-	function updateDropdownPosition() {
-		if (!triggerElement) return;
-
-		const rect = triggerElement.getBoundingClientRect();
-		const scrollX = window.scrollX || document.documentElement.scrollLeft;
-		const scrollY = window.scrollY || document.documentElement.scrollTop;
-
-		let top = rect.bottom + scrollY;
-		let left = rect.left + scrollX;
-
-		// Ajustement pour position top
-		if (position === "top") {
-			top = rect.top + scrollY - 8; // -8 pour le margin
-		} else {
-			top = rect.bottom + scrollY + 8; // +8 pour le margin
-		}
-
-		// Ajustement pour alignement
-		if (align === "right") {
-			left = rect.right + scrollX;
-		} else if (align === "center") {
-			left = rect.left + scrollX + rect.width / 2;
-		}
-
-		dropdownPosition = { top, left };
 	}
 
 	function closeDropdown() {
@@ -120,7 +82,7 @@
 		if (!closeOnOutsideClick) return;
 
 		const target = event.target as HTMLElement;
-		if (dropdownElement && !dropdownElement.contains(target)) {
+		if (containerElement && !containerElement.contains(target)) {
 			closeDropdown();
 		}
 	}
@@ -143,14 +105,9 @@
 		};
 	});
 
-	// Calcul des classes de position
+	// Classes de position
 	const positionClasses = $derived(() => {
-		const baseClasses = portal ? "fixed z-[9999]" : "absolute z-50";
-
-		if (portal) {
-			return baseClasses;
-		}
-
+		const baseClasses = "absolute z-50";
 		const positionClass = position === "top" ? "bottom-full mb-2" : "top-full mt-2";
 
 		let alignClass = "";
@@ -168,53 +125,11 @@
 
 		return `${baseClasses} ${positionClass} ${alignClass}`;
 	});
-
-	// Style pour position fixed
-	const portalStyle = $derived(() => {
-		if (!portal) return "";
-
-		let style = `top: ${dropdownPosition.top}px; `;
-
-		if (align === "right") {
-			style += `right: ${window.innerWidth - dropdownPosition.left}px; `;
-		} else if (align === "center") {
-			style += `left: ${dropdownPosition.left}px; transform: translateX(-50%); `;
-		} else {
-			style += `left: ${dropdownPosition.left}px; `;
-		}
-
-		if (position === "top") {
-			style += `transform: translateY(-100%); `;
-		}
-
-		return style;
-	});
-
-	// Animation selon le type choisi
-	function getTransition(node: Element) {
-		const direction = position === "top" ? 10 : -10;
-
-		switch (animation) {
-			case "fade":
-				return fade(node, { duration: 200 });
-			case "scale":
-				return fly(node, { y: 0, scale: 0.95, duration: 200 });
-			case "fly":
-			default:
-				return fly(node, { y: direction, duration: 200 });
-		}
-	}
 </script>
 
-<div bind:this={dropdownElement} class="dropdown-container relative {className}">
+<div bind:this={containerElement} class="dropdown-container relative {className}">
 	<!-- Bouton déclencheur -->
-	<button
-		bind:this={triggerElement}
-		class={triggerClass}
-		onclick={toggleDropdown}
-		aria-expanded={isOpen}
-		aria-haspopup="true"
-	>
+	<button class={triggerClass} onclick={toggleDropdown} aria-expanded={isOpen} aria-haspopup="true">
 		{@render trigger()}
 	</button>
 
@@ -222,8 +137,7 @@
 	{#if isOpen}
 		<div
 			class="{positionClasses} {width} rounded-lg border shadow-xl {contentClass}"
-			style={portal ? portalStyle : ""}
-			transition:getTransition
+			transition:fly={{ y: position === "top" ? 10 : -10, duration: 200 }}
 			role="menu"
 			aria-orientation="vertical"
 		>
@@ -264,7 +178,6 @@
 
 <style>
 	.dropdown-container {
-		/* Assure que le dropdown ne sort pas de l'écran */
 		contain: layout;
 	}
 </style>
