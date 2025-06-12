@@ -1,14 +1,12 @@
 <script lang="ts">
-	import {
-		calculateConflicts,
-		type ConflictResult,
-		ConflictCalculator
-	} from "$lib/services/conflictService.svelte";
+	import { type ConflictResult, ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { format } from "date-fns";
 	import { fr } from "date-fns/locale";
 	import { isValidDate } from "$lib/utils";
 	import type { EventType } from "$lib/types/event.types";
+	import type { ConflictType } from "$lib/services/eventConflicts";
+	import { TriangleAlert } from "lucide-svelte";
 
 	// 👉 Props pour les deux modes
 	let {
@@ -34,8 +32,6 @@
 		currentEvent?: EventType;
 		mode?: "realtime" | "cached";
 	}>();
-
-	let isExpanded = $state(false);
 
 	$effect(() => {
 		if (mode === "realtime" && conflictCalculator) {
@@ -91,7 +87,7 @@
 			time_start: conflictEvent.time_start || "??:??",
 			time_end: conflictEvent.time_end || "??:??",
 			rooms: conflictEvent.rooms || [],
-			conflictType: conflictEvent.isConfirmed ? "confirmed" : "unconfirmed",
+			conflictType: (conflictEvent.isConfirmed ? "confirmed" : "unconfirmed") as ConflictType,
 			hasSameRoom: hasSharedRoom(event.rooms || [], conflictEvent.rooms || []),
 			date_event: conflictEvent.date_event || "",
 			isConfirmed: conflictEvent.isConfirmed || false,
@@ -149,23 +145,15 @@
 		return formatDateForDisplay(startDate);
 	});
 
-	const getConflictColor = (conflictType: string) => {
-		switch (conflictType) {
-			case "confirmed":
-				return "text-error";
-			case "unconfirmed":
-				return "text-orange-500";
-			case "sondage":
-				return "text-gray-500";
-			case "close-confirmed":
-			case "close-unconfirmed":
-				return "text-gray-500";
-			default:
-				return "text-gray-500";
+	const getConflictColor = (conflictType: ConflictType, hasSameRoom: boolean) => {
+		// 👉 Orange uniquement si l'événement est confirmé ET a des salles communes/identiques
+		if (conflictType === "confirmed" && hasSameRoom) {
+			return "text-orange-500";
 		}
+		return "text-gray-700";
 	};
 
-	const getConflictTypeMsg = (conflictType: string) => {
+	const getConflictTypeMsg = (conflictType: ConflictType) => {
 		switch (conflictType) {
 			case "confirmed":
 				return "événement confirmé";
@@ -199,71 +187,21 @@
 
 {#if conflicts.length > 0}
 	<div
-		class="bg-warning/20 border-warning text-fluid-sm cursor-pointer items-center gap-1 rounded-xl border-2 p-2 px-4 text-gray-500 hover:text-gray-700"
-		onclick={() => (isExpanded = !isExpanded)}
-		onkeydown={(e) => e.key === "Enter" && (isExpanded = !isExpanded)}
-		role="button"
-		tabindex="0"
+		class={`text-fluid-sm items-center gap-1 rounded-xl p-2 px-4 text-gray-500 ${
+			hasRealConflict.value ? "bg-warning/10 border-warning border-2" : "bg-base-200"
+		}`}
 	>
 		<div class="space-y-1">
-			<div class="flex flex-wrap justify-between">
-				<div class="text-fluid-sm text-gray-600 italic">
-					D'autres événements sont prévus le {dateOfConflict}...
-				</div>
-				{#if conflicts.length > realConflicts.length}
-					<div class="flex items-center text-orange-600 hover:text-orange-800">
-						{#if !isExpanded}
-							+ {conflicts.length - realConflicts.length} conflits potentiels...
-						{:else}
-							réduire
-						{/if}
-						<svg
-							class={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M19 9l-7 7-7-7"
-							/>
-						</svg>
-					</div>
-				{/if}
+			<div class="text-fluid-sm items-top flex gap-2 text-gray-600 italic">
+				<TriangleAlert size={16} /> D'autres événements sont prévus le {dateOfConflict}...
 			</div>
 
-			{#if !isExpanded && hasRealConflict.value}
-				<ul class="ms-2">
-					{#each realConflicts as conflict, index (conflict.id + index)}
-						<li
-							class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(
-								conflict.conflictType
-							)}`}
-						>
-							<div class="font-bold">{conflict.event_title} :</div>
-							<div class="italic">{getConflictTypeMsg(conflict.conflictType)}</div>
-							<div class="">
-								de {conflict.time_start} à {conflict.time_end}
-								<span class={getRoomMsg(conflict.hasSameRoom, conflict.rooms).style}
-									>{getRoomMsg(conflict.hasSameRoom, conflict.rooms).msg}</span
-								>
-							</div>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
-
-		{#if isExpanded}
 			<ul class="ms-2">
 				{#each conflicts as conflict, index (conflict.id + index)}
 					<li
-						class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(conflict.conflictType)}`}
+						class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(conflict.conflictType, conflict.hasSameRoom)}`}
 					>
-						<div class="font-bold">{conflict.event_title} :</div>
+						<div class="font-bold">• {conflict.event_title} :</div>
 						<div class="italic">{getConflictTypeMsg(conflict.conflictType)}</div>
 						<div class="">
 							de {conflict.time_start} à {conflict.time_end}
@@ -274,6 +212,6 @@
 					</li>
 				{/each}
 			</ul>
-		{/if}
+		</div>
 	</div>
 {/if}

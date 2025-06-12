@@ -3,12 +3,13 @@
 	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import { notificationService } from "$lib/services/notificationService.svelte";
+	import { validateDate } from "$lib/services/eventActions";
 	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { DateProposedType, EventType } from "$lib/types/types";
 	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
 
-	let eventData = $state<EventType>({ ...eventState.is });
+	let eventData = $state<EventType>(eventState.is as EventType);
 	let dateAccepted: DateProposedType | null = $state(null);
 
 	const closeModal = () => {
@@ -26,6 +27,23 @@
 
 	function handleUpdateIsSondage(isSondage: boolean) {
 		eventData.isSondage = isSondage;
+	}
+
+	// 👉 Fonction pour valider une date proposée avec gestion des conflits
+	async function handleValidateDate(dateProposal: DateProposedType) {
+		if (!eventData?.id || !userDb.current) {
+			showAlert("Erreur : données manquantes pour la validation", "error");
+			return;
+		}
+
+		try {
+			await validateDate(eventData, dateProposal, userDb.current, true, false);
+			// Si validation réussie, fermer le modal
+			closeModal();
+		} catch (error) {
+			console.error("Erreur lors de la validation de la date :", error);
+			showAlert("Erreur lors de la validation de la date", "error");
+		}
 	}
 
 	async function handleSubmit() {
@@ -51,12 +69,12 @@
 							onConfirm: async () => {
 								// Confirmer sans organisateurs 'oui'
 								dataToUpdate = {
-									date_event: formatDatePb(dateAccepted.dateStart),
-									time_start: formatTimePb(dateAccepted.dateStart),
-									time_end: formatTimePb(dateAccepted.dateEnd),
+									date_event: formatDatePb(dateAccepted!.dateStart),
+									time_start: formatTimePb(dateAccepted!.dateStart),
+									time_end: formatTimePb(dateAccepted!.dateEnd),
 									organizers: confirmedOrganizers, // Sera vide ou seulement les 'maybehere' convertis
-									dateStart: dateAccepted.dateStart, // Garder la date ISO complète
-									dateEnd: dateAccepted.dateEnd, // Garder la date ISO complète
+									dateStart: dateAccepted!.dateStart, // Garder la date ISO complète
+									dateEnd: dateAccepted!.dateEnd, // Garder la date ISO complète
 									isSondage: false, // Le sondage est terminé
 									dates_proposed: [] // Vider les propositions
 								};
@@ -65,8 +83,8 @@
 								// Envoyer notification aux participants du sondage
 								await notificationService.sendSondageValidationNotification({
 									event: eventData,
-									dateProposal: dateAccepted,
-									user: userDb.current,
+									dateProposal: dateAccepted!,
+									user: userDb.current!,
 									options: { showUserFeedback: true }
 								});
 
@@ -87,10 +105,6 @@
 						isSondage: false,
 						dates_proposed: []
 					};
-
-					// Variables pour notification à envoyer après la mise à jour
-					const shouldNotify = true;
-					const proposalToNotify = dateAccepted;
 				}
 			}
 			// Cas 2: Pas de date validée, on sauvegarde juste les dates proposées actuelles
@@ -107,11 +121,11 @@
 				await updateEvent(eventData.id, dataToUpdate);
 
 				// Si une date a été acceptée, envoyer une notification
-				if (dateAccepted && proposalToNotify) {
+				if (dateAccepted) {
 					await notificationService.sendSondageValidationNotification({
 						event: eventData,
-						dateProposal: proposalToNotify,
-						user: userDb.current,
+						dateProposal: dateAccepted,
+						user: userDb.current!,
 						options: { showUserFeedback: true }
 					});
 				}
@@ -135,6 +149,7 @@
 				{eventData}
 				onUpdateDatesProposed={handleUpdateDatesProposed}
 				onUpdateIsSondage={handleUpdateIsSondage}
+				onValidateDate={handleValidateDate}
 			/>
 		</div>
 	</div>

@@ -4,9 +4,7 @@
 
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import {
-		handleDateValidationModal,
-		prepareDateValidationData,
-		updateEventData
+		handleDateValidationModal
 	} from "$lib/services/eventActions";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate, lisibleTime } from "$lib/utils";
@@ -41,7 +39,7 @@
 	async function handleSondageSubscription(
 		eventId: string,
 		dateStart: string,
-		maybehereValue: "oui" | "non" | "peut-être"
+		maybehereValue: "oui" | "non" | "peut-être" | ""
 	) {
 		if (!currentUser) return;
 
@@ -52,19 +50,27 @@
 				let updatedOrganizers = [...(dateProposed.organizers ?? [])];
 				const userIndex = updatedOrganizers.findIndex((org) => org.id === currentUser.id);
 
-				if (userIndex !== -1) {
-					updatedOrganizers[userIndex] = {
-						...updatedOrganizers[userIndex],
-						maybehere: maybehereValue
-					};
+				if (maybehereValue === "") {
+					// Si "aucun" est sélectionné, on retire l'organisateur
+					if (userIndex !== -1) {
+						updatedOrganizers.splice(userIndex, 1);
+					}
 				} else {
-					updatedOrganizers.push({
-						id: currentUser.id,
-						username: currentUser.username,
-						tasks: [],
-						maybehere: maybehereValue,
-						role: ""
-					});
+					// Sinon, on ajoute ou met à jour
+					if (userIndex !== -1) {
+						updatedOrganizers[userIndex] = {
+							...updatedOrganizers[userIndex],
+							maybehere: maybehereValue
+						};
+					} else {
+						updatedOrganizers.push({
+							id: currentUser.id,
+							username: currentUser.username,
+							tasks: [],
+							maybehere: maybehereValue,
+							role: ""
+						});
+					}
 				}
 				return { ...dateProposed, organizers: updatedOrganizers };
 			}
@@ -84,19 +90,7 @@
 		dateProposal: DateProposedType,
 		currentUser: UserType
 	) => {
-		handleDateValidationModal(currentEvent, dateProposal, currentUser, {
-			additionalAction: {
-				condition: true,
-				label: "Valider la date et confirmer l'événement",
-				action: async (notify?: boolean) => {
-					const eventDataToUpdate = prepareDateValidationData(currentEvent, dateProposal);
-					await updateEventData(currentEvent.id, {
-						...eventDataToUpdate,
-						isConfirmed: true
-					});
-				}
-			}
-		});
+		handleDateValidationModal(currentEvent, dateProposal, currentUser);
 	};
 </script>
 
@@ -151,7 +145,7 @@
 					dateProposal.organizers?.filter((org: OrganizerType) => org.maybehere === "non").length ??
 					0}
 				{@const userResponse = dateProposal.organizers?.find(
-					(org) => org.id === currentUser.id
+					(org: OrganizerType) => org.id === currentUser.id
 				)?.maybehere}
 
 				<div class="{bg} flex flex-col gap-2 rounded-lg p-2 shadow-sm">
@@ -209,7 +203,7 @@
 						<!-- Boutons de vote -->
 						<GroupRadioButton
 							value={userResponse}
-							onChange={(newValue) =>
+							onChange={(newValue: "oui" | "peut-être" | "non" | "") =>
 								handleSondageSubscription(currentEvent.id, dateProposal.dateStart, newValue)}
 						/>
 					</div>

@@ -18,7 +18,8 @@
 		createEvent,
 		createRecurrentEvent,
 		updateAllOccurrences,
-		updateEvent
+		updateEvent,
+		pb
 	} from "$lib/pocketbase.svelte";
 	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import {
@@ -31,10 +32,13 @@
 		getDefaultRecurrence,
 		getNewEvent,
 		checkSondageValidation,
-		checkEventConflicts,
-		handleEventSubmissionConfirmation
+		handleEventSubmissionConfirmation,
+		handleEventConflictsAfterSave,
+		detectAllEventConflicts,
+		generateConflictMessage
 	} from "$lib/services/eventActions";
-	import { getSpace } from "$lib/shared/spaceOptions.svelte";
+	import { notificationService } from "$lib/services/notificationService.svelte";
+	import { getSpace, userDb } from "$lib/shared";
 	import {
 		eventState,
 		getOrganizersPossibles,
@@ -55,6 +59,7 @@
 	// import EventValidationStatus from "./EventValidationStatus.svelte";
 	import TimeReservation from "./forModal/TimeReservation.svelte";
 	import OtherSetting from "./forModal/OtherSetting.svelte";
+
 	import {
 		createEventValidator,
 		type ValidationProfile
@@ -255,14 +260,20 @@
 		}
 	});
 
-	let hasSondageValidation = $state(false);
+	let hasSondageValidation = $state(eventState.pendingSondageValidation || false);
 
 	// instance unique de calcul des conflit pour ce modal
 	const conflictCalculator = new ConflictCalculator();
-	// Calcul des conflits d'événements Réactif
-	const currentConflicts = $derived(conflictCalculator.result);
 
 	// ::: $effect
+
+	// // 👉 Réinitialiser le flag pendingSondageValidation après utilisation
+	// $effect(() => {
+	// 	if (eventState.pendingSondageValidation) {
+	// 		hasSondageValidation = true;
+	// 		eventState.pendingSondageValidation = false;
+	// 	}
+	// });
 
 	$effect.pre(() => {
 		if (eventData.isRecurrent && !eventData.id && !eventData.recurrence) {
@@ -461,6 +472,10 @@
 		}
 	});
 
+	/**
+	 * Génère un message détaillé pour les conflits détectés
+	 */
+
 	const submitForm = async (e?: SubmitEvent, shouldConfirm: boolean = false) => {
 		if (e) e.preventDefault();
 
@@ -482,15 +497,35 @@
 				return;
 			}
 
-			// 👉 Vérification des conflits et sondage via les services
-			const conflictCheck = checkEventConflicts(currentConflicts);
+			// 👉 Détection unifiée des conflits selon le type d'événement
+			let excludeEventIds: string[] = [];
+			if (eventMode === "EDIT_RECURRENT_ALL" && eventData.id) {
+				// Pour EDIT_RECURRENT_ALL, exclure tous les événements de la série
+				try {
+					const existingOccurrences = await pb.collection("events").getFullList({
+						filter: `masterRecurrentId = '${eventData.id}'`
+					});
+					excludeEventIds = [eventData.id, ...existingOccurrences.map((occ) => occ.id)];
+				} catch (error) {
+					console.warn("Erreur lors de la récupération des occurrences existantes:", error);
+					excludeEventIds = [eventData.id];
+				}
+			}
+
+			const conflictDetection = detectAllEventConflicts(eventData, eventMode, excludeEventIds);
 			const sondageCheck = checkSondageValidation(eventData, hasSondageValidation);
 
+			// Convertir en format compatible pour handleEventSubmissionConfirmation
+			const conflictCheck = {
+				hasConflicts: conflictDetection.hasConflicts,
+				canProceed: false, // Force la confirmation si il y a des conflits
+				message: conflictDetection.hasConflicts
+					? generateConflictMessage(conflictDetection, eventMode, eventData)
+					: undefined
+			};
+
 			// Si besoin de confirmation, utiliser le service centralisé
-			if (
-				(conflictCheck.hasConflicts && !conflictCheck.canProceed) ||
-				sondageCheck.needsValidation
-			) {
+			if (conflictDetection.hasConflicts || sondageCheck.needsValidation) {
 				// Gestion spéciale pour les récurrences globales
 				if (
 					eventMode === "EDIT_RECURRENT_ALL" &&
@@ -505,7 +540,7 @@
 								"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
 							variant: "warning",
 							onConfirm: async () => {
-								await proceedWithSave(false, { hasConflicts: false, canProceed: true });
+								await proceedWithSave(false, conflictDetection, false);
 							}
 						}
 					};
@@ -513,10 +548,11 @@
 				}
 
 				handleEventSubmissionConfirmation(eventData, {
-					conflictCheck: conflictCheck.hasConflicts ? conflictCheck : undefined,
+					conflictCheck: conflictDetection.hasConflicts ? conflictCheck : undefined,
 					sondageCheck: sondageCheck.needsValidation ? sondageCheck : undefined,
-					onConfirm: async (confirm) => {
-						await proceedWithSave(confirm || shouldConfirm, conflictCheck);
+					shouldConfirm: shouldConfirm, // 👉 Passer le paramètre shouldConfirm
+					onConfirm: async (confirm, notifyOthers = true) => {
+						await proceedWithSave(confirm || shouldConfirm, conflictDetection, notifyOthers);
 					},
 					onComplete: () => {
 						// Ok: la validation est déjà enclenché pour la modification d'événement
@@ -535,7 +571,7 @@
 							"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
 						variant: "warning",
 						onConfirm: async () => {
-							await proceedWithSave(false, { hasConflicts: false, canProceed: true });
+							await proceedWithSave(false, conflictDetection, false);
 						}
 					}
 				};
@@ -543,7 +579,7 @@
 			}
 
 			// Pas besoin de confirmation, procéder directement
-			await proceedWithSave(shouldConfirm, conflictCheck);
+			await proceedWithSave(shouldConfirm, conflictDetection, false);
 		} catch (error) {
 			console.error(error);
 			showAlert("Erreur lors de l'enregistrement de l'événement.", "error");
@@ -553,26 +589,40 @@
 	// 👉 Fonction séparée pour la logique de sauvegarde
 	const proceedWithSave = async (
 		shouldConfirm: boolean,
-		conflictCheck: ReturnType<typeof checkEventConflicts>
+		conflictDetection: ReturnType<typeof detectAllEventConflicts>,
+		notifyOthers: boolean = true
 	) => {
-		// Appliquer les conflits si acceptés
-		if (conflictCheck.hasConflicts && conflictCheck.canProceed) {
-			eventData.inConflictWith = currentConflicts.conflictIds;
-		}
-
 		// Confirmer l'événement si demandé
 		if (shouldConfirm) {
 			eventData.isConfirmed = true;
 		}
 
+		// 👉 Utiliser les conflits détectés de manière unifiée
+		let conflictIds = conflictDetection.conflictIds;
+		let recurrentConflictsMap = conflictDetection.recurrentConflictsMap;
+		let createdEventIds: string[] = [];
+
 		// Sauvegarde selon le mode
 		switch (eventMode) {
 			case "NEW_SINGLE": {
-				await createEvent(eventData);
+				const createdEvent = await createEvent(eventData);
+				// 👉 Pour un nouvel événement, on récupère l'ID créé
+				if (createdEvent?.id) {
+					eventData.id = createdEvent.id;
+					createdEventIds = [createdEvent.id];
+				}
 				break;
 			}
 			case "NEW_RECURRENT": {
-				await createRecurrentEvent(eventData);
+				const result = await createRecurrentEvent(eventData);
+				// 👉 Récupérer les IDs des événements créés
+				console.log("✅ Événements créés:", result);
+				if (result?.eventIds) {
+					createdEventIds = result.eventIds;
+					console.log("📋 IDs récupérés:", createdEventIds);
+				} else {
+					console.warn("⚠️ Pas d'eventIds retournés");
+				}
 				break;
 			}
 			case "EDIT_SINGLE":
@@ -581,9 +631,81 @@
 				break;
 			}
 			case "EDIT_RECURRENT_ALL": {
-				await updateAllOccurrences(eventData);
+				const result = await updateAllOccurrences(eventData);
+				// 👉 Récupérer les IDs des événements mis à jour
+				if (result?.eventIds) {
+					createdEventIds = result.eventIds;
+				}
 				break;
 			}
+		}
+
+		// 👉 Gérer les conflits après sauvegarde
+		// Pour les événements modifiés, toujours appeler la gestion des conflits pour nettoyer les anciens
+		const isEditMode =
+			eventMode === "EDIT_SINGLE" ||
+			eventMode === "EDIT_RECURRENT_ONE" ||
+			eventMode === "EDIT_RECURRENT_ALL";
+		const shouldManageConflicts =
+			conflictDetection.hasConflicts || (isEditMode && eventData.inConflictWith?.length > 0);
+
+		if (shouldManageConflicts) {
+			console.log(
+				"🔧 Gestion conflits - Mode:",
+				eventMode,
+				"IDs:",
+				createdEventIds,
+				"Conflits simples:",
+				conflictIds,
+				"Conflits récurrents:",
+				recurrentConflictsMap.size,
+				"Anciens conflits:",
+				eventData.inConflictWith
+			);
+			await handleEventConflictsAfterSave(
+				eventMode,
+				eventData,
+				conflictIds,
+				createdEventIds,
+				recurrentConflictsMap
+			);
+		}
+
+		// 👉 Envoyer la notification de validation de sondage si nécessaire
+		// Seulement si l'événement n'est plus un sondage (a été complété) et si l'utilisateur veut notifier
+		if (
+			hasSondageValidation &&
+			!eventData.isSondage &&
+			notifyOthers &&
+			eventData.dates_proposed &&
+			eventData.dates_proposed.length > 0
+		) {
+			// Trouver la date validée (celle qui a des organisateurs confirmés)
+			const validatedDate = eventData.dates_proposed.find((date) =>
+				date.organizers?.some((org) => org.maybehere === "oui")
+			);
+
+			if (validatedDate && userDb.current) {
+				try {
+					await notificationService.sendSondageValidationNotification({
+						event: eventData,
+						dateProposal: validatedDate,
+						user: userDb.current,
+						options: {
+							showUserFeedback: true,
+							willBeConfirmed: shouldConfirm,
+							specificFeedbackMessage: shouldConfirm
+								? "Date validée et événement confirmé. Notification envoyée aux participants."
+								: "Date validée et événement complété. Notification envoyée aux participants du sondage."
+						}
+					});
+				} catch (error) {
+					console.error("Erreur lors de l'envoi de la notification:", error);
+				}
+			}
+
+			// 👉 Réinitialiser le flag après utilisation
+			hasSondageValidation = false;
 		}
 
 		closeModal();
@@ -595,7 +717,7 @@
 	};
 </script>
 
-{$inspect("eventData", eventData)}
+<!-- {$inspect("eventData", eventData)} -->
 <!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
 <!-- {$inspect('eOrg', eventData.organizers)} -->
 <!-- {$inspect('activeTabDate', activeTabDate)} -->

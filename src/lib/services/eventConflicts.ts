@@ -1,7 +1,5 @@
 import { format, parse } from "date-fns";
 import type { EventType, OrganizerType } from "$lib/types/event.types";
-import { eventsStore } from "$lib/shared";
-import { updateEvent } from "$lib/pocketbase.svelte";
 
 // --- Types Definition ---
 
@@ -537,21 +535,4 @@ export function getOverlappingEventGroups(
 	return overlappingByDate;
 }
 
-// FIXIT : Doit être géré dans un hook, car on n'a pas l'id de l'event actuellement crée.
-export const updateReciprocalConflicts = async (eventId: string, conflictIds: string[]) => {
-	try {
-		for (const conflictId of conflictIds) {
-			const conflictEvent = eventsStore.getEventById(conflictId);
-			if (conflictEvent) {
-				const existingConflicts = conflictEvent.inConflictWith || [];
-				if (!existingConflicts.includes(eventId)) {
-					await updateEvent(conflictId, {
-						inConflictWith: [...existingConflicts, eventId]
-					});
-				}
-			}
-		}
-	} catch (error) {
-		console.error("Erreur lors de la mise à jour réciproque des conflits:", error);
-	}
-};
+
