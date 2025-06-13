@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { Clock, Euro, Users, AlertTriangle, ChevronRight } from 'lucide-svelte';
-	import type { PublicEventInfo } from '$lib/shared/publicStore.svelte';
-	import type { PublicSiteThemeOptions } from '$lib/types/theme.d';
+	//  FIXIT : clean wrap text description
+
+	import { Clock, Euro, Users, AlertTriangle, ChevronRight } from "lucide-svelte";
+	import type { PublicEventInfo } from "$lib/shared/publicStore.svelte";
+	import type { PublicSiteThemeOptions } from "$lib/types/theme.d";
 
 	interface Props {
 		event: PublicEventInfo;
-		cardOptions: PublicSiteThemeOptions['eventCard'];
+		cardOptions: PublicSiteThemeOptions["eventCard"];
 		eventImageUrl: string | null;
 	}
 	let { event, cardOptions, eventImageUrl }: Props = $props();
@@ -39,33 +41,33 @@
 	function formatDate(dateString: string): string {
 		try {
 			const date = new Date(dateString);
-			return new Intl.DateTimeFormat('fr-FR', {
-				weekday: 'long',
-				day: 'numeric',
-				month: 'long'
+			return new Intl.DateTimeFormat("fr-FR", {
+				weekday: "long",
+				day: "numeric",
+				month: "long"
 			}).format(date);
 		} catch (e) {
-			console.error('Erreur de formatage de date:', dateString, e);
-			return 'Date invalide';
+			console.error("Erreur de formatage de date:", dateString, e);
+			return "Date invalide";
 		}
 	}
 
 	// Formater l'heure
 	function formatTime(timeString: string | null | undefined): string {
-		if (!timeString) return '';
+		if (!timeString) return "";
 		// Crée une date bidon juste pour extraire l'heure avec Intl
 		try {
-			const [hours, minutes] = timeString.split(':');
+			const [hours, minutes] = timeString.split(":");
 			const date = new Date();
 			date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
-			return new Intl.DateTimeFormat('fr-FR', {
-				hour: 'numeric',
-				minute: 'numeric',
+			return new Intl.DateTimeFormat("fr-FR", {
+				hour: "numeric",
+				minute: "numeric",
 				hour12: false // Utilise le format 24h
 			}).format(date);
 		} catch (e) {
 			console.error("Erreur de formatage d'heure:", timeString, e);
-			return 'Heure invalide';
+			return "Heure invalide";
 		}
 	}
 </script>
@@ -73,26 +75,26 @@
 <!-- Base de la carte avec largeur réactive et classes flex conditionnelles -->
 <div
 	class="card round transition-all duration-300 {cardOptions.bgClass} {cardOptions.shadowClass} {cardOptions.roundedClass} {cardWidthClass}"
-	class:lg:flex-row={imagePosition === 'left'}
-	class:flex-col={imagePosition === 'top'}
+	class:lg:flex-row={imagePosition === "left"}
+	class:flex-col={imagePosition === "top"}
 >
 	<!-- Section Image (position réactive) -->
 	{#if eventImageUrl}
 		<figure
 			class="relative {imagePosition === 'left' ? 'lg:w-1/3' : ''}"
-			class:w-full={imagePosition === 'left'}
-			class:h-48={imagePosition === 'top'}
-			class:lg:h-auto={imagePosition === 'left'}
-			class:shrink-0={imagePosition === 'left'}
+			class:w-full={imagePosition === "left"}
+			class:h-48={imagePosition === "top"}
+			class:lg:h-auto={imagePosition === "left"}
+			class:shrink-0={imagePosition === "left"}
 		>
 			<img
 				src={eventImageUrl}
 				alt={event.event_title}
 				class="h-full w-full object-cover"
-				class:lg:rounded-l-2xl={imagePosition === 'left' &&
-					cardOptions.roundedClass !== 'rounded-none'}
-				class:lg:rounded-tr-none={imagePosition === 'left'}
-				class:rounded-t-2xl={imagePosition === 'top' && cardOptions.roundedClass !== 'rounded-none'}
+				class:lg:rounded-l-2xl={imagePosition === "left" &&
+					cardOptions.roundedClass !== "rounded-none"}
+				class:lg:rounded-tr-none={imagePosition === "left"}
+				class:rounded-t-2xl={imagePosition === "top" && cardOptions.roundedClass !== "rounded-none"}
 			/>
 			{#if event.canceled}
 				<div class="bg-error bg-opacity-70 absolute inset-0 flex items-center justify-center">
@@ -124,11 +126,11 @@
 			</div>
 			<!-- 👉 Section Date et Heure d'ouverture  -->
 			<div class="text-base-content/80 flex flex-col text-right font-semibold">
-				<span class={cardOptions.dateSizeClass || 'text-fluid-lg'}
+				<span class={cardOptions.dateSizeClass || "text-fluid-lg"}
 					>{formatDate(event.date_event)}</span
 				>
 				{#if event.start_public}
-					<span class={cardOptions.timeSizeClass || 'text-fluid-base'}
+					<span class={cardOptions.timeSizeClass || "text-fluid-base"}
 						>à partir de {formatTime(event.start_public)}</span
 					>
 				{/if}
@@ -155,7 +157,7 @@
 						'badge-lg'} badge-info badge-outline flex items-center gap-2"
 				>
 					<Euro size={18} />
-					<span>{event.is_prix_libre ? 'Prix libre' : `${event.prix}`}</span>
+					<span>{event.is_prix_libre ? "Prix libre" : `${event.prix}`}</span>
 				</div>
 			{/if}
 
@@ -185,14 +187,15 @@
 
 		<!-- Description avec troncature réactive -->
 		{#if event.desc_public}
-			<div class="relative mt-2 flex-grow">
+			<div class="relative mt-2">
 				<div
 					bind:this={descriptionEl}
-					class="prose prose-sm text-fluid-base max-w-none"
-					class:overflow-hidden={shouldTruncate && !isExpanded}
+					class="prose prose-sm text-fluid-base overflow-hidden text-wrap"
 					class:relative={shouldTruncate && !isExpanded}
-					style:max-height={isExpanded ? 'none' : `${maxHeight}px`}
-					style:-webkit-line-clamp={isExpanded ? 'unset' : truncateLines}
+					style:max-height={isExpanded ? "none" : `${maxHeight}px`}
+					style:-webkit-line-clamp={isExpanded ? "unset" : truncateLines}
+					style:overflow-wrap="break-word"
+					style:hyphens="auto"
 					class:line-clamp-dynamic={shouldTruncate && !isExpanded}
 				>
 					{@html event.desc_public}
@@ -214,7 +217,7 @@
 							class="btn btn-ghost btn-sm text-primary mt-1 py-0 hover:bg-transparent"
 							onclick={() => (isExpanded = !isExpanded)}
 						>
-							{isExpanded ? 'Voir moins' : 'Lire la suite'}
+							{isExpanded ? "Voir moins" : "Lire la suite"}
 							<ChevronRight
 								size={14}
 								class="transform transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
@@ -253,5 +256,55 @@
 	.card.lg\:flex-row figure.lg\:w-1\/3 img {
 		height: 100%;
 		object-position: center;
+	}
+
+	/* Contraindre naturellement les éléments prose sans débordement */
+	.prose * {
+		max-width: 100%;
+		word-wrap: break-word;
+		overflow-wrap: break-word;
+		box-sizing: border-box;
+	}
+
+	/* Styles spécifiques pour les éléments qui peuvent déborder */
+	.prose img,
+	.prose table,
+	.prose pre,
+	.prose code {
+		max-width: 100% !important;
+		overflow: auto;
+	}
+
+	.prose table {
+		display: block;
+		white-space: nowrap;
+		overflow-x: auto;
+	}
+
+	/* Styles spécifiques pour rich editor PocketBase */
+	.prose p,
+	.prose div,
+	.prose span {
+		word-break: normal;
+		overflow-wrap: break-word;
+		hyphens: auto;
+	}
+
+	/* Code inline et blocs de code */
+	.prose code {
+		white-space: pre-wrap;
+		word-break: break-all;
+		overflow-wrap: anywhere;
+	}
+
+	.prose pre {
+		white-space: pre-wrap;
+		overflow-wrap: break-word;
+	}
+
+	/* Liens longs */
+	.prose a {
+		word-break: break-all;
+		overflow-wrap: anywhere;
 	}
 </style>

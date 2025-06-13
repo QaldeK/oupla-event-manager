@@ -1,21 +1,188 @@
 // src/lib/services/eventActions.ts
-import { updateEvent, updateReciprocalConflicts, pb } from "$lib/pocketbase.svelte";
+import {
+	updateEvent,
+	updateReciprocalConflicts,
+	pb,
+	createEvent,
+	createRecurrentEvent,
+	updateAllOccurrences
+} from "$lib/pocketbase.svelte";
 import { validateEventStatic } from "$lib/validation/event-validator.svelte";
 import { notificationService } from "$lib/services/notificationService.svelte";
-import { modalState, showAlert, eventState } from "$lib/shared";
 import { ConflictCalculator, calculateConflicts } from "$lib/services/conflictService.svelte";
 import { eventsStore } from "$lib/shared/eventsStore.svelte";
 import type { DateProposedType, UserType } from "$lib/types/types";
 import type { EventType, RecurrenceType, RecurrenceConfigType } from "$lib/types/event.types";
-import {
-	filterAndConvertOrganizers,
-	formatDatePb,
-	formatTimePb,
-	lisibleDate,
-	lisibleTime
-} from "$lib/utils";
+import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
+import type { ConfirmModalData } from "$lib/shared/states.svelte";
 
-// ::: FONCTIONS UTILITAIRES POUR LA GÉNÉRATION DE MESSAGES :::
+// ::: 1. TYPES D'ACTION :::
+
+export type EventActionPlan =
+	| { type: "PROCEED_DIRECTLY"; action: () => Promise<EventActionPlan> }
+	| { type: "SUCCESS"; message?: string; payload?: unknown }
+	| { type: "ERROR"; message: string; error?: unknown }
+	| {
+			type: "NEEDS_CONFIRMATION";
+			confirmationDetails: Omit<ConfirmModalData, "onConfirm">;
+			onConfirmedAction: (notify?: boolean) => Promise<EventActionPlan>;
+	  }
+	| { type: "NEEDS_COMPLETION"; completionDetails: { eventData: Partial<EventType> } };
+
+// ::: 2. LOGIQUE DE SAUVEGARDE :::
+
+/**
+ * Fonction pure pour sauvegarder un événement
+ * @param eventData - Données de l'événement à sauvegarder
+ * @param eventMode - Mode de l'événement
+ * @param shouldConfirm - Si l'événement doit être confirmé
+ * @param conflictDetection - Résultat de la détection des conflits
+ * @param notifyOthers - Si les autres doivent être notifiés
+ * @param hasSondageValidation - Si une validation de sondage a eu lieu
+ * @returns EventActionPlan avec le résultat de l'opération
+ */
+export async function submitEvent(
+	eventData: EventType,
+	eventMode: string,
+	shouldConfirm: boolean,
+	conflictDetection: ReturnType<typeof detectAllEventConflicts>,
+	notifyOthers: boolean = false,
+	hasSondageValidation: boolean = false,
+	currentUser?: UserType
+): Promise<EventActionPlan> {
+	try {
+		// Confirmer l'événement si demandé
+		if (shouldConfirm) {
+			eventData.isConfirmed = true;
+		}
+
+		// 👉 Utiliser les conflits détectés de manière unifiée
+		const conflictIds = conflictDetection.conflictIds;
+		const recurrentConflictsMap = conflictDetection.recurrentConflictsMap;
+		let createdEventIds: string[] = [];
+
+		// Sauvegarde selon le mode
+		switch (eventMode) {
+			case "NEW_SINGLE": {
+				const createdEvent = await createEvent(eventData);
+				// 👉 Pour un nouvel événement, on récupère l'ID créé
+				if (createdEvent?.id) {
+					eventData.id = createdEvent.id;
+					createdEventIds = [createdEvent.id];
+				}
+				break;
+			}
+			case "NEW_RECURRENT": {
+				const result = await createRecurrentEvent(eventData);
+				// 👉 Récupérer les IDs des événements créés
+				console.log("✅ Événements créés:", result);
+				if (result?.eventIds) {
+					createdEventIds = result.eventIds;
+					console.log("📋 IDs récupérés:", createdEventIds);
+				} else {
+					console.warn("⚠️ Pas d'eventIds retournés");
+				}
+				break;
+			}
+			case "EDIT_SINGLE":
+			case "EDIT_RECURRENT_ONE": {
+				await updateEvent(eventData.id, eventData);
+				break;
+			}
+			case "EDIT_RECURRENT_ALL": {
+				const result = await updateAllOccurrences(eventData);
+				// 👉 Récupérer les IDs des événements mis à jour
+				if (result?.eventIds) {
+					createdEventIds = result.eventIds;
+				}
+				break;
+			}
+		}
+
+		// 👉 Gérer les conflits après sauvegarde
+		// Pour les événements modifiés, toujours appeler la gestion des conflits pour nettoyer les anciens
+		const isEditMode =
+			eventMode === "EDIT_SINGLE" ||
+			eventMode === "EDIT_RECURRENT_ONE" ||
+			eventMode === "EDIT_RECURRENT_ALL";
+		const shouldManageConflicts =
+			conflictDetection.hasConflicts || (isEditMode && eventData.inConflictWith?.length > 0);
+
+		if (shouldManageConflicts) {
+			console.log(
+				"🔧 Gestion conflits - Mode:",
+				eventMode,
+				"IDs:",
+				createdEventIds,
+				"Conflits simples:",
+				conflictIds,
+				"Conflits récurrents:",
+				recurrentConflictsMap.size,
+				"Anciens conflits:",
+				eventData.inConflictWith
+			);
+			await handleEventConflictsAfterSave(
+				eventMode,
+				eventData,
+				conflictIds,
+				createdEventIds,
+				recurrentConflictsMap
+			);
+		}
+
+		// 👉 Envoyer la notification de validation de sondage si nécessaire
+		// Seulement si l'événement n'est plus un sondage (a été complété) et si l'utilisateur veut notifier
+		if (
+			hasSondageValidation &&
+			!eventData.isSondage &&
+			notifyOthers &&
+			eventData.dates_proposed &&
+			eventData.dates_proposed.length > 0 &&
+			currentUser
+		) {
+			// Trouver la date validée (celle qui a des organisateurs confirmés)
+			const validatedDate = eventData.dates_proposed.find((date) =>
+				date.organizers?.some((org) => org.maybehere === "oui")
+			);
+
+			if (validatedDate) {
+				try {
+					await notificationService.sendSondageValidationNotification({
+						event: eventData,
+						dateProposal: validatedDate,
+						user: currentUser,
+						options: {
+							showUserFeedback: true,
+							willBeConfirmed: shouldConfirm,
+							specificFeedbackMessage: shouldConfirm
+								? "Date validée et événement confirmé. Notification envoyée aux participants."
+								: "Date validée et événement complété. Notification envoyée aux participants du sondage."
+						}
+					});
+				} catch (error) {
+					console.error("Erreur lors de l'envoi de la notification:", error);
+				}
+			}
+		}
+
+		return {
+			type: "SUCCESS",
+			message: "L'événement a été enregistré avec succès.",
+			payload: { eventId: eventData.id, createdEventIds }
+		};
+	} catch (error: unknown) {
+		const errorMessage =
+			error instanceof Error ? error.message : "Une erreur est survenue lors de l'enregistrement.";
+		console.error("Erreur lors de la sauvegarde de l'événement:", error);
+		return {
+			type: "ERROR",
+			message: errorMessage,
+			error
+		};
+	}
+}
+
+// ::: 3. FONCTIONS UTILITAIRES POUR LA GÉNÉRATION DE MESSAGES :::
 
 /**
  * Génère un message de conflit formaté pour les confirmations
@@ -195,223 +362,6 @@ export async function cleanupBidirectionalConflicts(
 	}
 }
 
-/**
- * Valide et nettoie les conflits existants d'un événement
- * Supprime les doublons et les références invalides
- * @param eventId - ID de l'événement
- * @param existingConflicts - Liste des conflits existants
- * @returns Liste nettoyée des conflits valides
- */
-export async function validateAndCleanExistingConflicts(
-	eventId: string,
-	existingConflicts: string[]
-): Promise<string[]> {
-	if (!existingConflicts || existingConflicts.length === 0) {
-		return [];
-	}
-
-	// 👉 Déduplication initiale
-	const uniqueConflicts = deduplicateConflictIds(existingConflicts, eventId);
-	const validConflicts: string[] = [];
-
-	// Vérifier que chaque conflit existe encore en base
-	for (const conflictId of uniqueConflicts) {
-		try {
-			await pb.collection("events").getOne(conflictId);
-			validConflicts.push(conflictId);
-		} catch {
-			console.warn(`Conflit invalide supprimé: ${conflictId} n'existe plus`);
-		}
-	}
-
-	// Si des conflits ont été supprimés, mettre à jour l'événement
-	if (validConflicts.length !== existingConflicts.length) {
-		try {
-			await updateEvent(eventId, { inConflictWith: validConflicts });
-			console.log(
-				`Conflits nettoyés pour l'événement ${eventId}: ${existingConflicts.length} -> ${validConflicts.length}`
-			);
-		} catch (error) {
-			console.warn(`Impossible de nettoyer les conflits pour l'événement ${eventId}:`, error);
-		}
-	}
-
-	return validConflicts;
-}
-
-/**
- * Détecte et répare les conflits bidirectionnels manquants
- * Vérifie que si l'événement A est en conflit avec B, alors B est aussi en conflit avec A
- * @param eventId - ID de l'événement à vérifier
- * @param conflictIds - Liste des conflits de l'événement
- */
-export async function ensureBidirectionalConflicts(
-	eventId: string,
-	conflictIds: string[]
-): Promise<void> {
-	const uniqueConflictIds = deduplicateConflictIds(conflictIds, eventId);
-
-	for (const conflictId of uniqueConflictIds) {
-		try {
-			const conflictEvent = await pb.collection("events").getOne(conflictId);
-			const conflictEventConflicts = conflictEvent.inConflictWith || [];
-
-			// Vérifier si le conflit bidirectionnel existe
-			if (!conflictEventConflicts.includes(eventId)) {
-				// 👉 Ajouter le conflit bidirectionnel manquant avec déduplication
-				const updatedConflicts = deduplicateConflictIds([...conflictEventConflicts, eventId]);
-
-				await updateEvent(conflictId, { inConflictWith: updatedConflicts });
-				console.log(`Conflit bidirectionnel réparé: ${conflictId} -> ${eventId}`);
-			}
-		} catch (error) {
-			console.warn(`Impossible de vérifier le conflit bidirectionnel pour ${conflictId}:`, error);
-		}
-	}
-}
-
-/**
- * Audit complet des conflits d'un événement
- * Nettoie, valide et répare les conflits bidirectionnels
- * @param eventId - ID de l'événement à auditer
- * @returns Rapport d'audit avec les actions effectuées
- */
-export async function auditEventConflicts(eventId: string): Promise<{
-	cleaned: number;
-	invalid: number;
-	repaired: number;
-	finalConflicts: string[];
-}> {
-	try {
-		const event = await pb.collection("events").getOne(eventId);
-		const originalConflicts = event.inConflictWith || [];
-
-		// 👉 Étape 1: Nettoyer et valider les conflits existants
-		const validConflicts = await validateAndCleanExistingConflicts(eventId, originalConflicts);
-
-		// 👉 Étape 2: S'assurer que les conflits sont bidirectionnels
-		await ensureBidirectionalConflicts(eventId, validConflicts);
-
-		// 👉 Calcul des statistiques
-		const cleaned = originalConflicts.length - validConflicts.length;
-		const invalid = originalConflicts.filter((id: string) => !validConflicts.includes(id)).length;
-
-		return {
-			cleaned,
-			invalid,
-			repaired: 0, // 🤔 À améliorer : compter les réparations effectuées
-			finalConflicts: validConflicts
-		};
-	} catch (error) {
-		console.error(`Erreur lors de l'audit des conflits pour l'événement ${eventId}:`, error);
-		throw error;
-	}
-}
-
-/**
- * Diagnostic rapide des conflits pour un événement ou tous les événements
- * @param eventId - ID de l'événement spécifique (optionnel)
- * @returns Rapport de diagnostic
- */
-export async function quickConflictDiagnostic(eventId?: string): Promise<{
-	eventCount: number;
-	totalConflicts: number;
-	duplicateConflicts: number;
-	invalidConflicts: number;
-	missingBidirectional: number;
-	selfReferences: number;
-	issues: Array<{
-		eventId: string;
-		issueType: string;
-		description: string;
-	}>;
-}> {
-	const report = {
-		eventCount: 0,
-		totalConflicts: 0,
-		duplicateConflicts: 0,
-		invalidConflicts: 0,
-		missingBidirectional: 0,
-		selfReferences: 0,
-		issues: [] as Array<{
-			eventId: string;
-			issueType: string;
-			description: string;
-		}>
-	};
-
-	try {
-		// Récupérer les événements à diagnostiquer
-		const events = eventId
-			? [await pb.collection("events").getOne(eventId)]
-			: await pb.collection("events").getFullList();
-
-		report.eventCount = events.length;
-
-		for (const event of events) {
-			const conflicts = event.inConflictWith || [];
-			report.totalConflicts += conflicts.length;
-
-			if (conflicts.length === 0) continue;
-
-			// 👉 Détection des doublons
-			const uniqueConflicts = [...new Set(conflicts)];
-			const duplicates = conflicts.length - uniqueConflicts.length;
-			if (duplicates > 0) {
-				report.duplicateConflicts += duplicates;
-				report.issues.push({
-					eventId: event.id,
-					issueType: "DUPLICATES",
-					description: `${duplicates} conflit(s) en doublon`
-				});
-			}
-
-			// 👉 Détection des auto-références
-			const selfRefs = conflicts.filter((id: string) => id === event.id).length;
-			if (selfRefs > 0) {
-				report.selfReferences += selfRefs;
-				report.issues.push({
-					eventId: event.id,
-					issueType: "SELF_REFERENCE",
-					description: `${selfRefs} auto-référence(s)`
-				});
-			}
-
-			// 👉 Vérification des conflits invalides et bidirectionnels
-			for (const conflictId of uniqueConflicts) {
-				if (conflictId === event.id) continue; // Déjà traité
-
-				try {
-					const conflictEvent = await pb.collection("events").getOne(conflictId as string);
-					const conflictEventConflicts = conflictEvent.inConflictWith || [];
-
-					// Vérifier si le conflit bidirectionnel existe
-					if (!conflictEventConflicts.includes(event.id)) {
-						report.missingBidirectional++;
-						report.issues.push({
-							eventId: event.id,
-							issueType: "MISSING_BIDIRECTIONAL",
-							description: `Conflit non réciproque avec ${conflictId}`
-						});
-					}
-				} catch {
-					report.invalidConflicts++;
-					report.issues.push({
-						eventId: event.id,
-						issueType: "INVALID_CONFLICT",
-						description: `Conflit invalide avec ${conflictId} (événement n'existe pas)`
-					});
-				}
-			}
-		}
-
-		return report;
-	} catch (error) {
-		console.error("Erreur lors du diagnostic des conflits:", error);
-		throw error;
-	}
-}
-
 // ::: FONCTION UTILITAIRE POUR CRÉER UN NOUVEL ÉVÉNEMENT :::
 // Cette fonction crée un nouvel événement avec des valeurs par défaut
 // No Zod changes needed here
@@ -525,23 +475,27 @@ export function prepareDateValidationData(
  */
 export async function updateEventData(
 	eventId: string,
-	eventData: Partial<EventType>,
+	data: Partial<EventType>,
 	successMessage?: string
-): Promise<void> {
+) {
 	try {
-		await updateEvent(eventId, eventData);
-		if (successMessage) {
-			showAlert(successMessage, "success");
-		}
-	} catch (err) {
-		console.error("Erreur lors de la mise à jour de l'événement:", err);
-		showAlert("Une erreur est survenue lors de la mise à jour. Veuillez réessayer.", "error");
-		throw err;
+		await updateEvent(eventId, data);
+		// Note: showAlert n'est plus disponible ici - la gestion des messages est maintenant dans le handler
+		console.log(successMessage || "Événement mis à jour avec succès");
+	} catch (error) {
+		console.error("Erreur lors de la mise à jour de l'événement:", error);
+		throw error; // Laisser le handler gérer l'affichage de l'erreur
 	}
 }
 
 /**
- * Valide une date proposée pour un événement
+ * Valide et met à jour un événement avec une date de sondage sélectionnée.
+ * Cette fonction est maintenant utilisée seulement par l'orchestrateur.
+ * @param currentEvent - L'événement actuel
+ * @param dateProposal - La date proposée à valider
+ * @param currentUser - L'utilisateur actuel
+ * @param notify - Si les participants doivent être notifiés
+ * @param willBeConfirmed - Si l'événement sera confirmé après validation
  */
 export async function validateDate(
 	currentEvent: EventType,
@@ -550,62 +504,11 @@ export async function validateDate(
 	notify: boolean = true,
 	willBeConfirmed: boolean = false
 ): Promise<void> {
-	if (!currentUser) {
-		showAlert("Utilisateur non authentifié. Veuillez vous reconnecter.", "error");
-		return;
+	if (!currentUser || !currentEvent) {
+		throw new Error("Utilisateur ou événement manquant pour la validation.");
 	}
 
-	if (!currentEvent) {
-		showAlert("Aucun événement n'est sélectionné pour la validation.", "error");
-		console.error("validateDate a été appelée sans currentEvent.");
-		return;
-	}
-
-	// 👉 Vérifier les conflits pour cette date
-	const conflictMessage = generateDateProposalConflictMessage(dateProposal, currentEvent);
-
-	// 👉 Vérifier si au moins un organisateur a confirmé 'oui'
-	const confirmedOrganizers = filterAndConvertOrganizers(dateProposal.organizers || []);
-
-	// Si conflits ou pas d'organisateurs confirmés, demander confirmation
-	if (conflictMessage || confirmedOrganizers.length === 0) {
-		let confirmationMessage = "";
-
-		if (confirmedOrganizers.length === 0) {
-			confirmationMessage +=
-				"Aucun·e organisateur·ice n'a confirmé ('oui') sa présence pour cette date.<br/><br/>";
-		}
-
-		if (conflictMessage) {
-			confirmationMessage += "<br/>" + conflictMessage + "<br/>";
-		}
-
-		if (confirmedOrganizers.length === 0 && !conflictMessage) {
-			confirmationMessage += "Voulez-vous vraiment valider cette date ?";
-		}
-
-		// Ouvrir le modal de confirmation
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: conflictMessage ? "Attention : Conflits détectés" : "Attention",
-				message: confirmationMessage,
-				variant: conflictMessage ? "danger" : "warning",
-				onConfirm: async () => {
-					await proceedWithDateValidation(
-						currentEvent,
-						dateProposal,
-						currentUser,
-						notify,
-						willBeConfirmed
-					);
-				}
-			}
-		};
-		return;
-	}
-
-	// Pas de conflit et organisateurs confirmés, procéder directement
+	// Procéder directement à la validation sans UI
 	await proceedWithDateValidation(currentEvent, dateProposal, currentUser, notify, willBeConfirmed);
 }
 
@@ -647,255 +550,12 @@ async function proceedWithDateValidation(
 /**
  * Gère l'ouverture du modal de confirmation pour la validation d'une date avec détection des conflits
  */
-export function handleDateValidationModal(
-	currentEvent: EventType,
-	dateProposal: DateProposedType,
-	currentUser: UserType,
-	options?: {
-		onValidate?: (eventData: Partial<EventType>) => Promise<void>;
-		additionalAction?: {
-			condition: boolean;
-			label: string;
-			action: (notify?: boolean) => Promise<void>;
-		};
-	}
-) {
-	const confirmedOrganizersList = filterAndConvertOrganizers(dateProposal.organizers || []);
-	const hasConfirmedOrganizers = confirmedOrganizersList.length > 0;
-
-	// 👉 Vérifier les conflits pour cette date
-	const conflictMessage = generateDateProposalConflictMessage(dateProposal, currentEvent);
-
-	// Simuler l'événement pour vérifier s'il peut être publié
-	const simulatedEvent: EventType = {
-		...currentEvent,
-		...prepareDateValidationData(currentEvent, dateProposal)
-	};
-
-	const validation = validateEventStatic(simulatedEvent);
-	const canBePublished = validation.isValid;
-	const canBeConfirmed = canBePublished && hasConfirmedOrganizers && !conflictMessage;
-
-	// 👉 Construction du message avec gestion des conflits
-	let message = "";
-	const title = "Clôturer le sondage";
-	let variant: "warning" | "danger" = hasConfirmedOrganizers ? "warning" : "danger";
-
-	// Message principal selon les organisateurs
-	if (hasConfirmedOrganizers) {
-		message += `<p>Choisir la date du ${lisibleDate(dateProposal.dateStart)} (${lisibleTime(
-			dateProposal.dateStart
-		)}-${lisibleTime(dateProposal.dateEnd)}) ? Le sondage sera clôturé et les participants notifiés.<p/>`;
-
-		if (canBeConfirmed) {
-			message +=
-				"<p><strong>L'événement peut être confirmé</strong> (il sera publié sur le site et pourra être ajouté à la newsletter).</p>";
-		} else if (!canBePublished) {
-			message +=
-				"<p><br/>Si vous souhaiter confirmer l'événement, vous devez auparavant completer certaines informations.</p>";
-		}
-	} else {
-		message += `Attention : Aucun·e organisateur·ice n'a confirmé sa présence pour cette date (${lisibleDate(
-			dateProposal.dateStart
-		)}). Êtes-vous sûr·e de vouloir la valider ?`;
-	}
-
-	// Gestion des conflits
-	if (conflictMessage) {
-		// title = "Attention : Conflits détectés";
-		variant = "danger";
-		message += "<br/>" + conflictMessage + "<br/>";
-	}
-
-	let additionalButton:
-		| {
-				label: string;
-				onClick: () => Promise<void>;
-				variant?: "primary" | "success" | "warning" | "error";
-		  }
-		| undefined = undefined;
-
-	// Bouton pour confirmer l'événement (priorité la plus haute)
-	if (canBeConfirmed) {
-		additionalButton = {
-			label: "Valider et confirmer l'événement",
-			variant: "success",
-			onClick: async () => {
-				// Récupérer l'état de la checkbox de notification
-				const notifyCheckbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
-				const notify = notifyCheckbox?.checked ?? true;
-
-				const eventDataToUpdate = {
-					...prepareDateValidationData(currentEvent, dateProposal),
-					isConfirmed: true
-				};
-
-				if (options?.onValidate) {
-					await options.onValidate(eventDataToUpdate);
-				} else {
-					await updateEventData(currentEvent.id, eventDataToUpdate);
-				}
-
-				if (notify) {
-					await notificationService.sendSondageValidationNotification({
-						event: currentEvent,
-						dateProposal,
-						user: currentUser,
-						options: {
-							showUserFeedback: true,
-							willBeConfirmed: true,
-							specificFeedbackMessage:
-								"Date validée et événement confirmé. Notification envoyée aux participants."
-						}
-					});
-				}
-			}
-		};
-	}
-	// Bouton pour compléter l'événement (si pas confirmable mais possible)
-	else if (hasConfirmedOrganizers && !canBeConfirmed) {
-		additionalButton = {
-			label: "Compléter l'événement",
-			variant: "success",
-			onClick: async () => {
-				// const notify = true; // 👉 Notification désactivée pour ce cas
-
-				const eventDataToUpdate = prepareDateValidationData(currentEvent, dateProposal);
-
-				// Ouvrir automatiquement le modal d'édition pour compléter
-				setTimeout(() => {
-					eventState.is = { ...currentEvent, ...eventDataToUpdate };
-					eventState.pendingSondageValidation = true; // 👉 Indiquer qu'une validation de sondage vient d'avoir lieu
-					modalState.event = true;
-				}, 100);
-			}
-		};
-	}
-
-	modalState.confirm = {
-		isOpen: true,
-		data: {
-			title,
-			message,
-			variant,
-			showCheckbox: { checked: true, label: "Notifier les participant·es" },
-			onConfirm: async (notify?: boolean) => {
-				// Action par défaut : valider sans confirmer
-				const eventDataToUpdate = prepareDateValidationData(currentEvent, dateProposal);
-
-				if (options?.onValidate) {
-					await options.onValidate(eventDataToUpdate);
-				} else {
-					await validateDate(currentEvent, dateProposal, currentUser, notify, false);
-					return; // validateDate gère déjà les notifications
-				}
-
-				if (notify) {
-					await notificationService.sendSondageValidationNotification({
-						event: currentEvent,
-						dateProposal,
-						user: currentUser,
-						options: {
-							showUserFeedback: true,
-							willBeConfirmed: false,
-							specificFeedbackMessage:
-								"Date validée. Notification envoyée aux participants du sondage."
-						}
-					});
-				}
-			},
-			additionalButton
-		}
-	};
-}
+// Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts
 
 /**
  * Confirme un événement après validation du schéma et vérification des tâches
  */
-export async function confirmEventAction(
-	event: EventType,
-	currentUser: UserType,
-	notify: boolean = true
-): Promise<void> {
-	const validation = validateEventStatic(event);
-
-	// Si l'événement ne peut pas être confirmé, afficher les erreurs
-	if (!validation.isValid) {
-		const errorMessages = validation.getErrors();
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: "Événement incomplet",
-				variant: "warning",
-				message: `Certaines informations doivent être renseignées avant de pouvoir de confirmer l'événements.<br/>${errorMessages.map((error) => `• ${error}`).join("<br/>")}`,
-				onConfirm: () => {
-					// Ouvrir le modal d'édition
-					eventState.is = event;
-					modalState.event = true;
-				},
-				confirmLabel: "Compléter l'événement"
-			}
-		};
-		return;
-	}
-
-	// S'il y a des tâches non assignées mais que ce n'est pas bloquant
-	if (validation.hasUnassignedTasks) {
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: "Confirmer l'événement",
-				variant: "warning",
-				message: `Il reste des tâches non assignées:\n${validation.unassignedTasks
-					.map((task) => `• ${task.name}`)
-					.join("\n")}\n\nVoulez-vous quand même confirmer l'événement ?`,
-				showCheckbox: notify
-					? { checked: true, label: "Notifier les organisateur·ices" }
-					: undefined,
-				onConfirm: async (notifyChecked?: boolean) => {
-					await updateEventData(
-						event.id,
-						{ isConfirmed: true },
-						"L'événement a été confirmé avec succès."
-					);
-					if (notifyChecked) {
-						await notificationService.sendEventConfirmationNotification({
-							event,
-							user: currentUser,
-							options: { showUserFeedback: true }
-						});
-					}
-				}
-			}
-		};
-		return;
-	}
-
-	// Si tout est OK, demander confirmation simple
-	modalState.confirm = {
-		isOpen: true,
-		data: {
-			title: "Confirmer l'événement",
-			variant: "info",
-			message: "Voulez-vous confirmer cet événement ?",
-			showCheckbox: notify ? { checked: true, label: "Notifier les organisateur·ices" } : undefined,
-			onConfirm: async (notifyChecked?: boolean) => {
-				await updateEventData(
-					event.id,
-					{ isConfirmed: true },
-					"L'événement a été confirmé avec succès."
-				);
-				if (notifyChecked) {
-					await notificationService.sendEventConfirmationNotification({
-						event,
-						user: currentUser,
-						options: { showUserFeedback: true }
-					});
-				}
-			}
-		}
-	};
-}
+// Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts
 
 // --- Refactoring  ---
 
@@ -918,8 +578,8 @@ export function checkSondageValidation(
 		return {
 			needsValidation: true,
 			message: canBeConfirmed
-				? `<p>Vous avez validé la date et cloturé le sondage : les participants seront notifiés. L'événement peut être confirmé afin d'être publié et ajouté à la newsletter.</p>`
-				: `<p>Vous avez validé la date et cloturé le sondage. Les participants seront notifiés. Si vous souhaitez confirmer l'événement (publication en ligne), vous devez d'abord compléter certaines informations manquantes.</p>`,
+				? `<p>Vous avez validé la date et cloturé le sondage : les participant·es seront notifiés.</p> L'événement peut être confirmé afin d'être publié sur le site et ajouté à la newsletter.</p>`
+				: `<p>Vous avez validé la date et cloturé le sondage. Les participants seront notifiés.</p> <p> Si vous souhaitez confirmer l'événement (publication en ligne), vous devez d'abord compléter certaines informations manquantes.</p>`,
 			variant: canBeConfirmed ? "info" : "warning",
 			canBeConfirmed,
 			showCompleteButton: !canBeConfirmed // Afficher le bouton "Compléter" si l'événement n'est pas prêt
@@ -1052,7 +712,7 @@ export function detectAllEventConflicts(
 
 					// Calculer les conflits pour cette date spécifique
 					const conflictResult = calculateConflicts({
-						eventId: excludeEventIds ? undefined : eventData.id,
+						eventId: excludeEventIds && excludeEventIds.length > 0 ? undefined : eventData.id,
 						startDate,
 						endDate,
 						rooms: eventData.rooms || [],
@@ -1087,7 +747,7 @@ export function detectAllEventConflicts(
 				const endDate = new Date(`${eventData.date_event}T${eventData.time_end}:00`);
 
 				const conflictResult = calculateConflicts({
-					eventId: excludeEventIds ? undefined : eventData.id,
+					eventId: excludeEventIds && excludeEventIds.length > 0 ? undefined : eventData.id,
 					startDate,
 					endDate,
 					rooms: eventData.rooms || [],
@@ -1237,81 +897,11 @@ export async function handleEventConflictsAfterSave(
 	} catch (error) {
 		console.error("Erreur lors de la gestion des conflits après sauvegarde:", error);
 		// 👉 Ne pas faire échouer la sauvegarde pour un problème de conflits
-		showAlert("Événement sauvegardé, mais erreur lors de la mise à jour des conflits.", "error");
+		// Note: L'erreur est loggée mais pas affichée à l'utilisateur - le handler s'en chargera
 	}
 }
 
 /**
  * Prépare et affiche un modal de confirmation pour la soumission d'événement
  */
-export function handleEventSubmissionConfirmation(
-	eventData: EventType,
-	options: {
-		conflictCheck?: ReturnType<typeof checkEventConflicts>;
-		sondageCheck?: ReturnType<typeof checkSondageValidation>;
-		shouldConfirm?: boolean; // 👉 Indique si la confirmation est déjà demandée
-		onConfirm: (shouldConfirm?: boolean, notifyOthers?: boolean) => Promise<void>;
-		onCancel?: () => void;
-		onComplete?: () => void; // 👉 Nouvelle action pour "Compléter"
-	}
-) {
-	const { conflictCheck, sondageCheck, shouldConfirm = false, onConfirm, onComplete } = options;
-
-	// Construire le message combiné
-	const messages: string[] = [];
-	let variant: "info" | "warning" | "danger" = "info";
-	const additionalButtons: Array<{
-		label: string;
-		variant: "error" | "success" | "warning" | "primary" | "secondary" | "accent" | "ghost";
-		onClick: () => void;
-	}> = [];
-
-	// Ajouter message de conflit si nécessaire
-	if (conflictCheck?.hasConflicts && conflictCheck.message) {
-		messages.push(conflictCheck.message);
-		variant = "warning";
-	}
-
-	// Ajouter message de sondage si nécessaire
-	if (sondageCheck?.needsValidation && sondageCheck.message) {
-		messages.push(sondageCheck.message);
-
-		// Bouton pour confirmer l'événement si possible ET si pas déjà demandé
-		if (sondageCheck.canBeConfirmed && !shouldConfirm) {
-			additionalButtons.push({
-				label: "Confirmer l'événement",
-				variant: "success",
-				onClick: () => onConfirm(true)
-			});
-		}
-		// 👉 Bouton pour compléter les informations manquantes
-		else if (sondageCheck.showCompleteButton && onComplete) {
-			additionalButtons.push({
-				label: "Compléter l'événement",
-				variant: "warning",
-				onClick: onComplete
-			});
-		}
-	}
-
-	// Si pas de message spécifique, message par défaut
-	if (messages.length === 0) {
-		messages.push("Voulez-vous enregistrer cet événement ?");
-	}
-
-	modalState.confirm = {
-		isOpen: true,
-		data: {
-			title: shouldConfirm ? "Confirmer l'événement" : "Enregistrer l'événement",
-			message: messages.join("\n\n"),
-			variant,
-			confirmLabel: shouldConfirm ? "Continuer" : "Enregistrer",
-			showCheckbox: {
-				label: "Notifier les participant·es",
-				checked: true
-			},
-			onConfirm: (notifyOthers) => onConfirm(shouldConfirm, notifyOthers),
-			additionalButton: additionalButtons[0] // Pour l'instant, un seul bouton additionnel
-		}
-	};
-}
+// Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts

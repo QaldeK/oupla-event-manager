@@ -13,6 +13,7 @@
 	let cancelEventConfig = $derived(modalState.confirm.data.showCancelEventButton);
 	let onConfirmCallback = $derived(modalState.confirm.data.onConfirm);
 	let onCancelEventCallback = $derived(cancelEventConfig?.onCancelEvent);
+	let cancelButton = $derived(modalState.confirm.data.showCancelButton ?? true);
 
 	// --- État local pour la checkbox ---
 	let notifyOthers = $derived(checkboxConfig?.checked); // Initialiser avec la valeur par défaut
@@ -102,7 +103,9 @@
 				{/if}
 			</div>
 			<div class="flex flex-wrap gap-2">
-				<button class="btn btn-ghost grow" onclick={handleCancel}>Annuler</button>
+				{#if cancelButton}
+					<button class="btn btn-ghost grow" onclick={handleCancel}>Annuler</button>
+				{/if}
 				{#if additionnalButton}
 					<button class="btn btn-{additionnalButton.variant}" onclick={handleAdditionnalButton}
 						>{additionnalButton.label}</button

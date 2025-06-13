@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { confirmEventAction } from "$lib/services/eventActions";
-	import type {
-		ValidMaster,
-		ValidOccurrence
-	} from "$lib/types/event.types";
+	import {
+		createSimpleConfirmationPlan,
+		handleEventAction
+	} from "$lib/shared/eventActionHandler.svelte";
+	import type { ValidMaster, ValidOccurrence } from "$lib/types/event.types";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
@@ -31,11 +31,16 @@
 
 	const handleSubscriptionClick = (occurrence: ValidOccurrence) => {
 		if (!currentUser) return;
-		eventsStore.requestTaskUpdate({ event: occurrence as unknown as Parameters<typeof eventsStore.requestTaskUpdate>[0]['event'], user: currentUser });
+		eventsStore.requestTaskUpdate({
+			event: occurrence as unknown as Parameters<typeof eventsStore.requestTaskUpdate>[0]["event"],
+			user: currentUser
+		});
 	};
 
 	const handleConfirmClick = async (occurrence: ValidOccurrence) => {
-		await confirmEventAction(occurrence, currentUser as UserType, true);
+		if (!currentUser) return;
+		const plan = await createSimpleConfirmationPlan(occurrence, currentUser, true);
+		await handleEventAction(plan);
 	};
 
 	const getSubscriptionButtonText = (occurrence: ValidOccurrence): string => {

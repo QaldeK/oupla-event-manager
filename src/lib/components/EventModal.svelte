@@ -14,13 +14,7 @@
 	import OrganizersAndTasksSelect from "$lib/components/forModal/OrganizersAndTasksSelect.svelte";
 	import RecurrentTab from "$lib/components/forModal/RecurrentTab.svelte";
 	import Textarea from "$lib/components/ui-custom/textarea/textarea.svelte";
-	import {
-		createEvent,
-		createRecurrentEvent,
-		updateAllOccurrences,
-		updateEvent,
-		pb
-	} from "$lib/pocketbase.svelte";
+	import { pb } from "$lib/pocketbase.svelte";
 	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import {
 		type DateProposedType,
@@ -28,16 +22,11 @@
 		type TaskType
 	} from "$lib/types/event.types";
 	import type { EventType } from "$lib/types/event.types";
+	import { getDefaultRecurrence, getNewEvent } from "$lib/services/eventActions";
 	import {
-		getDefaultRecurrence,
-		getNewEvent,
-		checkSondageValidation,
-		handleEventSubmissionConfirmation,
-		handleEventConflictsAfterSave,
-		detectAllEventConflicts,
-		generateConflictMessage
-	} from "$lib/services/eventActions";
-	import { notificationService } from "$lib/services/notificationService.svelte";
+		createEventSubmissionPlan,
+		handleEventAction
+	} from "$lib/shared/eventActionHandler.svelte";
 	import { getSpace, userDb } from "$lib/shared";
 	import {
 		eventState,
@@ -261,7 +250,7 @@
 	});
 
 	let hasSondageValidation = $state(eventState.pendingSondageValidation || false);
-
+	$inspect("hasSondageValidation", hasSondageValidation);
 	// instance unique de calcul des conflit pour ce modal
 	const conflictCalculator = new ConflictCalculator();
 
@@ -475,12 +464,8 @@
 	/**
 	 * Génère un message détaillé pour les conflits détectés
 	 */
-
-	const submitForm = async (e?: SubmitEvent, shouldConfirm: boolean = false) => {
-		if (e) e.preventDefault();
-
+	const submitForm = async (shouldConfirm: boolean = false) => {
 		hasTriggeredValidation = true;
-
 		try {
 			// Validation initiale
 			if (!validator) {
@@ -488,14 +473,10 @@
 			}
 			validator?.setProfile(determineValidationProfile(shouldConfirm));
 
-			if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
-				showAlert(
-					`L'événement ne peut être sauvegardé: veuillez compléter les champs obligatoires.`,
-					"error"
-				);
-				console.warn("errors: ", validator?.errors);
-				return;
-			}
+			// if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
+			// 	showAlert("Veuillez compléter les champs obligatoires.", "error");
+			// 	return;
+			// }
 
 			// 👉 Détection unifiée des conflits selon le type d'événement
 			let excludeEventIds: string[] = [];
@@ -510,58 +491,15 @@
 					console.warn("Erreur lors de la récupération des occurrences existantes:", error);
 					excludeEventIds = [eventData.id];
 				}
+			} else if (
+				(eventMode === "EDIT_SINGLE" || eventMode === "EDIT_RECURRENT_ONE") &&
+				eventData.id
+			) {
+				// Pour les autres modes d'édition, exclure seulement l'événement actuel
+				excludeEventIds = [eventData.id];
 			}
 
-			const conflictDetection = detectAllEventConflicts(eventData, eventMode, excludeEventIds);
-			const sondageCheck = checkSondageValidation(eventData, hasSondageValidation);
-
-			// Convertir en format compatible pour handleEventSubmissionConfirmation
-			const conflictCheck = {
-				hasConflicts: conflictDetection.hasConflicts,
-				canProceed: false, // Force la confirmation si il y a des conflits
-				message: conflictDetection.hasConflicts
-					? generateConflictMessage(conflictDetection, eventMode, eventData)
-					: undefined
-			};
-
-			// Si besoin de confirmation, utiliser le service centralisé
-			if (conflictDetection.hasConflicts || sondageCheck.needsValidation) {
-				// Gestion spéciale pour les récurrences globales
-				if (
-					eventMode === "EDIT_RECURRENT_ALL" &&
-					!conflictCheck.hasConflicts &&
-					!sondageCheck.needsValidation
-				) {
-					modalState.confirm = {
-						isOpen: true,
-						data: {
-							title: "Modifier toutes les occurrences ?",
-							message:
-								"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
-							variant: "warning",
-							onConfirm: async () => {
-								await proceedWithSave(false, conflictDetection, false);
-							}
-						}
-					};
-					return;
-				}
-
-				handleEventSubmissionConfirmation(eventData, {
-					conflictCheck: conflictDetection.hasConflicts ? conflictCheck : undefined,
-					sondageCheck: sondageCheck.needsValidation ? sondageCheck : undefined,
-					shouldConfirm: shouldConfirm, // 👉 Passer le paramètre shouldConfirm
-					onConfirm: async (confirm, notifyOthers = true) => {
-						await proceedWithSave(confirm || shouldConfirm, conflictDetection, notifyOthers);
-					},
-					onComplete: () => {
-						// Ok: la validation est déjà enclenché pour la modification d'événement
-					}
-				});
-				return;
-			}
-
-			// Gestion spéciale pour les récurrences globales sans conflit/sondage
+			// Gestion spéciale pour les récurrences globales
 			if (eventMode === "EDIT_RECURRENT_ALL") {
 				modalState.confirm = {
 					isOpen: true,
@@ -571,15 +509,30 @@
 							"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
 						variant: "warning",
 						onConfirm: async () => {
-							await proceedWithSave(false, conflictDetection, false);
+							const plan = await createEventSubmissionPlan(eventData, {
+								mode: eventMode,
+								shouldConfirmIntent: shouldConfirm,
+								hasSondageBeenValidated: hasSondageValidation,
+								excludeEventIds,
+								currentUser: userDb.current || undefined
+							});
+							await handleEventAction(plan);
 						}
 					}
 				};
-				return;
 			}
 
-			// Pas besoin de confirmation, procéder directement
-			await proceedWithSave(shouldConfirm, conflictDetection, false);
+			// Utiliser le nouvel orchestrateur
+			const plan = await createEventSubmissionPlan(eventData, {
+				mode: eventMode,
+				shouldConfirmIntent: shouldConfirm,
+				hasSondageBeenValidated: hasSondageValidation,
+				excludeEventIds,
+				currentUser: userDb.current || undefined
+			});
+
+			await handleEventAction(plan);
+			// closeModal();
 		} catch (error) {
 			console.error(error);
 			showAlert("Erreur lors de l'enregistrement de l'événement.", "error");
@@ -587,133 +540,12 @@
 	};
 
 	// 👉 Fonction séparée pour la logique de sauvegarde
-	const proceedWithSave = async (
-		shouldConfirm: boolean,
-		conflictDetection: ReturnType<typeof detectAllEventConflicts>,
-		notifyOthers: boolean = true
-	) => {
-		// Confirmer l'événement si demandé
-		if (shouldConfirm) {
-			eventData.isConfirmed = true;
-		}
-
-		// 👉 Utiliser les conflits détectés de manière unifiée
-		let conflictIds = conflictDetection.conflictIds;
-		let recurrentConflictsMap = conflictDetection.recurrentConflictsMap;
-		let createdEventIds: string[] = [];
-
-		// Sauvegarde selon le mode
-		switch (eventMode) {
-			case "NEW_SINGLE": {
-				const createdEvent = await createEvent(eventData);
-				// 👉 Pour un nouvel événement, on récupère l'ID créé
-				if (createdEvent?.id) {
-					eventData.id = createdEvent.id;
-					createdEventIds = [createdEvent.id];
-				}
-				break;
-			}
-			case "NEW_RECURRENT": {
-				const result = await createRecurrentEvent(eventData);
-				// 👉 Récupérer les IDs des événements créés
-				console.log("✅ Événements créés:", result);
-				if (result?.eventIds) {
-					createdEventIds = result.eventIds;
-					console.log("📋 IDs récupérés:", createdEventIds);
-				} else {
-					console.warn("⚠️ Pas d'eventIds retournés");
-				}
-				break;
-			}
-			case "EDIT_SINGLE":
-			case "EDIT_RECURRENT_ONE": {
-				await updateEvent(eventData.id, eventData);
-				break;
-			}
-			case "EDIT_RECURRENT_ALL": {
-				const result = await updateAllOccurrences(eventData);
-				// 👉 Récupérer les IDs des événements mis à jour
-				if (result?.eventIds) {
-					createdEventIds = result.eventIds;
-				}
-				break;
-			}
-		}
-
-		// 👉 Gérer les conflits après sauvegarde
-		// Pour les événements modifiés, toujours appeler la gestion des conflits pour nettoyer les anciens
-		const isEditMode =
-			eventMode === "EDIT_SINGLE" ||
-			eventMode === "EDIT_RECURRENT_ONE" ||
-			eventMode === "EDIT_RECURRENT_ALL";
-		const shouldManageConflicts =
-			conflictDetection.hasConflicts || (isEditMode && eventData.inConflictWith?.length > 0);
-
-		if (shouldManageConflicts) {
-			console.log(
-				"🔧 Gestion conflits - Mode:",
-				eventMode,
-				"IDs:",
-				createdEventIds,
-				"Conflits simples:",
-				conflictIds,
-				"Conflits récurrents:",
-				recurrentConflictsMap.size,
-				"Anciens conflits:",
-				eventData.inConflictWith
-			);
-			await handleEventConflictsAfterSave(
-				eventMode,
-				eventData,
-				conflictIds,
-				createdEventIds,
-				recurrentConflictsMap
-			);
-		}
-
-		// 👉 Envoyer la notification de validation de sondage si nécessaire
-		// Seulement si l'événement n'est plus un sondage (a été complété) et si l'utilisateur veut notifier
-		if (
-			hasSondageValidation &&
-			!eventData.isSondage &&
-			notifyOthers &&
-			eventData.dates_proposed &&
-			eventData.dates_proposed.length > 0
-		) {
-			// Trouver la date validée (celle qui a des organisateurs confirmés)
-			const validatedDate = eventData.dates_proposed.find((date) =>
-				date.organizers?.some((org) => org.maybehere === "oui")
-			);
-
-			if (validatedDate && userDb.current) {
-				try {
-					await notificationService.sendSondageValidationNotification({
-						event: eventData,
-						dateProposal: validatedDate,
-						user: userDb.current,
-						options: {
-							showUserFeedback: true,
-							willBeConfirmed: shouldConfirm,
-							specificFeedbackMessage: shouldConfirm
-								? "Date validée et événement confirmé. Notification envoyée aux participants."
-								: "Date validée et événement complété. Notification envoyée aux participants du sondage."
-						}
-					});
-				} catch (error) {
-					console.error("Erreur lors de l'envoi de la notification:", error);
-				}
-			}
-
-			// 👉 Réinitialiser le flag après utilisation
-			hasSondageValidation = false;
-		}
-
-		closeModal();
-	};
+	// Cette fonction a été déplacée vers eventActions.ts sous le nom submitEvent
 
 	const closeModal = () => {
-		modalState.event = false;
 		eventState.is = getNewEvent();
+		eventState.pendingSondageValidation = false;
+		modalState.event = false;
 	};
 </script>
 
@@ -1124,13 +956,13 @@
 					class="btn btn-accent block w-full font-bold sm:w-fit {validator?.isValid
 						? ''
 						: 'opacity-50'}"
-					onclick={() => submitForm(undefined, true)}>Enregistrer et Confirmer l'événement</button
+					onclick={() => submitForm(true)}>Enregistrer et Confirmer l'événement</button
 				>
 			{/if}
 			<button
 				class="btn btn-primary block w-full font-bold sm:w-fit"
 				type="button"
-				onclick={() => submitForm()}>Enregistrer</button
+				onclick={() => submitForm(eventData.isConfirmed ? true : false)}>Enregistrer</button
 			>
 		</div>
 	</div>

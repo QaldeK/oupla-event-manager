@@ -4,8 +4,9 @@
 
 	import { updateEvent } from "$lib/pocketbase.svelte";
 	import {
-		handleDateValidationModal
-	} from "$lib/services/eventActions";
+		createDateValidationPlan,
+		handleEventAction
+	} from "$lib/shared/eventActionHandler.svelte";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate, lisibleTime } from "$lib/utils";
 	import {
@@ -85,12 +86,13 @@
 		}
 	}
 
-	const handleValidateDate = (
+	const handleValidateDate = async (
 		currentEvent: EventType,
 		dateProposal: DateProposedType,
 		currentUser: UserType
 	) => {
-		handleDateValidationModal(currentEvent, dateProposal, currentUser);
+		const plan = await createDateValidationPlan(currentEvent, dateProposal, currentUser);
+		await handleEventAction(plan);
 	};
 </script>
 
@@ -158,9 +160,10 @@
 						</span>
 						<div class="tooltip float-end ms-2" data-tip="Valider cette date">
 							<button
-								onclick={() => handleValidateDate(currentEvent, dateProposal, currentUser)}
+								onclick={() => handleValidateDate(currentEvent, dateProposal, currentUser!)}
 								class="btn btn-outline btn-compact {oui > 0 ? 'btn-success' : 'text-neutral/50'}"
 								title="Valider cette date"
+								disabled={!currentUser}
 							>
 								<CalendarCheck />
 							</button>
