@@ -26,23 +26,119 @@ import { filterAndConvertOrganizers, lisibleDate, lisibleTime } from "$lib/utils
  * Orchestrateur pour la soumission d'un formulaire d'événement.
  * Construit un plan d'action unifié basé sur plusieurs vérifications.
  */
-export async function createEventSubmissionPlan(
+export async function createEventActionPlan(
 	eventData: EventType,
 	options: {
-		mode: string;
-		shouldConfirmIntent: boolean;
-		hasSondageBeenValidated: boolean;
+		mode?: string;
+		shouldConfirmIntent?: boolean;
+		hasSondageBeenValidated?: boolean;
 		excludeEventIds?: string[];
 		currentUser?: UserType;
+		isSimpleConfirmation?: boolean;
+		notify?: boolean;
 	}
 ): Promise<EventActionPlan> {
 	const {
-		mode,
-		shouldConfirmIntent,
-		hasSondageBeenValidated,
+		mode = "create",
+		shouldConfirmIntent = false,
+		hasSondageBeenValidated = false,
 		excludeEventIds = [],
-		currentUser
+		currentUser,
+		isSimpleConfirmation = false,
+		notify = true
 	} = options;
+
+	// --- CAS SPÉCIFIQUE : Confirmation simple d'un événement existant ---
+	if (isSimpleConfirmation) {
+		const validation = validateEventStatic(eventData);
+
+		// Si l'événement ne peut pas être confirmé, afficher les erreurs
+		if (!validation.isValid) {
+			return {
+				type: "NEEDS_COMPLETION",
+				completionDetails: { eventData }
+			};
+		}
+
+		// S'il y a des tâches non assignées mais que ce n'est pas bloquant
+		if (validation.hasUnassignedTasks) {
+			return {
+				type: "NEEDS_CONFIRMATION",
+				confirmationDetails: {
+					title: "Confirmer l'événement",
+					message: `Il reste des tâches non assignées:\n${validation.unassignedTasks
+						.map((task) => `• ${task.name}`)
+						.join("\n")}\n\nVoulez-vous quand même confirmer l'événement ?`,
+					variant: "warning",
+					showCheckbox: notify
+						? { checked: true, label: "Notifier les organisateur·ices" }
+						: undefined
+				},
+				onConfirmedAction: async (notifyChecked) => {
+					try {
+						await updateEventData(
+							eventData.id,
+							{ isConfirmed: true },
+							"L'événement a été confirmé avec succès."
+						);
+						if (notifyChecked) {
+							await notificationService.sendEventConfirmationNotification({
+								event: eventData,
+								user: currentUser!,
+								options: { showUserFeedback: true }
+							});
+						}
+						return { type: "SUCCESS", message: "L'événement a été confirmé avec succès." };
+					} catch (error: unknown) {
+						return {
+							type: "ERROR",
+							message: error instanceof Error ? error.message : "Erreur lors de la confirmation",
+							error
+						};
+					}
+				}
+			};
+		}
+
+		// Si tout est OK, demander confirmation simple avec message explicite
+		return {
+			type: "NEEDS_CONFIRMATION",
+			confirmationDetails: {
+				title: "Confirmer l'événement",
+				message:
+					"<p>Une fois confirmé, la date de l'événement ne sera plus modifiable (il pourra cependant être annulé). S'il s'agit d'un événement public, il sera publié en ligne et pourra être ajouté à la newsletter.</p><p>Cliquez sur 'Confirmer' pour continuer.</p>",
+				variant: "info",
+				showCheckbox: notify
+					? { checked: true, label: "Notifier les organisateur·ices" }
+					: undefined
+			},
+			onConfirmedAction: async (notifyChecked) => {
+				try {
+					await updateEventData(
+						eventData.id,
+						{ isConfirmed: true },
+						"L'événement a été confirmé avec succès."
+					);
+					if (notifyChecked) {
+						await notificationService.sendEventConfirmationNotification({
+							event: eventData,
+							user: currentUser!,
+							options: { showUserFeedback: true }
+						});
+					}
+					return { type: "SUCCESS", message: "L'événement a été confirmé avec succès." };
+				} catch (error: unknown) {
+					return {
+						type: "ERROR",
+						message: error instanceof Error ? error.message : "Erreur lors de la confirmation",
+						error
+					};
+				}
+			}
+		};
+	}
+
+	// --- CAS GÉNÉRAL : Soumission/modification d'événement ---
 
 	// --- 1. Vérifications TOUJOURS nécessaires ---
 	const conflictCheck = detectAllEventConflicts(eventData, mode, excludeEventIds);
@@ -145,6 +241,52 @@ export async function createEventSubmissionPlan(
 				}
 			};
 		}
+
+		// --- 2.2. Gestion des tâches non assignées pour les confirmations ---
+		if (completionCheck.hasUnassignedTasks && completionCheck.isValid) {
+			return {
+				type: "NEEDS_CONFIRMATION",
+				confirmationDetails: {
+					title: "Confirmer l'événement",
+					message: `Il reste des tâches non assignées:\n${completionCheck.unassignedTasks
+						.map((task) => `• ${task.name}`)
+						.join("\n")}\n\nVoulez-vous quand même confirmer l'événement ?`,
+					variant: "warning",
+					showCheckbox: notify
+						? { checked: true, label: "Notifier les organisateur·ices" }
+						: undefined
+				},
+				onConfirmedAction: async (notifyChecked) => {
+					try {
+						await submitEvent(
+							eventData,
+							mode,
+							shouldConfirmIntent,
+							conflictCheck,
+							false,
+							hasSondageBeenValidated,
+							currentUser
+						);
+
+						if (notifyChecked && currentUser) {
+							await notificationService.sendEventConfirmationNotification({
+								event: eventData,
+								user: currentUser,
+								options: { showUserFeedback: true }
+							});
+						}
+
+						return { type: "SUCCESS", message: "L'événement a été confirmé avec succès." };
+					} catch (error: unknown) {
+						return {
+							type: "ERROR",
+							message: error instanceof Error ? error.message : "Erreur lors de la confirmation",
+							error
+						};
+					}
+				}
+			};
+		}
 	}
 
 	// --- 3. Vérifier si l'événement peut être soumis directement ---
@@ -187,7 +329,8 @@ export async function createEventSubmissionPlan(
 			};
 		}
 	}
-	// --- 3. Agréger les résultats pour construire le message et les actions ---
+
+	// --- 4. Agréger les résultats pour construire le message et les actions ---
 	const messages: string[] = [];
 	let variant: ConfirmModalData["variant"] = "info";
 	const title = shouldConfirmIntent ? "Confirmer l'événement" : "Enregistrer l'événement";
@@ -305,19 +448,25 @@ export async function createEventSubmissionPlan(
 		};
 	}
 
-	// Si pas de message spécifique, message par défaut
+	// Si pas de message spécifique, message par défaut avec texte explicite
 	if (messages.length === 0) {
-		messages.push("Voulez-vous enregistrer cet événement ?");
+		if (shouldConfirmIntent) {
+			messages.push(
+				"<p>Une fois confirmé, la date de l'événement ne sera plus modifiable (il pourra cependant être annulé). S'il s'agit d'un événement public, il sera publié en ligne et pourra être ajouté à la newsletter.</p><p>Cliquez sur 'Confirmer' pour continuer.</p>"
+			);
+		} else {
+			messages.push("Voulez-vous enregistrer cet événement ?");
+		}
 	}
 
-	// --- 4. Construire et retourner le plan d'action final ---
+	// --- 5. Construire et retourner le plan d'action final ---
 	return {
 		type: "NEEDS_CONFIRMATION",
 		confirmationDetails: {
 			title,
 			message: messages.join("\n\n"),
 			variant,
-			confirmLabel: shouldConfirmIntent ? "Continuer" : "Enregistrer",
+			confirmLabel: shouldConfirmIntent ? "Confirmer" : "Enregistrer",
 			showCheckbox,
 			additionalButton
 		},
@@ -334,98 +483,34 @@ export async function createEventSubmissionPlan(
 	};
 }
 
-/**
- * Orchestrateur pour la confirmation simple d'un événement existant
- */
+// Fonction de rétrocompatibilité pour createEventSubmissionPlan
+export async function createEventSubmissionPlan(
+	eventData: EventType,
+	options: {
+		mode: string;
+		shouldConfirmIntent: boolean;
+		hasSondageBeenValidated: boolean;
+		excludeEventIds?: string[];
+		currentUser?: UserType;
+	}
+): Promise<EventActionPlan> {
+	return createEventActionPlan(eventData, {
+		...options,
+		isSimpleConfirmation: false
+	});
+}
+
+// Fonction de rétrocompatibilité pour createSimpleConfirmationPlan
 export async function createSimpleConfirmationPlan(
 	event: EventType,
 	currentUser: UserType,
 	notify: boolean = true
 ): Promise<EventActionPlan> {
-	const validation = validateEventStatic(event);
-
-	// Si l'événement ne peut pas être confirmé, afficher les erreurs
-	if (!validation.isValid) {
-		return {
-			type: "NEEDS_COMPLETION",
-			completionDetails: { eventData: event }
-		};
-	}
-
-	// S'il y a des tâches non assignées mais que ce n'est pas bloquant
-	if (validation.hasUnassignedTasks) {
-		return {
-			type: "NEEDS_CONFIRMATION",
-			confirmationDetails: {
-				title: "Confirmer l'événement",
-				message: `Il reste des tâches non assignées:\n${validation.unassignedTasks
-					.map((task) => `• ${task.name}`)
-					.join("\n")}\n\nVoulez-vous quand même confirmer l'événement ?`,
-				variant: "warning",
-				showCheckbox: notify
-					? { checked: true, label: "Notifier les organisateur·ices" }
-					: undefined
-			},
-			onConfirmedAction: async (notifyChecked) => {
-				try {
-					await updateEventData(
-						event.id,
-						{ isConfirmed: true },
-						"L'événement a été confirmé avec succès."
-					);
-					if (notifyChecked) {
-						await notificationService.sendEventConfirmationNotification({
-							event,
-							user: currentUser,
-							options: { showUserFeedback: true }
-						});
-					}
-					return { type: "SUCCESS", message: "L'événement a été confirmé avec succès." };
-				} catch (error: unknown) {
-					return {
-						type: "ERROR",
-						message: error instanceof Error ? error.message : "Erreur lors de la confirmation",
-						error
-					};
-				}
-			}
-		};
-	}
-
-	// Si tout est OK, demander confirmation simple
-	return {
-		type: "NEEDS_CONFIRMATION",
-		confirmationDetails: {
-			title: "Confirmer l'événement",
-			message:
-				"<p>Une fois confirmé, la date de l'événement ne sera plus modifiable (il pourra cependant être annulé). S'il s'agit d'un événement public, il sera publié en ligne et pourra être ajouté à la newsletter.</p><p>Cliquez sur 'Confirmer' pour continuer.</p>",
-			variant: "info",
-			showCheckbox: notify ? { checked: true, label: "Notifier les organisateur·ices" } : undefined
-		},
-		onConfirmedAction: async (notifyChecked) => {
-			try {
-				await updateEventData(
-					event.id,
-					{ isConfirmed: true },
-					"L'événement a été confirmé avec succès."
-				);
-				if (notifyChecked) {
-					await notificationService.sendEventConfirmationNotification({
-						event,
-						user: currentUser,
-						options: { showUserFeedback: true }
-					});
-				}
-				return { type: "SUCCESS", message: "L'événement a été confirmé avec succès." };
-			} catch (error: unknown) {
-				return {
-					type: "ERROR",
-					message: error instanceof Error ? error.message : "Erreur lors de la confirmation",
-					error
-				};
-			}
-		}
-	};
+	return createEventActionPlan(event, {
+		currentUser,
+		notify,
+		isSimpleConfirmation: true
+	});
 }
 
 /**
