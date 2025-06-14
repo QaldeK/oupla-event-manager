@@ -162,32 +162,37 @@
 						{/if}
 					</div>
 				{:else}
-					<div class="space-y-1">
+					<div class="">
 						{#each summaryEvents as event (event.id)}
-							<button
-								data-event-id={event.id}
-								onclick={() => scrollToEvent(event.id)}
-								class="hover:bg-base-200 text-base-content/70 w-full rounded-lg px-2 py-1 text-left transition-colors hover:cursor-pointer {visibleEventId ===
-								event.id
-									? 'bg-base-200 '
-									: ''} "
-							>
-								<div class="flex flex-wrap items-center justify-between">
-									<div
-										class="text-base-content/60 rounded-lg px-2 text-xs {event.isConfirmed
-											? 'bg-success/10'
-											: 'bg-warning/10'}"
-									>
-										{formatEventDate(event)}
+							<div class="border-base-300/90 gap-2 border-b-1">
+								<button
+									data-event-id={event.id}
+									onclick={() => scrollToEvent(event.id)}
+									class="hover:bg-base-200 text-base-content/70 w-full px-2 py-2 text-left transition-colors hover:cursor-pointer {visibleEventId ===
+									event.id
+										? 'bg-base-200 '
+										: ''} "
+								>
+									<div class="flex items-center justify-between">
+										<div
+											class="text-base-content/60 rounded-lg px-2 text-xs {event.isConfirmed &&
+												!event.canceled &&
+												'bg-success/10'} {!event.isConfirmed && !event.canceled && 'bg-warning/10'}
+									 {event.canceled && 'bg-error/10'}"
+										>
+											{formatEventDate(event)}
+										</div>
+										<div
+											class="line-clamp-2 flex max-h-9 max-w-3/5 flex-wrap text-end text-sm font-medium"
+										>
+											{event.event_title}
+										</div>
 									</div>
-									<div class="mb-1 line-clamp-2 text-end text-sm font-medium">
-										{event.event_title}
-									</div>
-								</div>
-								<!-- {#if !displayedEvents.some((e) => e.id === event.id)}
-									<div class="text-warning mt-1 text-xs">• Non chargé</div>
-								{/if} -->
-							</button>
+									<!-- {#if !displayedEvents.some((e) => e.id === event.id)}
+								<div class="text-warning mt-1 text-xs">• Non chargé</div>
+							{/if} -->
+								</button>
+							</div>
 						{/each}
 					</div>
 				{/if}
