@@ -3,10 +3,8 @@
 	import type { DateProposedType, EventType, OrganizerType } from "$lib/types/types";
 
 	import { updateEvent } from "$lib/pocketbase.svelte";
-	import {
-		createDateValidationPlan,
-		handleEventAction
-	} from "$lib/shared/eventActionHandler.svelte";
+	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
+
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate, lisibleTime } from "$lib/utils";
 	import {
@@ -91,7 +89,21 @@
 		dateProposal: DateProposedType,
 		currentUser: UserType
 	) => {
-		const plan = await createDateValidationPlan(currentEvent, dateProposal, currentUser);
+		if (!currentUser) {
+			showAlert("Vous devez être connecté pour valider une date.", "error");
+			return;
+		}
+
+		// Créer le plan d'action avec la nouvelle interface améliorée
+		const plan = await createEventActionPlan(currentEvent, {
+			context: "external_action",
+			isValidatingSondage: true,
+			wantsToConfirmEvent: false,
+			checkConflicts: true,
+			currentUser,
+			notify: true,
+			dateSondageToValidate: dateProposal
+		});
 		await handleEventAction(plan);
 	};
 </script>

@@ -29,10 +29,10 @@ pb/*.log
 pb/*.tmp
 pb/.env*
 
-.prompts
 _pb_bak
 .directory
 *_bak
+test
 
 # llm
 .aider*
@@ -44,3 +44,4 @@ aider.conf.yml
 .augment-guidelines
 aider*
 CLAUDE.md
+.prompts

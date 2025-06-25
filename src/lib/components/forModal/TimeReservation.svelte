@@ -1,8 +1,8 @@
 <script lang="ts">
 	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import TimePickRange from "$lib/components/TimePickRange.svelte";
-	import { addTime } from "$lib/utils";
 	import { showAlert } from "$lib/shared/states.svelte";
+	import { addTime } from "$lib/utils";
 	import "flatpickr/dist/flatpickr.min.css";
 	import "tippy.js/dist/tippy.css";
 
@@ -12,7 +12,8 @@
 			time_start: "",
 			time_end: "",
 			start_public: "",
-			start_event: ""
+			start_event: "",
+			isPublic: Boolean
 		})
 	} = $props();
 
@@ -115,24 +116,26 @@
 		<ErrorMessage error={errors?.timeStart || errors?.timeEnd} />
 	</div>
 
-	<div class="flex flex-col">
-		<div class="flex items-center gap-x-6 gap-y-2">
-			<TimePickRange
-				bind:value={eventData.start_public}
-				classAdd="md:w-48 w-full"
-				initial={addTime(eventData.time_start, 10)}
-				label="ouverture au public :"
-			/>
-			<TimePickRange
-				bind:value={eventData.start_event}
-				classAdd="md:w-48 w-full"
-				initial={addTime(eventData.start_public || eventData.time_start, 20)}
-				label="début de l'événement :"
-			/>
+	{#if eventData.isPublic}
+		<div class="flex flex-col">
+			<div class="flex items-center gap-x-6 gap-y-2">
+				<TimePickRange
+					bind:value={eventData.start_public}
+					classAdd="md:w-48 w-full"
+					initial={addTime(eventData.time_start, 10)}
+					label="ouverture au public :"
+				/>
+				<TimePickRange
+					bind:value={eventData.start_event}
+					classAdd="md:w-48 w-full"
+					initial={addTime(eventData.start_public || eventData.time_start, 20)}
+					label="début de l'événement :"
+				/>
+			</div>
+			<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires annoncées au public</p>
+			<div class="max-w-96"><ErrorMessage error={errors?.publicStartTime} /></div>
 		</div>
-		<p class="text-fluid-sm pt-1 text-gray-500 italic">horaires annoncées au public</p>
-		<div class="max-w-96"><ErrorMessage error={errors?.publicStartTime} /></div>
-	</div>
+	{/if}
 </div>
 
 <style>

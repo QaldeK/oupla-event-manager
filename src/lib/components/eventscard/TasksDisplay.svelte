@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { fade } from "svelte/transition";
+	import type { OrganizerType, RecurrenceTeamType, TaskType, UserType } from "$lib/types/types";
 	import { Info } from "lucide-svelte";
-	import type { OrganizerType, TaskType, UserType, RecurrenceTeamType } from "$lib/types/types";
+	import { fade } from "svelte/transition";
 
 	interface Props {
 		tasks: TaskType[];
@@ -25,11 +25,15 @@
 
 	const isUserSubscribedToTask = (task: string) => {
 		return organizers.some(
-			(org: OrganizerType) => org.id === currentUser.id && org.tasks?.includes(task)
+			(org: OrganizerType) => org.id === currentUser!.id && org.tasks?.includes(task)
 		);
 	};
 
-	const shouldShowTaskDetails = $derived(isUserInRecurrenceTeam && tasks.length > 1);
+	const shouldShowTaskDetails = $derived.by(() => {
+		if (isRecurrent && isUserInRecurrenceTeam && tasks.length > 1) return true;
+		if (!isRecurrent && tasks.length > 1) return true;
+		return false;
+	});
 </script>
 
 {#if isRecurrent}
@@ -75,7 +79,7 @@
 						{/each}
 					{/if}
 					<button
-						class="btn btn-outline btn-xs ml-auto {isUserInTask ? 'btn-error' : 'btn-primary'}"
+						class="btn btn-outline btn-badge ml-auto {isUserInTask ? 'btn-error' : 'btn-primary'}"
 						onclick={() => onTaskSubscription(task.name)}
 					>
 						{isUserInTask ? "Se désinscrire" : "S'inscrire"}

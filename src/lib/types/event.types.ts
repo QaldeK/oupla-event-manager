@@ -92,11 +92,11 @@ export interface ExternalProposalType {
 
 // Types pour les différents modes de validation
 export type EventMode =
-	| "NEW_SINGLE"
-	| "NEW_RECURRENT"
-	| "EDIT_SINGLE"
-	| "EDIT_RECURRENT_ALL"
-	| "EDIT_RECURRENT_OCCURRENCE";
+	| "NEW_SINGLE" // Création événement unique
+	| "NEW_RECURRENT" // Création événement récurrent
+	| "EDIT_SINGLE" // Modification événement unique
+	| "EDIT_RECURRENT_ONE" // Modification occurrence unique
+	| "EDIT_RECURRENT_ALL"; // Modification toutes occurrences
 
 export type ValidationContext = "SAVE" | "PUBLISH" | "RECURRENT_MASTER";
 

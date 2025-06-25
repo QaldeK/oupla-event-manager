@@ -1,22 +1,22 @@
 <script lang="ts">
+	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
 	import { eventsStore, userDb } from "$lib/shared";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { DateProposedType, EventType, UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
-	import { fade } from "svelte/transition";
-	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
-	import TasksDisplay from "./TasksDisplay.svelte";
-	import OrganizersHeader from "./OrganizersHeader.svelte";
-
-	import ButtonAction from "./ButtonAction.svelte";
 	import {
 		formatRecurrence,
 		getRecurrenceLabel,
 		hasAuthorizations,
 		isInTeam
 	} from "$lib/utils/recurrence";
+	import { fade } from "svelte/transition";
+	import ButtonAction from "./ButtonAction.svelte";
+	import OrganizersHeader from "./OrganizersHeader.svelte";
+	import TasksDisplay from "./TasksDisplay.svelte";
+	import TopAlert from "./TopAlert.svelte";
 
 	// ::: context & props
 	interface Props {
@@ -156,7 +156,7 @@
 			? ''
 			: 'border-l-warning/80 border-l-4'}"
 	>
-		<!-- <TopAlert thisEvent={currentEvent} /> -->
+		<TopAlert thisEvent={currentEvent} />
 		<!-- <span>auth : {hasAuth}</span> -->
 		<div class="pb-4">
 			<div id="Header-event" class="mb-4 justify-between gap-2 @md:flex @md:px-4 @md:py-2">
@@ -209,18 +209,58 @@
 
 				<div id="titleAndCat" class="w-full p-3 @max-md:text-center @md:order-first @md:w-3/5">
 					<p class="text-fluid-xl font-bold">{currentEvent.event_title}</p>
-					{#each currentEvent.categories ?? [] as category, index (category)}
-						<p class="font-semibold uppercase">
-							{category}{index < (currentEvent.categories ?? []).length - 1 ? ", " : ""}
-						</p>
-					{/each}
+
+					<div class="flex flex-wrap items-center justify-center gap-2 @md:justify-between">
+						{#each currentEvent.categories ?? [] as category, index (category)}
+							<span class="font-semibold uppercase"
+								>{category}{index < (currentEvent.categories ?? []).length - 1 ? ", " : ""}
+							</span>
+						{/each}
+					</div>
+					<div
+						id="info-event"
+						class="my-2 flex flex-wrap gap-x-2 gap-y-2 font-semibold @max-md:justify-center"
+					>
+						<div
+							class="badge badge-sm {currentEvent.isPublic
+								? 'badge-accent badge-soft'
+								: 'bg-neutral/10 '}"
+						>
+							{currentEvent.isPublic ? "Public" : "non-public"}
+						</div>
+
+						{#if currentEvent.is_prix_libre}
+							<div class="badge badge-sm badge-accent badge-soft">Prix libre</div>
+						{:else if currentEvent.prix}
+							<div class="badge badge-sm badge-accent badge-soft">
+								Prix : {currentEvent.prix}
+							</div>
+						{/if}
+
+						{#if currentEvent.isMixiteChoisie}
+							<div class="badge badge-sm badge-accent badge-soft">
+								mixité : {currentEvent.mixite}
+							</div>
+						{/if}
+
+						{#if !currentEvent.is_age_no_restriction}
+							<div class="badge badge-sm badge-accent badge-soft">
+								Âge : {currentEvent.age_advice}
+							</div>
+						{/if}
+
+						{#if !currentEvent.isMixiteChoisie && currentEvent.is_age_no_restriction}
+							<div class="badge badge-sm badge-accent badge-soft">tout public</div>
+						{/if}
+					</div>
 					{#if currentEvent.reportedFrom}
 						<div class="text-fluid-sm text-base-content/70 p-1">
 							Initialement prévu le {lisibleDate(currentEvent.reportedFrom)}
 						</div>
 					{/if}
+
 					{#if currentEvent.isRecurrent && currentEvent.recurrence}
-						<div class="text-fluid-sm text-base-content/80 mt-1">
+						<div class="text-fluid-sm text-base-content/80 me-2 mt-1">
 							{formatRecurrence(currentEvent.recurrence)}
 							<span>• {getRecurrenceLabel(currentEvent.recurrence)}</span>
 
@@ -320,7 +360,7 @@
 						</div>
 					</div>
 					{#if currentEvent.inConflictWith?.length}
-						<ConflictAlert {currentEvent} mode="cached" />
+						<ConflictAlert {currentEvent} mode="cached" showOnlyLevel="confirmed" />
 					{/if}
 				</div>
 			{/if}

@@ -1,24 +1,20 @@
 <script lang="ts">
 	import DropDownModEvent from "$lib/components/DropDownModEvent.svelte";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { eventState, messageSheet, modalState, showAlert, userDb } from "$lib/shared";
+	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
 	import type { EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
-	import { pb } from "$lib/pocketbase.svelte";
-	import { showAlert, userDb } from "$lib/shared";
-	import { eventState, messageSheet, modalState } from "$lib/shared";
 	import { hasAuthorizations } from "$lib/utils/recurrence";
-	import {
-		createSimpleConfirmationPlan,
-		handleEventAction
-	} from "$lib/shared/eventActionHandler.svelte";
-	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
 	import {
+		CalendarCheck,
 		CalendarPlus,
-		MessageCircle,
-		PencilIcon,
-		Menu,
 		CalendarX,
-		CalendarCheck
+		Menu,
+		MessageCircle,
+		PencilIcon
 	} from "lucide-svelte";
 
 	// ::: props and reactive states
@@ -66,7 +62,13 @@
 
 	async function handleConfirmEvent() {
 		if (!userDb.current) return;
-		const plan = await createSimpleConfirmationPlan(currentEvent, userDb.current, true);
+		const plan = await createEventActionPlan(currentEvent, {
+			context: "external_action",
+			wantsToConfirmEvent: true,
+			checkConflicts: true,
+			currentUser: userDb.current,
+			notify: true
+		});
 		await handleEventAction(plan);
 	}
 
@@ -138,7 +140,7 @@
 				class="btn {!hasAuth ? 'cursor-default opacity-50' : ''}"
 			>
 				<PencilIcon />
-				modifier
+				Modifier
 			</button>
 		{/if}
 	{/if}

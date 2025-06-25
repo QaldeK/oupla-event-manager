@@ -1,12 +1,12 @@
 <script lang="ts">
 	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
-	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import Info from "$lib/components/Info.svelte";
+	import { modifyRecord } from "$lib/pocketbase.svelte";
+	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
+	import { modalState } from "$lib/shared/states.svelte";
 	import { type EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
-	import { modifyRecord } from "$lib/pocketbase.svelte";
-	import { modalState } from "$lib/shared/states.svelte";
 	import "flatpickr/dist/flatpickr.min.css";
 	import "tippy.js/dist/tippy.css";
 
@@ -60,7 +60,7 @@
 	};
 </script>
 
-<div class="space-y-6">
+<div class="space-y-10">
 	{#if !eventData.isConfirmed}
 		<Info>
 			{#if !eventData.dates_proposed?.length}

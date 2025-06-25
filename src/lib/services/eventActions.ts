@@ -1,20 +1,23 @@
 // src/lib/services/eventActions.ts
 import {
-	updateEvent,
-	updateReciprocalConflicts,
-	pb,
 	createEvent,
 	createRecurrentEvent,
-	updateAllOccurrences
+	pb,
+	updateAllOccurrences,
+	updateEvent,
+	updateReciprocalConflicts
 } from "$lib/pocketbase.svelte";
-import { validateEventStatic } from "$lib/validation/event-validator.svelte";
-import { notificationService } from "$lib/services/notificationService.svelte";
 import { ConflictCalculator, calculateConflicts } from "$lib/services/conflictService.svelte";
-import { eventsStore } from "$lib/shared/eventsStore.svelte";
-import type { DateProposedType, UserType } from "$lib/types/types";
-import type { EventType, RecurrenceType, RecurrenceConfigType } from "$lib/types/event.types";
-import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
 import type { ConfirmModalData } from "$lib/shared/states.svelte";
+import type {
+	EventMode,
+	EventType,
+	RecurrenceConfigType,
+	RecurrenceType
+} from "$lib/types/event.types";
+import type { EventsRecord } from "$lib/types/pocketbase";
+import type { DateProposedType, UserType } from "$lib/types/types";
+import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
 
 // ::: 1. TYPES D'ACTION :::
 
@@ -32,6 +35,32 @@ export type EventActionPlan =
 // ::: 2. LOGIQUE DE SAUVEGARDE :::
 
 /**
+ * Nettoie les données d'un événement avant envoi à PocketBase
+ * Supprime les champs générés par PocketBase et non compatibles
+ */
+function cleanEventDataForPocketBase(event: EventType | Partial<EventType>): Partial<EventsRecord> {
+	const cleanedData = { ...event };
+
+	// Supprimer les champs générés par PocketBase
+	const fieldsToRemove = [
+		"id",
+		"collectionId",
+		"collectionName",
+		"created",
+		"updated",
+		"expand"
+	] as const;
+
+	fieldsToRemove.forEach((field) => {
+		if (field in cleanedData) {
+			delete (cleanedData as Record<string, unknown>)[field];
+		}
+	});
+
+	return cleanedData;
+}
+
+/**
  * Fonction pure pour sauvegarder un événement
  * @param eventData - Données de l'événement à sauvegarder
  * @param eventMode - Mode de l'événement
@@ -43,26 +72,27 @@ export type EventActionPlan =
  */
 export async function submitEvent(
 	eventData: EventType,
-	eventMode: string,
-	shouldConfirm: boolean,
-	conflictDetection: ReturnType<typeof detectAllEventConflicts>,
-	notifyOthers: boolean = false,
-	hasSondageValidation: boolean = false,
-	currentUser?: UserType
+	options: {
+		mode: EventMode;
+		wantsToConfirmEvent: boolean;
+		conflictIds: string[];
+		notify?: boolean;
+		hasSondageValidation?: boolean;
+		currentUser?: UserType;
+	}
 ): Promise<EventActionPlan> {
 	try {
 		// Confirmer l'événement si demandé
-		if (shouldConfirm) {
+		if (options.wantsToConfirmEvent) {
 			eventData.isConfirmed = true;
 		}
 
 		// 👉 Utiliser les conflits détectés de manière unifiée
-		const conflictIds = conflictDetection.conflictIds;
-		const recurrentConflictsMap = conflictDetection.recurrentConflictsMap;
+		const conflictIds = options.conflictIds;
 		let createdEventIds: string[] = [];
 
 		// Sauvegarde selon le mode
-		switch (eventMode) {
+		switch (options.mode) {
 			case "NEW_SINGLE": {
 				const createdEvent = await createEvent(eventData);
 				// 👉 Pour un nouvel événement, on récupère l'ID créé
@@ -86,7 +116,9 @@ export async function submitEvent(
 			}
 			case "EDIT_SINGLE":
 			case "EDIT_RECURRENT_ONE": {
-				await updateEvent(eventData.id, eventData);
+				// Nettoyer les données avant envoi à PocketBase
+				const cleanedData = cleanEventDataForPocketBase(eventData);
+				await updateEvent(eventData.id, cleanedData);
 				break;
 			}
 			case "EDIT_RECURRENT_ALL": {
@@ -102,68 +134,34 @@ export async function submitEvent(
 		// 👉 Gérer les conflits après sauvegarde
 		// Pour les événements modifiés, toujours appeler la gestion des conflits pour nettoyer les anciens
 		const isEditMode =
-			eventMode === "EDIT_SINGLE" ||
-			eventMode === "EDIT_RECURRENT_ONE" ||
-			eventMode === "EDIT_RECURRENT_ALL";
+			options.mode === "EDIT_SINGLE" ||
+			options.mode === "EDIT_RECURRENT_ONE" ||
+			options.mode === "EDIT_RECURRENT_ALL";
 		const shouldManageConflicts =
-			conflictDetection.hasConflicts || (isEditMode && eventData.inConflictWith?.length > 0);
+			conflictIds.length > 0 || (isEditMode && eventData.inConflictWith?.length > 0);
 
 		if (shouldManageConflicts) {
 			console.log(
 				"🔧 Gestion conflits - Mode:",
-				eventMode,
+				options.mode,
 				"IDs:",
 				createdEventIds,
 				"Conflits simples:",
 				conflictIds,
-				"Conflits récurrents:",
-				recurrentConflictsMap.size,
 				"Anciens conflits:",
 				eventData.inConflictWith
 			);
 			await handleEventConflictsAfterSave(
-				eventMode,
+				options.mode,
 				eventData,
 				conflictIds,
 				createdEventIds,
-				recurrentConflictsMap
+				new Map()
 			);
 		}
 
-		// 👉 Envoyer la notification de validation de sondage si nécessaire
-		// Seulement si l'événement n'est plus un sondage (a été complété) et si l'utilisateur veut notifier
-		if (
-			hasSondageValidation &&
-			!eventData.isSondage &&
-			notifyOthers &&
-			eventData.dates_proposed &&
-			eventData.dates_proposed.length > 0 &&
-			currentUser
-		) {
-			// Trouver la date validée (celle qui a des organisateurs confirmés)
-			const validatedDate = eventData.dates_proposed.find((date) =>
-				date.organizers?.some((org) => org.maybehere === "oui")
-			);
-
-			if (validatedDate) {
-				try {
-					await notificationService.sendSondageValidationNotification({
-						event: eventData,
-						dateProposal: validatedDate,
-						user: currentUser,
-						options: {
-							showUserFeedback: true,
-							willBeConfirmed: shouldConfirm,
-							specificFeedbackMessage: shouldConfirm
-								? "Date validée et événement confirmé. Notification envoyée aux participants."
-								: "Date validée et événement complété. Notification envoyée aux participants du sondage."
-						}
-					});
-				} catch (error) {
-					console.error("Erreur lors de l'envoi de la notification:", error);
-				}
-			}
-		}
+		// 👉 Les notifications sont maintenant gérées dans eventActionHandler
+		// pour éviter les doublons et avoir une gestion centralisée
 
 		return {
 			type: "SUCCESS",
@@ -190,76 +188,77 @@ export async function submitEvent(
  * @param eventMode - Mode de l'événement (optionnel)
  * @param eventData - Données de l'événement (optionnel)
  * @returns Message formaté pour l'affichage
+ * USELESS ?
  */
-export function generateConflictMessage(
-	conflictDetection: ReturnType<typeof detectAllEventConflicts>,
-	eventMode?: string,
-	eventData?: EventType
-): string {
-	const { conflictIds, totalConflictCount, recurrentConflictsMap } = conflictDetection;
+// export function generateConflictMessage(
+// 	conflictDetection: ReturnType<typeof detectAllEventConflicts>,
+// 	eventMode?: string,
+// 	eventData?: EventType
+// ): string {
+// 	const { conflictIds, totalConflictCount, recurrentConflictsMap } = conflictDetection;
 
-	// Helper pour formater les informations d'un événement en conflit
-	const formatConflictEvent = (eventId: string): string => {
-		const conflictEvent = eventsStore.getEventById(eventId);
-		if (!conflictEvent) return `Événement ${eventId}`;
+// 	// Helper pour formater les informations d'un événement en conflit
+// 	const formatConflictEvent = (eventId: string): string => {
+// 		const conflictEvent = eventsStore.getEventById(eventId);
+// 		if (!conflictEvent) return `Événement ${eventId}`;
 
-		const timeInfo =
-			conflictEvent.time_start && conflictEvent.time_end
-				? `de ${conflictEvent.time_start} à ${conflictEvent.time_end}`
-				: "";
+// 		const timeInfo =
+// 			conflictEvent.time_start && conflictEvent.time_end
+// 				? `de ${conflictEvent.time_start} à ${conflictEvent.time_end}`
+// 				: "";
 
-		const roomInfo = conflictEvent.rooms?.length ? ` (${conflictEvent.rooms.join(", ")})` : "";
+// 		const roomInfo = conflictEvent.rooms?.length ? ` (${conflictEvent.rooms.join(", ")})` : "";
 
-		const statusInfo = conflictEvent.isConfirmed ? " [confirmé]" : " [non confirmé]";
+// 		const statusInfo = conflictEvent.isConfirmed ? " [confirmé]" : " [non confirmé]";
 
-		return `• ${conflictEvent.event_title}${statusInfo} ${timeInfo}${roomInfo}`;
-	};
+// 		return `• ${conflictEvent.event_title}${statusInfo} ${timeInfo}${roomInfo}`;
+// 	};
 
-	let message = ``;
+// 	let message = ``;
 
-	if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
-		// Pour les événements récurrents, détailler par date
-		if (recurrentConflictsMap.size > 0) {
-			message += `Certaines occurrences de votre événement récurrent sont en conflit :\n\n`;
+// 	if (eventMode === "NEW_RECURRENT" || eventMode === "EDIT_RECURRENT_ALL") {
+// 		// Pour les événements récurrents, détailler par date
+// 		if (recurrentConflictsMap.size > 0) {
+// 			message += `Certaines occurrences de votre événement récurrent sont en conflit :\n\n`;
 
-			for (const [dateStr, dateConflictIds] of recurrentConflictsMap) {
-				const dateObj = new Date(dateStr);
-				const formattedDate = dateObj.toLocaleDateString("fr-FR", {
-					weekday: "long",
-					year: "numeric",
-					month: "long",
-					day: "numeric"
-				});
+// 			for (const [dateStr, dateConflictIds] of recurrentConflictsMap) {
+// 				const dateObj = new Date(dateStr);
+// 				const formattedDate = dateObj.toLocaleDateString("fr-FR", {
+// 					weekday: "long",
+// 					year: "numeric",
+// 					month: "long",
+// 					day: "numeric"
+// 				});
 
-				message += `<bold>${formattedDate} :</bold><br/>`;
-				dateConflictIds.forEach((conflictId) => {
-					message += `  ${formatConflictEvent(conflictId)}\n`;
-				});
-				message += `\n`;
-			}
-		}
-	} else {
-		// Pour les événements simples
-		const eventDate = eventData?.date_event ? new Date(eventData.date_event) : null;
-		const formattedDate =
-			eventDate?.toLocaleDateString("fr-FR", {
-				weekday: "long",
-				year: "numeric",
-				month: "long",
-				day: "numeric"
-			}) || "la date sélectionnée";
+// 				message += `<bold>${formattedDate} :</bold><br/>`;
+// 				dateConflictIds.forEach((conflictId) => {
+// 					message += `  ${formatConflictEvent(conflictId)}\n`;
+// 				});
+// 				message += `\n`;
+// 			}
+// 		}
+// 	} else {
+// 		// Pour les événements simples
+// 		const eventDate = eventData?.date_event ? new Date(eventData.date_event) : null;
+// 		const formattedDate =
+// 			eventDate?.toLocaleDateString("fr-FR", {
+// 				weekday: "long",
+// 				year: "numeric",
+// 				month: "long",
+// 				day: "numeric"
+// 			}) || "la date sélectionnée";
 
-		message += `Votre événement entre en conflit avec ${conflictIds.length} autre${conflictIds.length > 1 ? "s" : ""} événement${conflictIds.length > 1 ? "s" : ""} le ${formattedDate} :<br/>`;
+// 		message += `Votre événement entre en conflit avec ${conflictIds.length} autre${conflictIds.length > 1 ? "s" : ""} événement${conflictIds.length > 1 ? "s" : ""} le ${formattedDate} :<br/>`;
 
-		conflictIds.forEach((conflictId) => {
-			message += `${formatConflictEvent(conflictId)}<br/>`;
-		});
-	}
+// 		conflictIds.forEach((conflictId) => {
+// 			message += `${formatConflictEvent(conflictId)}<br/>`;
+// 		});
+// 	}
 
-	message += `<br/>Voulez-vous continuer malgré ${totalConflictCount > 1 ? "ces conflits" : "ce conflit"} ?`;
+// 	message += `<br/>Voulez-vous continuer malgré ${totalConflictCount > 1 ? "ces conflits" : "ce conflit"} ?`;
 
-	return message;
-}
+// 	return message;
+// }
 
 /**
  * Génère un message de conflit simplifié pour une date proposée
@@ -477,116 +476,113 @@ export async function updateEventData(
 	eventId: string,
 	data: Partial<EventType>,
 	successMessage?: string
-) {
+): Promise<EventActionPlan> {
 	try {
-		await updateEvent(eventId, data);
-		// Note: showAlert n'est plus disponible ici - la gestion des messages est maintenant dans le handler
+		// Nettoyer les données avant envoi à PocketBase
+		const cleanedData = cleanEventDataForPocketBase(data);
+		await updateEvent(eventId, cleanedData);
 		console.log(successMessage || "Événement mis à jour avec succès");
+		return {
+			type: "SUCCESS",
+			message: successMessage || "L'événement a été mis à jour avec succès."
+		};
 	} catch (error) {
 		console.error("Erreur lors de la mise à jour de l'événement:", error);
-		throw error; // Laisser le handler gérer l'affichage de l'erreur
+		return {
+			type: "ERROR",
+			message:
+				error instanceof Error ? error.message : "Erreur lors de la mise à jour de l'événement.",
+			error
+		};
 	}
 }
 
 /**
- * Valide et met à jour un événement avec une date de sondage sélectionnée.
- * Cette fonction est maintenant utilisée seulement par l'orchestrateur.
- * @param currentEvent - L'événement actuel
- * @param dateProposal - La date proposée à valider
- * @param currentUser - L'utilisateur actuel
- * @param notify - Si les participants doivent être notifiés
- * @param willBeConfirmed - Si l'événement sera confirmé après validation
+ * Applique une date de sondage à un événement, le mettant à jour en base de données,
+ * et retourne une version mise à jour de l'objet événement pour un enchaînement d'actions.
+ * @param currentEvent L'événement à mettre à jour.
+ * @param dateProposal La date de sondage à appliquer.
+ * @returns L'objet événement avec les données de la date fusionnées (mise à jour optimiste).
  */
-export async function validateDate(
+export async function applyDateProposalToEvent(
 	currentEvent: EventType,
-	dateProposal: DateProposedType,
-	currentUser: UserType | null,
-	notify: boolean = true,
-	willBeConfirmed: boolean = false
-): Promise<void> {
-	if (!currentUser || !currentEvent) {
-		throw new Error("Utilisateur ou événement manquant pour la validation.");
-	}
-
-	// Procéder directement à la validation sans UI
-	await proceedWithDateValidation(currentEvent, dateProposal, currentUser, notify, willBeConfirmed);
-}
-
-/**
- * Procède à la validation de la date après confirmation
- */
-async function proceedWithDateValidation(
-	currentEvent: EventType,
-	dateProposal: DateProposedType,
-	currentUser: UserType,
-	notify: boolean,
-	willBeConfirmed: boolean
-): Promise<void> {
+	dateProposal: DateProposedType
+): Promise<EventType> {
 	const eventDataToUpdate = prepareDateValidationData(currentEvent, dateProposal);
+
+	// Créer l'événement mis à jour pour le calcul des conflits
+	const updatedEvent = { ...currentEvent, ...eventDataToUpdate };
+
+	// Recalculer les conflits après modification de la date
+	let conflictIds: string[] = [];
+	try {
+		const conflictResult = detectAllEventConflicts(updatedEvent, "EDIT_SINGLE", [updatedEvent.id]);
+		conflictIds = conflictResult.conflictIds;
+	} catch (error) {
+		console.error("Erreur lors du calcul des conflits:", error);
+	}
+
+	// Fusionner les données de date et les conflits pour une seule mise à jour
+	const dataWithConflicts = {
+		...eventDataToUpdate,
+		inConflictWith: conflictIds
+	};
 
 	await updateEventData(
 		currentEvent.id,
-		eventDataToUpdate,
-		"La date de l'événement a été validée et enregistrée avec succès."
+		dataWithConflicts,
+		"La date du sondage a été appliquée à l'événement."
 	);
 
-	// Envoyer une notification aux participants du sondage si demandé
-	if (notify) {
-		await notificationService.sendSondageValidationNotification({
-			event: currentEvent,
-			dateProposal,
-			user: currentUser,
-			options: {
-				showUserFeedback: true,
-				willBeConfirmed: willBeConfirmed,
-				specificFeedbackMessage: willBeConfirmed
-					? "Date validée et événement confirmé. Notification envoyée aux participants."
-					: "Date validée. Notification envoyée aux participants du sondage."
-			}
-		});
+	// Mettre à jour les conflits réciproques uniquement (sans re-modifier l'événement)
+	try {
+		if (conflictIds.length > 0) {
+			await updateReciprocalConflicts(currentEvent.id, conflictIds);
+		}
+
+		// Nettoyer les anciens conflits bidirectionnels si nécessaire
+		const previousConflicts = currentEvent.inConflictWith || [];
+		const conflictsToRemove = previousConflicts.filter((id) => !conflictIds.includes(id));
+		if (conflictsToRemove.length > 0) {
+			await cleanupBidirectionalConflicts(currentEvent.id, conflictsToRemove);
+		}
+	} catch (error) {
+		console.error("Erreur lors de la mise à jour des conflits réciproques:", error);
+		// On ne fait pas échouer l'opération principale pour un problème de conflits
 	}
+
+	// Retourne l'événement avec les nouvelles données fusionnées pour une utilisation immédiate.
+	return { ...updatedEvent, inConflictWith: conflictIds };
 }
-
-/**
- * Gère l'ouverture du modal de confirmation pour la validation d'une date avec détection des conflits
- */
-// Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts
-
-/**
- * Confirme un événement après validation du schéma et vérification des tâches
- */
-// Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts
-
-// --- Refactoring  ---
 
 /**
  * Vérifie si une validation de sondage est nécessaire
  */
-export function checkSondageValidation(
-	eventData: EventType,
-	hasSondageValidation: boolean
-): {
-	needsValidation: boolean;
-	message?: string;
-	variant?: "info" | "warning";
-	canBeConfirmed?: boolean;
-	showCompleteButton?: boolean;
-} {
-	// Logique pour déterminer si on a besoin de validation sondage
-	if (hasSondageValidation && !eventData.isSondage) {
-		const canBeConfirmed = validateEventStatic(eventData).isValid;
-		return {
-			needsValidation: true,
-			message: canBeConfirmed
-				? `<p>Vous avez validé la date et cloturé le sondage : les participant·es seront notifiés.</p> L'événement peut être confirmé afin d'être publié sur le site et ajouté à la newsletter.</p>`
-				: `<p>Vous avez validé la date et cloturé le sondage. Les participants seront notifiés.</p> <p> Si vous souhaitez confirmer l'événement (publication en ligne), vous devez d'abord compléter certaines informations manquantes.</p>`,
-			variant: canBeConfirmed ? "info" : "warning",
-			canBeConfirmed,
-			showCompleteButton: !canBeConfirmed // Afficher le bouton "Compléter" si l'événement n'est pas prêt
-		};
-	}
-	return { needsValidation: false };
-}
+// export function checkSondageValidation(
+// 	eventData: EventType,
+// 	hasSondageValidation: boolean
+// ): {
+// 	needsValidation: boolean;
+// 	message?: string;
+// 	variant?: "info" | "warning";
+// 	canBeConfirmed?: boolean;
+// 	showCompleteButton?: boolean;
+// } {
+// 	// Logique pour déterminer si on a besoin de validation sondage
+// 	if (hasSondageValidation && !eventData.isSondage) {
+// 		const canBeConfirmed = validateEventStatic(eventData).isValid;
+// 		return {
+// 			needsValidation: true,
+// 			message: canBeConfirmed
+// 				? `<p>Vous avez validé la date et cloturé le sondage : les participant·es seront notifiés.</p> L'événement peut être confirmé afin d'être publié sur le site et ajouté à la newsletter.</p>`
+// 				: `<p>Vous avez validé la date et cloturé le sondage. Les participants seront notifiés.</p> <p> Si vous souhaitez confirmer l'événement (publication en ligne), vous devez d'abord compléter certaines informations manquantes.</p>`,
+// 			variant: canBeConfirmed ? "info" : "warning",
+// 			canBeConfirmed,
+// 			showCompleteButton: !canBeConfirmed // Afficher le bouton "Compléter" si l'événement n'est pas prêt
+// 		};
+// 	}
+// 	return { needsValidation: false };
+// }
 
 /**
  * Vérifie les conflits d'événements
@@ -686,7 +682,7 @@ export async function updateEventConflicts(
  */
 export function detectAllEventConflicts(
 	eventData: EventType,
-	eventMode: string,
+	eventMode: EventMode,
 	excludeEventIds?: string[]
 ): {
 	hasConflicts: boolean;

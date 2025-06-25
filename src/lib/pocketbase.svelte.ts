@@ -1,5 +1,5 @@
-import { type TaskType } from "$lib/types/event.types";
 import { getSpace, userDb } from "$lib/shared/";
+import { type TaskType } from "$lib/types/event.types";
 import type {
 	Collections,
 	EventsRecord,
@@ -10,6 +10,12 @@ import { createEventDates } from "$lib/utils";
 import type { ListOptions, ListResult, RecordModel } from "pocketbase";
 
 import type { EventType } from "./types/event.types";
+
+// Type pour les résultats de batch PocketBase
+type BatchResult = {
+	body: RecordModel;
+	status: number;
+};
 
 type GetOneOptions = {
 	expand?: string;
@@ -59,23 +65,6 @@ export async function loadPublicEvents(spaceId: string) {
 
 export const updateEvent = async (eventID: string, data: Partial<EventsRecord>) => {
 	try {
-		// Créer l'objet complet pour la validation (merger avec les données existantes si nécessaire)
-		// const eventData = {
-		// 	...data,
-		// 	id: eventID
-		// } as EventType;
-
-		// // 👉 Validation obligatoire
-		// const profile = determineValidationProfile(eventData);
-		// const validationResult = validateEventStatic(eventData, profile);
-
-		// console.log("pbError", validationResult.errors);
-
-		// // Si validation échoue, throw error
-		// if (!validationResult.isValid) {
-		// 	throw new Error("Validation failed");
-		// }
-
 		const record = await pb.collection("events").update(eventID, data);
 
 		return record;
@@ -114,18 +103,22 @@ export const createEventForTest = async (data: EventType, userId?: string, space
 		const defaultSpaceId = "xl69b9bu7yjbaj7"; // MOFO space
 
 		// Nettoyer les champs en lecture seule qui ne doivent pas être envoyés à PocketBase
-		const {
-			id: _id,
-			created: _created,
-			updated: _updated,
-			collectionId: _collectionId,
-			collectionName: _collectionName,
-			expand: _expand,
-			...cleanData
-		} = data;
-
+		const cleanedData = { ...data };
+		const fieldsToRemove = [
+			"id",
+			"collectionId",
+			"collectionName",
+			"created",
+			"updated",
+			"expand"
+		] as const;
+		fieldsToRemove.forEach((field) => {
+			if (field in cleanedData) {
+				delete (cleanedData as Record<string, unknown>)[field];
+			}
+		});
 		const eventData = {
-			...cleanData,
+			...cleanedData,
 			created_by: userId || userDb.id || defaultUserId,
 			space: spaceId || getSpace.id || defaultSpaceId
 		};
@@ -277,10 +270,15 @@ export const createRecurrentEvent = async (eventData: Partial<EventType>) => {
 			batch.collection("events").create(occurrenceData);
 		});
 
-		// Commentaire corrigé
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		// 👉 Récupérer les IDs des événements créés
 		const createOccurrences = await batch.send();
+		const eventIds = createOccurrences.map((result: BatchResult) => result.body.id);
 		console.log("Création des événements récurrents terminée");
+
+		return {
+			masterEventId: masterRecord.id,
+			eventIds: eventIds
+		};
 	} catch (error) {
 		console.error("Erreur lors de la création des événements récurrents:", error);
 		throw error;
@@ -308,13 +306,20 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			// On crée une copie pour ne pas modifier l'original
 			const cleanedData = { ...event };
 			// Suppression des champs générés par PocketBase
-			// Utilisation du optional chaining pour éviter les erreurs TS
-			delete (cleanedData as any).id; // L'ID sera ajouté spécifiquement pour l'update
-			delete (cleanedData as any).collectionId;
-			delete (cleanedData as any).collectionName;
-			delete (cleanedData as any).created;
-			delete (cleanedData as any).updated;
-			delete (cleanedData as any).expand; // Important de supprimer expand
+			// Utilisation d'une fonction utilitaire pour nettoyer les données
+			const fieldsToRemove = [
+				"id",
+				"collectionId",
+				"collectionName",
+				"created",
+				"updated",
+				"expand"
+			] as const;
+			fieldsToRemove.forEach((field) => {
+				if (field in cleanedData) {
+					delete (cleanedData as Record<string, unknown>)[field];
+				}
+			});
 			return cleanedData;
 		};
 
@@ -431,13 +436,15 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 			}
 		}
 		// Batch de création
+		let createdEventIds: string[] = [];
 		if (toCreate.length > 0) {
 			try {
 				const batch = pb.createBatch();
 				toCreate.forEach((record) => {
 					batch.collection("events").create(record);
 				});
-				await batch.send();
+				const createResults = await batch.send();
+				createdEventIds = createResults.map((result: BatchResult) => result.body.id);
 				console.log(`${toCreate.length} nouvelles occurrences créées`);
 			} catch (error) {
 				console.warn(`Erreur lors de la création des occurrences:`, error);
@@ -445,6 +452,7 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 		}
 
 		// Batch de mise à jour
+		const updatedEventIds: string[] = [];
 		if (toUpdate.length > 0) {
 			try {
 				const updateBatch = pb.createBatch();
@@ -452,8 +460,9 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 					if (record && record.id) {
 						// Vérification supplémentaire
 						const recordId = record.id;
+						updatedEventIds.push(recordId);
 						const updateData = { ...record };
-						delete (updateData as any).id; // On retire l'ID des données à mettre à jour
+						delete (updateData as Record<string, unknown>).id; // On retire l'ID des données à mettre à jour
 						updateBatch.collection("events").update(recordId, updateData);
 					}
 				});
@@ -463,6 +472,12 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 				console.warn(`Erreur lors de la mise à jour des occurrences:`, error);
 			}
 		}
+
+		// 👉 Retourner les IDs des événements traités
+		return {
+			masterEventId: masterId,
+			eventIds: [...createdEventIds, ...updatedEventIds]
+		};
 	} catch (error) {
 		console.error("Erreur lors de la mise à jour des occurrences:", error);
 		throw error;
@@ -741,11 +756,11 @@ export async function sendGenericEmail(payload: GenericEmailPayload): Promise<vo
 			}
 		});
 		console.log("Generic email request sent successfully.");
-	} catch (error: any) {
+	} catch (error: unknown) {
 		console.error("Failed to send generic email:", error);
 		// Afficher plus de détails si disponibles
-		if (error?.response) {
-			console.error("PocketBase error response:", error.response);
+		if (error && typeof error === "object" && "response" in error) {
+			console.error("PocketBase error response:", (error as { response: unknown }).response);
 		}
 		// Gérer l'erreur (Sentry, toast, etc.)
 		throw error; // Propager
@@ -762,8 +777,11 @@ export async function updateReciprocalConflicts(
 	conflictIds: string[]
 ): Promise<void> {
 	try {
+		// Déduplication des IDs de conflits entrants
+		const uniqueConflictIds = [...new Set(conflictIds.filter((id) => id && id !== eventId))];
+
 		// Pour chaque événement en conflit, ajouter l'ID de l'événement actuel à son inConflictWith
-		for (const conflictId of conflictIds) {
+		for (const conflictId of uniqueConflictIds) {
 			try {
 				// Récupérer l'événement en conflit
 				const conflictEvent = await pb.collection("events").getOne(conflictId);
@@ -771,7 +789,8 @@ export async function updateReciprocalConflicts(
 				// Ajouter l'ID de l'événement actuel s'il n'y est pas déjà
 				const currentConflicts = conflictEvent.inConflictWith || [];
 				if (!currentConflicts.includes(eventId)) {
-					const updatedConflicts = [...currentConflicts, eventId];
+					// 👉 Déduplication complète des conflits existants + nouveau conflit
+					const updatedConflicts = [...new Set([...currentConflicts, eventId])];
 
 					// Mettre à jour l'événement en conflit
 					await pb.collection("events").update(conflictId, {

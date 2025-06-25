@@ -409,7 +409,7 @@ function processSondageValidation(context, event, utils, result, withConfirmatio
 	htmlContent += `
 		<p>Merci de votre participation au sondage !</p>
 		<p style="margin-top: 1.5em;"><a href="${$app.settings().meta.appURL}/dashboard/events#${event.id}">Voir l'événement</a></p>
-		<p style="margin-top: 1.5em; color: #666; font-style: italic;">Ceci est un message automatique envoyé par le système Oupla. Il vous à été envoyé parce que vous participé au sondage concernant cet événement.</p>
+		<p style="margin-top: 1.5em; color: #666; font-style: italic;">Ceci est un message automatique envoyé par le système Oupla. Il vous à été envoyé parce que vous avez participé au sondage concernant cet événement.</p>
 	`;
 
 	result.htmlContent = htmlContent;

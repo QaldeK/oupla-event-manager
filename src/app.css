@@ -42,7 +42,66 @@
 
 @tailwind utilities;
 
+/* Variables shadcn-svelte basées sur les couleurs DaisyUI */
+:root {
+	--radius: 0.5rem;
+
+	/* Utilisation des couleurs DaisyUI pour shadcn-svelte */
+	--background: var(--color-base-100);
+	--foreground: var(--color-base-content);
+	--card: var(--color-base-100);
+	--card-foreground: var(--color-base-content);
+	--popover: var(--color-base-100);
+	--popover-foreground: var(--color-base-content);
+	--primary: var(--color-primary);
+	--primary-foreground: var(--color-primary-content);
+	--secondary: var(--color-base-200);
+	--secondary-foreground: var(--color-base-content);
+	--muted: var(--color-base-200);
+	--muted-foreground: var(--color-secondary);
+	--accent: var(--color-accent);
+	--accent-foreground: var(--color-accent-content);
+	--destructive: var(--color-error);
+	--destructive-foreground: var(--color-error-content);
+	--border: var(--color-base-300);
+	--input: var(--color-base-300);
+	--ring: var(--color-primary);
+
+	/* Variables pour les graphiques */
+	--chart-1: var(--color-primary);
+	--chart-2: var(--color-accent);
+	--chart-3: var(--color-secondary);
+	--chart-4: var(--color-success);
+	--chart-5: var(--color-warning);
+}
+
 @theme {
+	/* Ajout des couleurs shadcn-svelte au système Tailwind */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary-shadcn: var(--primary);
+	--color-primary-foreground-shadcn: var(--primary-foreground);
+	--color-secondary-shadcn: var(--secondary);
+	--color-secondary-foreground-shadcn: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent-shadcn: var(--accent);
+	--color-accent-foreground-shadcn: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+
 	/* Tailles fluides pour les utilitaires */
 	--fluid-xs: clamp(0.8125rem, 0.7375rem + 0.375vw, 0.875rem); /* ~13px to ~14px */
 	--fluid-sm: clamp(0.875rem, 0.7875rem + 0.4375vw, 0.9375rem); /* ~14px to ~15px */
@@ -135,6 +194,15 @@
 		min-height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
 		padding-top: calc(0.25rem * var(--btn-scale)) !important;
 		padding-bottom: calc(0.25rem * var(--btn-scale)) !important;
+	}
+
+	.btn-badge {
+		--btn-scale: 0.65;
+		height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
+		min-height: calc(var(--btn-height, 2.5rem) * var(--btn-scale)) !important;
+		padding-top: calc(0.25rem * var(--btn-scale)) !important;
+		padding-bottom: calc(0.25rem * var(--btn-scale)) !important;
+		font-size: var(--fluid-xs) !important;
 	}
 
 	/* 👉 Suppression globale de l'outline et du box-shadow de focus pour les composants DaisyUI ciblés */

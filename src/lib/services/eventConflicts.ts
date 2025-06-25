@@ -1,8 +1,8 @@
 import { format, parse } from "date-fns";
 import type { EventType, OrganizerType } from "$lib/types/event.types";
-
 // --- Types Definition ---
 
+// FIXIT : seule les type sont utilisé ailleurs ???
 export type ConflictType =
 	| "confirmed"
 	| "unconfirmed"
@@ -534,5 +534,3 @@ export function getOverlappingEventGroups(
 
 	return overlappingByDate;
 }
-
-

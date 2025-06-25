@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { CalendarPlus, UserCheck, UserPlus } from "lucide-svelte";
 	import type { EventType } from "$lib/types/types";
+	import { CalendarCogIcon, CalendarPlus, UserCheck, UserPlus } from "lucide-svelte";
 
 	interface Props {
 		event: EventType;
@@ -55,9 +55,14 @@
 
 	<div class="me-1 self-start">
 		{#if isSondage && hasAuth}
-			<button onclick={onSondageClick} class="btn btn-primary btn-outline btn-compact">
-				<CalendarPlus />
-				<span class="not-md:hidden">Modifier le sondage</span>
+			<button
+				onclick={onSondageClick}
+				class="btn btn-primary btn-outline btn-compact"
+				aria-label="Modifier le sondage"
+				data-tip="Modifier le sondage"
+			>
+				<CalendarCogIcon />
+				<span class="@max-xl:hidden">Modifier le sondage</span>
 			</button>
 		{:else if hasDate && event.tasks?.length === 1 && notRecurrentOrUserInTeam}
 			<button
@@ -75,7 +80,12 @@
 				{generalTaskButtonState.text}
 			</button>
 		{:else if hasNoPropositions && hasAuth}
-			<button onclick={onSondageClick} class="btn btn-compact btn-primary btn-outline">
+			<button
+				onclick={onSondageClick}
+				class="btn btn-compact btn-primary btn-outline"
+				aria-label="Créer un sondage"
+				data-tip="Créer un sondage"
+			>
 				<CalendarPlus />
 				<span class="not-md:hidden">Créer un sondage</span>
 			</button>

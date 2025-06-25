@@ -11,19 +11,19 @@
 	import InviteUserModal from "$lib/components/InviteUserModal.svelte";
 	// 👉 Nouveaux composants refactorisés
 	import HeaderBar from "$lib/components/HeaderBar.svelte";
-	import Sidebar from "$lib/components/Sidebar.svelte";
 	import MobileDock from "$lib/components/MobileDock.svelte";
 	import MobileDrawer from "$lib/components/MobileDrawer.svelte";
+	import Sidebar from "$lib/components/Sidebar.svelte";
 	// 👉 Utilitaire pour la détection d'écran
-	import { screenDetector } from "$lib/utils/screen.svelte";
 	import { pb } from "$lib/pocketbase.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { messageStore } from "$lib/shared/messageStore.svelte";
-	import { loadNotifications, clearNotifications } from "$lib/utils/notificationsAndLogs";
 	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
 	import { loadingState, messageSheet, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { CurrentUser } from "$lib/types/types";
+	import { clearNotifications, loadNotifications } from "$lib/utils/notificationsAndLogs";
+	import { screenDetector } from "$lib/utils/screen.svelte";
 
 	import { goto } from "$app/navigation";
 
@@ -258,7 +258,7 @@
 					{/if}
 
 					<!-- Mode desktop avec sidebar classique -->
-					<div id="global-app" class="flex min-h-screen {isMobile ? 'pb-20' : 'pt-16'}">
+					<div id="global-app" class="min-h-screen {isMobile ? 'pb-20' : 'pt-16'}">
 						<!-- Sidebar desktop -->
 						{#if !isMobile}
 							<Sidebar {sidebarState} />
@@ -270,39 +270,39 @@
 								!sidebarState.isCompact && !isMobile && "ml-64"
 							]}
 						>
-							<div class="container mx-auto xl:mx-10 {isMobile ? 'p-2 pt-4' : 'p-10'}">
+							<div class=" mx-auto xl:mx-10 {isMobile ? 'p-2 pt-4' : 'px-5 py-10'}">
 								{@render children()}
 							</div>
 						</main>
 					</div>
-
-					<!-- Modales -->
-					{#if modalState.event}
-						<EventModal />
-					{/if}
-					{#if modalState.report}
-						<!-- <ReportEvent /> -->
-					{/if}
-					{#if modalState.dateSondage}
-						<DateSondageModal />
-					{/if}
-					{#if modalState.tasks.isOpen}
-						<TaskDialog />
-					{/if}
-					{#if modalState.inviteUser}
-						<InviteUserModal />
-					{/if}
-					{#if modalState.confirm.isOpen}
-						<ConfirmDialog />
-					{/if}
-					{#if messageSheet.isOpen}
-						<MessageSheet />
-					{/if}
-
-					<Alert />
 				{/if}
 			</div>
 		{/if}
+
+		<!-- Modales -->
+		{#if modalState.event}
+			<EventModal />
+		{/if}
+		{#if modalState.report}
+			<!-- <ReportEvent /> -->
+		{/if}
+		{#if modalState.dateSondage}
+			<DateSondageModal />
+		{/if}
+		{#if modalState.tasks.isOpen}
+			<TaskDialog />
+		{/if}
+		{#if modalState.inviteUser}
+			<InviteUserModal />
+		{/if}
+		{#if modalState.confirm.isOpen}
+			<ConfirmDialog />
+		{/if}
+		{#if messageSheet.isOpen}
+			<MessageSheet />
+		{/if}
+
+		<Alert />
 	{:catch error}
 		<div class="fixed inset-0 z-50 flex items-center justify-center">
 			<div class="rounded-lg bg-white p-6 shadow-lg">

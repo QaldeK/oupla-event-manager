@@ -2,9 +2,9 @@
 
 // export const eventsList = $state();
 
-import { type TaskType } from "$lib/types/event.types";
 import { getNewEvent } from "$lib/services/eventActions";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
+import { type TaskType } from "$lib/types/event.types";
 
 import type { LogsResponse, UsersResponse } from "$lib/types/pocketbase";
 
@@ -26,7 +26,7 @@ export interface ConfirmModalData {
 		variant?: "primary" | "secondary" | "accent" | "ghost" | "success" | "warning" | "error";
 		onClick: () => void | Promise<void>;
 	};
-
+	showCancelButton?: boolean;
 	onConfirm: ((notifyOthers?: boolean, customMessage?: string) => void | Promise<void>) | null;
 }
 // Interface pour TaskDialog (Gestion multiple)
@@ -183,3 +183,40 @@ export const notificationState = $state({
 	isInitialized: false,
 	subscription: null as (() => void) | null
 });
+
+// ::: Validation d'événements // Crée pour les test... USELESS?
+import type { EventType } from "$lib/types/event.types";
+import {
+	determineValidationProfile,
+	validateEventStatic,
+	type ValidationProfile
+} from "$lib/validation/event-validator.svelte";
+
+interface ValidationState {
+	isValid: boolean;
+	errors: Record<string, string>;
+	profile: ValidationProfile | null;
+}
+
+export const validator = $state({
+	state: {
+		isValid: true,
+		errors: {},
+		profile: null
+	} as ValidationState
+});
+
+export function validateEventManually(event: EventType) {
+	const profile = determineValidationProfile(event);
+	const result = validateEventStatic(event, profile);
+
+	validator.state.isValid = result.isValid;
+	validator.state.errors = result.errors as Record<string, string>;
+	validator.state.profile = profile;
+}
+
+export function clearCurrentEventValidation() {
+	validator.state.isValid = true;
+	validator.state.errors = {};
+	validator.state.profile = null;
+}

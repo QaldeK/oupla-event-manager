@@ -2,12 +2,10 @@
 	import Modal from "$lib/components/Modal.svelte";
 	import DatePickerProposed from "$lib/components/forModal/DatePickerProposed.svelte";
 	import { updateEvent } from "$lib/pocketbase.svelte";
-	import { notificationService } from "$lib/services/notificationService.svelte";
-	import { validateDate } from "$lib/services/eventActions";
+	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
 	import { eventState, modalState, showAlert } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { DateProposedType, EventType } from "$lib/types/types";
-	import { filterAndConvertOrganizers, formatDatePb, formatTimePb } from "$lib/utils";
 
 	let eventData = $state<EventType>(eventState.is as EventType);
 	let dateAccepted: DateProposedType | null = $state(null);
@@ -37,9 +35,18 @@
 		}
 
 		try {
-			await validateDate(eventData, dateProposal, userDb.current, true, false);
+			const plan = await createEventActionPlan(eventData, {
+				context: "external_action",
+				isValidatingSondage: true,
+				wantsToConfirmEvent: false,
+				checkConflicts: true,
+				currentUser: userDb.current,
+				notify: true,
+				dateSondageToValidate: dateProposal
+			});
+			await handleEventAction(plan);
 			// Si validation réussie, fermer le modal
-			closeModal();
+			// closeModal();
 		} catch (error) {
 			console.error("Erreur lors de la validation de la date :", error);
 			showAlert("Erreur lors de la validation de la date", "error");
@@ -47,93 +54,36 @@
 	}
 
 	async function handleSubmit() {
-		if (!eventData?.id) return;
+		if (!eventData?.id || !userDb.current) return;
+
 		try {
-			let dataToUpdate: Partial<EventType> = {};
-
-			// Cas 1: Une date a été validée dans ce modal
+			// Cas 1: Une date a été sélectionnée pour validation
 			if (dateAccepted) {
-				// 👉 On filtre les organisateurs 'oui' pour la date acceptée
-				const confirmedOrganizers = filterAndConvertOrganizers(dateAccepted.organizers ?? []);
-
-				// Vérifier si au moins un organisateur est confirmé 'oui'
-				if (confirmedOrganizers.length === 0) {
-					// Afficher la confirmation
-					modalState.confirm = {
-						isOpen: true,
-						data: {
-							title: "Attention",
-							message:
-								"Aucun·e organisateur·ice n'a confirmé ('oui') sa présence pour cette date. Voulez-vous vraiment la valider ?",
-							variant: "warning", // 👉 Utiliser warning plutôt que danger peut-être ?
-							onConfirm: async () => {
-								// Confirmer sans organisateurs 'oui'
-								dataToUpdate = {
-									date_event: formatDatePb(dateAccepted!.dateStart),
-									time_start: formatTimePb(dateAccepted!.dateStart),
-									time_end: formatTimePb(dateAccepted!.dateEnd),
-									organizers: confirmedOrganizers, // Sera vide ou seulement les 'maybehere' convertis
-									dateStart: dateAccepted!.dateStart, // Garder la date ISO complète
-									dateEnd: dateAccepted!.dateEnd, // Garder la date ISO complète
-									isSondage: false, // Le sondage est terminé
-									dates_proposed: [] // Vider les propositions
-								};
-								await updateEvent(eventData.id!, dataToUpdate);
-
-								// Envoyer notification aux participants du sondage
-								await notificationService.sendSondageValidationNotification({
-									event: eventData,
-									dateProposal: dateAccepted!,
-									user: userDb.current!,
-									options: { showUserFeedback: true }
-								});
-
-								closeModal();
-							}
-						}
-					};
-					return; // Sortir car on attend la confirmation
-				} else {
-					// Assez d'organisateurs, on prépare la mise à jour
-					dataToUpdate = {
-						date_event: formatDatePb(dateAccepted.dateStart),
-						time_start: formatTimePb(dateAccepted.dateStart),
-						time_end: formatTimePb(dateAccepted.dateEnd),
-						organizers: confirmedOrganizers,
-						dateStart: dateAccepted.dateStart,
-						dateEnd: dateAccepted.dateEnd,
-						isSondage: false,
-						dates_proposed: []
-					};
-				}
+				const plan = await createEventActionPlan(eventData, {
+					context: "external_action",
+					isValidatingSondage: false,
+					wantsToConfirmEvent: false,
+					checkConflicts: true,
+					currentUser: userDb.current,
+					notify: true
+				});
+				await handleEventAction(plan);
 			}
 			// Cas 2: Pas de date validée, on sauvegarde juste les dates proposées actuelles
 			else {
-				dataToUpdate = {
+				const dataToUpdate: Partial<EventType> = {
 					dates_proposed: eventData.dates_proposed,
-					isSondage: eventData.isSondage // Sauvegarder si l'utilisateur a cliqué "annuler ce sondage"
-					// Ne pas toucher aux organisateurs principaux ici
+					isSondage: eventData.isSondage
 				};
-			}
 
-			// Appeler PocketBase seulement si des données sont à mettre à jour
-			if (Object.keys(dataToUpdate).length > 0) {
-				await updateEvent(eventData.id, dataToUpdate);
-
-				// Si une date a été acceptée, envoyer une notification
-				if (dateAccepted) {
-					await notificationService.sendSondageValidationNotification({
-						event: eventData,
-						dateProposal: dateAccepted,
-						user: userDb.current!,
-						options: { showUserFeedback: true }
-					});
+				if (Object.keys(dataToUpdate).length > 0) {
+					await updateEvent(eventData.id, dataToUpdate);
 				}
 			}
 			closeModal();
 		} catch (e) {
 			console.error("Erreur lors de la sauvegarde du sondage :", e);
-			showAlert("Erreur lors de la sauvegarde du sondage :", "error");
+			showAlert("Erreur lors de la sauvegarde du sondage", "error");
 		}
 	}
 </script>

@@ -1,12 +1,11 @@
+import { getSpace } from "$lib/shared/";
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
 import { addMinutes, format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import tippy from "tippy.js";
-import "tippy.js/dist/tippy.css";
-import { getSpace } from "$lib/shared/";
 import { cubicOut } from "svelte/easing";
 import type { TransitionConfig } from "svelte/transition";
+import { twMerge } from "tailwind-merge";
+import "tippy.js/dist/tippy.css";
 
 import type { OrganizerType } from "./types/event.types";
 import type { UserType } from "./types/types";
@@ -81,12 +80,12 @@ export const createDateFromString = (dateStr: string, timeStr: string): Date => 
 export const createEventDates = (dateStr: string, timeStart: string, timeEnd: string) => {
 	const startDate = createDateFromString(dateStr, timeStart);
 	const endDate = createDateFromString(dateStr, timeEnd);
-	
+
 	// Si l'heure de fin est avant l'heure de début, l'événement se termine le lendemain
 	if (endDate < startDate) {
 		endDate.setDate(endDate.getDate() + 1);
 	}
-	
+
 	return {
 		dateStart: startDate.toISOString(),
 		dateEnd: endDate.toISOString()
@@ -116,16 +115,34 @@ export const lisibleDate = (date: Date | string | undefined) => {
 
 export const lisibleDateShort = (date: Date | string | undefined) => {
 	if (!date) return "";
-	return format(new Date(date), "EE d MMM", { locale: fr });
+	try {
+		const dateObj = new Date(date);
+		if (isNaN(dateObj.getTime())) return "";
+		return format(dateObj, "EE d MMM", { locale: fr });
+	} catch {
+		return "";
+	}
 };
 export const lisibleTime = (date: Date | string | undefined) => {
 	if (!date) return "";
-	return format(new Date(date), "kk:mm", { locale: fr });
+	try {
+		const dateObj = new Date(date);
+		if (isNaN(dateObj.getTime())) return "";
+		return format(dateObj, "kk:mm", { locale: fr });
+	} catch {
+		return "";
+	}
 };
 
 export const lisibleDateTime = (date: Date | string | undefined) => {
 	if (!date) return "";
-	return format(new Date(date), "EEEE d MMMM à kk:mm", { locale: fr });
+	try {
+		const dateObj = new Date(date);
+		if (isNaN(dateObj.getTime())) return "";
+		return format(dateObj, "EEEE d MMMM à kk:mm", { locale: fr });
+	} catch {
+		return "";
+	}
 };
 
 export const formatDatePb = (date: Date | string) => {
@@ -181,14 +198,14 @@ export const handleOrganizerMaybehere = (params: {
 	}
 };
 
-export const convertMaybehereToOrganizer = (org) => ({
+export const convertMaybehereToOrganizer = (org: any) => ({
 	id: org.id,
 	username: org.username,
 	tasks: [getSpace.defaultTask.name]
 });
 
-export const filterAndConvertOrganizers = (organizers) => {
-	return organizers.filter((org) => org.maybehere === "oui").map(convertMaybehereToOrganizer);
+export const filterAndConvertOrganizers = (organizers: any[]) => {
+	return organizers.filter((org: any) => org.maybehere === "oui").map(convertMaybehereToOrganizer);
 };
 
 /**

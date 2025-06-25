@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { type ConflictResult, ConflictCalculator } from "$lib/services/conflictService.svelte";
+	import type { ConflictType } from "$lib/services/eventConflicts";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import type { EventType } from "$lib/types/event.types";
+	import { isValidDate } from "$lib/utils";
 	import { format } from "date-fns";
 	import { fr } from "date-fns/locale";
-	import { isValidDate } from "$lib/utils";
-	import type { EventType } from "$lib/types/event.types";
-	import type { ConflictType } from "$lib/services/eventConflicts";
 	import { TriangleAlert } from "lucide-svelte";
 
 	// 👉 Props pour les deux modes
@@ -19,7 +19,8 @@
 
 		// Mode "cached" (EventCard, Dashboard)
 		currentEvent,
-		mode = "realtime"
+		mode = "realtime",
+		showOnlyLevel = "all"
 	} = $props<{
 		// Mode realtime
 		eventId?: string;
@@ -31,6 +32,7 @@
 		// Mode cached
 		currentEvent?: EventType;
 		mode?: "realtime" | "cached";
+		showOnlyLevel?: "all" | "confirmed" | "real";
 	}>();
 
 	$effect(() => {
@@ -183,32 +185,45 @@
 		// Si l'événement a des salles
 		return { msg: `- salle: ${rooms.join(", ")}`, style: "" };
 	};
+
+	// 👉 Détermine si l'alerte doit être affichée selon le niveau demandé
+	const shouldShowAlert = $derived.by(() => {
+		switch (showOnlyLevel) {
+			case "real":
+				return realConflicts.length > 0;
+			case "confirmed":
+				return conflictResult.confirmedConflicts.length > 0;
+			case "all":
+			default:
+				return conflicts.length > 0;
+		}
+	});
 </script>
 
-{#if conflicts.length > 0}
+{#if shouldShowAlert}
 	<div
-		class={`text-fluid-sm items-center gap-1 rounded-xl p-2 px-4 text-gray-500 ${
-			hasRealConflict.value ? "bg-warning/10 border-warning border-2" : "bg-base-200"
-		}`}
+		class="text-fluid-sm items-center gap-1 p-2 px-4 text-gray-500 {hasRealConflict.value
+			? 'bg-warning/10 border-warning border-1'
+			: 'bg-base-200'} @md:rounded-xl"
 	>
-		<div class="space-y-1">
-			<div class="text-fluid-sm items-top flex gap-2 text-gray-600 italic">
+		<div class="space-y-2">
+			<div class="text-fluid-sm flex items-center gap-2 text-gray-600 italic">
 				<TriangleAlert size={16} /> D'autres événements sont prévus le {dateOfConflict}...
 			</div>
 
 			<ul class="ms-2">
 				{#each conflicts as conflict, index (conflict.id + index)}
 					<li
-						class={`text-fluid-sm flex flex-wrap items-baseline gap-1 ${getConflictColor(conflict.conflictType, conflict.hasSameRoom)}`}
+						class={`text-fluid-sm  items-baseline gap-1 ${getConflictColor(conflict.conflictType, conflict.hasSameRoom)}`}
 					>
-						<div class="font-bold">• {conflict.event_title} :</div>
-						<div class="italic">{getConflictTypeMsg(conflict.conflictType)}</div>
-						<div class="">
+						<span class="font-bold">• {conflict.event_title} :</span>
+						<span class="italic">{getConflictTypeMsg(conflict.conflictType)}</span>
+						<span class="">
 							de {conflict.time_start} à {conflict.time_end}
 							<span class={getRoomMsg(conflict.hasSameRoom, conflict.rooms).style}
 								>{getRoomMsg(conflict.hasSameRoom, conflict.rooms).msg}</span
 							>
-						</div>
+						</span>
 					</li>
 				{/each}
 			</ul>

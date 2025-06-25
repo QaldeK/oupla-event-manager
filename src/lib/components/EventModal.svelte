@@ -16,24 +16,21 @@
 	import Textarea from "$lib/components/ui-custom/textarea/textarea.svelte";
 	import { pb } from "$lib/pocketbase.svelte";
 	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
-	import {
-		type DateProposedType,
-		type RecurrenceConfigType,
-		type TaskType
-	} from "$lib/types/event.types";
-	import type { EventType } from "$lib/types/event.types";
 	import { getDefaultRecurrence, getNewEvent } from "$lib/services/eventActions";
-	import {
-		createEventSubmissionPlan,
-		handleEventAction
-	} from "$lib/shared/eventActionHandler.svelte";
 	import { getSpace, userDb } from "$lib/shared";
+	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
 	import {
 		eventState,
 		getOrganizersPossibles,
 		modalState,
 		showAlert
 	} from "$lib/shared/states.svelte";
+	import type { EventMode, EventType } from "$lib/types/event.types";
+	import {
+		type DateProposedType,
+		type RecurrenceConfigType,
+		type TaskType
+	} from "$lib/types/event.types";
 	import {
 		createEventDates,
 		filterAndConvertOrganizers,
@@ -43,23 +40,16 @@
 		lisibleDate
 	} from "$lib/utils";
 
-	import { slide } from "svelte/transition";
 	import { UserPlus } from "lucide-svelte";
+	import { slide } from "svelte/transition";
 	// import EventValidationStatus from "./EventValidationStatus.svelte";
-	import TimeReservation from "./forModal/TimeReservation.svelte";
 	import OtherSetting from "./forModal/OtherSetting.svelte";
+	import TimeReservation from "./forModal/TimeReservation.svelte";
 
 	import {
 		createEventValidator,
 		type ValidationProfile
 	} from "$lib/validation/event-validator.svelte";
-
-	type EventMode =
-		| "NEW_SINGLE" // Création événement unique
-		| "NEW_RECURRENT" // Création événement récurrent
-		| "EDIT_SINGLE" // Modification événement unique
-		| "EDIT_RECURRENT_ONE" // Modification occurrence unique
-		| "EDIT_RECURRENT_ALL"; // Modification toutes occurrences
 
 	let eventMode: EventMode = $derived.by(() => {
 		if (!eventData.id) {
@@ -473,16 +463,18 @@
 			}
 			validator?.setProfile(determineValidationProfile(shouldConfirm));
 
-			// if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
-			// 	showAlert("Veuillez compléter les champs obligatoires.", "error");
-			// 	return;
-			// }
+			// pour le moment encore necessaire au moins pour empecher l'enregistrement d'un MasterRecurrent incomplet
+			if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
+				showAlert("Veuillez compléter les champs obligatoires.", "error");
+				return;
+			}
 
 			// 👉 Détection unifiée des conflits selon le type d'événement
 			let excludeEventIds: string[] = [];
 			if (eventMode === "EDIT_RECURRENT_ALL" && eventData.id) {
 				// Pour EDIT_RECURRENT_ALL, exclure tous les événements de la série
 				try {
+					// FIXIT : utilisé l'indexDb
 					const existingOccurrences = await pb.collection("events").getFullList({
 						filter: `masterRecurrentId = '${eventData.id}'`
 					});
@@ -499,6 +491,14 @@
 				excludeEventIds = [eventData.id];
 			}
 
+			// Préparer les données de validation pour eventActionHandler
+			const validationData = {
+				isValid: validator?.isValid(determineValidationProfile(shouldConfirm)) ?? false,
+				errors: validator?.errors || {},
+				hasUnassignedTasks: validator?.hasUnassignedTasks ?? false,
+				unassignedTasks: validator?.unassignedTasks || []
+			};
+
 			// Gestion spéciale pour les récurrences globales
 			if (eventMode === "EDIT_RECURRENT_ALL") {
 				modalState.confirm = {
@@ -509,30 +509,36 @@
 							"Vous êtes sur le point de modifier toutes les occurrences de cet événement récurrent. Êtes-vous sûr de vouloir continuer ?",
 						variant: "warning",
 						onConfirm: async () => {
-							const plan = await createEventSubmissionPlan(eventData, {
+							const plan = await createEventActionPlan(eventData, {
+								context: "form",
 								mode: eventMode,
-								shouldConfirmIntent: shouldConfirm,
-								hasSondageBeenValidated: hasSondageValidation,
+								wantsToConfirmEvent: shouldConfirm,
+								checkConflicts: shouldConfirm,
 								excludeEventIds,
-								currentUser: userDb.current || undefined
+								currentUser: userDb.current || undefined,
+								notify: shouldConfirm,
+								validationData,
+								hasSondageValidation
 							});
 							await handleEventAction(plan);
 						}
 					}
 				};
+				return;
 			}
 
-			// Utiliser le nouvel orchestrateur
-			const plan = await createEventSubmissionPlan(eventData, {
+			const plan = await createEventActionPlan(eventData, {
+				context: "form",
 				mode: eventMode,
-				shouldConfirmIntent: shouldConfirm,
-				hasSondageBeenValidated: hasSondageValidation,
+				wantsToConfirmEvent: shouldConfirm,
+				checkConflicts: shouldConfirm,
 				excludeEventIds,
-				currentUser: userDb.current || undefined
+				currentUser: userDb.current || undefined,
+				notify: shouldConfirm,
+				validationData,
+				hasSondageValidation
 			});
-
 			await handleEventAction(plan);
-			// closeModal();
 		} catch (error) {
 			console.error(error);
 			showAlert("Erreur lors de l'enregistrement de l'événement.", "error");
@@ -549,7 +555,7 @@
 	};
 </script>
 
-<!-- {$inspect("eventData", eventData)} -->
+{$inspect("eventData", eventData)}
 <!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
 <!-- {$inspect('eOrg', eventData.organizers)} -->
 <!-- {$inspect('activeTabDate', activeTabDate)} -->
@@ -950,7 +956,7 @@
 			<button type="button" class="btn block w-full font-bold sm:w-fit" onclick={closeModal}
 				>Fermer sans enregistrer</button
 			>
-			{#if eventMode === "NEW_SINGLE" || (eventMode === "EDIT_SINGLE" && !eventData.isSondage && !eventData.isConfirmed) || (eventMode === "EDIT_RECURRENT_ONE" && !eventData.isSondage && !eventData.isConfirmed)}
+			{#if (eventMode === "EDIT_SINGLE" || eventMode === "EDIT_RECURRENT_ONE" || eventMode === "NEW_SINGLE") && !eventData.isSondage && !eventData.isConfirmed}
 				<button
 					type="button"
 					class="btn btn-accent block w-full font-bold sm:w-fit {validator?.isValid
@@ -962,7 +968,7 @@
 			<button
 				class="btn btn-primary block w-full font-bold sm:w-fit"
 				type="button"
-				onclick={() => submitForm(eventData.isConfirmed ? true : false)}>Enregistrer</button
+				onclick={() => submitForm(false)}>Enregistrer</button
 			>
 		</div>
 	</div>

@@ -1,28 +1,19 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { page } from "$app/state"; // $app/store est déprécié !
-	import { screenDetector } from "$lib/utils/screen.svelte";
-
+	import { page } from "$app/state";
 	import { modalState } from "$lib/shared/states.svelte.js";
+	import { screenDetector } from "$lib/utils/screen.svelte";
+	// Importation de TOUT depuis notre nouveau fichier de configuration
 	import {
-		AlertTriangle,
-		Calendar,
-		CalendarCheck2,
-		CalendarCog,
-		CalendarPlus,
-		CalendarSearch,
-		CalendarX,
-		CalendarX2,
-		Clock,
-		Files,
-		Globe,
-		Mail,
-		RefreshCw,
-		Settings,
-		UserPlus,
-		Users,
-		UserX
-	} from "lucide-svelte";
+		confMenuItems,
+		eventsMenuItems,
+		generateUrl,
+		inviteUserButton,
+		newEventButton,
+		otherMenuItems,
+		type ActionItem,
+		type MenuItem
+	} from "$lib/shared/navigation";
 
 	interface Props {
 		isCompact?: boolean;
@@ -31,273 +22,134 @@
 
 	let { isCompact = false, onItemClick }: Props = $props();
 	let isMobile = $derived(screenDetector.isMobile);
-	let currentUrl = $derived(page.url.pathname + page.url.search);
+
+	// L'URL courante, utilisée pour déterminer l'état "actif"
+	let currentFullUrl = $derived(page.url.pathname + page.url.search);
 	let currentPathname = $derived(page.url.pathname);
 
-	function getFilterUrl(filters: { status?: string }): string {
-		const url = new URL("/dashboard/events", window.location.origin);
-		Object.entries(filters).forEach(([key, value]) => {
-			if (value) url.searchParams.set(key, value);
-		});
-		return url.toString();
-	}
-
-	function handleNavigation(url: string) {
-		goto(url);
-		onItemClick?.();
-	}
-
-	// Fonction pour vérifier si un élément est actif
+	// Vérifie si un item de navigation correspond EXACTEMENT à l'URL actuelle
 	function isItemActive(item: MenuItem): boolean {
-		const itemUrl = typeof item.url === "function" ? item.url(item.filterParams || {}) : item.url;
-
-		// Normaliser les URLs pour la comparaison
-		const normalizedItemUrl = new URL(itemUrl, window.location.origin);
-		const normalizedCurrentUrl = new URL(currentUrl, window.location.origin);
-
-		// Vérification directe pour l'URL exacte (pathname + search params)
-		if (
-			normalizedCurrentUrl.pathname === normalizedItemUrl.pathname &&
-			normalizedCurrentUrl.search === normalizedItemUrl.search
-		) {
-			return true;
-		}
-
-		// Vérification pour les sous-éléments
-		if (item.subItems) {
-			return item.subItems.some((subItem) => isItemActive(subItem));
-		}
-
-		return false;
+		return generateUrl(item) === currentFullUrl;
 	}
 
-	// Fonction pour vérifier si les sous-menus doivent être affichés
+	// Vérifie si un groupe de sous-menus doit être déplié
 	function shouldShowSubItems(item: MenuItem): boolean {
-		if (isCompact || !item.subItems) return false;
+		if (!item.subItems) return false;
 
-		const itemUrl = typeof item.url === "function" ? item.url(item.filterParams || {}) : item.url;
-		const normalizedItemUrl = new URL(itemUrl, window.location.origin);
-
-		// Pour le niveau 1 (Événement) : toujours afficher si on est sur la section
-		if (currentPathname === normalizedItemUrl.pathname) return true;
-
-		// Pour les sous-pages (ex: /dashboard/events/recurrent)
-		if (
-			currentPathname.startsWith(normalizedItemUrl.pathname) &&
-			currentPathname !== normalizedItemUrl.pathname
-		)
+		// Déplie si on est sur la page parente ou une de ses sous-pages
+		if (currentPathname.startsWith(item.path)) {
 			return true;
+		}
 
-		// Vérifier si un des sous-éléments est actif
-		return item.subItems.some((subItem) => isItemActive(subItem));
+		// Déplie si un des enfants est la page active
+		return item.subItems.some(isItemActive);
 	}
 
-	interface MenuItem {
-		label: string;
-		icon;
-		url: string | ((filters: { status?: string }) => string);
-		filterParams?: { status?: string };
-		subItems?: MenuItem[];
-		iconClass?: string;
+	// Gère tous les clics : soit une navigation, soit une action
+	function handleClick(item: MenuItem | ActionItem) {
+		// Vérifie si c'est un item d'action (a la prop 'action')
+		if ("action" in item) {
+			switch (item.action) {
+				case "openEventModal":
+					modalState.event = true;
+					break;
+				case "openInviteModal":
+					modalState.inviteUser = true;
+					break;
+			}
+		}
+		// Sinon, c'est un item de navigation (a la prop 'path')
+		else if ("path" in item) {
+			goto(generateUrl(item));
+		}
+
+		onItemClick?.(); // Ferme le menu sur mobile, par exemple
 	}
-
-	const menuItems: MenuItem[] = [
-		{
-			label: "Événement",
-			icon: Calendar,
-			url: "/dashboard/events",
-			filterParams: { status: "all" },
-			subItems: [
-				{
-					label: "Programmés",
-					icon: CalendarCheck2,
-					url: (filters) => getFilterUrl(filters),
-					filterParams: { status: "confirmed" }
-				},
-				{
-					label: "En attentes",
-					icon: CalendarCog,
-					iconClass: "text-warning",
-					url: (filters) => getFilterUrl(filters),
-					filterParams: { status: "pending" },
-					subItems: [
-						{
-							label: "Sans date",
-							icon: CalendarX2,
-							iconClass: "text-error",
-							url: (filters) => getFilterUrl(filters),
-							filterParams: { status: "eventsWithoutDate" }
-						},
-						{
-							label: "Sans organisateur·ices",
-							icon: UserX,
-							iconClass: "text-error",
-							url: (filters) => getFilterUrl(filters),
-							filterParams: { status: "eventsWithoutOrganizers" }
-						},
-						{
-							label: "Sondages en cours",
-							icon: CalendarSearch,
-							iconClass: "text-primary",
-							url: (filters) => getFilterUrl(filters),
-							filterParams: { status: "eventsWithSondage" }
-						}
-					]
-				},
-				{
-					label: "En conflits",
-					icon: AlertTriangle,
-					iconClass: "text-error",
-					url: (filters) => getFilterUrl(filters),
-					filterParams: { status: "conflicts" }
-				},
-				{
-					label: "Récurrents",
-					icon: RefreshCw,
-					url: "/dashboard/events/recurrent"
-				}
-			]
-		},
-		{
-			label: "Newsletter",
-			icon: Mail,
-			url: "/dashboard/newsletter"
-		},
-		{
-			label: "Site public",
-			icon: Globe,
-			url: "/dashboard/site_pages"
-		},
-		{
-			label: "Documents",
-			url: "/dashboard/pads",
-			icon: Files
-		}
-	];
-
-	const secondaryMenuItems: MenuItem[] = [
-		{
-			label: "Inviter",
-			icon: UserPlus,
-			url: "#" // Utilisé pour le bouton modal
-		},
-		{
-			label: "Configuration",
-			icon: Settings,
-			url: "/dashboard/config"
-		}
-	];
 </script>
 
-{#snippet menuItem(item)}
+<!-- SNIPPET RÉCURSIF POUR AFFICHER LES ITEMS DE MENU -->
+{#snippet renderMenuItem(item, level = 0)}
+	{@const url = generateUrl(item)}
+	{@const Icon = item.icon}
 	<li>
-		<a
-			href={typeof item.url === "function" ? item.url(item.filterParams || {}) : item.url}
-			class={isItemActive(item) ? "bg-base-300" : ""}
-			onclick={(e) => {
-				e.preventDefault();
-				if (item === secondaryMenuItems[0]) {
-					// Cas spécial pour le bouton modal Inviter
-					modalState.inviteUser = true;
-					onItemClick?.();
-				} else {
-					handleNavigation(
-						typeof item.url === "function" ? item.url(item.filterParams || {}) : item.url
-					);
-				}
-			}}
-		>
-			<item.icon size={24} class={item.iconClass} />
-			<span class:hidden={isCompact}>{item.label}</span>
+		<a href={url} class={[isItemActive(item) && "bg-base-300"]} onclick={() => handleClick(item)}>
+			<Icon size={isCompact ? "26" : "24"} class={item.iconClass} />
+			<span class={[isCompact && "hidden"]}>{item.label}</span>
 		</a>
 
-		{#if shouldShowSubItems(item)}
-			<ul>
-				{#each item.subItems as subItem (subItem)}
-					<li>
-						<a
-							href={typeof subItem.url === "function"
-								? subItem.url(subItem.filterParams || {})
-								: subItem.url}
-							class={isItemActive(subItem) ? "bg-base-300" : ""}
-							onclick={(e) => {
-								e.preventDefault();
-								handleNavigation(
-									typeof subItem.url === "function"
-										? subItem.url(subItem.filterParams || {})
-										: subItem.url
-								);
-							}}
-						>
-							<subItem.icon size={20} class={subItem.iconClass} />
-							{subItem.label}
-						</a>
-
-						{#if shouldShowSubItems(subItem)}
-							<ul>
-								{#each subItem.subItems as subSubItem (subSubItem)}
-									<li>
-										<a
-											href={typeof subSubItem.url === "function"
-												? subSubItem.url(subSubItem.filterParams || {})
-												: subSubItem.url}
-											class={isItemActive(subSubItem) ? "bg-base-300" : ""}
-											onclick={(e) => {
-												e.preventDefault();
-												handleNavigation(
-													typeof subSubItem.url === "function"
-														? subSubItem.url(subSubItem.filterParams || {})
-														: subSubItem.url
-												);
-											}}
-										>
-											<subSubItem.icon size={18} class={subSubItem.iconClass} />
-											{subSubItem.label}
-										</a>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</li>
+		<!-- Appel récursif si des sous-items existent et doivent être montrés -->
+		{#if item.subItems && shouldShowSubItems(item)}
+			<ul class="menu-sub {isCompact ? 'compact-subitem' : ''}">
+				{#each item.subItems as subItem (subItem.label)}
+					{@render renderMenuItem(subItem, level + 1)}
 				{/each}
 			</ul>
 		{/if}
 	</li>
 {/snippet}
 
-<div class=" flex flex-col gap-4">
-	<!-- Bouton Nouvel événement -->
-	<button
-		class="btn btn-primary mb-4 p-2"
-		onclick={() => {
-			modalState.event = true;
-			onItemClick?.();
-		}}
-	>
-		{#if isCompact}
-			<CalendarPlus size={24} />
-		{:else}
-			<CalendarPlus size={24} />
-			Nouvel événement
+<div class="flex w-full flex-col gap-4">
+	<!-- Bouton d'action "Nouvel événement" -->
+	<button class="btn btn-primary p-2" onclick={() => handleClick(newEventButton)}>
+		<newEventButton.icon size={isCompact ? "26" : "24"} />
+		{#if !isCompact}
+			<span>{newEventButton.label}</span>
 		{/if}
 	</button>
-	<!-- Menu principal -->
-	<ul class="menu rounded-box bg-base-100 w-full gap-2 {isMobile ? 'menu-md' : 'menu-lg'}">
-		{#each menuItems as item, index (index)}
-			{@render menuItem(item)}
+
+	<!-- Menu evenement -->
+	<ul class="menu rounded-box menu-vertical bg-base-200 menu-lg w-full gap-1">
+		{#each eventsMenuItems as item (item.label)}
+			{@render renderMenuItem(item)}
 		{/each}
 	</ul>
 
-	<!-- Menu secondaire -->
-	<ul class="menu w-full {isMobile ? 'menu-md' : 'menu-lg'} rounded-box bg-base-100 mt-4 gap-2">
-		{#each secondaryMenuItems as item, index (index)}
-			{@render menuItem(item)}
+	<!-- menu autre (newsletter, doc) -->
+
+	<ul class="menu rounded-box menu-vertical bg-base-200 menu-lg w-full gap-1">
+		{#each otherMenuItems as item (item.label)}
+			{@render renderMenuItem(item)}
+		{/each}
+	</ul>
+
+	<!-- Menu bottom -->
+	<ul
+		class="menu menu-vertical w-full {isMobile
+			? 'menu-md'
+			: 'menu-lg'} rounded-box bg-base-200 mt-auto mb-4 gap-1"
+	>
+		<!-- Bouton d'action "Inviter" -->
+		<li>
+			<button onclick={() => handleClick(inviteUserButton)}>
+				<inviteUserButton.icon size={isCompact ? "26" : "24"} />
+				<span class:hidden={isCompact}>{inviteUserButton.label}</span>
+			</button>
+		</li>
+
+		<!-- Liens de navigation secondaires -->
+		{#each confMenuItems as item (item.label)}
+			{@render renderMenuItem(item)}
 		{/each}
 	</ul>
 </div>
 
 <style>
-	li {
-		margin: 4px 0 0 0;
+	/* Si le sous-menu est en mode compact, on supprime la marge */
+	.compact-subitem {
+		margin-inline-start: 0;
+		padding-inline-start: 0;
+	}
+
+	.compact-subitem li {
+		scale: 0.9;
+	}
+
+	.compact-subitem li li {
+		scale: 0.9;
+	}
+
+	/* Supprime la fine bordure gauche en mode compact */
+	.compact-subitem:before {
+		display: none;
 	}
 </style>

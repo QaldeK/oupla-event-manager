@@ -159,7 +159,7 @@ function createValidators(): Record<ValidationRule, ValidatorFunction> {
 		},
 		publicStartTime: (e) => {
 			if (e.isPublic && (!e.start_public || e.start_public.trim() === "")) {
-				return "L'horaire d'ouverture du lieu est requise pour pouvoir confirmer un événement public";
+				return "L'horaire d'ouverture au public est requise pour pouvoir confirmer un événement public";
 			}
 			return undefined;
 		},

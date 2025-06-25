@@ -1,19 +1,16 @@
 <script lang="ts">
-	import { eventState, modalState } from "$lib/shared/states.svelte";
+	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
+	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import {
-		createSimpleConfirmationPlan,
-		handleEventAction
-	} from "$lib/shared/eventActionHandler.svelte";
+	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { ValidMaster, ValidOccurrence } from "$lib/types/event.types";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
-	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
 
 	import { userDb } from "$lib/shared/userDb.svelte";
 
+	import { formatRecurrence, getRecurrenceLabel } from "$lib/utils/recurrence";
 	import { CalendarCheck, Pencil, UserCheck, UserPlus } from "lucide-svelte";
-	import { getRecurrenceLabel, formatRecurrence } from "$lib/utils/recurrence";
 	import OrgAndTasksCard from "./OrgAndTasksCard.svelte";
 
 	let { master, occurrences = [] } = $props<{
@@ -39,7 +36,13 @@
 
 	const handleConfirmClick = async (occurrence: ValidOccurrence) => {
 		if (!currentUser) return;
-		const plan = await createSimpleConfirmationPlan(occurrence, currentUser, true);
+		const plan = await createEventActionPlan(occurrence, {
+			context: "external_action",
+			wantsToConfirmEvent: true,
+			checkConflicts: true,
+			currentUser,
+			notify: true
+		});
 		await handleEventAction(plan);
 	};
 
