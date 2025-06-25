@@ -4,19 +4,29 @@
 	import GroupRadioButton from "$lib/components/GroupRadioButton.svelte";
 	import Info from "$lib/components/Info.svelte";
 	import TimePickRange from "$lib/components/TimePickRange.svelte";
+	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 
 	import { eventState, getSpace, showAlert } from "$lib/shared";
+	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
 	import type { DateProposedType, EventType } from "$lib/types/event.types";
 	import { addTime, isValidDate, lisibleDate, lisibleTime } from "$lib/utils";
 	import { fade } from "svelte/transition";
 
-	import { CalendarCheck, PlusCircle, Trash2, UserPlus } from "lucide-svelte";
+	import {
+		CalendarCheck,
+		PlusCircle,
+		Trash2,
+		UserPlus,
+		ThumbsUp,
+		ThumbsDown,
+		BadgeHelp
+	} from "lucide-svelte";
 
 	interface Props {
 		eventData: EventType;
 		onUpdateDatesProposed: (dates: DateProposedType[]) => void;
 		onValidateDate: (date: DateProposedType) => void;
-		onUpdateIsSondage: () => void;
+		onUpdateIsSondage: (isSondage: boolean) => void;
 		errors?: Partial<Record<string, string>>;
 	}
 
@@ -38,7 +48,10 @@
 	let editingDateIndex = $state<number | null>(null);
 	let spaceMembers = $derived(getSpace.members);
 
-	let rooms = $derived(eventState.is?.rooms); // for conflicts
+	// let rooms = $derived(eventState.is?.rooms); // for conflicts
+
+	// 👉 Calculateurs de conflits pour chaque date proposée
+	let conflictCalculators = $state<Map<string, ConflictCalculator>>(new Map());
 
 	let datesFutureProposed = $derived.by(() => {
 		const now = new Date();
@@ -189,6 +202,7 @@
 					id: benevoleId,
 					username: username,
 					maybehere: newValue,
+					role: "",
 					tasks: [] // Les tâches ne sont pas gérées ici pour les dates proposées
 				});
 			}
@@ -261,6 +275,14 @@
 			selectedDate = newValue;
 		}
 	}
+
+	// 👉 Fonction pour obtenir ou créer un calculateur de conflit pour une date
+	function getConflictCalculator(dateKey: string): ConflictCalculator {
+		if (!conflictCalculators.has(dateKey)) {
+			conflictCalculators.set(dateKey, new ConflictCalculator());
+		}
+		return conflictCalculators.get(dateKey)!;
+	}
 </script>
 
 {#snippet ProposedDateCard(date: DateProposedType, displayIndex: number)}
@@ -312,16 +334,22 @@
 			</div>
 		</div>
 
-		<div class="min-h-8 p-4">
+		<div class="min-h-8 space-y-3 p-4">
 			<div class="flex flex-wrap gap-2">
 				{#each date.organizers?.filter((org) => org.maybehere === "oui") ?? [] as organizer (organizer.id)}
-					<span class="badge badge-success badge-outline">{organizer.username}</span>
+					<span class="badge badge-success badge-outline"
+						><ThumbsUp size={16} /> {organizer.username}</span
+					>
 				{/each}
 				{#each date.organizers?.filter((org) => org.maybehere === "peut-être") ?? [] as organizer (organizer.id)}
-					<span class="badge badge-warning badge-outline">{organizer.username}</span>
+					<span class="badge badge-warning badge-outline"
+						><BadgeHelp size={16} /> {organizer.username}</span
+					>
 				{/each}
 				{#each date.organizers?.filter((org) => org.maybehere === "non") ?? [] as organizer (organizer.id)}
-					<span class="badge badge-error badge-outline">{organizer.username}</span>
+					<span class="badge badge-error badge-outline"
+						><ThumbsDown size={16} /> {organizer.username}</span
+					>
 				{/each}
 			</div>
 			{#if !date.organizers || date.organizers.length === 0}
@@ -329,6 +357,20 @@
 					Personne n'a répondu pour cette date.
 				</p>
 			{/if}
+
+			<!-- 👉 Affichage des conflits pour cette date proposée -->
+			{#each [date] as dateItem (dateItem.dateStart + dateItem.dateEnd)}
+				{@const dateKey = `${dateItem.dateStart}-${dateItem.dateEnd}`}
+				{@const calculator = getConflictCalculator(dateKey)}
+				<ConflictAlert
+					mode="realtime"
+					{eventId}
+					startDate={new Date(dateItem.dateStart)}
+					endDate={new Date(dateItem.dateEnd)}
+					rooms={eventData.rooms || []}
+					conflictCalculator={calculator}
+				/>
+			{/each}
 		</div>
 	</div>
 {/snippet}
@@ -336,18 +378,13 @@
 <div id="datesProposedTab" class="space-y-2">
 	<Info>
 		<p>
-			Ajoutez des propositions de dates et horaires. Les membres pourront indiquer leur
-			disponibilité (<span class="badge badge-success badge-outline">oui</span>,
-			<span class="badge badge-warning badge-outline">peut-être</span>,
-			<span class="badge badge-error badge-outline">non</span>).
-			{#if datesFutureProposed.length > 0}
-				Vous pouvez ensuite valider la date choisie (<CalendarCheck class="inline" size={20} />) ,
-				ou
-				<button class="link link-error" onclick={() => onUpdateIsSondage(false)}
-					>annuler ce sondage</button
-				>
-				pour revenir à une date unique.
-			{/if}
+			Ajoutez des propositions de dates et horaires. Les membres pourront indiquer leurs
+			disponibilités.
+
+			<button
+				class="btn btn-badge btn-outline btn-error float-end mt-2"
+				onclick={() => onUpdateIsSondage(false)}>annuler ce sondage</button
+			>
 		</p>
 	</Info>
 	{#if (eventData?.external_proposal?.proposals?.length ?? 0) > 0 && hasUnproposedDates()}
