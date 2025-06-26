@@ -121,14 +121,16 @@ function createValidators(): Record<ValidationRule, ValidatorFunction> {
 			return undefined;
 		},
 		organizers: (e) => {
-			if (e.isRecurrent && e.recurrence) {
+			if (e.isRecurrent && e.recurrence && !e.isConfirmed) {
 				const minRequired = e.recurrence.minOrganizersRequired ?? 1;
 				if ((e.organizers?.length || 0) < minRequired) {
 					return `Définissez au moins ${minRequired} organisateur•ice${minRequired > 1 ? "s" : " pour confirmer l'événement"}`;
 				}
 			} else {
-				if ((e.organizers?.length || 0) < 1) {
+				if ((e.organizers?.length || 0) < 1 && !e.isConfirmed) {
 					return "Définissez au moins un·e organisateur·ice pour confirmer l'événement";
+				} else if ((e.organizers?.length || 0) < 1 && e.isConfirmed) {
+					return "Attention, cet événement est confirmé mais n'a plus d'organisateur·ice.";
 				}
 			}
 			return undefined;
@@ -332,6 +334,7 @@ export function createEventValidator(initialEvent: EventType, config: ValidatorC
 
 		isValid: (profile?: ValidationProfile): boolean => {
 			// 👉 Délègue à la fonction statique !
+			// XXX Pourquoi ?
 			const result = validateEventStatic(event, profile || activeProfile || "STANDARD_EVENT");
 			return result.isValid;
 		},
