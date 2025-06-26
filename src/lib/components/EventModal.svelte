@@ -464,10 +464,10 @@
 			validator?.setProfile(determineValidationProfile(shouldConfirm));
 
 			// pour le moment encore necessaire au moins pour empecher l'enregistrement d'un MasterRecurrent incomplet
-			if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
-				showAlert("Veuillez compléter les champs obligatoires.", "error");
-				return;
-			}
+			// if (!validator?.isValid(determineValidationProfile(shouldConfirm))) {
+			// 	showAlert("Veuillez compléter les champs obligatoires.", "error");
+			// 	return;
+			// }
 
 			// 👉 Détection unifiée des conflits selon le type d'événement
 			let excludeEventIds: string[] = [];
