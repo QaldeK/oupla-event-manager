@@ -1,16 +1,19 @@
 <script lang="ts">
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
-	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
-	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import {
+		createEventActionPlan,
+		handleEventAction,
+		requestTaskUpdate
+	} from "$lib/shared/eventActionHandler.svelte";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
-	import type { ValidMaster, ValidOccurrence } from "$lib/types/event.types";
+	import type { EventType, ValidMaster, ValidOccurrence } from "$lib/types/event.types";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 
 	import { userDb } from "$lib/shared/userDb.svelte";
 
 	import { formatRecurrence, getRecurrenceLabel } from "$lib/utils/recurrence";
-	import { CalendarCheck, Pencil, UserCheck, UserPlus } from "lucide-svelte";
+	import { CalendarArrowUp, CalendarCheck, Pencil, UserCheck, UserPlus } from "lucide-svelte";
 	import OrgAndTasksCard from "./OrgAndTasksCard.svelte";
 
 	let { master, occurrences = [] } = $props<{
@@ -28,8 +31,8 @@
 
 	const handleSubscriptionClick = (occurrence: ValidOccurrence) => {
 		if (!currentUser) return;
-		eventsStore.requestTaskUpdate({
-			event: occurrence as unknown as Parameters<typeof eventsStore.requestTaskUpdate>[0]["event"],
+		requestTaskUpdate({
+			event: occurrence as unknown as EventType,
 			user: currentUser
 		});
 	};
@@ -57,6 +60,10 @@
 			return subscribed ? "Gérer mes tâches" : "S'inscrire";
 		}
 	};
+
+	function restoreCanceledEvent(id: any) {
+		throw new Error("Function not implemented.");
+	}
 </script>
 
 <div class="bg-base-200 @container flex h-full flex-col overflow-hidden rounded-lg shadow-lg">
@@ -114,7 +121,7 @@
 						!occurrence.canceled
 							? ' border-l-success/30 border-l-3'
 							: occurrence.canceled
-								? 'border-l-error/30 border-l-3'
+								? 'border-l-error/30 bg-neutral/2 border-l-3 '
 								: !occurrence.isConfirmed
 									? 'border-l-warning/50 border-l-3'
 									: ''}"
@@ -141,46 +148,66 @@
 										<span class="@max-md:hidden">Confirmer</span>
 									</button>
 								{/if}
-								<button
-									onclick={() => {
-										eventState.is = occurrence;
-										modalState.event = true;
-									}}
-									class="btn btn-square btn-sm"
-									title="modifier cette occurrence"
-								>
-									<Pencil />
-								</button>
+								{#if !occurrence.canceled}
+									<button
+										onclick={() => {
+											eventState.is = occurrence;
+											modalState.event = true;
+										}}
+										class="btn btn-square btn-sm"
+										title="modifier cette occurrence"
+									>
+										<Pencil />
+									</button>
+								{/if}
 							</div>
 						</div>
 						<!-- Affichage des organisateurs -->
-						{#if Array.isArray(occurrence.organizers) && occurrence.organizers.length > 0}
-							<OrgAndTasksCard organizers={occurrence.organizers} tasks={occurrence.tasks} />
-						{:else}
-							<div class="text-fluid-sm text-base-content/60">
-								Aucun·e organisateur·ice inscrit·e
-							</div>
+						{#if !occurrence.canceled}
+							{#if Array.isArray(occurrence.organizers) && occurrence.organizers.length > 0}
+								<OrgAndTasksCard organizers={occurrence.organizers} tasks={occurrence.tasks} />
+							{:else}
+								<div
+									class="text-fluid-sm {occurrence.isConfirmed
+										? 'text-error'
+										: 'text-base-content/60'}"
+								>
+									Aucun·e organisateur·ice inscrit·e
+								</div>
+							{/if}
 						{/if}
 
 						<div class="mt-4 flex flex-wrap items-center justify-between gap-4">
 							<!-- Bouton d'inscription/gestion -->
-							<div>
-								{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
-									<UnassignedTasks event={occurrence} class="" />
-								{/if}
-							</div>
-							<button
-								onclick={() => handleSubscriptionClick(occurrence)}
-								class=" btn btn-primary btn-compact btn-soft ms-auto"
-								disabled={occurrence.canceled}
-							>
-								{#if isUserSubscribed(occurrence)}
-									<UserCheck />
-								{:else}
-									<UserPlus />
-								{/if}
-								<span> {getSubscriptionButtonText(occurrence)}</span>
-							</button>
+							{#if !occurrence.canceled}
+								<div>
+									{#if Array.isArray(occurrence.tasks) && occurrence.tasks.length > 1}
+										<UnassignedTasks event={occurrence} class="" />
+									{/if}
+								</div>
+								<button
+									onclick={() => handleSubscriptionClick(occurrence)}
+									class=" btn btn-primary btn-compact btn-outline ms-auto"
+									disabled={occurrence.canceled}
+								>
+									{#if isUserSubscribed(occurrence)}
+										<UserCheck />
+									{:else}
+										<UserPlus />
+									{/if}
+									<span> {getSubscriptionButtonText(occurrence)}</span>
+								</button>
+							{:else}
+								<button
+									onclick={() => {
+										restoreCanceledEvent(occurrence.id);
+									}}
+									class="btn btn-compact btn-outline ms-auto"
+									title="Rétablir occurrence"
+								>
+									<CalendarArrowUp /><span> Rétablir</span>
+								</button>
+							{/if}
 						</div>
 					</div>
 				{:else}

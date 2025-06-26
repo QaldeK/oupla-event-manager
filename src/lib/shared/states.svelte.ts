@@ -36,7 +36,8 @@ export interface TaskModalData {
 	selectedTaskNames: string[];
 	eventIsConfirmed: boolean; // Utile pour affichage informatif dans TaskDialog
 	eventId?: string;
-	onSubmit: ((result: string[]) => void | Promise<void>) | null;
+	organizers: Array<{ id: string; username: string; tasks: string[] }>;
+	onSubmit: ((result: string[], notifyOthers?: boolean) => void | Promise<void>) | null;
 }
 
 export interface ModalStateType {
@@ -70,6 +71,7 @@ export const modalState = $state<ModalStateType>({
 			tasksAvailable: [],
 			selectedTaskNames: [],
 			eventIsConfirmed: false,
+			organizers: [],
 			onSubmit: null
 		}
 	},
@@ -90,6 +92,7 @@ export const openTaskModal = (params: {
 	selectedTaskNames: string[];
 	eventIsConfirmed: boolean;
 	eventId?: string;
+	organizers: Array<{ id: string; username: string; tasks: string[] }>;
 	onSubmit: (result: string[], notifyOthers?: boolean) => void | Promise<void>;
 }) => {
 	modalState.tasks = {
@@ -100,6 +103,7 @@ export const openTaskModal = (params: {
 			selectedTaskNames: params.selectedTaskNames,
 			eventIsConfirmed: params.eventIsConfirmed,
 			eventId: params.eventId,
+			organizers: params.organizers,
 			onSubmit: params.onSubmit
 		}
 	};

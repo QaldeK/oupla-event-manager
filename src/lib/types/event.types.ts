@@ -44,7 +44,7 @@ export interface OrganizerType {
 	id: string;
 	username: string;
 	tasks: string[];
-	role: string;
+	// role: string;
 	maybehere?: string | null;
 }
 

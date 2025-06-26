@@ -25,7 +25,9 @@
 
 	// Liste des utilisateurs disponibles (non sélectionnés)
 	let availableUsers = $derived.by(() =>
-		organizersPossibles.filter((user: UserType) => !organizers.some((org: OrganizerType) => org.id === user.id))
+		organizersPossibles.filter(
+			(user: UserType) => !organizers.some((org: OrganizerType) => org.id === user.id)
+		)
 	);
 
 	// liste des utilisateur de l'espace non présent dans organizers
@@ -68,6 +70,7 @@
 				tasksAvailable: tasks, // Passer toutes les tâches définies pour l'événement
 				selectedTaskNames: currentSelectedTaskNames,
 				eventIsConfirmed: false, // On est dans l'éditeur, l'état de confirmation importe peu ici
+				organizers: organizers || [], // Passer les organisateurs actuels
 				// eventId: eventData.id, // On n'a pas l'ID de l'event ici, pas grave pour ce callback
 				onSubmit: (resultTaskNames: string[]) => {
 					// 👉 Mettre à jour la prop `organizers` (état local de EventModal)
@@ -183,7 +186,8 @@
 					<button
 						class={cn(
 							"btn  btn-compact btn-dash",
-							organizers?.some((org: OrganizerType) => org.id === user.id) && "border-4 border-green-500 font-bold"
+							organizers?.some((org: OrganizerType) => org.id === user.id) &&
+								"border-4 border-green-500 font-bold"
 						)}
 						onclick={() => handleOrganizer(user)}
 					>
