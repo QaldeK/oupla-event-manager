@@ -5,6 +5,7 @@
 		handleEventAction,
 		requestTaskUpdate
 	} from "$lib/shared/eventActionHandler.svelte";
+	import { restoreCanceledEvent } from "$lib/services/eventActions";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { EventType, ValidMaster, ValidOccurrence } from "$lib/types/event.types";
 	import type { UserType } from "$lib/types/types";
@@ -61,8 +62,8 @@
 		}
 	};
 
-	function restoreCanceledEvent(id: any) {
-		throw new Error("Function not implemented.");
+	function restoreEvent(eventData: EventType) {
+		restoreCanceledEvent(eventData);
 	}
 </script>
 
@@ -200,7 +201,7 @@
 							{:else}
 								<button
 									onclick={() => {
-										restoreCanceledEvent(occurrence.id);
+										restoreEvent(occurrence);
 									}}
 									class="btn btn-compact btn-outline ms-auto"
 									title="Rétablir occurrence"

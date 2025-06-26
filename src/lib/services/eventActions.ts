@@ -897,16 +897,36 @@ export async function handleEventConflictsAfterSave(
 	}
 }
 
-/**
- * Prépare et affiche un modal de confirmation pour la soumission d'événement
- */
-// Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts
 
 /** Rétablir un événement annulé */
-export async function restoreCanceledEvent(eventId: string): Promise<EventActionPlan> {
+export async function restoreCanceledEvent(eventData: EventType): Promise<EventActionPlan> {
 	try {
-		await updateEvent(eventId, { canceled: false });
-		return {
+		const eventId = eventData.id;
+
+	// 1. Simuler l'état de l'événement après restauration pour la détection des conflits.
+		const restoredEventData: EventType = { ...eventData, canceled: false };
+
+		// 2. Recalculer les conflits pour l'événement restauré.
+		const conflictResult = detectAllEventConflicts(restoredEventData, "EDIT_SINGLE", [eventId]);
+		const newConflictIds = conflictResult.conflictIds;
+
+		
+		await updateEvent(eventId, {
+			canceled: false,
+			inConflictWith: newConflictIds
+		});
+
+		// 4. Gérer les conflits réciproques sur les AUTRES événements.
+		const previousConflictIds = eventData.inConflictWith || [];
+		const conflictsToRemove = previousConflictIds.filter((id) => !newConflictIds.includes(id));
+
+		if (newConflictIds.length > 0) {
+			await updateReciprocalConflicts(eventId, newConflictIds);
+		}
+		if (conflictsToRemove.length > 0) {
+			await cleanupBidirectionalConflicts(eventId, conflictsToRemove);
+		}
+				return {
 			type: "SUCCESS",
 			message: "L'événement a été rétabli avec succès."
 		};

@@ -23,8 +23,10 @@
 	} from "lucide-svelte";
 
 	// ::: props and reactive states
-
-	const { thisEvent: currentEvent } = $props();
+	interface Props {
+		thisEvent: EventType;
+	}
+	const { thisEvent: currentEvent }: Props = $props();
 
 	const hasAuth = $derived(
 		hasAuthorizations({
@@ -82,7 +84,7 @@
 	}
 
 	async function restoreEvent() {
-		await restoreCanceledEvent(currentEvent.id);
+		await restoreCanceledEvent(currentEvent);
 	}
 </script>
 
