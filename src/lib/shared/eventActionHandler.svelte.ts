@@ -34,10 +34,12 @@ import {
 	applyDateProposalToEvent,
 	getNewEvent,
 	getUnassignedTasks,
+	cleanupBidirectionalConflicts,
 	submitEvent,
 	updateEventData,
 	type EventActionPlan
 } from "$lib/services/eventActions";
+import { updateReciprocalConflicts } from "$lib/pocketbase.svelte";
 import type { Conflict } from "$lib/services/eventConflicts";
 import { notificationService } from "$lib/services/notificationService.svelte";
 import {
@@ -46,7 +48,7 @@ import {
 	showAlert,
 	type ConfirmModalData
 } from "$lib/shared/states.svelte";
-import type { DateProposedType, EventMode, EventType } from "$lib/types/event.types";
+import type { DateProposedType, EventMode, EventType, OrganizerType } from "$lib/types/event.types";
 import type { UserType } from "$lib/types/types";
 import { filterAndConvertOrganizers, lisibleDate, lisibleTime } from "$lib/utils";
 import { validateEventStatic } from "$lib/validation/event-validator.svelte";
@@ -72,7 +74,7 @@ const STANDARD_MESSAGES = {
 // Types pour clarifier les contextes
 type ActionOptions = {
 	/** Contexte d'origine de l'action */
-	context: "form" | "external_action";
+	context?: "form" | "external_action";
 	/** Mode d'événement (pour EventModal) */
 	mode?: EventMode;
 	/** L'utilisateur valide une date de sondage */
@@ -81,6 +83,9 @@ type ActionOptions = {
 	wantsToConfirmEvent?: boolean;
 	/** Forcer la vérification des conflits même sans confirmation */
 	checkConflicts?: boolean;
+	/** Skip conflict check entirely */
+	// XXX Pourquoi ?
+	skipConflictCheck?: boolean;
 	/** IDs d'événements à exclure de détection de conflits */
 	excludeEventIds?: string[];
 	/** Utilisateur effectuant l'action */
@@ -91,6 +96,10 @@ type ActionOptions = {
 	dateSondageToValidate?: DateProposedType;
 	/** Indique si l'événement vient de valider un sondage (pour EventModal) */
 	hasSondageValidation?: boolean;
+	/** Message de succès personnalisé */
+	successMessage?: string;
+	/** Fermer automatiquement le modal après l'action */
+	autoCloseModal?: boolean;
 	/** Données de validation personnalisées (pour EventModal) */
 	validationData?: {
 		isValid: boolean;
@@ -181,9 +190,34 @@ function createActionExecutor(
 				const updateData: Partial<EventType> = {};
 				if (options.wantsToConfirmEvent) {
 					updateData.isConfirmed = true;
+					// Ajouter les conflits détectés dans la même mise à jour
+					updateData.inConflictWith = conflictResults.conflictIds;
 				}
 
+				// Une seule mise à jour avec toutes les données
 				result = await updateEventData(eventData.id, updateData);
+
+				// Gérer les conflits bidirectionnels séparément (sans re-modifier l'événement principal)
+				if (result.type === "SUCCESS" && options.wantsToConfirmEvent) {
+					try {
+						const currentConflicts = eventData.inConflictWith || [];
+						const newConflicts = conflictResults.conflictIds;
+
+						// Mettre à jour les conflits réciproques
+						if (newConflicts.length > 0) {
+							await updateReciprocalConflicts(eventData.id, newConflicts);
+						}
+
+						// Nettoyer les anciens conflits bidirectionnels si nécessaire
+						const conflictsToRemove = currentConflicts.filter((id) => !newConflicts.includes(id));
+						if (conflictsToRemove.length > 0) {
+							await cleanupBidirectionalConflicts(eventData.id, conflictsToRemove);
+						}
+					} catch (error) {
+						console.error("Erreur lors de la gestion des conflits bidirectionnels:", error);
+						// On ne relance pas l'erreur pour ne pas bloquer le flux principal
+					}
+				}
 			}
 
 			// Réinitialiser l'état si nécessaire
@@ -209,19 +243,12 @@ function createActionExecutor(
 function handleConfirmedEventWithoutOrganizer(
 	eventData: EventType,
 	options: ActionOptions,
-	conflictResults: ConflictResult,
-	completionCheck: { errors: Record<string, string> }
+	conflictResults: ConflictResult
 ): EventActionPlan {
 	const conflictMessage =
-		conflictResults.conflicts.length > 0
-			? generateConflictMessage(conflictResults.conflicts, options.dateSondageToValidate)
-			: "";
+		conflictResults.conflicts.length > 0 ? generateConflictMessage(conflictResults.conflicts) : "";
 
-	const messages = [
-		"<p><strong>🚨 Attention :</strong> Cet événement est confirmé mais aucun organisateur n'est assigné.</p>",
-
-		"<ul><li>Continuer malgré tout</li><li>Assigner des organisateurs d'abord</li></ul>"
-	];
+	const messages = ["<p> Cet événement est confirmé mais aucun organisateur n'est assigné.</p>"];
 
 	if (conflictMessage) {
 		messages.push(conflictMessage);
@@ -262,9 +289,7 @@ function handleConfirmedIncompleteEvent(
 ): EventActionPlan {
 	const errorMessages = completionCheck.getErrors();
 	const conflictMessage =
-		conflictResults.conflicts.length > 0
-			? generateConflictMessage(conflictResults.conflicts, options.dateSondageToValidate)
-			: "";
+		conflictResults.conflicts.length > 0 ? generateConflictMessage(conflictResults.conflicts) : "";
 
 	const messages = [
 		"<p><strong>⚠️ Événement confirmé mais incomplet :</strong></p>",
@@ -373,14 +398,7 @@ function buildConfirmationDetails(
 	showCheckbox?: { label: string; checked: boolean };
 	additionalButton?: ConfirmModalData["additionalButton"];
 } {
-	const {
-		hasConflicts,
-		needsCompletion,
-		hasUnassignedTasks,
-		conflictResults,
-		completionCheck,
-		unassignedTasks
-	} = checks;
+	const { hasConflicts, hasUnassignedTasks, conflictResults, unassignedTasks } = checks;
 
 	const messages: string[] = [];
 	let variant: "info" | "warning" | "danger" = "info";
@@ -455,10 +473,7 @@ function buildConfirmationDetails(
 				: conflictResults.realConflicts;
 
 		if (relevantConflicts.length > 0) {
-			const conflictMessage = generateConflictMessage(
-				relevantConflicts,
-				options.dateSondageToValidate
-			);
+			const conflictMessage = generateConflictMessage(relevantConflicts);
 			if (conflictMessage) {
 				messages.push(conflictMessage);
 				if (variant === "info") variant = "warning";
@@ -480,7 +495,7 @@ function resetEventState() {
 /**
  * Génère un message de conflit formaté
  */
-function generateConflictMessage(conflicts: Conflict[], dateProposal?: DateProposedType): string {
+function generateConflictMessage(conflicts: Conflict[]): string {
 	if (!conflicts.length) return "";
 
 	const conflictsByType = conflicts.reduce(
@@ -499,7 +514,7 @@ function generateConflictMessage(conflicts: Conflict[], dateProposal?: DatePropo
 
 	if (conflictsByType.confirmed.length > 0) {
 		messages.push(
-			`<p><strong>Evénement confirmer au même moment :</strong></p><ul>${conflictsByType.confirmed
+			`<p><strong>Evénement confirmé au même moment :</strong></p><ul>${conflictsByType.confirmed
 				.map((conflict) => {
 					const rooms = conflict.hasSameRoom ? " (même salle)" : `${conflict.rooms}`;
 					const timeInfo =
@@ -616,7 +631,7 @@ async function createEventActionPlan(
 		const completionCheck = validateEventStatic(eventData);
 		if (completionCheck.errors.organizers) {
 			const conflicts = checkEventConflicts(eventData, options);
-			return handleConfirmedEventWithoutOrganizer(eventData, options, conflicts, completionCheck);
+			return handleConfirmedEventWithoutOrganizer(eventData, options, conflicts);
 		}
 	}
 
@@ -652,9 +667,8 @@ async function createEventActionPlan(
 		needsCompletion = !options.validationData.isValid;
 		completionCheck = {
 			errors: options.validationData.errors,
-			hasUnassignedTasks: options.validationData.hasUnassignedTasks,
-			unassignedTasks: options.validationData.unassignedTasks,
-			getErrors: () => Object.values(options.validationData!.errors)
+			getErrors: () => Object.values(options.validationData!.errors),
+			unassignedTasks: options.validationData.unassignedTasks
 		};
 	} else if (options.wantsToConfirmEvent || options.context === "external_action") {
 		// Validation complète pour les confirmations
@@ -673,12 +687,17 @@ async function createEventActionPlan(
 		options.wantsToConfirmEvent &&
 		completionCheck
 	) {
-		return handleIncompleteEventFromExternalContext(eventData, completionCheck);
+		return handleIncompleteEventFromExternalContext(eventData, {
+			getErrors: completionCheck.getErrors
+		});
 	}
 
 	// 6. Cas spécial : événement confirmé mais incomplet (autre contexte)
 	if (needsCompletion && eventData.isConfirmed && completionCheck) {
-		return handleConfirmedIncompleteEvent(eventData, options, conflictResults, completionCheck);
+		return handleConfirmedIncompleteEvent(eventData, options, conflictResults, {
+			errors: completionCheck.errors as Record<string, string>,
+			getErrors: completionCheck.getErrors
+		});
 	}
 
 	// 7. Vérifier si on peut procéder directement
@@ -773,7 +792,9 @@ async function createEventActionPlan(
 						// Utiliser le handler existant pour les événements incomplets
 						return handleIncompleteEventFromExternalContext(
 							updatedEvent,
-							completionCheck,
+							{
+								getErrors: completionCheck.getErrors
+							},
 							options.dateSondageToValidate
 						);
 					}
@@ -896,5 +917,482 @@ async function handleEventAction(plan: EventActionPlan): Promise<void> {
 	}
 }
 
+/**
+ * Annule un événement et nettoie ses conflits réciproques
+ * Fonction commune utilisée par ButtonAction et DateUniq
+ */
+async function cancelEventWithConflictCleanup(
+	eventData: EventType,
+	options: {
+		confirmationTitle?: string;
+		confirmationMessage?: string;
+		successMessage?: string;
+		onCancel?: () => void;
+	} = {}
+): Promise<void> {
+	const {
+		confirmationTitle = "Annuler l'événement",
+		confirmationMessage = "Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
+		successMessage = "L'événement a bien été annulé",
+		onCancel
+	} = options;
+
+	modalState.confirm = {
+		isOpen: true,
+		data: {
+			variant: "danger",
+			title: confirmationTitle,
+			message: confirmationMessage,
+			onConfirm: async () => {
+				try {
+					// Récupérer les conflits actuels avant annulation
+					const currentConflicts = eventData.inConflictWith || [];
+
+					// Annuler l'événement
+					await updateEventData(eventData.id, { canceled: true });
+
+					// Nettoyer les conflits bidirectionnels
+					if (currentConflicts.length > 0) {
+						try {
+							await cleanupBidirectionalConflicts(eventData.id, currentConflicts);
+						} catch (error) {
+							console.error("Erreur lors du nettoyage des conflits:", error);
+							// On ne fait pas échouer l'annulation pour un problème de conflits
+						}
+					}
+
+					showAlert(successMessage, "info");
+
+					// Callback optionnel (fermer modal, etc.)
+					if (onCancel) {
+						onCancel();
+					}
+				} catch (error) {
+					console.error("Error canceling event:", error);
+					showAlert("Une erreur est survenue lors de l'annulation", "error");
+				}
+			}
+		}
+	};
+}
+
+/**
+ * Vérifier si toutes les tâches d'un événement sont assignées à des organisateurs
+ */
+function areAllTasksAssigned(tasks: string[], organizers: OrganizerType[]): boolean {
+	if (!tasks || tasks.length === 0) return true; // Pas de tâche = assigné
+	if (!organizers || organizers.length === 0) return false;
+	const assignedTasks = new Set(organizers.flatMap((org) => org.tasks || []));
+	return tasks.every((taskName) => assignedTasks.has(taskName));
+}
+
+/**
+ * Exécuter la mise à jour des tâches d'un utilisateur pour un événement
+ */
+async function executeTaskUpdate(
+	eventId: string,
+	userId: string,
+	username: string,
+	newTasks: string[],
+	options: { notifyOthers?: boolean; customMessage?: string; taskBeingLeft?: string } = {}
+): Promise<void> {
+	// Importer les services nécessaires
+	const { eventsStore } = await import("$lib/shared/eventsStore.svelte");
+	const { notificationService } = await import("$lib/services/notificationService.svelte");
+	const { updateEvent } = await import("$lib/pocketbase.svelte");
+
+	const event = eventsStore.getEventById(eventId);
+	if (!event) {
+		console.error(`Event ${eventId} not found in store for task update.`);
+		throw new Error(`Événement ${eventId} non trouvé.`);
+	}
+
+	const currentOrganizers: OrganizerType[] = Array.isArray(event.organizers)
+		? JSON.parse(JSON.stringify(event.organizers)) // Copie profonde simple
+		: [];
+	const userIndex = currentOrganizers.findIndex((org) => org.id === userId);
+
+	let finalOrganizers: OrganizerType[];
+
+	if (userIndex !== -1) {
+		if (newTasks.length === 0) {
+			// Retirer l'utilisateur s'il n'a plus de tâches
+			finalOrganizers = currentOrganizers.filter((org) => org.id !== userId);
+		} else {
+			// Mettre à jour les tâches de l'utilisateur existant
+			currentOrganizers[userIndex].tasks = newTasks;
+			finalOrganizers = currentOrganizers;
+		}
+	} else if (newTasks.length > 0) {
+		// Ajouter le nouvel utilisateur (cas d'inscription)
+		finalOrganizers = [
+			...currentOrganizers,
+			{ id: userId, username: username, tasks: newTasks, role: "", maybehere: null }
+		];
+	} else {
+		// Cas: utilisateur non trouvé ET pas de nouvelles tâches -> ne rien faire
+		finalOrganizers = currentOrganizers;
+	}
+
+	// Vérifier si l'événement devient sans organisateur et est confirmé
+	const isConfirmedAndWillBeWithoutOrganizers = event.isConfirmed && finalOrganizers.length === 0;
+
+	// Préparer les données pour PocketBase
+	const updateData: Partial<EventType> = {
+		organizers: finalOrganizers
+	};
+
+	// Logique d'auto-confirmation (SEULEMENT si on ajoute/met à jour des tâches et que les conditions sont remplies)
+	const wasOrganizedBefore = areAllTasksAssigned(
+		event.tasks?.map((t) => t.name) || [],
+		currentOrganizers
+	);
+	const isOrganizedNow = areAllTasksAssigned(
+		event.tasks?.map((t) => t.name) || [],
+		finalOrganizers
+	);
+
+	if (
+		!event.isConfirmed && // Ne pas reconfirmer
+		event.recurrence?.autoConfirm &&
+		Array.isArray(event.tasks) &&
+		event.tasks.length > 0 && // Doit avoir des tâches définies
+		!wasOrganizedBefore &&
+		isOrganizedNow && // Changement d'état vers organisé
+		finalOrganizers.length >= (event.recurrence.autoConfirmMin ?? 1)
+	) {
+		updateData.isConfirmed = true;
+		showAlert(
+			`Événement "${event.event_title}" auto-confirmé car toutes les tâches sont assignées.`,
+			"success"
+		);
+	}
+
+	// Si l'événement est confirmé et va devenir sans organisateur, déclencher la logique spéciale.
+	// USELESS : déjà géré par requestTaskUpdate (on perd juste le bouton pour "assigner des organisateur")
+	// if (isConfirmedAndWillBeWithoutOrganizers) {
+	// 	// Utiliser handleConfirmedEventWithoutOrganizer pour gérer ce cas
+	// 	const conflictResults = checkEventConflicts(
+	// 		{ ...event, organizers: finalOrganizers },
+	// 		{
+	// 			skipConflictCheck: false,
+	// 			autoCloseModal: false,
+	// 			successMessage: "Événement confirmé malgré l'absence d'organisateurs"
+	// 		}
+	// 	);
+	// 	const plan = handleConfirmedEventWithoutOrganizer(
+	// 		{ ...event, organizers: finalOrganizers },
+	// 		{
+	// 			skipConflictCheck: false,
+	// 			autoCloseModal: false,
+	// 			successMessage: "Événement confirmé malgré l'absence d'organisateurs"
+	// 		},
+	// 		conflictResults
+	// 	);
+
+	// 	if (plan.type === "NEEDS_CONFIRMATION") {
+	// 		// Modifier le message pour le contexte de désinscription
+	// 		const enhancedMessage = `
+	// 			<p><strong>🚨 Attention :</strong> Vous êtes le/la dernier·e organisateur·ice de cet événement confirmé.</p>
+	// 			<p>En vous désinscrivant, l'événement n'aura plus d'organisateur·ice assigné·e.</p>
+	// 			${plan.confirmationDetails?.message || ""}
+	// 		`;
+
+	// 		modalState.confirm = {
+	// 			isOpen: true,
+	// 			data: {
+	// 				...plan.confirmationDetails!,
+	// 				message: enhancedMessage,
+	// 				showCancelEventButton: {
+	// 					label: "Annuler l'événement",
+	// 					onCancelEvent: async () => {
+	// 						await cancelEventWithConflictCleanup(event);
+	// 					}
+	// 				},
+	// 				onConfirm: async (notifyOthers?: boolean, customMessage?: string) => {
+	// 					// Continuer avec la mise à jour malgré l'absence d'organisateur
+	// 					await updateEvent(eventId, updateData);
+
+	// 					// Notification de désinscription si demandée
+	// 					if (options.notifyOthers && options.taskBeingLeft !== undefined) {
+	// 						try {
+	// 							await notificationService.sendTaskUnsubscriptionNotification({
+	// 								event,
+	// 								user: { id: userId, username },
+	// 								task: options.taskBeingLeft,
+	// 								options: {
+	// 									customMessage: customMessage || options.customMessage,
+	// 									notifyOthers: notifyOthers || options.notifyOthers,
+	// 									showUserFeedback: true
+	// 								}
+	// 							});
+	// 						} catch (err) {
+	// 							console.error("Erreur lors de l'envoi de la notification:", err);
+	// 							showAlert(
+	// 								"L'inscription a été mise à jour, mais la notification n'a pas pu être envoyée.",
+	// 								"error"
+	// 							);
+	// 						}
+	// 					}
+	// 				}
+	// 			}
+	// 		};
+	// 		return; // Arrêter ici, la confirmation gérera la suite
+	// 	}
+	// }
+
+	// --- Mise à jour PocketBase ---
+	try {
+		await updateEvent(eventId, updateData);
+		// Pas d'alerte succès ici, gérée par l'appelant
+	} catch (updateError) {
+		console.error(`Failed to execute task update for event ${eventId}:`, updateError);
+		showAlert("Erreur lors de la mise à jour de l'inscription.", "error");
+		throw updateError;
+	}
+
+	// --- Notification (si désinscription et demandé) ---
+	if (options.notifyOthers && options.taskBeingLeft !== undefined) {
+		try {
+			await notificationService.sendTaskUnsubscriptionNotification({
+				event,
+				user: { id: userId, username },
+				task: options.taskBeingLeft,
+				options: {
+					customMessage: options.customMessage,
+					notifyOthers: options.notifyOthers,
+					showUserFeedback: true
+				}
+			});
+		} catch (err) {
+			console.error("Erreur lors de l'envoi de la notification:", err);
+			showAlert(
+				"L'inscription a été mise à jour, mais la notification n'a pas pu être envoyée.",
+				"error"
+			);
+		}
+	}
+}
+
+/**
+ * Gérer les demandes de mise à jour des tâches d'un utilisateur
+ */
+async function requestTaskUpdate(params: { event: EventType; user: UserType; taskName?: string }) {
+	const { event, user, taskName } = params;
+
+	// Vérifications initiales robustes
+	if (!event || !user) {
+		console.error("requestTaskUpdate: event ou user manquant.");
+		showAlert("Impossible de traiter la demande (données manquantes).", "error");
+		return;
+	}
+
+	// Si l'événement est annulé, interdire les modifications d'inscription
+	if (event.canceled) {
+		showAlert("Cet événement est annulé, impossible de modifier l'inscription.", "info");
+		return;
+	}
+
+	const currentOrganizers: OrganizerType[] = Array.isArray(event.organizers)
+		? event.organizers
+		: [];
+	const userIndex = currentOrganizers.findIndex((org) => org.id === user.id);
+	const userOrg = userIndex !== -1 ? currentOrganizers[userIndex] : null;
+	const userCurrentTasks = userOrg?.tasks || [];
+	const eventTasks = event.tasks || [];
+
+	const isSingleTaskEvent = eventTasks.length === 1;
+	const targetTask = taskName ?? (isSingleTaskEvent ? eventTasks[0]?.name : undefined);
+	const isSubscribedToTarget = targetTask ? userCurrentTasks.includes(targetTask) : !!userOrg;
+
+	// --- Cas : Gestion de tâches multiples via TaskDialog ---
+	if (eventTasks.length > 1 && !taskName) {
+		const { openTaskModal } = await import("$lib/shared/states.svelte");
+
+		openTaskModal({
+			username: user.username,
+			tasksAvailable: eventTasks,
+			selectedTaskNames: userCurrentTasks,
+			eventIsConfirmed: event.isConfirmed ?? false,
+			eventId: event.id,
+			organizers: event.organizers || [],
+			onSubmit: async (selectedTaskNames: string[], notifyOthers?: boolean) => {
+				try {
+					const removedTasks = userCurrentTasks.filter((task) => !selectedTaskNames.includes(task));
+
+					const hasRemovedTasks = removedTasks.length > 0;
+					const isCompleteUnsubscribe =
+						userCurrentTasks.length > 0 && selectedTaskNames.length === 0;
+
+					const shouldNotify =
+						event.isConfirmed &&
+						(hasRemovedTasks || isCompleteUnsubscribe) &&
+						(notifyOthers !== undefined ? notifyOthers : true);
+
+					await executeTaskUpdate(
+						event.id,
+						user.id,
+						user.username,
+						selectedTaskNames,
+						shouldNotify
+							? {
+									notifyOthers: true,
+									taskBeingLeft: removedTasks.join(", ")
+								}
+							: {}
+					);
+
+					if (hasRemovedTasks) {
+						showAlert(`Vous vous êtes désinscrit de ${removedTasks.length} tâche(s)`, "success");
+					} else if (isCompleteUnsubscribe) {
+						showAlert("Vous vous êtes désinscrit de l'événement", "success");
+					} else {
+						showAlert("Vos tâches ont été mises à jour.", "success");
+					}
+				} catch {
+					/* Erreur déjà gérée par executeTaskUpdate */
+				}
+			}
+		});
+		return;
+	}
+
+	// --- Cas : Inscription (tâche spécifique ou unique) ---
+	if (targetTask && !isSubscribedToTarget) {
+		const newTasks = [...new Set([...userCurrentTasks, targetTask])];
+		try {
+			await executeTaskUpdate(event.id, user.id, user.username, newTasks);
+			showAlert(`Inscrit à la tâche "${targetTask}".`, "success");
+		} catch {
+			/* Erreur déjà gérée par executeTaskUpdate */
+		}
+		return;
+	}
+
+	// --- Cas : Désinscription (tâche spécifique ou unique) ---
+	if (targetTask && isSubscribedToTarget) {
+		const newTasks = userCurrentTasks.filter((t) => t !== targetTask);
+
+		if (event.isConfirmed) {
+			const finalOrganizersAfterUpdate =
+				newTasks.length === 0
+					? currentOrganizers.filter((org) => org.id !== user.id)
+					: currentOrganizers.map((org) =>
+							org.id === user.id ? { ...org, tasks: newTasks } : org
+						);
+
+			const isLastForThisTask = !currentOrganizers.some(
+				(org) => org.id !== user.id && org.tasks?.includes(targetTask)
+			);
+			const isLastOverall = finalOrganizersAfterUpdate.length === 0;
+
+			let message = `L'événement "${event.event_title}" est confirmé. Êtes-vous sûr·e de vouloir vous désinscrire de la tâche "${targetTask}" ?`;
+			if (isLastOverall) {
+				message = `<p>Vous êtes le/la dernier·e organisateur·ice pour cet événement (${targetTask}). Si l'événement doit avoir lieu bientôt, songez à l'annuler. Cliquez sur "continuer" pour confirmer votre désinscription.</p>`;
+			} else if (isLastForThisTask) {
+				message += `<p><strong>Attention</strong> : vous êtiez la seule personne inscrite pour cette tâche spécifique.</p>`;
+			}
+
+			modalState.confirm = {
+				isOpen: true,
+				data: {
+					title: "Confirmer la désinscription",
+					message: message,
+					variant: isLastOverall ? "danger" : "warning",
+					showCheckbox: { label: "Prévenir les autres organisateur·ices", checked: true },
+					showCancelEventButton: isLastOverall
+						? {
+								label: "Annuler l'événement",
+								onCancelEvent: async () => {
+									await cancelEventWithConflictCleanup(event);
+								}
+							}
+						: undefined,
+					onConfirm: async (notifyOthers?: boolean, customMessage?: string) => {
+						try {
+							await executeTaskUpdate(event.id, user.id, user.username, newTasks, {
+								notifyOthers,
+								customMessage,
+								taskBeingLeft: targetTask
+							});
+							showAlert(`Désinscrit de la tâche "${targetTask}".`, "success");
+						} catch {
+							/* Erreur déjà gérée par executeTaskUpdate */
+						}
+					}
+				}
+			};
+		} else {
+			// --- Désinscription Directe (événement non confirmé) ---
+			try {
+				await executeTaskUpdate(event.id, user.id, user.username, newTasks, {
+					taskBeingLeft: targetTask
+				});
+				showAlert(`Désinscrit de la tâche "${targetTask}".`, "success");
+			} catch {
+				/* Erreur déjà gérée par executeTaskUpdate */
+			}
+		}
+		return;
+	}
+
+	// --- Cas non géré ---
+	console.warn("requestTaskUpdate: Cas non géré ou action invalide.", {
+		eventId: event.id,
+		userId: user.id,
+		taskName
+	});
+	showAlert("Action impossible ou non reconnue.", "error");
+}
+
+/**
+ * Analyse l'impact d'une désinscription d'utilisateur sur un événement
+ */
+export function analyzeUnsubscriptionImpact(
+	organizers: OrganizerType[], // 👉 Utilisation du type OrganizerType complet pour la cohérence
+	userId: string,
+	currentUserTasks: string[],
+	newSelectedTaskNames: string[]
+): {
+	tasksBecomingOrphan: string[];
+	eventBecomingOrphan: boolean;
+} {
+	const removedTasks = currentUserTasks.filter((task) => !newSelectedTaskNames.includes(task));
+
+	// Analyser quelles tâches n'auront plus d'organisateur
+	const tasksBecomingOrphan: string[] = [];
+
+	for (const removedTask of removedTasks) {
+		// Vérifier si d'autres organisateurs ont cette tâche
+		const otherOrganizersWithTask = organizers.filter(
+			(org) => org.id !== userId && org.tasks.includes(removedTask)
+		);
+
+		if (otherOrganizersWithTask.length === 0) {
+			tasksBecomingOrphan.push(removedTask);
+		}
+	}
+
+	// Vérifier si l'événement n'aura plus d'organisateur du tout
+	const otherOrganizersWithAnyTask = organizers.filter(
+		(org) => org.id !== userId && org.tasks.length > 0
+	);
+	const eventBecomingOrphan =
+		newSelectedTaskNames.length === 0 && otherOrganizersWithAnyTask.length === 0;
+
+	return {
+		tasksBecomingOrphan,
+		eventBecomingOrphan
+	};
+}
+
 // Exports
-export { createEventActionPlan, handleEventAction, type ActionOptions };
+export {
+	createEventActionPlan,
+	handleEventAction,
+	cancelEventWithConflictCleanup,
+	requestTaskUpdate,
+	executeTaskUpdate,
+	areAllTasksAssigned,
+	type ActionOptions
+};
