@@ -901,3 +901,25 @@ export async function handleEventConflictsAfterSave(
  * Prépare et affiche un modal de confirmation pour la soumission d'événement
  */
 // Cette fonction a été supprimée - la logique est maintenant dans eventActionHandler.svelte.ts
+
+/** Rétablir un événement annulé */
+export async function restoreCanceledEvent(eventId: string): Promise<EventActionPlan> {
+	try {
+		await updateEvent(eventId, { canceled: false });
+		return {
+			type: "SUCCESS",
+			message: "L'événement a été rétabli avec succès."
+		};
+	} catch (error) {
+		const errorMessage =
+			error instanceof Error
+				? error.message
+				: "Une erreur est survenue lors du rétablissement de l'événement.";
+		console.error("Erreur lors du rétablissement de l'événement:", error);
+		return {
+			type: "ERROR",
+			message: errorMessage,
+			error
+		};
+	}
+}
