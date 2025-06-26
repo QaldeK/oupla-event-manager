@@ -128,8 +128,7 @@ export const eventsMenuItems: MenuItem[] = [
 				label: "En conflits",
 				icon: AlertTriangle,
 				iconClass: "text-error",
-				path: "/dashboard/events",
-				params: { status: "conflicts" }
+				path: "/dashboard/events/conflicts"
 			},
 			{
 				label: "Récurrents",
