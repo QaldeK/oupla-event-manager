@@ -1,12 +1,13 @@
 <script lang="ts">
 	import UnassignedTasks from "$lib/components/UnassignedTasks.svelte";
 	import type { EventType } from "$lib/types/event.types";
-	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { requestTaskUpdate } from "$lib/shared/eventActionHandler.svelte";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
 	import type { UserType } from "$lib/types/types";
-	import { lisibleDate } from "$lib/utils";
+	import { lisibleDateShort } from "$lib/utils";
 	import { ListTodo, Pencil, UserMinus } from "lucide-svelte";
+	import OrgAndTasksCard from "./OrgAndTasksCard.svelte";
 
 	let { event } = $props<{
 		event: EventType;
@@ -15,7 +16,9 @@
 	let currentUser: UserType | null = userDb.current;
 
 	const isCurrentUserSubscribed = $derived(() => {
-		return event.organizers?.some((org: { id: string; username: string }) => org.id === currentUser?.id);
+		return event.organizers?.some(
+			(org: { id: string; username: string }) => org.id === currentUser?.id
+		);
 	});
 
 	const eventStatus = $derived.by(() => {
@@ -36,12 +39,14 @@
 
 	const manageTasks = () => {
 		if (!currentUser) return;
-		eventsStore.requestTaskUpdate({ event: event, user: currentUser });
+		requestTaskUpdate({ event: event, user: currentUser });
 	};
 
 	// 👉 Helper pour lister les tâches de l'utilisateur actuel
 	const currentUserTasks = $derived(
-		event.organizers?.find((org: { id: string; username: string; tasks?: string[] }) => org.id === currentUser?.id)?.tasks ?? []
+		event.organizers?.find(
+			(org: { id: string; username: string; tasks?: string[] }) => org.id === currentUser?.id
+		)?.tasks ?? []
 	);
 </script>
 
@@ -49,12 +54,12 @@
 	<!-- En-tête -->
 	<div
 		id="header-user-event-card"
-		class="items-top flex gap-2 @max-md:flex-col @md:justify-between"
+		class="items-top flex gap-2 @max-lg:flex-col @lg:justify-between"
 	>
 		<div
-			class="text-fluid-base @max-dm:px-2 flex flex-wrap items-center @max-md:justify-between @max-md:gap-x-4 @max-md:px-4 @max-md:py-2 @max-md:align-middle @md:order-2 @md:max-w-56 @md:gap-x-3 @md:gap-y-1 @md:text-right {eventStatus.bg} @max-md:rounded-t-lg @md:justify-end @md:self-start @md:rounded-tr-lg @md:rounded-bl-lg @md:py-2 @md:pr-4 @md:pl-8"
+			class="text-fluid-base flex flex-wrap items-center @max-lg:justify-between @max-lg:gap-x-4 @max-lg:px-4 @max-lg:py-2 @max-lg:align-middle @lg:order-2 @lg:max-w-56 @lg:gap-x-3 @lg:gap-y-1 @lg:text-right {eventStatus.bg} @max-lg:rounded-t-lg @lg:me-3 @lg:mt-3 @lg:justify-end @lg:self-start @lg:rounded-lg @lg:py-2 @lg:pr-4"
 		>
-			<div class="font-semibold text-nowrap">{lisibleDate(new Date(event.date_event))}</div>
+			<div class="font-semibold text-nowrap">{lisibleDateShort(new Date(event.date_event))}</div>
 			<div class="text-base-content text-fluid-sm font-medium text-nowrap">
 				{event.time_start} - {event.time_end}
 			</div>
@@ -76,27 +81,18 @@
 
 	<div class="flex flex-1 flex-col gap-3 px-4 py-2">
 		<!-- Organisateurs et tâches -->
-		<div class="flex flex-wrap items-center gap-2">
+		<!-- <div class="flex flex-wrap items-center gap-2">
 			<div class="text-base-content/60 me-2">Vos taches:</div>
 			{#each currentUserTasks as taskName (taskName)}
 				<div class="badge badge-primary badge-soft font-semibold">
 					{taskName}
 				</div>
 			{/each}
-		</div>
+		</div> -->
 		<div>
-			{#if event.organizers.length > 1}
-				<span class="text-base-content/60 me-2">Avec</span>
-				{#each event.organizers as organizer (organizer.id)}
-					<div
-						class="badge badge-soft badge-accent me-2 font-semibold {organizer.username ===
-							currentUser?.username && 'hidden'}"
-					>
-						{organizer.username}
-					</div>
-				{/each}
-			{:else}
-				<span class="text-fluid-sm text-base-content/60"
+			<OrgAndTasksCard organizers={event.organizers} tasks={event.tasks} />
+			{#if event.organizers.length < 2}
+				<span class="text-fluid-sm text-base-content/60 p-2"
 					>Il n'y a pas d'autre organisateur·ice pour le moment</span
 				>
 			{/if}
@@ -111,7 +107,7 @@
 		{#if isCurrentUserSubscribed()}
 			<button
 				onclick={manageTasks}
-				class="btn btn-compact btn-outline {event.tasks.length > 1 ? 'btn-accent' : 'btn-error'}"
+				class="btn btn-compact btn-outline {event.tasks.length > 1 ? 'btn-primary' : 'btn-error'}"
 			>
 				{#if event.tasks.length > 1}
 					<ListTodo size={18} />

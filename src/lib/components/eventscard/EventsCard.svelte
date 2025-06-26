@@ -2,7 +2,8 @@
 	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 	import ExpandableCard from "$lib/components/ExpandableCard.svelte";
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
-	import { eventsStore, userDb } from "$lib/shared";
+	import { userDb } from "$lib/shared";
+	import { requestTaskUpdate } from "$lib/shared/eventActionHandler.svelte";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
 	import type { DateProposedType, EventType, UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
@@ -94,7 +95,7 @@
 	const handleTaskSubscription = (taskName?: string) => {
 		if (!currentUser || currentEvent.canceled) return;
 
-		eventsStore.requestTaskUpdate({
+		requestTaskUpdate({
 			event: currentEvent,
 			user: currentUser,
 			taskName
