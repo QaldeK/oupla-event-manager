@@ -1,5 +1,4 @@
 <script lang="ts">
-	import ConflictsEvents from "$lib/components/ConflictsEvents.svelte";
 	import RecurrentEventsCard from "$lib/components/RecurrentEventsCard.svelte";
 	import RecentlyCreatedEventsCard from "$lib/components/RecentlyCreatedEventsCard.svelte";
 	import UserEventsCard from "$lib/components/UserEventsCard.svelte";
@@ -19,8 +18,6 @@
 <div>
 	<h1 class="mb-6 text-2xl font-semibold">Votre tableau de bord</h1>
 	<div class="flex flex-col gap-8">
-		<ConflictsEvents />
-
 		{#if recentlyCreatedEvents.length > 0}
 			<section class="my-8">
 				<RecentlyCreatedEventsCard events={recentlyCreatedEvents as any} />
