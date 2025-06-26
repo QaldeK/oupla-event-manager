@@ -1027,7 +1027,7 @@ async function executeTaskUpdate(
 		// Ajouter le nouvel utilisateur (cas d'inscription)
 		finalOrganizers = [
 			...currentOrganizers,
-			{ id: userId, username: username, tasks: newTasks, role: "", maybehere: null }
+			{ id: userId, username: username, tasks: newTasks, maybehere: null }
 		];
 	} else {
 		// Cas: utilisateur non trouvé ET pas de nouvelles tâches -> ne rien faire

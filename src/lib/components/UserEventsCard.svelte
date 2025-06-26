@@ -57,7 +57,7 @@
 		class="items-top flex gap-2 @max-lg:flex-col @lg:justify-between"
 	>
 		<div
-			class="text-fluid-base flex flex-wrap items-center @max-lg:justify-between @max-lg:gap-x-4 @max-lg:px-4 @max-lg:py-2 @max-lg:align-middle @lg:order-2 @lg:max-w-56 @lg:gap-x-3 @lg:gap-y-1 @lg:text-right {eventStatus.bg} @max-lg:rounded-t-lg @lg:me-3 @lg:mt-3 @lg:justify-end @lg:self-start @lg:rounded-lg @lg:py-2 @lg:pr-4"
+			class="text-fluid-base flex flex-wrap items-center @max-lg:justify-between @max-lg:gap-x-4 @max-lg:px-4 @max-lg:py-2 @max-lg:align-middle @lg:order-2 @lg:max-w-52 @lg:gap-x-3 @lg:gap-y-1 @lg:text-right {eventStatus.bg} @max-lg:rounded-t-lg @lg:me-3 @lg:mt-3 @lg:justify-end @lg:self-start @lg:rounded-lg @lg:px-4 @lg:py-2"
 		>
 			<div class="font-semibold text-nowrap">{lisibleDateShort(new Date(event.date_event))}</div>
 			<div class="text-base-content text-fluid-sm font-medium text-nowrap">
