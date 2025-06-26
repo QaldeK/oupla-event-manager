@@ -2,8 +2,13 @@
 	import DropDownModEvent from "$lib/components/DropDownModEvent.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import { pb } from "$lib/pocketbase.svelte";
+	import { restoreCanceledEvent } from "$lib/services/eventActions";
 	import { eventState, messageSheet, modalState, showAlert, userDb } from "$lib/shared";
-	import { createEventActionPlan, handleEventAction } from "$lib/shared/eventActionHandler.svelte";
+	import {
+		createEventActionPlan,
+		handleEventAction,
+		cancelEventWithConflictCleanup
+	} from "$lib/shared/eventActionHandler.svelte";
 	import type { EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
 	import { hasAuthorizations } from "$lib/utils/recurrence";
@@ -73,33 +78,11 @@
 	}
 
 	async function cancelEvent() {
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				variant: "danger",
-				title: "Annuler l'événement",
-				message:
-					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
-				onConfirm: async () => {
-					try {
-						await pb.collection("events").update(currentEvent.id, { canceled: true });
-						showAlert("L'événement a bien été annulé", "info");
-					} catch (error) {
-						console.error("Error updating event:", error);
-						showAlert("Une erreur est survenue lors de l'annulation", "error");
-					}
-				}
-			}
-		};
+		await cancelEventWithConflictCleanup(currentEvent);
 	}
 
-	async function redoEvent() {
-		try {
-			await pb.collection("events").update(currentEvent.id, { canceled: false });
-			showAlert("L'événement a bien été rétablit", "info");
-		} catch (error) {
-			console.error("Error updating event:", error);
-		}
+	async function restoreEvent() {
+		await restoreCanceledEvent(currentEvent.id);
 	}
 </script>
 
@@ -166,7 +149,7 @@
 					{/if}
 				{/if}
 				{#if currentEvent.canceled && !currentEvent.reportedTo}
-					<DropdownMenu.Item onclick={redoEvent}>
+					<DropdownMenu.Item onclick={restoreEvent}>
 						<CalendarCheck class="mr-2 h-4 w-4" />
 						Rétablir l'événement
 					</DropdownMenu.Item>
