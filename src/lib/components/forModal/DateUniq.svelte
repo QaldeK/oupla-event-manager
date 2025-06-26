@@ -4,6 +4,7 @@
 	import Info from "$lib/components/Info.svelte";
 	import { modifyRecord } from "$lib/pocketbase.svelte";
 	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
+	import { cancelEventWithConflictCleanup } from "$lib/shared/eventActionHandler.svelte";
 	import { modalState } from "$lib/shared/states.svelte";
 	import { type EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
@@ -43,20 +44,14 @@
 		eventData.organizers = []; // FIXIT : les organizer inscrit a des tasks beforeEvent peuvent etre préserver pour ces taches
 	};
 
-	const cancelEvent = (): void => {
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				variant: "danger",
-				title: "Annuler l'événement",
-				message:
-					"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site s'il s'agissait d'un événement public.",
-				onConfirm: () => {
-					modifyRecord("events", eventData.id, { canceled: true });
-					modalState.event = false;
-				}
+	const cancelEvent = async (): Promise<void> => {
+		await cancelEventWithConflictCleanup(eventData, {
+			confirmationMessage:
+				"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site s'il s'agissait d'un événement public.",
+			onCancel: () => {
+				modalState.event = false;
 			}
-		};
+		});
 	};
 </script>
 
