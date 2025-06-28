@@ -1,10 +1,10 @@
-import { pb } from '$lib/pocketbase.svelte';
+import { pb } from "$lib/pocketbase.svelte";
 import type {
 	SitePagesResponse,
 	SpacesOptionsResponse,
 	SpacesResponse
-} from '$lib/types/pocketbase';
-import { getDefaultThemeOptions, type PublicSiteThemeOptions } from '$lib/types/theme.d';
+} from "$lib/types/pocketbase";
+import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
 
 // Type d'informations publiques sur un espace
 export interface PublicSpaceInfo {
@@ -65,7 +65,7 @@ let error = $state<string | null>(null);
 let themeOptions = $state<PublicSiteThemeOptions>(getDefaultThemeOptions()); // Initialiser avec les défauts
 let currentSpaceName: string | null = $state(null); // Pour suivre l'espace actuel
 
-const layoutSections = ['leftSide', 'top', 'rightSide', 'footer'];
+const layoutSections = ["leftSide", "top", "rightSide", "footer"];
 // --- Main Loading Function ---
 /**
  * Charge toutes les données publiques nécessaires pour un espace donné.
@@ -76,7 +76,6 @@ async function loadPublicData(spaceName: string): Promise<void> {
 	if (!spaceName || spaceName === currentSpaceName) {
 		if (spaceName === currentSpaceName) return; // Strictement éviter le rechargement si même nom
 	}
-	// console.log(`[PublicStore] Loading data for space: ${spaceName}`);
 
 	// 👉 Gérer l'état global de chargement/erreur ici
 	isLoading = true;
@@ -88,24 +87,32 @@ async function loadPublicData(spaceName: string): Promise<void> {
 		clearStore();
 		// 1. Récupérer l'ID et les infos de base de l'espace
 		const fetchedSpaceInfo = await pb
-			.collection('spaces')
+			.collection("spaces")
 			.getFirstListItem<SpacesResponse>(`name="${spaceName}"`);
 
-		spaceInfo = fetchedSpaceInfo;
+		spaceInfo = {
+			id: fetchedSpaceInfo.id,
+			name: fetchedSpaceInfo.name,
+			url: fetchedSpaceInfo.name, // Utiliser le nom comme URL par défaut
+			description: fetchedSpaceInfo.description || "",
+			categories: [],
+			rooms: [],
+			public_site: false
+		};
 		if (!spaceInfo) {
 			throw new Error(`Espace "${spaceName}" non trouvé.`);
 		}
 		const spaceId = spaceInfo.id;
-		// console.log('spaceId', spaceId);
+		console.log("spaceId", spaceId);
 
 		// 2. Récupérer les options et vérifier l'accès public
 		try {
 			const fetchedSpaceOptions = await pb
-				.collection('spaces_options')
+				.collection("spaces_options")
 				.getFirstListItem<SpacesOptionsResponse>(`space="${spaceId}"`, {
 					// expand: 'space',
 					fields:
-						'categories,rooms,public_site,space,expand.space.name,expand.space.description,publicSiteTheme'
+						"categories,rooms,public_site,space,expand.space.name,expand.space.description,publicSiteTheme"
 				});
 
 			const loadedTheme = fetchedSpaceOptions?.publicSiteTheme as
@@ -130,20 +137,20 @@ async function loadPublicData(spaceName: string): Promise<void> {
 				}
 			};
 
-			if (themeOptions && themeOptions.defaultMode === 'dark') {
+			if (themeOptions && themeOptions.defaultMode === "dark") {
 				themeOptions.daisyTheme = themeOptions.daisyThemeDark;
 			}
 
-			console.log('[PublicStore] Theme options loaded:', themeOptions);
-
 			// On pourrait aussi stocker categories/rooms/public_site dans spaceInfo si nécessaire
-			// if (spaceInfo) {
-			//     spaceInfo.categories = fetchedSpaceOptions.categories;
-			//     spaceInfo.rooms = fetchedSpaceOptions.rooms;
-			//     spaceInfo.public_site = fetchedSpaceOptions.public_site;
-			// }
+			if (spaceInfo) {
+				spaceInfo.categories = Array.isArray(fetchedSpaceOptions.categories)
+					? fetchedSpaceOptions.categories
+					: [];
+				spaceInfo.rooms = Array.isArray(fetchedSpaceOptions.rooms) ? fetchedSpaceOptions.rooms : [];
+				spaceInfo.public_site = fetchedSpaceOptions.public_site || false;
+			}
 		} catch (e: unknown) {
-			if (typeof e === 'object' && e !== null && 'status' in e && e.status === 404) {
+			if (typeof e === "object" && e !== null && "status" in e && e.status === 404) {
 				console.warn(`[PublicStore] Options not found for space ${spaceId}. Using default theme.`);
 				themeOptions = getDefaultThemeOptions(); // Assurer les défauts si options non trouvées
 			} else {
@@ -152,30 +159,30 @@ async function loadPublicData(spaceName: string): Promise<void> {
 		}
 
 		// 3. Récupérer les événements publics
-		const fetchedEvents = await pb.collection('events').getFullList<PublicEventInfo>({
-			filter: `space="${spaceId}" && isConfirmed=true && date_event>="${new Date().toISOString().split('T')[0]}"`,
-			sort: 'date_event,start_public',
+		const fetchedEvents = await pb.collection("events").getFullList<PublicEventInfo>({
+			filter: `space="${spaceId}" && isConfirmed=true && date_event>="${new Date().toISOString().split("T")[0]}"`,
+			sort: "date_event,start_public",
 			fields:
-				'id,event_title,date_event,start_public,start_event, duree,categories,desc_public,is_prix_libre,prix,isMixiteChoisie,mixite,is_age_no_restriction,age_advice,canceled,image'
+				"id,event_title,date_event,start_public,start_event, duree,categories,desc_public,is_prix_libre,prix,isMixiteChoisie,mixite,is_age_no_restriction,age_advice,canceled,image"
 		});
 
 		spaceEvents = fetchedEvents as PublicEventInfo[];
 		// console.log(`[publicStore] ${events.length} événements chargés.`);
 
 		// 5. Récupérer les SitePages pour le layout
-		const sectionsFilter = layoutSections.map((s) => `section="${s}"`).join(' || ');
-		const fetchedLayoutPages = await pb.collection('site_pages').getFullList<SitePagesResponse>({
+		const sectionsFilter = layoutSections.map((s) => `section="${s}"`).join(" || ");
+		const fetchedLayoutPages = await pb.collection("site_pages").getFullList<SitePagesResponse>({
 			filter: `space="${spaceId}" && (${sectionsFilter})`,
 			// Le tri par pos sera fait dans le composant via $derived, mais peut rester ici
-			sort: 'pos',
-			fields: 'id,title,content,section,componentConfig,pos'
+			sort: "pos",
+			fields: "id,title,content,section,componentConfig,pos"
 		});
 
 		layoutSitePages = fetchedLayoutPages;
 	} catch (err) {
-		console.error('Erreur dans publicStore.loadPublicData:', err);
+		console.error("Erreur dans publicStore.loadPublicData:", err);
 		error =
-			err instanceof Error ? err.message : 'Une erreur inconnue est survenue lors du chargement';
+			err instanceof Error ? err.message : "Une erreur inconnue est survenue lors du chargement";
 		// Le store a déjà été vidé au début
 	} finally {
 		// 👉 Marquer la fin du chargement global
@@ -186,7 +193,7 @@ async function loadPublicData(spaceName: string): Promise<void> {
 
 // --- Clear Function ---
 function clearStore() {
-	console.log('[publicStore] Clearing store...');
+	console.log("[publicStore] Clearing store...");
 	spaceInfo = null;
 	spaceEvents = [];
 	layoutSitePages = [];
@@ -196,7 +203,7 @@ function clearStore() {
 
 // Vide tout, peut être appelé de l'extérieur ou en cas d'erreur majeure
 function clearStoreAll() {
-	console.log('[publicStore] Clearing store completely...');
+	console.log("[publicStore] Clearing store completely...");
 	clearStore();
 	themeOptions = getDefaultThemeOptions();
 	isLoading = false;
