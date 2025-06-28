@@ -19,11 +19,17 @@
 		onChange?: (newValue: string | string[]) => void;
 		onResetDate?: () => void;
 		mode?: "single" | "multiple";
+		validation?: boolean; // pour le bouton "ok", en plus du mode multiple
+		position?: string;
 		resetButton?: boolean;
 		placeholder?: string;
 		label?: string;
 		eventId?: string;
+		enableTime?: boolean;
+		time_24hr?: boolean;
+		defaultHour?: number;
 		activeSelectionDates?: string[];
+		inline?: boolean; // toujours déplié
 	}
 
 	let {
@@ -31,11 +37,17 @@
 		onChange = (newValue: string | string[]) => {},
 		onResetDate = () => {},
 		mode = "single", // 'single' or 'multiple'
+		validation = true, // pour le bouton "ok" dans le mode multiple
+		position = "auto",
 		resetButton = false,
 		placeholder = "Selectionnez une date",
 		label = "Ajoutez des dates",
 		eventId = undefined,
-		activeSelectionDates = []
+		enableTime = false,
+		time_24hr = true,
+		defaultHour = 18,
+		activeSelectionDates = [],
+		inline = false
 	}: Props = $props();
 
 	let fp: Instance | null = null;
@@ -85,9 +97,14 @@
 			static: true,
 			allowInvalidPreload: true,
 			mode,
+			enableTime,
+			time_24hr,
+			defaultHour,
+			position: position,
+			inline,
 			closeOnSelect: mode === "single",
 			plugins:
-				mode === "multiple"
+				mode === "multiple" && validation
 					? [
 							confirmDatePlugin({
 								confirmText: "OK",
@@ -129,11 +146,20 @@
 			},
 			onChange: (selectedDates, dateStr, instance) => {
 				if (mode === "single") {
-					onChange(dateStr);
+					if (enableTime) {
+						onChange(selectedDates[0]?.toISOString() ?? "");
+					} else {
+						onChange(dateStr);
+					}
 				} else {
 					// Pour 'multiple', selectedDates contient les objets Date
-					const values = selectedDates.map((date) => instance.formatDate(date, "Y-m-d"));
-					onChange(values);
+					if (enableTime) {
+						const values = selectedDates.map((date) => date.toISOString());
+						onChange(values);
+					} else {
+						const values = selectedDates.map((date) => instance.formatDate(date, "Y-m-d"));
+						onChange(values);
+					}
 				}
 			},
 			onMonthChange: (selectedDates, dateStr, instance) => {
@@ -249,7 +275,7 @@
 			bind:this={dateInput}
 			id={dpId}
 			type="text"
-			class="input input-bordered min-w-60 sm:min-w-92"
+			class="input input-bordered {inline && 'hidden'} min-w-60 sm:min-w-92"
 			{placeholder}
 			readonly
 		/>
