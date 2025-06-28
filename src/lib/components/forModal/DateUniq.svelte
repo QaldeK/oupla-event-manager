@@ -2,9 +2,8 @@
 	import ConflictAlert from "$lib/components/ConflictAlert.svelte";
 	import ErrorMessage from "$lib/components/ErrorMessage.svelte";
 	import Info from "$lib/components/Info.svelte";
-	import { modifyRecord } from "$lib/pocketbase.svelte";
 	import { ConflictCalculator } from "$lib/services/conflictService.svelte";
-	import { cancelEventWithConflictCleanup } from "$lib/shared/eventActionHandler.svelte";
+	import { cancelEventWithConflictCleanupConfirmation } from "$lib/shared/eventActionHandler.svelte";
 	import { modalState } from "$lib/shared/states.svelte";
 	import { type EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
@@ -45,7 +44,7 @@
 	};
 
 	const cancelEvent = async (): Promise<void> => {
-		await cancelEventWithConflictCleanup(eventData, {
+		await cancelEventWithConflictCleanupConfirmation(eventData, {
 			confirmationMessage:
 				"Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site s'il s'agissait d'un événement public.",
 			onCancel: () => {

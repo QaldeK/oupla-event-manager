@@ -37,7 +37,8 @@ import {
 	cleanupBidirectionalConflicts,
 	submitEvent,
 	updateEventData,
-	type EventActionPlan
+	type EventActionPlan,
+	cancelEventWithConflictCleanup
 } from "$lib/services/eventActions";
 import { updateReciprocalConflicts } from "$lib/pocketbase.svelte";
 import type { Conflict } from "$lib/services/eventConflicts";
@@ -921,7 +922,7 @@ async function handleEventAction(plan: EventActionPlan): Promise<void> {
  * Annule un événement et nettoie ses conflits réciproques
  * Fonction commune utilisée par ButtonAction et DateUniq
  */
-async function cancelEventWithConflictCleanup(
+export async function cancelEventWithConflictCleanupConfirmation(
 	eventData: EventType,
 	options: {
 		confirmationTitle?: string;
@@ -932,9 +933,7 @@ async function cancelEventWithConflictCleanup(
 ): Promise<void> {
 	const {
 		confirmationTitle = "Annuler l'événement",
-		confirmationMessage = "Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site.",
-		successMessage = "L'événement a bien été annulé",
-		onCancel
+		confirmationMessage = "Êtes-vous sûr de vouloir annuler cet événement ? Les organisateur·ices en seront notifiées par email, et l'événement sera annoncé comme annulé sur le site."
 	} = options;
 
 	modalState.confirm = {
@@ -944,33 +943,7 @@ async function cancelEventWithConflictCleanup(
 			title: confirmationTitle,
 			message: confirmationMessage,
 			onConfirm: async () => {
-				try {
-					// Récupérer les conflits actuels avant annulation
-					const currentConflicts = eventData.inConflictWith || [];
-
-					// Annuler l'événement
-					await updateEventData(eventData.id, { canceled: true });
-
-					// Nettoyer les conflits bidirectionnels
-					if (currentConflicts.length > 0) {
-						try {
-							await cleanupBidirectionalConflicts(eventData.id, currentConflicts);
-						} catch (error) {
-							console.error("Erreur lors du nettoyage des conflits:", error);
-							// On ne fait pas échouer l'annulation pour un problème de conflits
-						}
-					}
-
-					showAlert(successMessage, "info");
-
-					// Callback optionnel (fermer modal, etc.)
-					if (onCancel) {
-						onCancel();
-					}
-				} catch (error) {
-					console.error("Error canceling event:", error);
-					showAlert("Une erreur est survenue lors de l'annulation", "error");
-				}
+				cancelEventWithConflictCleanup(eventData);
 			}
 		}
 	};
@@ -1390,7 +1363,7 @@ export function analyzeUnsubscriptionImpact(
 export {
 	createEventActionPlan,
 	handleEventAction,
-	cancelEventWithConflictCleanup,
+	cancelEventWithConflictCleanupConfirmation as cancelEventWithConflictCleanup,
 	requestTaskUpdate,
 	executeTaskUpdate,
 	areAllTasksAssigned,

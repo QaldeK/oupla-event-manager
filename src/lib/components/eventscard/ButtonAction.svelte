@@ -7,7 +7,7 @@
 	import {
 		createEventActionPlan,
 		handleEventAction,
-		cancelEventWithConflictCleanup
+		cancelEventWithConflictCleanupConfirmation
 	} from "$lib/shared/eventActionHandler.svelte";
 	import type { EventType } from "$lib/types/event.types";
 	import { lisibleDate } from "$lib/utils";
@@ -80,7 +80,7 @@
 	}
 
 	async function cancelEvent() {
-		await cancelEventWithConflictCleanup(currentEvent);
+		await cancelEventWithConflictCleanupConfirmation(currentEvent);
 	}
 
 	async function restoreEvent() {
