@@ -897,20 +897,18 @@ export async function handleEventConflictsAfterSave(
 	}
 }
 
-
 /** Rétablir un événement annulé */
 export async function restoreCanceledEvent(eventData: EventType): Promise<EventActionPlan> {
 	try {
 		const eventId = eventData.id;
 
-	// 1. Simuler l'état de l'événement après restauration pour la détection des conflits.
+		// 1. Simuler l'état de l'événement après restauration pour la détection des conflits.
 		const restoredEventData: EventType = { ...eventData, canceled: false };
 
 		// 2. Recalculer les conflits pour l'événement restauré.
 		const conflictResult = detectAllEventConflicts(restoredEventData, "EDIT_SINGLE", [eventId]);
 		const newConflictIds = conflictResult.conflictIds;
 
-		
 		await updateEvent(eventId, {
 			canceled: false,
 			inConflictWith: newConflictIds
@@ -926,7 +924,7 @@ export async function restoreCanceledEvent(eventData: EventType): Promise<EventA
 		if (conflictsToRemove.length > 0) {
 			await cleanupBidirectionalConflicts(eventId, conflictsToRemove);
 		}
-				return {
+		return {
 			type: "SUCCESS",
 			message: "L'événement a été rétabli avec succès."
 		};
@@ -936,6 +934,34 @@ export async function restoreCanceledEvent(eventData: EventType): Promise<EventA
 				? error.message
 				: "Une erreur est survenue lors du rétablissement de l'événement.";
 		console.error("Erreur lors du rétablissement de l'événement:", error);
+		return {
+			type: "ERROR",
+			message: errorMessage,
+			error
+		};
+	}
+}
+
+export async function cancelEventWithConflictCleanup(
+	eventData: EventType
+): Promise<EventActionPlan> {
+	try {
+		const eventId = eventData.id;
+
+		updateEvent(eventId, { canceled: true });
+
+		// 2. Nettoyer les conflits bidirectionnels
+		const previousConflictIds = eventData.inConflictWith || [];
+		await cleanupBidirectionalConflicts(eventId, previousConflictIds);
+
+		return {
+			type: "SUCCESS",
+			message: "L'événement a été annulé avec succès."
+		};
+	} catch (error) {
+		const errorMessage =
+			error instanceof Error ? error.message : "Une erreur est survenue lors de l'annulation.";
+		console.error("Erreur lors de l'annulation de l'événement:", error);
 		return {
 			type: "ERROR",
 			message: errorMessage,
