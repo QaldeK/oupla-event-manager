@@ -275,18 +275,10 @@
 		{#if hasUnsavedChanges}
 			<div
 				transition:slide={{ duration: 300, axis: "y" }}
-				class="bg-base-300/70 shadow-t-lg fixed bottom-0 left-0 flex w-full justify-end gap-4 px-4 py-2"
+				class="bg-neutral/50 shadow-t-lg fixed bottom-0 left-0 flex w-full justify-end gap-4 px-4 py-2"
 			>
-				<button
-					type="button"
-					onclick={resetChanges}
-					class="rounded bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
-				>
-					Annuler
-				</button>
-				<button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-					Enregistrer
-				</button>
+				<button type="button" onclick={resetChanges} class="btn btn-error"> Annuler </button>
+				<button type="submit" class="btn btn-primary"> Enregistrer </button>
 			</div>
 		{/if}
 	</form>
