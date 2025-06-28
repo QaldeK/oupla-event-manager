@@ -30,3 +30,4 @@
 - Use modern ES6+ features (arrow functions, const/let, etc.)
 - Build optimized and performance-focused solutions
 - Use the existing project structure and conventions
+- write tests only in src/lib/test

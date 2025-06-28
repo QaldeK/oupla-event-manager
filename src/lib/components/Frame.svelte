@@ -8,8 +8,10 @@
 
 <fieldset
 	transition:fade={{ duration: 200 }}
-	class="bg-base-100 mx-auto mb-8 w-[calc(100%-2rem)] border-t-2 border-gray-300 py-8 transition-all duration-200 ease-in-out md:relative md:mb-12 md:rounded-xl md:border md:p-8 md:shadow-sm
-		{class_frame ? class_frame : ''}"
+	class={cn(
+		"bg-base-100 mx-auto mb-8 w-[calc(100%-2rem)] border-t-2 border-gray-300 py-8 transition-all duration-200 ease-in-out md:relative md:mb-12 md:rounded-xl md:border md:p-8 md:shadow-sm",
+		class_frame ? class_frame : ""
+	)}
 >
 	{#if title}
 		<legend

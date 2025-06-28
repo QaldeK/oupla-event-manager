@@ -78,9 +78,9 @@ class MessageStoreClass {
 	/**
 	 * Retourne les messages d'un événement spécifique.
 	 * @param {string} eventId - L'identifiant de l'événement.
-	 * @returns {MessagesRecord[]} - Tableau des messages pour cet événement.
+	 * @returns {MessagesResponse[]} - Tableau des messages pour cet événement.
 	 */
-	getMessageOfEvent = $derived.by(() => (id: string): MessagesRecord[] => {
+	getMessageOfEvent = $derived.by(() => (id: string): MessagesResponse[] => {
 		if (!this.#store.syncStore) {
 			console.warn("messageStore is not initialized yet.");
 			return [];
@@ -94,7 +94,7 @@ class MessageStoreClass {
 			.sort((a, b) => {
 				return new Date(a.created).getTime() - new Date(b.created).getTime();
 			})
-			.exec() as MessagesRecord[];
+			.exec() as MessagesResponse[];
 	});
 
 	get isInitialized(): boolean {

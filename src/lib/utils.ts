@@ -222,3 +222,7 @@ export const slugify = (str: string): string => {
 		.replace(/[^a-z0-9]+/g, "-") // Remplace les caractères non alphanumériques par des tirets
 		.replace(/^-+|-+$/g, ""); // Supprime les tirets en début/fin
 };
+
+// Re-export
+
+export { isMobile } from "./utils/screen.svelte";

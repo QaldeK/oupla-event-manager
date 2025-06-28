@@ -10,7 +10,7 @@
 	let { value = $bindable(), label = "", placeholder = "Selectionnez une date" } = $props();
 
 	// Génération automatique d'un ID unique
-	const uniqueId = `datepicker-${Math.random().toString(36).substr(2, 9)}`;
+	const uniqueId = `datepicker-${Math.random().toString(36).substring(2, 9)}`;
 
 	let fp: any;
 	let dateInput: HTMLInputElement;
@@ -27,7 +27,8 @@
 				const eventsForDate = eventsByDateTime.get(dateStr);
 
 				// Filtrer uniquement les événements confirmés
-				const confirmedEvents = eventsForDate?.filter((event) => event.conflictType === "confirmed") || [];
+				const confirmedEvents =
+					eventsForDate?.filter((event) => event.conflictType === "confirmed") || [];
 
 				if (confirmedEvents.length) {
 					dayElem.setAttribute("data-tippy-content", createTooltipContent(confirmedEvents));

@@ -549,11 +549,12 @@ export const sendMessage = async (
 	try {
 		await pb.collection("messages").create({
 			event: eventId,
-			user: pb.authStore.model?.id,
+			user: pb.authStore.record?.id,
 			content: content,
 			replyingTo: parentId,
 			space: getSpace.id
 		});
+		return true;
 	} catch (error) {
 		console.error("Error sending message:", error);
 		throw error;

@@ -3,8 +3,7 @@
 	import { Textarea } from "$lib/components/ui/textarea";
 	import { sendMessage } from "$lib/pocketbase.svelte";
 	import { messageStore } from "$lib/shared/messageStore.svelte";
-	import type { MessagesRecord, MessagesResponse } from "$lib/types/pocketbase";
-	import { pb } from "$lib/pocketbase.svelte";
+	import type { MessagesResponse } from "$lib/types/pocketbase";
 
 	import { MessageCircle, Reply, X } from "lucide-svelte";
 
@@ -18,13 +17,13 @@
 	let newMessage = $state("");
 	let replyingTo = $state<string | null>(null);
 	let replyingToMessage = $state<MessagesResponse | null>(null);
-	let messages = $derived<MessagesRecord[]>(messageStore.getMessageOfEvent(eventId));
+	let messages = $derived<MessagesResponse[]>(messageStore.getMessageOfEvent(eventId));
 	let isLoading = $state(false);
 	let messageRefs = $state<Record<string, HTMLElement>>({});
 	let messageResponseOf = $state<string | null>(null);
 
-	const handleSend = () => {
-		const result = sendMessage(eventId, newMessage, replyingTo);
+	const handleSend = async () => {
+		const result = await sendMessage(eventId, newMessage, replyingTo);
 		if (result) {
 			newMessage = "";
 			replyingTo = null;
@@ -98,7 +97,7 @@
 					<div class="flex items-center gap-2">
 						<Reply class="h-4 w-4" />
 						<span class="font-semibold">
-							Réponse à {replyingToMessage.expand?.user?.username || "Utilisateur"}
+							Réponse à {replyingToMessage.expand?.user.username || "Utilisateur"}
 						</span>
 					</div>
 					<button

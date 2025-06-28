@@ -3,7 +3,7 @@
  * Basé sur les breakpoints standard de Tailwind CSS et svelte/reactivity/window
  */
 
-import { innerWidth } from 'svelte/reactivity/window';
+import { innerWidth } from "svelte/reactivity/window";
 
 // Breakpoints Tailwind CSS standard
 const BREAKPOINTS = {
@@ -11,7 +11,7 @@ const BREAKPOINTS = {
 	md: 768,
 	lg: 1024,
 	xl: 1280,
-	'2xl': 1536
+	"2xl": 1536
 } as const;
 
 /**
@@ -58,14 +58,14 @@ export const screenDetector = {
 	 * Breakpoint extra large (1280px - 1535px)
 	 */
 	get isXLarge() {
-		return this.width >= BREAKPOINTS.xl && this.width < BREAKPOINTS['2xl'];
+		return this.width >= BREAKPOINTS.xl && this.width < BREAKPOINTS["2xl"];
 	},
 
 	/**
 	 * Breakpoint 2x extra large (>= 1536px)
 	 */
 	get is2XLarge() {
-		return this.width >= BREAKPOINTS['2xl'];
+		return this.width >= BREAKPOINTS["2xl"];
 	},
 
 	/**
@@ -108,17 +108,24 @@ export function useScreen() {
  * Fonction utilitaire pour créer des dérivations personnalisées
  * basées sur la largeur d'écran
  */
-export function createBreakpointMatcher(breakpoint: keyof typeof BREAKPOINTS, operator: 'min' | 'max' = 'min') {
+export function createBreakpointMatcher(
+	breakpoint: keyof typeof BREAKPOINTS,
+	operator: "min" | "max" = "min"
+) {
 	return {
 		get matches() {
 			const width = screenDetector.width;
 			const threshold = BREAKPOINTS[breakpoint];
-			return operator === 'min' ? width >= threshold : width < threshold;
+			return operator === "min" ? width >= threshold : width < threshold;
 		}
 	};
 }
 
-// Exports de convenience pour les breakpoints les plus utilisés
+/* Exports de convenience pour les breakpoints les plus utilisés
+USAGE:
+import { isMobile } from './screen.svelte';
+let is_mobile = $derived(isMobile.current);
+*/
 export const isMobile = {
 	get current() {
 		return screenDetector.isMobile;

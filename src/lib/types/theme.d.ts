@@ -4,9 +4,9 @@ export interface PublicSiteThemeOptions {
 	daisyThemeLight;
 	daisyThemeDark;
 	eventCard: {
-		imagePosition: 'left' | 'top';
+		imagePosition: "left" | "top";
 		widthClass: string;
-		truncateLines: number;
+		truncateSize: string;
 		bgClass: string;
 		textClass: string;
 		shadowClass: string;
@@ -51,31 +51,31 @@ export interface SideMenuType {
 
 // Fonction pour fournir une valeur par défaut robuste (peut être partagée)
 export function getDefaultThemeOptions(): PublicSiteThemeOptions {
-	console.log('getDefaultThemeOptions');
+	console.log("getDefaultThemeOptions");
 	return {
-		daisyTheme: 'light', // Thème par défaut si rien n'est trouvé
-		defaultMode: 'light',
-		daisyThemeLight: 'light',
-		daisyThemeDark: 'dark',
+		daisyTheme: "light", // Thème par défaut si rien n'est trouvé
+		defaultMode: "light",
+		daisyThemeLight: "light",
+		daisyThemeDark: "dark",
 		eventCard: {
-			imagePosition: 'left',
-			widthClass: 'w-full',
-			truncateLines: 24,
-			bgClass: 'bg-base-100',
-			textClass: 'text-base-content',
-			shadowClass: 'shadow-lg',
-			roundedClass: 'rounded-lg',
-			titleSizeClass: 'text-xl',
-			dateSizeClass: 'text-sm',
-			categorySizeClass: 'text-sm'
+			imagePosition: "left",
+			widthClass: "w-full",
+			truncateSize: "medium",
+			bgClass: "bg-base-100",
+			textClass: "text-base-content",
+			shadowClass: "shadow-lg",
+			roundedClass: "rounded-lg",
+			titleSizeClass: "text-xl",
+			dateSizeClass: "text-sm",
+			categorySizeClass: "text-sm"
 		},
 		layoutSections: {
-			header: { bgClass: 'bg-base-100', textClass: 'text-base-content' },
-			leftSidebar: { bgClass: 'bg-base-100', textClass: 'text-base-content' },
-			rightSidebar: { bgClass: 'bg-base-100', textClass: 'text-base-content' },
-			footer: { bgClass: 'bg-base-300', textClass: 'text-base-content' },
-			mainBackgroundClass: 'bg-base-200/50',
-			top: { bgClass: 'bg-base-100', textClass: 'text-base-content' }
+			header: { bgClass: "bg-base-100", textClass: "text-base-content" },
+			leftSidebar: { bgClass: "bg-base-100", textClass: "text-base-content" },
+			rightSidebar: { bgClass: "bg-base-100", textClass: "text-base-content" },
+			footer: { bgClass: "bg-base-300", textClass: "text-base-content" },
+			mainBackgroundClass: "bg-base-200/50",
+			top: { bgClass: "bg-base-100", textClass: "text-base-content" }
 		},
 		components: {
 			navbarHeader: {
@@ -84,18 +84,18 @@ export function getDefaultThemeOptions(): PublicSiteThemeOptions {
 				// section: 'header',
 				// hasMenu: true,
 				isFixed: true,
-				size: 'min-h-[4rem]',
-				titleClass: ['text-fluid-2xl', 'font-bold'],
-				linkClass: ['text-base-content', 'font-semibold']
+				size: "min-h-[4rem]",
+				titleClass: ["text-fluid-2xl", "font-bold"],
+				linkClass: ["text-base-content", "font-semibold"]
 			},
 			primaryNavLinks: [
 				{
-					title: 'À propos',
+					title: "À propos",
 					url: `about`
 				},
 
-				{ title: 'Nous trouver', url: 'find-us' },
-				{ title: 'Proposer un événement', url: `proposition` }
+				{ title: "Nous trouver", url: "find-us" },
+				{ title: "Proposer un événement", url: `proposition` }
 			]
 			// sideMenu: {
 			// 	enabled: false,

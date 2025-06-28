@@ -120,7 +120,7 @@
 	// Effet pour la mise à jour de Tipex - se déclenche seulement si nécessaire
 	$effect(() => {
 		if (!isEditing && tipexEditor && doc?.content !== tipexEditor.getHTML()) {
-			console.log("[PadEditor] Contenu externe changé (mode lecture), mise à jour Tipex.");
+			// console.log("[PadEditor] Contenu externe changé (mode lecture), mise à jour Tipex.");
 			tipexEditor.commands.setContent(doc?.content ?? "", false);
 		}
 	});
