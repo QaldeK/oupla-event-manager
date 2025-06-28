@@ -14,27 +14,17 @@
 
 	let imagePosition = $derived(cardOptions.imagePosition);
 	let cardWidthClass = $derived(cardOptions.widthClass);
-	let truncateLines = $derived(cardOptions.truncateLines);
+	let truncateSize = $derived(cardOptions.truncateSize);
 
 	// --- États pour la troncature de la description ---
 	let isExpanded = $state(false);
 	let descriptionEl: HTMLElement | undefined = $state(undefined);
-	let shouldTruncate = $state(false);
 
-	let maxHeight = $derived(truncateLines * 16); // Approximation: 16px par ligne (ajustez si nécessaire)
+	let hasOverflow = $derived(
+		descriptionEl && descriptionEl.scrollHeight > descriptionEl.clientHeight
+	);
 
 	// --- Effets ---
-	// 👉 $effect pour recalculer la troncature quand descriptionEl ou truncateLines change
-	$effect(() => {
-		if (descriptionEl && descriptionEl.isConnected && descriptionEl.scrollHeight > maxHeight) {
-			shouldTruncate = true;
-		} else {
-			shouldTruncate = false;
-		}
-		// Recalcul quand descriptionEl ou le nombre de lignes changent
-		// $inspect(descriptionEl);
-		// $inspect(truncateLines);
-	});
 
 	// --- Fonctions Utilitaires ---
 	// Formater la date complète
@@ -74,27 +64,43 @@
 
 <!-- Base de la carte avec largeur réactive et classes flex conditionnelles -->
 <div
-	class="card round transition-all duration-300 {cardOptions.bgClass} {cardOptions.shadowClass} {cardOptions.roundedClass} {cardWidthClass}"
-	class:lg:flex-row={imagePosition === "left"}
-	class:flex-col={imagePosition === "top"}
+	class={[
+		"card",
+		"round",
+		"transition-all",
+		"duration-300",
+		"flex",
+		cardOptions.bgClass,
+		cardOptions.shadowClass,
+		cardOptions.roundedClass,
+		cardWidthClass,
+		imagePosition === "left" && ["lg:flex-row", "w-full", "lg:h-auto", "shrink-0"],
+		imagePosition === "top" && ["flex-col", "h-48"]
+	]}
 >
 	<!-- Section Image (position réactive) -->
 	{#if eventImageUrl}
 		<figure
-			class="relative {imagePosition === 'left' ? 'lg:w-1/3' : ''}"
-			class:w-full={imagePosition === "left"}
-			class:h-48={imagePosition === "top"}
-			class:lg:h-auto={imagePosition === "left"}
-			class:shrink-0={imagePosition === "left"}
+			class={[
+				"relative",
+				imagePosition === "left" && ["lg:w-1/3", "w-full", "lg:h-auto", "shrink-0"],
+				imagePosition === "top" && "h-48"
+			]}
 		>
 			<img
 				src={eventImageUrl}
 				alt={event.event_title}
-				class="h-full w-full object-cover"
-				class:lg:rounded-l-2xl={imagePosition === "left" &&
-					cardOptions.roundedClass !== "rounded-none"}
-				class:lg:rounded-tr-none={imagePosition === "left"}
-				class:rounded-t-2xl={imagePosition === "top" && cardOptions.roundedClass !== "rounded-none"}
+				class={[
+					"h-full",
+					"w-full",
+					"object-cover",
+					imagePosition === "left" &&
+						cardOptions.roundedClass !== "rounded-none" && [
+							"lg:rounded-l-2xl",
+							"lg:rounded-tr-none"
+						],
+					imagePosition === "top" && cardOptions.roundedClass !== "rounded-none" && "rounded-t-2xl"
+				]}
 			/>
 			{#if event.canceled}
 				<div class="bg-error bg-opacity-70 absolute inset-0 flex items-center justify-center">
@@ -106,18 +112,28 @@
 	<!-- /Section Image -->
 
 	<!-- Contenu de la carte (largeur réactive) -->
-	<div class="card-body {imagePosition === 'left' ? 'grow lg:w-2/3' : ''} flex flex-col">
-		<!-- 👉 Titre -->
-		<div class="mb-2 flex flex-wrap justify-between">
+	<div
+		class={[
+			"card-body @container flex flex-col @md:px-12 @md:py-10",
+			imagePosition === "left" && ["grow", "lg:w-2/3"],
+			hasOverflow && "pb-4"
+		]}
+	>
+		<!-- Titre et date -->
+		<div class="mb-2 gap-6 space-y-6 @max-md:text-center @md:flex @md:justify-between">
+			<!-- 👉 Titre et catégorie -->
 			<div class="flex flex-col gap-2">
-				<div class="{cardOptions.titleSizeClass || 'text-fluid-2xl'} font-semibold">
+				<div class={[cardOptions.titleSizeClass || "text-fluid-2xl", "font-semibold"]}>
 					{event.event_title}
 				</div>
-				<div class="flex flex-wrap gap-x-4 gap-y-2">
+				<div class="flex flex-wrap gap-x-4 gap-y-2 @max-md:justify-center">
 					{#each event.categories as category (category)}
 						<div
-							class="text-base-content/90 {cardOptions.categorySizeClass ||
-								'text-fluid-lg'} font-bold"
+							class={[
+								"text-base-content/90 ",
+								cardOptions.categorySizeClass || "text-fluid-lg",
+								"font-bold"
+							]}
 						>
 							{category}
 						</div>
@@ -125,12 +141,12 @@
 				</div>
 			</div>
 			<!-- 👉 Section Date et Heure d'ouverture  -->
-			<div class="text-base-content/80 flex flex-col text-right font-semibold">
+			<div class="text-base-content/80 flex flex-col font-semibold @md:text-right">
 				<span class={cardOptions.dateSizeClass || "text-fluid-lg"}
 					>{formatDate(event.date_event)}</span
 				>
 				{#if event.start_public}
-					<span class={cardOptions.timeSizeClass || "text-fluid-base"}
+					<span class={cardOptions.dateSizeClass || "text-fluid-base"}
 						>à partir de {formatTime(event.start_public)}</span
 					>
 				{/if}
@@ -138,12 +154,19 @@
 		</div>
 
 		<!-- Section Informations détaillées -->
-		<div class="  my-3 flex flex-wrap gap-x-4 gap-y-2">
+		<div class="my-3 flex flex-wrap gap-x-4 gap-y-2">
 			<!-- Horaires Début Événement -->
 			{#if event.start_event}
 				<div
-					class="badge {cardOptions.badgeSize ||
-						'badge-lg'} badge-info badge-outline flex items-center gap-2"
+					class={[
+						"badge",
+						"badge-lg",
+						"badge-info",
+						"badge-outline",
+						"flex",
+						"items-center",
+						"gap-2"
+					]}
 				>
 					<Clock size={18} />
 					<span><span>Début :</span> {formatTime(event.start_event)}</span>
@@ -153,8 +176,15 @@
 			<!-- Prix -->
 			{#if event.is_prix_libre || event.prix}
 				<div
-					class="badge {cardOptions.badgeSize ||
-						'badge-lg'} badge-info badge-outline flex items-center gap-2"
+					class={[
+						"badge",
+						"badge-lg",
+						"badge-info",
+						"badge-outline",
+						"flex",
+						"items-center",
+						"gap-2"
+					]}
 				>
 					<Euro size={18} />
 					<span>{event.is_prix_libre ? "Prix libre" : `${event.prix}`}</span>
@@ -164,8 +194,15 @@
 			<!-- Mixité -->
 			{#if event.isMixiteChoisie && event.mixite}
 				<div
-					class="badge {cardOptions.badgeSize ||
-						'badge-lg'} badge-error badge-outline flex items-center gap-2"
+					class={[
+						"badge",
+						"badge-lg",
+						"badge-error",
+						"badge-outline",
+						"flex",
+						"items-center",
+						"gap-2"
+					]}
 				>
 					<Users size={18} />
 					<span>{event.mixite}</span>
@@ -175,8 +212,15 @@
 			<!-- Âge -->
 			{#if !event.is_age_no_restriction && event.age_advice}
 				<div
-					class="badge {cardOptions.badgeSize ||
-						'badge-lg'} badge-error badge-outline flex items-center gap-2"
+					class={[
+						"badge",
+						"badge-lg",
+						"badge-error",
+						"badge-outline",
+						"flex",
+						"items-center",
+						"gap-2"
+					]}
 				>
 					<AlertTriangle size={18} />
 					<span>à partir de {event.age_advice} ans</span>
@@ -190,68 +234,49 @@
 			<div class="relative mt-2">
 				<div
 					bind:this={descriptionEl}
-					class="prose prose-sm text-fluid-base overflow-hidden text-wrap"
-					class:relative={shouldTruncate && !isExpanded}
-					style:max-height={isExpanded ? "none" : `${maxHeight}px`}
-					style:-webkit-line-clamp={isExpanded ? "unset" : truncateLines}
+					class={[
+						"prose",
+						"prose-sm",
+						"text-fluid-base",
+						`max-w-none`,
+
+						!isExpanded && [truncateSize, "relative overflow-hidden"]
+					]}
 					style:overflow-wrap="break-word"
 					style:hyphens="auto"
-					class:line-clamp-dynamic={shouldTruncate && !isExpanded}
 				>
-					{@html event.desc_public}
-
-					{#if shouldTruncate && !isExpanded}
-						<!-- FIXIT : fromColor undefined -->
+					<div>{@html event.desc_public}</div>
+					{#if !isExpanded && hasOverflow}
 						<div
-							class="from-base-200 pointer-events-none absolute right-0 bottom-0 left-0 h-24 bg-gradient-to-t to-transparent"
-							style="--tw-gradient-from: var(--{cardOptions.bgClass?.replace('bg-', '') ||
-								'base-200'})"
+							class="{cardOptions.bgClass} pointer-events-none absolute -right-4 bottom-0 -left-4 h-8 blur-lg"
 						></div>
 					{/if}
 				</div>
-
-				{#if shouldTruncate}
-					<!-- Bouton Lire la suite / Voir moins (maintenant après le div texte) -->
-					<div class="text-right">
-						<button
-							class="btn btn-ghost btn-sm text-primary mt-1 py-0 hover:bg-transparent"
-							onclick={() => (isExpanded = !isExpanded)}
-						>
-							{isExpanded ? "Voir moins" : "Lire la suite"}
-							<ChevronRight
-								size={14}
-								class="transform transition-transform duration-200 {isExpanded ? 'rotate-90' : ''}"
-							/>
-						</button>
-					</div>
-				{:else}
-					<!-- {/* Pour pousser les actions en bas si pas de description */} -->
-					<div class="flex-grow"></div>
-				{/if}
 			</div>
+			<!-- Bouton Lire la suite / Voir moins -->
+			{#if hasOverflow}
+				<div class="bg-transparent text-right">
+					<button
+						class="btn btn-ghost btn-sm text-primary mt-1 py-0 hover:bg-transparent"
+						onclick={() => (isExpanded = !isExpanded)}
+					>
+						{isExpanded ? "Voir moins" : "Lire la suite"}
+						<ChevronRight
+							size={14}
+							class="transform transition-transform duration-200 {isExpanded && '-rotate-90'}"
+						/>
+					</button>
+				</div>
+			{/if}
+		{:else}
+			<!-- Pour pousser les actions en bas si pas de description -->
+			<div class="flex-grow"></div>
 		{/if}
 		<!-- /Description -->
-
-		<!-- Actions de la carte -->
-		<!-- <div class="card-actions mt-4 justify-end">
-			<a href={`/${spaceName}/event/${event.id}`} class="btn btn-primary btn-sm text-fluid-sm">
-				Voir les détails
-			</a>
-		</div> -->
-		<!-- /Actions -->
 	</div>
-	<!-- /Contenu de la carte -->
 </div>
 
 <style lang="postcss">
-	/* Styles pour appliquer la troncature dynamiquement via -webkit-line-clamp */
-	.line-clamp-dynamic {
-		display: -webkit-box;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		/* -webkit-line-clamp est défini via l'attribut style */
-	}
-
 	/* Assurer que l'image couvre bien dans la disposition 'left' */
 	.card.lg\:flex-row figure.lg\:w-1\/3 img {
 		height: 100%;
@@ -260,51 +285,9 @@
 
 	/* Contraindre naturellement les éléments prose sans débordement */
 	.prose * {
-		max-width: 100%;
+		width: 100% !important;
 		word-wrap: break-word;
 		overflow-wrap: break-word;
 		box-sizing: border-box;
-	}
-
-	/* Styles spécifiques pour les éléments qui peuvent déborder */
-	.prose img,
-	.prose table,
-	.prose pre,
-	.prose code {
-		max-width: 100% !important;
-		overflow: auto;
-	}
-
-	.prose table {
-		display: block;
-		white-space: nowrap;
-		overflow-x: auto;
-	}
-
-	/* Styles spécifiques pour rich editor PocketBase */
-	.prose p,
-	.prose div,
-	.prose span {
-		word-break: normal;
-		overflow-wrap: break-word;
-		hyphens: auto;
-	}
-
-	/* Code inline et blocs de code */
-	.prose code {
-		white-space: pre-wrap;
-		word-break: break-all;
-		overflow-wrap: anywhere;
-	}
-
-	.prose pre {
-		white-space: pre-wrap;
-		overflow-wrap: break-word;
-	}
-
-	/* Liens longs */
-	.prose a {
-		word-break: break-all;
-		overflow-wrap: anywhere;
 	}
 </style>
