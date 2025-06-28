@@ -143,6 +143,15 @@
 		{ value: "text-fluid-3xl", label: "Gigantesque (3XL)" }
 	];
 
+	// Options pour la troncature de description
+	const truncateOptions = [
+		{ value: "h-full", label: "Pas de troncature" },
+		{ value: "max-h-20", label: "Petit" },
+		{ value: "max-h-32", label: "Moyen" },
+		{ value: "max-h-48", label: "Grand" },
+		{ value: "max-h-64", label: "Très grand" }
+	];
+
 	// Options pour les arrondis
 	const roundedOptions = [
 		{ value: "rounded-none", label: "Aucun" },
@@ -165,24 +174,38 @@
 	];
 
 	// Exemple de donnée pour la carte événement
-	const sampleEvent: Partial<PublicEventInfo> = {
+	const sampleEvent: PublicEventInfo = {
 		id: "example-id",
 		event_title: "Soirée découverte - Exemple de carte",
 		desc_public: `<p>Ceci est un exemple de description d'événement qui peut être formaté en HTML.
 		              C'est une prévisualisation pour montrer comment votre thème s'appliquera aux cartes d'événements.</p>
 		              <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin euismod,
-		              nunc eget ultricies tincidunt, nunc nunc tincidunt metus, vitae faucibus velit nunc ac risus.</p>`,
+		              nunc eget ultricies tincidunt, nunc nunc tincidunt metus, vitae faucibus velit nunc ac risus.</p>
+									<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim aeque doleamus animo, cum corpore dolemus, fieri tamen permagna accessio potest, si aliquod aeternum et infinitum impendere malum nobis opinemur. Quod.</p>
+									<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim aeque doleamus animo, cum corpore dolemus, fieri tamen permagna accessio potest, si aliquod aeternum et infinitum impendere malum nobis opinemur. Quod.</p>
+										<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim aeque doleamus animo, cum corpore dolemus, fieri tamen permagna accessio potest, si aliquod aeternum et infinitum impendere malum nobis opinemur. Quod.</p>
+
+`,
 		date_event: new Date().toISOString(),
+		time_start: "18:30",
+		time_end: "22:00",
 		start_event: "19:30",
 		start_public: "19:00",
 		prix: "5€",
 		is_prix_libre: false,
 		isMixiteChoisie: false,
-		mixite: "",
+		mixite: null,
 		is_age_no_restriction: true,
-		age_advice: "",
+		age_advice: null,
 		canceled: false,
-		categories: ["Atelier", "Culture"]
+		categories: ["Atelier", "Culture"],
+		isRecurrent: false,
+		isMasterRecurrent: false,
+		masterRecurrentId: null,
+		image: null,
+		duree: null,
+		dateEnd: null,
+		dateStart: null
 	};
 
 	// Charger les options existantes au montage
@@ -1208,19 +1231,20 @@
 						</label>
 					</div>
 
-					<!-- Lignes Troncature -->
+					<!-- Taille de troncature -->
 					<div class="form-control w-full">
-						<label class="label" for="truncate-lines">
-							<span class="label-text font-medium">Lignes avant troncature (description)</span>
+						<label class="label" for="truncate-size">
+							<span class="label-text font-medium">Taille de la description</span>
 						</label>
-						<input
-							type="number"
-							id="truncate-lines"
-							min="1"
-							max="20"
-							class="input input-bordered w-full"
-							bind:value={theme.eventCard.truncateLines}
-						/>
+						<select
+							id="truncate-size"
+							class="select select-bordered w-full"
+							bind:value={theme.eventCard.truncateSize}
+						>
+							{#each truncateOptions as option (option.value)}
+								<option value={option.value}>{option.label}</option>
+							{/each}
+						</select>
 					</div>
 
 					<!-- Taille du titre -->

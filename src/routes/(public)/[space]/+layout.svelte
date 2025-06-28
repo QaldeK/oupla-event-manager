@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { publicStore } from '$lib/shared/publicStore.svelte';
-	import Alert from '$lib/components/Alert.svelte';
+	import { publicStore } from "$lib/shared/publicStore.svelte";
+	import Alert from "$lib/components/Alert.svelte";
 
-	import NavBarHeader from '$lib/components/public/NavBarHeader.svelte';
+	import NavBarHeader from "$lib/components/public/NavBarHeader.svelte";
 
-	import { page } from '$app/state';
-	import { Menu } from 'lucide-svelte';
-	import '/src/daisy.css';
+	import { page } from "$app/state";
+	import { Menu } from "lucide-svelte";
+	import "/src/daisy.css";
 
 	// 👉 Importer le type SitePagesResponse
-	import type { SitePagesResponse } from '$lib/types/pocketbase';
-	import type { PublicSiteThemeOptions } from '$lib/types/theme';
-	import type { NavbarHeaderType } from '$lib/types/theme.d';
-	import { slugify } from '$lib/utils';
+	import type { SitePagesResponse } from "$lib/types/pocketbase";
+	import type { PublicSiteThemeOptions } from "$lib/types/theme";
+	import type { NavbarHeaderType } from "$lib/types/theme.d";
+	import { slugify } from "$lib/utils";
 
 	let { children } = $props();
 
@@ -56,7 +56,7 @@
 			footer: []
 		};
 		if (layoutSitePages) {
-			console.log('[pagesBySection] layoutSitePages contient:', layoutSitePages.length, 'éléments'); // 👉 DEBUG
+			console.log("[pagesBySection] layoutSitePages contient:", layoutSitePages.length, "éléments"); // 👉 DEBUG
 			for (const page of layoutSitePages) {
 				// Vérifier que la section existe dans 'groups' avant d'ajouter
 				// 👉 DEBUG: Log chaque page et sa section avant le tri
@@ -77,7 +77,7 @@
 
 	$effect(() => {
 		const spaceName = page.params.space; // Lire le paramètre de la route
-		console.log('[Layout Effect] Déclenché pour space:', spaceName);
+		console.log("[Layout Effect] Déclenché pour space:", spaceName);
 
 		if (!spaceName) {
 			console.warn("[Layout Effect] Nom d'espace manquant.");
@@ -109,7 +109,7 @@
 	$effect(() => {
 		if (themeOptions) {
 			const themeToApply =
-				themeOptions.defaultMode === 'dark'
+				themeOptions.defaultMode === "dark"
 					? themeOptions.daisyThemeDark
 					: themeOptions.daisyThemeLight;
 			theme = themeToApply;
@@ -130,19 +130,19 @@
 		isLeftSidebarOpen = !isLeftSidebarOpen;
 	}
 
-	function getSectionClasses(sectionName: keyof PublicSiteThemeOptions['layoutSections']): string {
-		if (sectionName === 'mainBackgroundClass') {
-			return themeOptions?.layoutSections?.mainBackgroundClass || 'bg-base-200/50';
+	function getSectionClasses(sectionName: keyof PublicSiteThemeOptions["layoutSections"]): string {
+		if (sectionName === "mainBackgroundClass") {
+			return themeOptions?.layoutSections?.mainBackgroundClass || "bg-base-200/50";
 		}
 
 		const sectionStyle = themeOptions?.layoutSections?.[sectionName];
 		// Retourne les classes définies ou des classes par défaut sûres
 		return sectionStyle
-			? `${sectionStyle.bgClass || 'bg-base-100'} ${sectionStyle.textClass || 'text-base-content'}`
-			: 'bg-base-100 text-base-content';
+			? `${sectionStyle.bgClass || "bg-base-100"} ${sectionStyle.textClass || "text-base-content"}`
+			: "bg-base-100 text-base-content";
 	}
 
-	$inspect(layoutSitePages, 'layoutSitePages brut du store'); // 👉 DEBUG: Voir les données brutes
+	$inspect(layoutSitePages, "layoutSitePages brut du store"); // 👉 DEBUG: Voir les données brutes
 </script>
 
 {#snippet pageBlock(page: SitePagesResponse)}
@@ -160,27 +160,27 @@
 	</div>
 {/snippet}
 
-<div data-theme={theme}>
-	{#if publicStore.isLoading}
-		<div class="flex min-h-screen items-center justify-center">
-			<div class="text-center">
-				<span class="loading loading-dots loading-lg"></span>
-				<p>Chargement de l'espace...</p>
+{#if publicStore.isLoading}
+	<div class="flex min-h-screen items-center justify-center">
+		<div class="text-center">
+			<span class="loading loading-dots loading-lg"></span>
+			<p>Chargement de l'espace...</p>
+		</div>
+	</div>
+{:else if storeError}
+	<div class="container mx-auto max-w-2xl p-4">
+		<div role="alert" class="alert alert-error">
+			<div>
+				<h3 class="font-bold">Erreur</h3>
+				<div class="text-xs">{storeError}</div>
 			</div>
 		</div>
-	{:else if storeError}
-		<div class="container mx-auto max-w-2xl p-4">
-			<div role="alert" class="alert alert-error">
-				<div>
-					<h3 class="font-bold">Erreur</h3>
-					<div class="text-xs">{storeError}</div>
-				</div>
-			</div>
-			<p class="mt-4 text-center text-sm">
-				Impossible de charger l'espace. Vérifiez l'URL ou réessayez plus tard..
-			</p>
-		</div>
-	{:else if spaceInfo && themeOptions}
+		<p class="mt-4 text-center text-sm">
+			Impossible de charger l'espace. Vérifiez l'URL ou réessayez plus tard..
+		</p>
+	</div>
+{:else if spaceInfo && themeOptions}
+	<div data-theme={theme}>
 		<div class="drawer lg:drawer-open">
 			<input
 				id="left-sidebar-drawer"
@@ -243,11 +243,9 @@
 							class="card order-first mt-6 w-full shrink-0 p-4 lg:order-last lg:mt-0 lg:w-72 xl:w-96 {getSectionClasses(
 								'rightSidebar'
 							)}"
-							role="complementary"
 							aria-labelledby="right-sidebar-heading"
 						>
 							<h2 id="right-sidebar-heading" class="sr-only">Informations supplémentaires</h2>
-							<!-- Pour l'accessibilité -->
 							{#each pagesBySection.rightSide as page (page.id)}
 								{@render pageBlock(page)}
 							{/each}
@@ -268,7 +266,7 @@
 			</div>
 
 			<!-- Sidebar gauche (Drawer) -->
-			{$inspect('navlink', primaryNavLinks)}
+			{$inspect("navlink", primaryNavLinks)}
 			{#if pagesBySection.leftSide.length > 0 || (primaryNavLinks && primaryNavLinks.length > 0)}
 				<div class="drawer-side z-40">
 					<!-- Overlay pour fermer en cliquant à côté -->
@@ -303,10 +301,10 @@
 		<!-- <div class="container mx-auto p-4">
 			<p class="text-error text-center">Impossible d'afficher l'espace public.</p>
 		</div> -->
-	{/if}
 
-	<Alert />
-</div>
+		<Alert />
+	</div>
+{/if}
 
 <style>
 	/* Styles spécifiques au layout si nécessaire */

@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { publicStore } from '$lib/shared/publicStore.svelte';
-	import PublicEventCard from '$lib/components/public/PublicEventCard.svelte';
-	import { pb } from '$lib/pocketbase.svelte';
-	import { Calendar } from 'lucide-svelte';
-	import type { PageData } from './$types';
+	import { publicStore } from "$lib/shared/publicStore.svelte";
+	import PublicEventCard from "$lib/components/public/PublicEventCard.svelte";
+	import { pb } from "$lib/pocketbase.svelte";
+	import { Calendar } from "lucide-svelte";
+	import type { PageData } from "./$types";
 
 	// 👉 Utiliser PageData qui inclut LayoutData (et donc themeOptions si passé par le layout via @render)
 	// SvelteKit fusionne automatiquement les données de LayoutData dans PageData.
@@ -20,7 +20,7 @@
 
 	// 👉 Extraire les options spécifiques à la carte
 	let eventCardOptions = $derived(themeOptions.eventCard);
-	let spaceName = $derived(spaceInfo?.name ?? '');
+	let spaceName = $derived(spaceInfo?.name ?? "");
 
 	function getImageUrl(event: PublicEventInfo): string | null {
 		if (event.image && event.image.length > 0) {
@@ -33,13 +33,13 @@
 				// Tentative avec un cast partiel (à risque si collectionId/Name manque)
 				const recordStub = {
 					id: event.id,
-					collectionId: 'events_collection_id', // METTRE LE VRAI ID DE COLLECTION EVENTS
-					collectionName: 'events' // METTRE LE VRAI NOM DE COLLECTION EVENTS
+					collectionId: "events_collection_id", // METTRE LE VRAI ID DE COLLECTION EVENTS
+					collectionName: "events" // METTRE LE VRAI NOM DE COLLECTION EVENTS
 				};
-				return pb.files.getURL(recordStub, event.image[0], { thumb: '100x100' }); // Ajouter thumb si désiré
+				return pb.files.getURL(recordStub, event.image[0], { thumb: "100x100" }); // Ajouter thumb si désiré
 				//return pb.getFileUrl(event as any, event.image[0]); // Moins sûr
 			} catch (e) {
-				console.error('Erreur getFileUrl:', e);
+				console.error("Erreur getFileUrl:", e);
 				return null; // Retourner null en cas d'erreur
 			}
 		}
@@ -47,22 +47,17 @@
 	}
 </script>
 
-<div class="container mx-auto p-4">
+<div class="@container mx-auto md:p-12">
 	<h1 class="mb-6 text-2xl font-bold">Événements à venir</h1>
 
 	{#if publicStore.spaceEvents.length === 0}
 		<p class="py-8 text-center">Aucun événement à venir pour le moment.</p>
 	{:else}
-		<div class="flex flex-col gap-12">
+		<div class="flex flex-col gap-16">
 			{#each events as event (event.id)}
 				{@const imageUrl = getImageUrl(event)}
 
-				<PublicEventCard
-					{event}
-					{spaceName}
-					cardOptions={eventCardOptions}
-					eventImageUrl={imageUrl}
-				/>
+				<PublicEventCard {event} cardOptions={eventCardOptions} eventImageUrl={imageUrl} />
 			{/each}
 		</div>
 	{/if}
