@@ -12,7 +12,9 @@ import {
 	Mail,
 	RefreshCw,
 	Settings,
-	UserPlus
+	UserPlus,
+	Palette,
+	PanelsTopLeft
 } from "lucide-svelte";
 
 // --- INTERFACES ---
@@ -148,7 +150,24 @@ export const otherMenuItems: MenuItem[] = [
 	{
 		label: "Site public",
 		icon: Globe,
-		path: "/dashboard/site_pages"
+		path: "/dashboard/site_pages",
+		subItems: [
+			{
+				label: "Pages",
+				icon: Files,
+				path: "/dashboard/site_pages/pages"
+			},
+			{
+				label: "Themes",
+				icon: Palette,
+				path: "/dashboard/site_pages/theme"
+			},
+			{
+				label: "Template",
+				icon: PanelsTopLeft,
+				path: "/dashboard/site_pages/layout"
+			}
+		]
 	},
 	{
 		label: "Documents",

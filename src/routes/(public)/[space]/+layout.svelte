@@ -182,23 +182,25 @@
 {:else if spaceInfo && themeOptions}
 	<div data-theme={theme}>
 		<div class="drawer lg:drawer-open">
-			<input
-				id="left-sidebar-drawer"
-				type="checkbox"
-				class="drawer-toggle"
-				bind:checked={isLeftSidebarOpen}
-			/>
+			{#if !showNavBarHeader}
+				<input
+					id="left-sidebar-drawer"
+					type="checkbox"
+					class="drawer-toggle"
+					bind:checked={isLeftSidebarOpen}
+				/>
+			{/if}
 
 			<!-- Contenu principal (incluant header, top, main, right, footer) -->
 			<div class="drawer-content flex flex-col {getSectionClasses('mainBackgroundClass')}">
-				<!-- <label
+				<label
 					for="left-sidebar-drawer"
 					aria-label="Ouvrir menu"
 					class="btn-square btn-ghost bg-neutral/20 fixed top-4 left-4 z-[51] cursor-pointer rounded lg:hidden {themeOptions
 						.layoutSections.header.textClass} "
 				>
 					<Menu />
-				</label> -->
+				</label>
 
 				<!-- Header Section -->
 				<header class="w-full shadow-sm">

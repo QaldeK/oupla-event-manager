@@ -11,10 +11,8 @@
 	}
 </script>
 
-<div class="container mx-auto px-4">
-	<div class="mb-4">
-		<button onclick={goBackToPads} class="btn btn-square btn-ghost"> <SquareArrowLeft /> </button>
-	</div>
-
-	<PageBlockEditor {docId} />
+<div class="mb-4">
+	<button onclick={goBackToPads} class="btn btn-square btn-ghost"> <SquareArrowLeft /> </button>
 </div>
+
+<PageBlockEditor {docId} />

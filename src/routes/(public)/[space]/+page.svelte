@@ -53,7 +53,7 @@
 	{#if publicStore.spaceEvents.length === 0}
 		<p class="py-8 text-center">Aucun événement à venir pour le moment.</p>
 	{:else}
-		<div class="flex flex-col gap-16">
+		<div class="flex flex-wrap justify-center gap-12">
 			{#each events as event (event.id)}
 				{@const imageUrl = getImageUrl(event)}
 

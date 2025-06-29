@@ -13,7 +13,9 @@ export interface PublicSiteThemeOptions {
 		roundedClass: string;
 		titleSizeClass: string;
 		dateSizeClass: string;
+		hourSizeClass: string;
 		categorySizeClass: string;
+		dateAtTop: boolean;
 	};
 	layoutSections: {
 		header: { bgClass: string; textClass: string };
@@ -67,7 +69,8 @@ export function getDefaultThemeOptions(): PublicSiteThemeOptions {
 			roundedClass: "rounded-lg",
 			titleSizeClass: "text-xl",
 			dateSizeClass: "text-sm",
-			categorySizeClass: "text-sm"
+			categorySizeClass: "text-sm",
+			dateAtTop: true
 		},
 		layoutSections: {
 			header: { bgClass: "bg-base-100", textClass: "text-base-content" },

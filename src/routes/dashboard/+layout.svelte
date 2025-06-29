@@ -270,7 +270,7 @@
 								!sidebarState.isCompact && !isMobile && "ml-64"
 							]}
 						>
-							<div class=" mx-auto xl:mx-10 {isMobile ? 'p-2 pt-4' : 'px-5 py-10'}">
+							<div class="container mx-auto p-4 md:p-8" style="min-height: calc(100dvh - 100px);">
 								{@render children()}
 							</div>
 						</main>

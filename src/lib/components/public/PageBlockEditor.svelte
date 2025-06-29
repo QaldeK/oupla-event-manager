@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { Tipex, defaultExtensions } from "@friendofsvelte/tipex";
+	import { Tipex, defaultExtensions, type TipexEditor } from "@friendofsvelte/tipex";
 	import { TextAlign } from "@tiptap/extension-text-align";
-	import type { TipexEditor } from "@friendofsvelte/tipex";
 	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
+	import "@friendofsvelte/tipex/styles/Tipex.css";
+	import "@friendofsvelte/tipex/styles/ProseMirror.css";
+	import "@friendofsvelte/tipex/styles/EditLink.css";
 	import {
 		createEditableDocumentStore,
 		INACTIVITY_TIMEOUT_MS
@@ -41,8 +43,7 @@
 	});
 
 	// États locaux
-	let editor: TipexEditor | undefined = $state();
-	let showUIOptions = $state(false);
+	let tipexEditor: TipexEditor | undefined = $state();
 
 	// États dérivés
 	let title = $derived(editableDoc.doc?.title ?? "");
@@ -59,69 +60,9 @@
 		return { ...defaultOptions, ...(editableDoc.doc.componentConfig || {}) };
 	});
 
-	let currentBgColor = $derived.by(() => getCurrentValue("bgColor"));
-
 	// État temporaire (local) pour les modifications d'UI options
 	// Utilisé pour retarder les mises à jour et éviter les boucles
 	let pendingUiChanges = $state<Record<string, any>>({});
-
-	// Liste des options de couleurs de fond disponibles
-	const bgColorOptions = [
-		{
-			value: "bg-base-100",
-			label: "Fond principal",
-			color: "base-100",
-			textColor: "text-base-content"
-		},
-		{
-			value: "bg-base-200",
-			label: "Fond secondaire",
-			color: "base-200",
-			textColor: "text-base-content"
-		},
-		{
-			value: "bg-base-300",
-			label: "Fond tertiaire",
-			color: "base-300",
-			textColor: "text-base-content"
-		},
-		{ value: "bg-neutral", label: "Neutre", color: "neutral", textColor: "text-neutral-content" },
-		{ value: "bg-primary", label: "Primaire", color: "primary", textColor: "text-primary-content" },
-		{
-			value: "bg-secondary",
-			label: "Secondaire",
-			color: "secondary",
-			textColor: "text-secondary-content"
-		},
-		{ value: "bg-accent", label: "Accent", color: "accent", textColor: "text-accent-content" },
-		{
-			value: "bg-warning",
-			label: "Avertissement",
-			color: "warning",
-			textColor: "text-warning-content"
-		},
-		{ value: "bg-error", label: "Erreur", color: "error", textColor: "text-error-content" },
-		{ value: "bg-success", label: "Succès", color: "success", textColor: "text-success-content" },
-		{
-			value: "bg-primary/10",
-			label: "Primaire (10%)",
-			color: "primary",
-			textColor: "text-primary-content"
-		},
-		{
-			value: "bg-secondary/10",
-			label: "Secondaire (10%)",
-			color: "secondary",
-			textColor: "text-secondary-content"
-		},
-		{
-			value: "bg-transparent",
-			label: "Transparent",
-			color: "transparent",
-			textColor: "text-base-content"
-		},
-		{ value: "bg-white", label: "Blanc", color: "white", textColor: "text-base-content" }
-	];
 
 	// Extensions Tipex
 	const tipexExtensions = [
@@ -131,14 +72,14 @@
 
 	// Synchroniser Tipex lorsque le contenu change via le store (ex: subscription) ET qu'on n'édite pas
 	$effect(() => {
-		if (!editor || editableDoc.isLoading || editableDoc.isEditing) {
+		if (!tipexEditor || editableDoc.isLoading || editableDoc.isEditing) {
 			return;
 		}
 
 		const currentStoreContent = editableDoc.doc?.content ?? "";
-		if (editor.getHTML() !== currentStoreContent) {
+		if (tipexEditor.getHTML() !== currentStoreContent) {
 			console.log(`[PageBlockEditor ${docId}] Syncing Tipex with store content.`);
-			editor.commands.setContent(currentStoreContent, false);
+			tipexEditor.commands.setContent(currentStoreContent, false);
 		}
 	});
 
@@ -159,8 +100,8 @@
 			changes.title = title;
 		}
 
-		if (editor && editor.getHTML() !== editableDoc.doc.content) {
-			changes.content = editor.getHTML();
+		if (tipexEditor && tipexEditor.getHTML() !== editableDoc.doc.content) {
+			changes.content = tipexEditor.getHTML();
 		}
 
 		// Intégrer les modifications d'UI en attente
@@ -230,7 +171,7 @@
 	}
 </script>
 
-<div class="simple-editor-container w-full" role="region" aria-label="Éditeur de contenu de site">
+<div class="flex h-full w-full flex-col" role="region" aria-label="Éditeur de contenu de site">
 	<!-- Affichage des erreurs et status -->
 	{#if editableDoc.error}
 		<div role="alert" class="alert alert-error mb-4 shadow-md" aria-live="assertive">
@@ -258,14 +199,30 @@
 				aria-label="Titre du contenu"
 			/>
 		</div>
+		<!-- Option Afficher le titre -->
+		<div class="form-control">
+			<label class="label cursor-pointer justify-start gap-4">
+				<span class="label-text font-medium">Afficher le titre</span>
+				<input
+					type="checkbox"
+					class="toggle toggle-primary"
+					checked={getCurrentValue("showTitle")}
+					onclick={() => updateUIOption("showTitle", !getCurrentValue("showTitle"))}
+				/>
+				{#if getCurrentValue("showTitle")}
+					<Eye size={16} />
+				{:else}
+					<EyeOff size={16} />
+				{/if}
+			</label>
+		</div>
 	</div>
 
 	<!-- Panneau d'options UI -->
-	<div class="border-base-300 bg-base-200 mb-4 rounded-md border p-4 shadow-sm">
+	<!-- <div class="border-base-300 bg-base-200 mb-4 rounded-md border p-4 shadow-sm">
 		<h3 class="mb-3 text-sm font-semibold">Options d'apparence du bloc</h3>
 
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-			<!-- Option Couleur de fond -->
 			<div class="form-control">
 				<label class="label" for="block-bg-color">
 					<span class="label-text font-medium">Couleur de fond</span>
@@ -276,26 +233,8 @@
 					bind:value={pendingUiChanges.bgColor}
 				/>
 			</div>
-
-			<!-- Option Afficher le titre -->
-			<div class="form-control">
-				<label class="label cursor-pointer justify-start gap-4">
-					<span class="label-text font-medium">Afficher le titre</span>
-					<input
-						type="checkbox"
-						class="toggle toggle-primary"
-						checked={getCurrentValue("showTitle")}
-						onclick={() => updateUIOption("showTitle", !getCurrentValue("showTitle"))}
-					/>
-					{#if getCurrentValue("showTitle")}
-						<Eye size={16} />
-					{:else}
-						<EyeOff size={16} />
-					{/if}
-				</label>
-			</div>
 		</div>
-	</div>
+	</div> -->
 
 	<!-- Indicateur de chargement global -->
 	{#if editableDoc.isLoading && !editableDoc.doc}
@@ -308,37 +247,25 @@
 			<AlertCircle /> <span>Document non trouvé ou erreur de chargement.</span>
 		</div>
 	{:else}
-		<!-- Prévisualisation d'apparence du bloc -->
-		{#if showUIOptions && editableDoc.isEditing}
-			<div class="border-base-300 mb-4 rounded-md border border-dashed p-2">
-				<h4 class="text-base-content/60 mb-2 text-xs font-medium">Prévisualisation</h4>
-				<div class="rounded-md {getCurrentValue('bgColor')} p-4 shadow-sm">
-					{#if getCurrentValue("showTitle")}
-						<h2 class="mb-4 text-xl font-bold {getCurrentValue('textColor')}">
-							{title || "Titre du bloc"}
-						</h2>
-						text-xl
-					{/if}
-					<div class="{getCurrentValue('textColor')} opacity-70">
-						Prévisualisation du contenu du bloc...
-					</div>
-				</div>
-			</div>
-		{/if}
-
 		<!-- Wrapper pour l'éditeur Tipex -->
-		<div class="editor-wrapper bg-base-100 rounded-b-lg border border-t-0 shadow-md">
+		<div class="bg-base-100 flex h-full flex-col rounded-lg border shadow-md">
 			{#if editableDoc.isEditing || editableDoc.isLockedByOther}
-				<TipexToolbar {editor} disabled={!editableDoc.isEditing || editableDoc.isSaving} />
+				<div class="bg-base-200 flex flex-shrink-0 items-center">
+					<TipexToolbar editor={tipexEditor} onSaveAndClose={handleSaveAndClose} />
+				</div>
+				<div class="flex-1 overflow-hidden">
+					<Tipex
+						bind:tipex={tipexEditor}
+						extensions={[...defaultExtensions]}
+						controls={false}
+						class="h-full"
+						body={content}
+						autofocus={false}
+						floating={false}
+						focal={false}
+					></Tipex>
+				</div>
 			{/if}
-			<Tipex
-				bind:tipex={editor as TipexEditor}
-				extensions={tipexExtensions}
-				controls={false}
-				class="tipex-editor-instance flex-grow"
-				body={content}
-				editable={editableDoc.isEditing && !editableDoc.isSaving}
-			/>
 		</div>
 		{#if editableDoc.isEditing}
 			<div class="text-base-content/70 mt-2 text-xs">
@@ -346,71 +273,28 @@
 			</div>
 		{/if}
 	{/if}
-
-	<div class="flex justify-end">
-		<!-- Bouton Enregistrer -->
-		<button
-			class="btn btn-primary mt-4"
-			onclick={handleSaveAndClose}
-			disabled={!editableDoc.isEditing || editableDoc.isLoading || editableDoc.isSaving}
-			title="Enregistrer les modifications"
-		>
-			{#if editableDoc.isSaving}
-				<span class="loading loading-spinner loading-xs"></span> Sauvegarde...
-			{:else}
-				<Save size={16} /> Enregistrer et Fermer
-			{/if}
-		</button>
-	</div>
 </div>
 
 <style>
-	.simple-editor-container {
-		/* Ajoutez des styles de conteneur si nécessaire */
-	}
-	.editor-wrapper {
+	:global(.tipex) {
+		height: 100%;
 		display: flex;
 		flex-direction: column;
-		min-height: 400px;
-		max-height: 70vh;
-		overflow: hidden;
 	}
 
-	:global(.tipex-editor-instance .ProseMirror) {
-		border: none;
-		border-top: 1px solid hsl(var(--b2) / var(--tw-border-opacity));
+	:global(.tipex .ProseMirror) {
 		border-top-left-radius: 0;
 		border-top-right-radius: 0;
 		outline: none;
-		background-color: hsl(var(--b1));
-		padding: 1rem;
-		flex-grow: 1;
+		background-color: white; /* Ou var(--base-100) */
+		flex: 1;
 		overflow-y: auto;
-		height: 100%;
-		color: hsl(var(--bc));
+		padding: 1rem;
+		min-height: 0; /* 👉 Permet au flex item de se rétrécir sous sa taille de contenu */
 	}
-	:global(.tipex-editor-instance .ProseMirror p.is-editor-empty:first-child::before) {
-		content: attr(data-placeholder);
-		float: left;
-		color: hsl(var(--bc) / 0.5);
-		pointer-events: none;
-		height: 0;
-	}
-
-	:global(.tipex-editor-instance hr) {
-		margin-top: 1.5rem !important;
-		margin-bottom: 1.5rem;
+	:global(hr) {
+		margin-top: 3rem !important;
+		margin-bottom: 3rem;
 		border-top-width: 1px;
-		border-color: hsl(var(--b2));
-	}
-
-	.document-content {
-		padding: 1rem;
-		overflow-y: auto;
-		min-height: 400px;
-		max-height: 70vh;
-		max-width: none;
-		width: 100%;
-		color: hsl(var(--bc));
 	}
 </style>

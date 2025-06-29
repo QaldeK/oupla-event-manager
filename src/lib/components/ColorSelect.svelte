@@ -4,7 +4,7 @@
 
 	// Props
 	interface Props {
-		options?: Array<{ value: string; label: string; color: string }>;
+		options?: Array<{ value: string; label: string; textClass?: string; previewColor?: string }>;
 		value: string;
 		label?: string;
 		helperText?: string;
@@ -13,6 +13,7 @@
 		id?: string;
 		mode?: "background" | "text";
 		complementaryColor?: string;
+		daisyTheme?: string;
 	}
 
 	let {
@@ -24,7 +25,8 @@
 		required = false,
 		id = crypto.randomUUID(),
 		mode = "background", // Par défaut, on affiche des couleurs de fond
-		complementaryColor = mode === "background" ? "text-base-content" : "bg-base-100"
+		complementaryColor = mode === "background" ? "text-base-content" : "bg-base-100",
+		daisyTheme = "light"
 	}: Props = $props();
 
 	// État local
@@ -48,21 +50,24 @@
 	}
 
 	// Générer les classes pour l'aperçu combiné
-	function getPreviewClasses(optionValue: string): string {
+	function getPreviewClasses(option: { value: string; textClass?: string }): string {
 		if (mode === "background") {
-			// Pour les fonds, on utilise la classe bg- et on ajoute la couleur de texte complémentaire
-			return `${optionValue} ${complementaryColor}`;
+			// Pour les fonds, on utilise la classe bg- et on ajoute la couleur de texte adaptée si dispo, sinon complémentaire
+			return `${option.value} ${option.textClass ?? complementaryColor}`;
 		} else {
 			// Pour les textes, on utilise la classe text- et on ajoute la couleur de fond complémentaire
-			return `${complementaryColor} ${optionValue}`;
+			return `${complementaryColor} ${option.value}`;
 		}
 	}
+
+	// Trouver l'option sélectionnée pour l'aperçu du bouton
+	let selectedOption = $derived(options.find((option) => option.value === value));
 </script>
 
 <div class="form-control w-full">
 	{#if label}
-		<label for={id} class="label">
-			<span class="label-text font-medium">{label}</span>
+		<label for={id} class="">
+			<span class="label-text mb-1 font-medium">{label}</span>
 			{#if required}<span class="text-error">*</span>{/if}
 		</label>
 	{/if}
@@ -80,22 +85,24 @@
 			aria-haspopup="listbox"
 			aria-expanded={isOpen}
 		>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" data-theme={daisyTheme}>
 				{#if value}
 					{#if mode === "background"}
 						<!-- Aperçu pour couleur de fond -->
-						<div
-							class="flex h-5 w-5 items-center justify-center rounded-full {getPreviewClasses(
-								value
-							)}"
-							aria-hidden="true"
-						></div>
+						{#if selectedOption}
+							<div
+								class="flex h-5 w-5 items-center justify-center rounded-full {getPreviewClasses(
+									selectedOption
+								)}"
+								aria-hidden="true"
+							></div>
+						{/if}
 					{:else}
 						<!-- Aperçu pour couleur de texte -->
 						<div
-							class="flex h-5 w-5 items-center justify-center rounded-full {getPreviewClasses(
+							class="flex h-5 w-5 items-center justify-center rounded-full {getPreviewClasses({
 								value
-							)}"
+							})}"
 							aria-hidden="true"
 						>
 							<span class="text-[8px] font-bold">A</span>
@@ -114,6 +121,7 @@
 			<div
 				class="bg-base-100 absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md shadow-lg"
 				role="listbox"
+				data-theme={daisyTheme}
 			>
 				<ul class="py-1">
 					{#each options as option (option.value)}
@@ -129,10 +137,10 @@
 						>
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-2">
-									<!-- Aperçu avec la couleur complémentaire -->
+									<!-- Aperçu avec la couleur de texte adaptée -->
 									<div
 										class="flex h-5 w-5 items-center justify-center rounded-full {getPreviewClasses(
-											option.value
+											option
 										)}"
 										aria-hidden="true"
 									>
