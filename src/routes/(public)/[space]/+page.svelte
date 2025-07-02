@@ -4,6 +4,7 @@
 	import { pb } from "$lib/pocketbase.svelte";
 	import { Calendar } from "lucide-svelte";
 	import type { PageData } from "./$types";
+	import type { EventsResponse } from "$lib/types/pocketbase";
 
 	// 👉 Utiliser PageData qui inclut LayoutData (et donc themeOptions si passé par le layout via @render)
 	// SvelteKit fusionne automatiquement les données de LayoutData dans PageData.
@@ -22,13 +23,8 @@
 	let eventCardOptions = $derived(themeOptions.eventCard);
 	let spaceName = $derived(spaceInfo?.name ?? "");
 
-	function getImageUrl(event: PublicEventInfo): string | null {
+	function getImageUrl(event): string | null {
 		if (event.image && event.image.length > 0) {
-			// Important: PocketBase attend l'objet Record complet ou au moins son ID et collectionId/Name
-			// pour getFileUrl. Si PublicEventInfo ne les a pas, ça ne marchera pas.
-			// Assumons que PublicEventInfo contient au moins id et collectionId/Name implicitement
-			// ou qu'on doit caster vers un type RecordModel partiel.
-			// Solution plus sûre: utiliser EventsResponse dans le store si possible.
 			try {
 				// Tentative avec un cast partiel (à risque si collectionId/Name manque)
 				const recordStub = {

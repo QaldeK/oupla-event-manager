@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { publicStore } from "$lib/shared/publicStore.svelte";
 	import Alert from "$lib/components/Alert.svelte";
+	import { publicStore } from "$lib/shared/publicStore.svelte";
 
 	import NavBarHeader from "$lib/components/public/NavBarHeader.svelte";
 
 	import { page } from "$app/state";
 	import { Menu } from "lucide-svelte";
 	import "/src/daisy.css";
-
 	// 👉 Importer le type SitePagesResponse
 	import type { SitePagesResponse } from "$lib/types/pocketbase";
+	import { type SitePagesNavigationMenuRecord } from "$lib/types/publicSiteType";
 	import type { PublicSiteThemeOptions } from "$lib/types/theme";
 	import type { NavbarHeaderType } from "$lib/types/theme.d";
 	import { slugify } from "$lib/utils";
@@ -23,7 +23,7 @@
 	let spaceInfo = $derived(publicStore.spaceInfo);
 
 	let themeOptions = $derived(publicStore.themeOptions); // Récupère les options du thème
-	let layoutSitePages = $derived(publicStore.layoutSitePages);
+	let layoutSiteBlock = $derived(publicStore.layoutSitePages);
 
 	let theme = $state();
 
@@ -46,23 +46,21 @@
 		]
 	});
 
-	let primaryNavLinks = $derived(themeOptions.components.primaryNavLinks);
-
-	let pagesBySection = $derived.by(() => {
+	let blockBySection = $derived.by(() => {
 		const groups: Record<string, SitePagesResponse[]> = {
 			leftSide: [],
 			top: [],
 			rightSide: [],
 			footer: []
 		};
-		if (layoutSitePages) {
-			console.log("[pagesBySection] layoutSitePages contient:", layoutSitePages.length, "éléments"); // 👉 DEBUG
-			for (const page of layoutSitePages) {
+		if (layoutSiteBlock) {
+			console.log("[pagesBySection] layoutSitePages contient:", layoutSiteBlock.length, "éléments"); // 👉 DEBUG
+			for (const block of layoutSiteBlock) {
 				// Vérifier que la section existe dans 'groups' avant d'ajouter
 				// 👉 DEBUG: Log chaque page et sa section avant le tri
-				console.log(`[pagesBySection] Traitement page ID: ${page.id}, Section: ${page.section}`);
-				if (page.section && page.section in groups) {
-					groups[page.section].push(page);
+				// console.log(`[pagesBySection] Traitement page ID: ${block.id}, Section: ${block.section}`);
+				if (block.section && block.section in groups) {
+					groups[block.section].push(block);
 				}
 			}
 		}
@@ -106,6 +104,7 @@
 		}
 	});
 
+	// GARBAGE ?
 	$effect(() => {
 		if (themeOptions) {
 			const themeToApply =
@@ -142,19 +141,27 @@
 			: "bg-base-100 text-base-content";
 	}
 
-	$inspect(layoutSitePages, "layoutSitePages brut du store"); // 👉 DEBUG: Voir les données brutes
+	$inspect(layoutSiteBlock, "layoutSitePages brut du store"); // 👉 DEBUG: Voir les données brutes
 </script>
 
-{#snippet pageBlock(page: SitePagesResponse)}
-	<div class="card mb-4 shadow-sm {page.componentConfig?.bgColor}">
+<!-- Block de contenu ou Menu pour les sidebar, header, footer -->
+{#snippet block(block: SitePagesResponse | SitePagesNavigationMenuRecord)}
+	<div class="card mb-4 shadow-sm {block.componentConfig?.bgColor}">
 		<div class="card-body">
-			{#if page.title}
-				<h3 class="card-title">{page.title}</h3>
+			{#if block.title}
+				<h3 class="card-title">{block.title}</h3>
 			{/if}
-			{#if page.content}
+			{#if block.content}
 				<div class="prose max-w-none">
-					{@html page.content}
+					{@html block.content}
 				</div>
+			{/if}
+			{#if block.componentType === "navigationMenu" && block.componentConfig && block.componentConfig.links && block.componentConfig.links.length > 0}
+				<ul class="menu bg-base-200 rounded-box">
+					{#each block.componentConfig.links as item, index (index + item.title)}
+						<li><a href={item.url}>{item.title}</a></li>
+					{/each}
+				</ul>
 			{/if}
 		</div>
 	</div>
@@ -182,26 +189,27 @@
 {:else if spaceInfo && themeOptions}
 	<div data-theme={theme}>
 		<div class="drawer lg:drawer-open">
-			{#if !showNavBarHeader}
-				<input
-					id="left-sidebar-drawer"
-					type="checkbox"
-					class="drawer-toggle"
-					bind:checked={isLeftSidebarOpen}
-				/>
-			{/if}
+			<!-- input du menu drawer, partager entre le header et le bouton flottant  -->
+			<input
+				id="left-sidebar-drawer"
+				type="checkbox"
+				class="drawer-toggle"
+				bind:checked={isLeftSidebarOpen}
+			/>
 
 			<!-- Contenu principal (incluant header, top, main, right, footer) -->
 			<div class="drawer-content flex flex-col {getSectionClasses('mainBackgroundClass')}">
-				<label
-					for="left-sidebar-drawer"
-					aria-label="Ouvrir menu"
-					class="btn-square btn-ghost bg-neutral/20 fixed top-4 left-4 z-[51] cursor-pointer rounded lg:hidden {themeOptions
-						.layoutSections.header.textClass} "
-				>
-					<Menu />
-				</label>
-
+				<!-- Menu burger btn when non headerbar -->
+				{#if !showNavBarHeader}
+					<label
+						for="left-sidebar-drawer"
+						aria-label="Ouvrir menu"
+						class="btn-square btn fixed top-4 left-4 z-[51] cursor-pointer rounded lg:hidden {themeOptions
+							.layoutSections.header.textClass} "
+					>
+						<Menu />
+					</label>
+				{/if}
 				<!-- Header Section -->
 				<header class="w-full shadow-sm">
 					<div class=""></div>
@@ -224,10 +232,10 @@
 				{/if}
 
 				<!-- Top Section -->
-				{#if pagesBySection.top.length > 0}
+				{#if blockBySection.top.length > 0}
 					<section aria-label="Contenu supérieur" class="container mx-auto px-4 pt-4">
-						{#each pagesBySection.top as page (page.id)}
-							{@render pageBlock(page)}
+						{#each blockBySection.top as page (page.id)}
+							{@render block(page)}
 						{/each}
 					</section>
 				{/if}
@@ -235,32 +243,32 @@
 				<!-- Zone principale: Main Content + Right Sidebar -->
 				<div class="container mx-auto flex flex-grow flex-col px-4 py-4 lg:flex-row lg:gap-6">
 					<!-- Main Content Area (Page spécifique + enfants) -->
-					<main class="order-last w-full flex-grow lg:order-first">
+					<main class="order-last w-full flex-grow not-md:mt-16 lg:order-first">
 						{@render children?.()}
 					</main>
 
 					<!-- Right Sidebar Section -->
-					{#if pagesBySection.rightSide.length > 0}
+					{#if blockBySection.rightSide.length > 0}
 						<aside
 							class="card order-first mt-6 w-full shrink-0 p-4 lg:order-last lg:mt-0 lg:w-72 xl:w-96 {getSectionClasses(
 								'rightSidebar'
 							)}"
 							aria-labelledby="right-sidebar-heading"
 						>
-							<h2 id="right-sidebar-heading" class="sr-only">Informations supplémentaires</h2>
-							{#each pagesBySection.rightSide as page (page.id)}
-								{@render pageBlock(page)}
+							<div id="right-sidebar-heading" class="sr-only">Informations supplémentaires</div>
+							{#each blockBySection.rightSide as page (page.id)}
+								{@render block(page)}
 							{/each}
 						</aside>
 					{/if}
 				</div>
 
 				<!-- Footer Section -->
-				{#if pagesBySection.footer.length > 0}
+				{#if blockBySection.footer.length > 0}
 					<footer class="mt-auto {getSectionClasses('footer')}">
 						<div class="container mx-auto p-4">
-							{#each pagesBySection.footer as page (page.id)}
-								{@render pageBlock(page)}
+							{#each blockBySection.footer as page (page.id)}
+								{@render block(page)}
 							{/each}
 						</div>
 					</footer>
@@ -268,8 +276,7 @@
 			</div>
 
 			<!-- Sidebar gauche (Drawer) -->
-			{$inspect("navlink", primaryNavLinks)}
-			{#if pagesBySection.leftSide.length > 0 || (primaryNavLinks && primaryNavLinks.length > 0)}
+			{#if blockBySection.leftSide.length > 0}
 				<div class="drawer-side z-40">
 					<!-- Overlay pour fermer en cliquant à côté -->
 					<label for="left-sidebar-drawer" aria-label="Fermer menu" class="drawer-overlay"></label>
@@ -279,18 +286,8 @@
 						class="min-h-full w-72 p-4 pt-28 shadow-lg lg:pt-24 {getSectionClasses('leftSidebar')}"
 						role="navigation"
 					>
-						{#if primaryNavLinks && primaryNavLinks.length > 0}
-							<div class="bg-base-100/10 rounded-xl">
-								<ul class="menu menu-lg px-0">
-									<!-- menu-sm pour un padding réduit -->
-									{#each primaryNavLinks as link, index (index)}
-										<li><a href={link.url}>{link.title}</a></li>
-									{/each}
-								</ul>
-							</div>
-						{/if}
-						{#each pagesBySection.leftSide as page (page.id)}
-							{@render pageBlock(page)}
+						{#each blockBySection.leftSide as page (page.id)}
+							{@render block(page)}
 						{/each}
 					</aside>
 				</div>

@@ -165,7 +165,7 @@ export const otherMenuItems: MenuItem[] = [
 			{
 				label: "Template",
 				icon: PanelsTopLeft,
-				path: "/dashboard/site_pages/layout"
+				path: "/dashboard/site_pages/template"
 			}
 		]
 	},

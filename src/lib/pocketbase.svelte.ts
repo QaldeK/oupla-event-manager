@@ -602,13 +602,9 @@ export async function acquireLock<T extends RecordModel>(
 	recordId: string
 ): Promise<T | null> {
 	try {
-		console.log(
-			`Tentative d'acquisition du verrou pour le document ${recordId} dans ${collection}`
-		);
-
 		const userId = pb.authStore.model?.id;
 		if (!userId) {
-			console.error("Utilisateur non authentifié.");
+			console.error("acquireLock: Utilisateur non authentifié.");
 			return null;
 		}
 
@@ -618,13 +614,28 @@ export async function acquireLock<T extends RecordModel>(
 			lastEditHeartbeat: new Date().toISOString()
 		};
 
-		const record = await pb.collection(collection).update<T>(recordId, data);
-		console.log(
-			`Verrou acquis avec succès pour le document ${recordId} par l'utilisateur ${userId}`
-		);
+		// L'option `filter` ici est cruciale. Elle transforme l'update en opération atomique :
+		// "Mets à jour ce document SEULEMENT SI le champ isEditing est false".
+		const record = await pb.collection(collection).update<T>(recordId, data, {
+			filter: `isEditing = false`,
+			expand: "editingUser"
+		});
+
+		console.log(`[Lock] Verrou acquis avec succès pour ${recordId} par ${userId}`);
 		return record;
 	} catch (error) {
-		console.error(`Erreur lors de l'acquisition du verrou pour le document ${recordId}:`, error);
+		// Si le filter `isEditing = false` n'est pas satisfait, PocketBase retourne une erreur 404
+		// car aucun document ne correspond à l'ID + filtre. On la traite comme un échec de verrouillage normal.
+		if (error instanceof ClientResponseError && (error.status === 404 || error.status === 400)) {
+			console.log(
+				`[Lock] Échec de l'acquisition pour ${recordId}, le document est probablement déjà verrouillé.`
+			);
+		} else {
+			console.error(
+				`[Lock] Erreur inattendue lors de l'acquisition du verrou pour ${recordId}:`,
+				error
+			);
+		}
 		return null;
 	}
 }
@@ -688,6 +699,43 @@ export async function releaseLock<T extends RecordModel>(
 	} catch (error) {
 		console.error(`Erreur lors de la libération du verrou pour le document ${recordId}:`, error);
 		throw error;
+	}
+}
+
+/**
+ * Force l'acquisition d'un verrou d'édition, écrasant un verrou existant.
+ * À n'utiliser que lorsque le client a déjà vérifié que le verrou est expiré.
+ * @param collection Nom de la collection.
+ * @param recordId ID du document à verrouiller.
+ * @returns Le document mis à jour avec le nouveau verrou, ou null en cas d'erreur.
+ */
+// USELESS ?
+export async function forceAcquireLock<T extends RecordModel>(
+	collection: string,
+	recordId: string
+): Promise<T | null> {
+	try {
+		const userId = pb.authStore.model?.id;
+		if (!userId) {
+			throw new Error("forceAcquireLock: Utilisateur non authentifié.");
+		}
+
+		const data = {
+			isEditing: true,
+			editingUser: userId,
+			lastEditHeartbeat: new Date().toISOString()
+		};
+
+		// Pas de filtre ici, on écrase délibérément.
+		const record = await pb
+			.collection(collection)
+			.update<T>(recordId, data, { expand: "editingUser" });
+
+		console.warn(`[Lock] Verrou forcé avec succès pour ${recordId} par ${userId}.`);
+		return record;
+	} catch (error) {
+		console.error(`[Lock] Erreur lors du forçage du verrou pour ${recordId}:`, error);
+		return null;
 	}
 }
 

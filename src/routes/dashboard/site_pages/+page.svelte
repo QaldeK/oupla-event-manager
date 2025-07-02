@@ -12,8 +12,8 @@
 		goto("/dashboard/site_pages/theme");
 	}
 
-	function navigateToLayout() {
-		goto("/dashboard/site_pages/layout");
+	function navigateToTemplate() {
+		goto("/dashboard/site_pages/template");
 	}
 </script>
 
@@ -80,7 +80,7 @@
 					principal et liens de navigation.
 				</p>
 				<div class="card-actions justify-end">
-					<button class="btn btn-accent" onclick={navigateToLayout}>
+					<button class="btn btn-accent" onclick={navigateToTemplate}>
 						Configurer la structure
 					</button>
 				</div>

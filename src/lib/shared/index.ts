@@ -39,18 +39,18 @@ export {
 
 // --- sitePageStore.svelte.ts ---
 // Gère les documents/pages de contenu spécifiques à un espace.
-export {
-	subscribeToPagesUpdates, // S'abonne aux mises à jour en temps réel des pages
-	getPages, // Obtient les pages actuellement chargées
-	loadDocs, // Charge une liste de pages depuis PocketBase (filtrable)
-	loadDoc, // Charge une page spécifique par ID
-	createPad, // Crée une nouvelle page
-	updatePad, // Met à jour une page existante
-	deletePad, // Supprime une page
-	acquirePadLock, // Acquiert un verrou d'édition sur une page
-	releasePadLock, // Libère un verrou d'édition
-	refreshPadLock // Rafraîchit le timestamp d'un verrou d'édition
-	// Note: SitePagesType n'est pas exporté depuis sitePageStore.svelte.ts.
-	// Si nécessaire, exportez SitePagesResponse depuis $lib/types/pocketbase
-	// ou définissez un type public dans $lib/types/sitePages.ts
-} from "./sitePageStore.svelte";
+// export {
+// 	subscribeToPagesUpdates, // S'abonne aux mises à jour en temps réel des pages
+// 	getPages, // Obtient les pages actuellement chargées
+// 	loadDocs, // Charge une liste de pages depuis PocketBase (filtrable)
+// 	loadDoc, // Charge une page spécifique par ID
+// 	createPad, // Crée une nouvelle page
+// 	updatePad, // Met à jour une page existante
+// 	deletePad, // Supprime une page
+// 	acquirePadLock, // Acquiert un verrou d'édition sur une page
+// 	releasePadLock, // Libère un verrou d'édition
+// 	refreshPadLock // Rafraîchit le timestamp d'un verrou d'édition
+// 	// Note: SitePagesType n'est pas exporté depuis sitePageStore.svelte.ts.
+// 	// Si nécessaire, exportez SitePagesResponse depuis $lib/types/pocketbase
+// 	// ou définissez un type public dans $lib/types/sitePages.ts
+// } from "./sitePageStore.svelte";

@@ -1,3 +1,10 @@
+/*
+Interface API spécifique pour la collection pads avec ses Types
+
+- Utilise documentStore pour gérer le cache et les subscriptions de liste.
+- Expose des fonctions simples et fortement typées (ex: `getPads()`, `createPad()`) d'interaction avec PocketBase.
+- Fournit les fonctions de verrouillage (`acquire...Lock`, `release...Lock`, `refresh...Lock`) qui seront injectées dans le moteur `editableDocumentStore`.
+*/
 import { acquireLock, refreshLock, releaseLock } from "$lib/pocketbase.svelte";
 import {
 	subscribeToCollection,
@@ -9,9 +16,10 @@ import {
 	deleteDocument
 } from "$lib/shared/documentStore.svelte";
 import { getSpace, userDb } from "$lib/shared";
-import { pb } from "$lib/pocketbase.svelte";
 import type { PadsResponse } from "$lib/types/pocketbase";
 import type { RecordModel } from "pocketbase";
+
+type PadsType = PadsResponse & RecordModel;
 
 const COLLECTION = "pads";
 const LIST_FIELDS = "id,created,updated,title,content,created_by,space";
@@ -36,17 +44,17 @@ export async function loadDocs(): Promise<PadsType[]> {
 		sort: "-created"
 	});
 }
-export async function loadDoc(docId: string): Promise<PadsResponse> {
-	return await loadDocument<PadsResponse>(docId, COLLECTION);
+export async function loadDoc(docId: string): Promise<PadsType> {
+	return await loadDocument<PadsType>(docId, COLLECTION);
 }
 
 export async function createPad(
 	title: string,
-	additionalData: Record<string, any> = {}
+	additionalData: Record<string, unknown> = {}
 ): Promise<PadsResponse> {
 	const currentUser = userDb.current?.id;
 	if (!currentUser) throw new Error("Vous devez être connecté pour créer un pad");
-	return await createDocument<PadsResponse>(COLLECTION, {
+	return await createDocument<PadsType>(COLLECTION, {
 		title,
 		space: getSpace.id,
 		created_by: currentUser,
@@ -54,33 +62,33 @@ export async function createPad(
 	});
 }
 
-export async function updatePad(docId: string, data: Record<string, any>): Promise<PadsResponse> {
-	return await updateDocument<PadsResponse>(COLLECTION, docId, data);
+export async function updatePad(docId: string, data: Partial<PadsType>): Promise<PadsType> {
+	return await updateDocument<PadsType, Partial<PadsType>>(COLLECTION, docId, data);
 }
 
 export async function updatePadContent(docId: string, content: string): Promise<PadsResponse> {
-	return await updateDocument<PadsResponse>(COLLECTION, docId, { content: content });
+	return await updateDocument<PadsType, Partial<PadsType>>(COLLECTION, docId, { content: content });
 }
 
 export async function updatePadTitle(docId: string, title: string): Promise<PadsResponse> {
-	return await updateDocument<PadsResponse>(COLLECTION, docId, { title: title });
+	return await updateDocument<PadsType, Partial<PadsType>>(COLLECTION, docId, { title: title });
 }
 
-export async function deletePad(docId: string): Promise<PadsResponse | null> {
-	return await deleteDocument<PadsResponse>(docId, COLLECTION);
+export async function deletePad(docId: string): Promise<boolean> {
+	return await deleteDocument(docId, COLLECTION);
 }
 
 // Acquérir le verrou d'édition
-export async function acquirePadLock(docId: string): Promise<PadsResponse | null> {
-	return await acquireLock<PadsResponse>("pads", docId);
+export async function acquirePadLock(docId: string): Promise<PadsType | null> {
+	return await acquireLock<PadsType>("pads", docId);
 }
 
 // Libérer le verrou d'édition
-export async function releasePadLock(docId: string): Promise<PadsResponse | null> {
-	return await releaseLock<PadsResponse>("pads", docId);
+export async function releasePadLock(docId: string): Promise<PadsType | null> {
+	return await releaseLock<PadsType>("pads", docId);
 }
 
 // Rafraîchir le verrou d'édition
-export async function refreshPadLock(docId: string): Promise<PadsResponse | null> {
-	return await refreshLock<PadsResponse>("pads", docId);
+export async function refreshPadLock(docId: string): Promise<PadsType | null> {
+	return await refreshLock<PadsType>("pads", docId);
 }

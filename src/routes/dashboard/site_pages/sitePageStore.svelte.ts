@@ -1,30 +1,43 @@
-import { acquireLock, refreshLock, releaseLock } from '$lib/pocketbase.svelte';
-import { getSpace } from '$lib/shared/spaceOptions.svelte';
-import { pb } from '$lib/pocketbase.svelte';
+/*
+Interface API spécifique pour la collection `site_pages` avec ses Types
+
+- Utilise documentStore pour gérer le cache et les subscriptions de liste.
+- Expose des fonctions simples et fortement typées (ex: `getPads()`, `createPad()`) d'interaction avec PocketBase.
+- Fournit les fonctions de verrouillage (`acquire...Lock`, `release...Lock`, `refresh...Lock`) qui seront injectées dans le moteur `documentEditManager`.
+*/
+
 import {
-	subscribeToCollection,
-	getCollectionData,
-	loadDocuments,
-	loadDocument,
+	acquireLock,
+	forceAcquireLock,
+	pb,
+	refreshLock,
+	releaseLock
+} from "$lib/pocketbase.svelte";
+import {
 	createDocument,
-	updateDocument,
-	deleteDocument
-} from '$lib/shared/documentStore.svelte';
-import type { SitePagesResponse } from '$lib/types/pocketbase';
-import { SitePagesSectionOptions } from '$lib/types/pocketbase';
-import type { RecordModel } from 'pocketbase';
+	deleteDocument,
+	getCollectionData,
+	loadDocument,
+	loadDocuments,
+	subscribeToCollection,
+	updateDocument
+} from "$lib/shared/documentStore.svelte";
+import { getSpace } from "$lib/shared/spaceOptions.svelte";
+import type { SitePagesResponse } from "$lib/types/pocketbase";
+import { SitePagesSectionOptions } from "$lib/types/pocketbase";
+import type { RecordModel } from "pocketbase";
 
 // Type d'intersection qui satisfait la contrainte RecordModel
 type SitePagesType = SitePagesResponse & RecordModel;
 
-const COLLECTION = 'site_pages';
-const LIST_FIELDS = 'id,created,updated,title,section,pos,componentConfig';
+const COLLECTION = "site_pages";
+const LIST_FIELDS = "id,created,updated,title,section,pos,componentConfig";
 
 // Fonction pour s'abonner aux mises à jour des pages
 export function subscribeToPagesUpdates(callback: () => void): () => void {
 	return subscribeToCollection<SitePagesType>(COLLECTION, callback, {
 		initialFields: LIST_FIELDS,
-		sort: '-pos'
+		sort: "-pos"
 	});
 }
 
@@ -34,11 +47,11 @@ export function getPages(): SitePagesType[] {
 }
 
 // Fonctions spécifiques aux pages du site, fortement typées
-export async function loadDocs(filter = ''): Promise<SitePagesType[]> {
+export async function loadDocs(filter = ""): Promise<SitePagesType[]> {
 	return await loadDocuments<SitePagesType>(COLLECTION, {
 		fields: LIST_FIELDS,
-		sort: '-pos',
-		filter: `space = '${getSpace.id}' ${filter ? `&& ${filter}` : ''}`
+		sort: "-pos",
+		filter: `space = '${getSpace.id}' ${filter ? `&& ${filter}` : ""}`
 	});
 }
 
@@ -55,7 +68,7 @@ export async function createPad(
 	const data = {
 		title,
 		space: getSpace.id, // Ajoute l'ID de l'espace
-		created_by: pb.authStore.model?.id, // Ajoute l'ID de l'utilisateur
+		created_by: pb.authStore.record?.id, // Ajoute l'ID de l'utilisateur
 		section,
 		...additionalData
 	};
@@ -68,7 +81,7 @@ export async function updatePad(
 ): Promise<SitePagesType> {
 	// Le type U de updateDocument doit correspondre à Partial<SitePagesType>
 	return await updateDocument<SitePagesType, Partial<SitePagesType>>(COLLECTION, docId, data, {
-		expand: 'editingUser' // Garde l'expand ici car spécifique à la logique d'édition
+		expand: "editingUser" // Garde l'expand ici car spécifique à la logique d'édition
 	});
 }
 
@@ -98,4 +111,12 @@ export async function refreshPadLock(
 	collection: string = COLLECTION
 ): Promise<SitePagesType | null> {
 	return await refreshLock<SitePagesType>(collection, docId);
+}
+
+// Forcer l'acquisition du verrou d'édition (par exemple, s'il a expiré)
+export async function forceAcquirePadLock(
+	docId: string,
+	collection: string = COLLECTION
+): Promise<SitePagesType | null> {
+	return await forceAcquireLock<SitePagesType>(collection, docId);
 }

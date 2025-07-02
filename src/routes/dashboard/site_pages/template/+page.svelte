@@ -1,73 +1,134 @@
 <script lang="ts">
-	import {
-		subscribeToPagesUpdates,
-		getPages,
-		createPad,
-		deletePad
-	} from "$lib/shared/sitePageStore.svelte";
+	// Imports des stores et des utilitaires Pocketbase
+	import { createPad, deletePad, getPages, subscribeToPagesUpdates } from "../sitePageStore.svelte";
+	import { pb, modifyRecord } from "$lib/pocketbase.svelte";
+	import { modalState, showAlert } from "$lib/shared/states.svelte";
 
-	import { pb } from "$lib/pocketbase.svelte";
-	import { showAlert, modalState } from "$lib/shared/states.svelte";
+	// Imports des types
 	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
-	import { modifyRecord } from "$lib/pocketbase.svelte";
-	import { goto } from "$app/navigation";
-	import { fade, slide } from "svelte/transition";
-	import { flip } from "svelte/animate";
-
 	import {
-		ArrowLeft,
-		Layout,
-		GripVertical,
-		Trash2,
-		Pencil,
-		Palette,
-		Plus,
-		X,
-		Sun,
-		Moon,
-		AlertCircle
-	} from "lucide-svelte";
-	import { draggable, droppable, type DragDropState } from "@thisux/sveltednd";
-
-	import ConfigModal from "../components/ConfigModal.svelte";
-	import NavBarHeaderConfig from "../components/NavBarHeaderConfig.svelte";
-	import PageBlockEditor from "$lib/components/public/PageBlockEditor.svelte";
-	import Modal from "$lib/components/Modal.svelte";
-	import ColorSelect from "$lib/components/ColorSelect.svelte";
-
+		ComponentType,
+		type NavigationLink,
+		type SitePagesNavigationMenuRecord
+	} from "$lib/types/publicSiteType";
 	import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
-	import { onMount } from "svelte";
 
-	import "/src/daisy.css";
+	// Imports Svelte
+	import { goto } from "$app/navigation";
+	import { onMount } from "svelte";
+	import { flip } from "svelte/animate";
+	import { fade, slide } from "svelte/transition";
+
+	// Imports des composants UI et icônes
+	import { draggable, droppable, type DragDropState } from "@thisux/sveltednd";
+	import {
+		AlertCircle,
+		ArrowLeft,
+		GripVertical,
+		Layout,
+		Moon,
+		Palette,
+		Pencil,
+		Plus,
+		Sun,
+		Trash2
+	} from "lucide-svelte";
+	import NavigationMenuEditor from "../components/NavigationMenuEditor.svelte";
+	import ModalX from "$lib/components/ModalX.svelte";
+	import PageBlockEditor from "../components/PageBlockEditor.svelte";
+	import NavBarHeaderConfig from "../components/NavBarHeaderConfig.svelte";
 	import Frame from "$lib/components/Frame.svelte";
 
+	// Import du CSS global
+	import "/src/daisy.css";
+
+	type BlocRecord = SitePagesNavigationMenuRecord | SitePagesResponse;
+
+	// --- Déclarations des variables d'état ($state) ---
 	let isLoading = $state(true);
-	let isCreating = $state(false);
 	let isUpdatingOrder = $state(false);
 	let error = $state<string | null>(null);
 
+	// Variables pour la gestion des modales et des éditeurs
 	let currentConfigSection = $state<SitePagesSectionOptions | null>(null);
-	let currentConfigBlock = $state<string | null>(null);
 	let navbarConfigModalOpen = $state(false);
 
+	let currentMenu = $state<BlocRecord | null>(null);
+
+	let currentBlockId = $state<string | null>(null);
+
+	// Variable reactive globale pour les modal de configuration
+	let modalConfig = $state({
+		blockEditorOpen: false,
+		navBarEditorOpen: false,
+		menuEditorOpen: false
+	});
+
+	// Variables pour la gestion du thème
 	let theme = $state<PublicSiteThemeOptions>(getDefaultThemeOptions());
 	let initialTheme = $state<PublicSiteThemeOptions | null>(null);
 
+	// Variables liées à Pocketbase
+	let optionsRecordId = $state<string | null>(null);
+	let spaceId = $state<string | null>(null);
+
+	// Variable pour le mode de prévisualisation du thème
+	let previewMode = $state<"light" | "dark">("light");
+
+	// --- Déclarations des variables dérivées ($derived) ---
 	let haveUnsavedChanges = $derived(
 		initialTheme ? JSON.stringify(theme) !== JSON.stringify(initialTheme) : false
 	);
 
-	let optionsRecordId = $state<string | null>(null);
-	let spaceId = $state<string | null>(null);
-	let previewMode = $state<"light" | "dark">("light");
-
 	let pages = $derived.by(() => getPages());
-	let navLinks = $derived(theme.components.primaryNavLinks);
 
-	let navLinkTitle = $state("");
-	let navLinkUrl = $state("");
-	let navSelectedPage = $state<"selectPage" | "" | string>("selectPage");
+	// Structure pour stocker les pages groupées par type
+	type GroupedPages = {
+		[SitePagesSectionOptions.header]: BlocRecord[];
+		[SitePagesSectionOptions.top]: BlocRecord[];
+		[SitePagesSectionOptions.leftSide]: BlocRecord[];
+		[SitePagesSectionOptions.rightSide]: BlocRecord[];
+		[SitePagesSectionOptions.footer]: BlocRecord[];
+		[SitePagesSectionOptions.page]: BlocRecord[];
+	};
 
+	// Groupement des pages par type et tri par position
+	let groupedPages = $derived.by<GroupedPages>(() => {
+		const groups: GroupedPages = {
+			[SitePagesSectionOptions.header]: [],
+			[SitePagesSectionOptions.top]: [],
+			[SitePagesSectionOptions.leftSide]: [],
+			[SitePagesSectionOptions.rightSide]: [],
+			[SitePagesSectionOptions.footer]: [],
+			[SitePagesSectionOptions.page]: []
+		};
+
+		pages.forEach((page: BlocRecord) => {
+			const pageSection = page.section;
+			if (pageSection && Object.values(SitePagesSectionOptions).includes(pageSection)) {
+				groups[pageSection as Exclude<keyof GroupedPages, "page">].push(page);
+			} else if (pageSection === SitePagesSectionOptions.page) {
+				groups[SitePagesSectionOptions.page].push(page);
+			}
+		});
+
+		for (const key in groups) {
+			if (Object.values(SitePagesSectionOptions).includes(key as SitePagesSectionOptions)) {
+				const groupKey = key as Exclude<keyof GroupedPages, "other">;
+				groups[groupKey].sort((a, b) => {
+					const posA = typeof a.pos === "number" ? a.pos : Infinity;
+					const posB = typeof b.pos === "number" ? b.pos : Infinity;
+					if (posA === posB) {
+						return new Date(a.created).getTime() - new Date(b.created).getTime();
+					}
+					return posA - posB;
+				});
+			}
+		}
+		return groups;
+	});
+
+	// --- Constantes de configuration UI ---
 	const allBackgroundColors = [
 		{ value: "bg-base-100", label: "Fond principal", color: "base-100" },
 		{ value: "bg-base-200", label: "Fond secondaire", color: "base-200" },
@@ -94,54 +155,7 @@
 		{ value: "text-secondary", label: "Secondaire", color: "secondary" }
 	];
 
-	// Structure pour stocker les pages groupées par type
-	type GroupedPages = {
-		[SitePagesSectionOptions.header]: SitePagesResponse[];
-		[SitePagesSectionOptions.top]: SitePagesResponse[];
-		[SitePagesSectionOptions.leftSide]: SitePagesResponse[];
-		[SitePagesSectionOptions.rightSide]: SitePagesResponse[];
-		[SitePagesSectionOptions.footer]: SitePagesResponse[];
-		[SitePagesSectionOptions.page]: SitePagesResponse[];
-	};
-
-	// Groupement des pages par type
-	let groupedPages = $derived.by<GroupedPages>(() => {
-		const groups: GroupedPages = {
-			[SitePagesSectionOptions.header]: [],
-			[SitePagesSectionOptions.top]: [],
-			[SitePagesSectionOptions.leftSide]: [],
-			[SitePagesSectionOptions.rightSide]: [],
-			[SitePagesSectionOptions.footer]: [],
-			[SitePagesSectionOptions.page]: []
-		};
-
-		pages.forEach((page: SitePagesResponse) => {
-			const pageSection = page.section;
-
-			if (pageSection && Object.values(SitePagesSectionOptions).includes(pageSection)) {
-				groups[pageSection as Exclude<keyof GroupedPages, "page">].push(page);
-			} else if (pageSection === SitePagesSectionOptions.page) {
-				groups[SitePagesSectionOptions.page].push(page);
-			}
-		});
-
-		// Trier chaque groupe par la position (pos)
-		for (const key in groups) {
-			if (Object.values(SitePagesSectionOptions).includes(key as SitePagesSectionOptions)) {
-				const groupKey = key as Exclude<keyof GroupedPages, "other">;
-				groups[groupKey].sort((a, b) => {
-					const posA = typeof a.pos === "number" ? a.pos : Infinity;
-					const posB = typeof b.pos === "number" ? b.pos : Infinity;
-					if (posA === posB) {
-						return new Date(a.created).getTime() - new Date(b.created).getTime();
-					}
-					return posA - posB;
-				});
-			}
-		}
-		return groups;
-	});
-
+	// --- Hooks de cycle de vie (onMount, $effect) ---
 	onMount(async () => {
 		spaceId = await getCurrentAdminSpaceId();
 
@@ -203,14 +217,19 @@
 		}
 	});
 
-	// S'abonner aux mises à jour des pages
 	$effect(() => {
 		const unsubscribe = subscribeToPagesUpdates(() => {});
 		return unsubscribe;
 	});
 
+	// --- Fonctions utilitaires et de lecture de données ---
+
+	/**
+	 * Récupère l'ID de l'espace admin courant.
+	 * @returns L'ID de l'espace admin ou null si non trouvé.
+	 */
 	async function getCurrentAdminSpaceId(): Promise<string | null> {
-		const user = pb.authStore.model;
+		const user = pb.authStore.record;
 		if (!user) return null;
 		try {
 			const memberRecord = await pb
@@ -223,6 +242,82 @@
 		}
 	}
 
+	/**
+	 * Retourne le thème actuel (light/dark) pour la prévisualisation.
+	 * @returns Le nom du thème DaisyUI.
+	 */
+	function getCurrentTheme() {
+		return previewMode === "light" ? theme.daisyThemeLight : theme.daisyThemeDark;
+	}
+
+	/**
+	 * Retourne la clé de configuration du thème pour une section donnée.
+	 * @param section Le type de section.
+	 * @returns La clé correspondante dans l'objet `theme.layoutSections`.
+	 */
+	function getSectionConfigKey(section: SitePagesSectionOptions) {
+		switch (section) {
+			case SitePagesSectionOptions.header:
+				return "header";
+			case SitePagesSectionOptions.leftSide:
+				return "leftSidebar";
+			case SitePagesSectionOptions.rightSide:
+				return "rightSidebar";
+			case SitePagesSectionOptions.footer:
+				return "footer";
+			case SitePagesSectionOptions.top:
+				return "top";
+		}
+	}
+
+	// --- Fonctions de manipulation des pages / blocs / menus ---
+
+	/**
+	 * Crée un menu de navigation par défaut si aucun n'existe dans la section 'leftSide'.
+	 */
+	// GARBAGE ?
+	async function createDefaultMenu() {
+		if (!spaceId) return;
+
+		try {
+			const existingMenus = groupedPages[SitePagesSectionOptions.leftSide]?.filter(
+				(item) => item.componentType === ComponentType.navigationMenu
+			);
+
+			if (existingMenus && existingMenus.length > 0) {
+				return;
+			}
+
+			const defaultLinks: NavigationLink[] = [
+				{ title: "À propos", url: "about" },
+				{ title: "Nous trouver", url: "find-us" },
+				{ title: "Proposer un événement", url: "proposition" }
+			];
+
+			const itemsInSection = groupedPages[SitePagesSectionOptions.leftSide] || [];
+			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
+				const currentPos = typeof item.pos === "number" ? item.pos : -1;
+				return Math.max(max, currentPos);
+			}, -1);
+			const nextPos = maxPos + 1;
+
+			await createPad("Menu principal", SitePagesSectionOptions.leftSide, {
+				pos: nextPos,
+				componentType: ComponentType.navigationMenu,
+				componentConfig: {
+					links: defaultLinks
+				}
+			});
+
+			console.log("Menu par défaut créé avec succès");
+		} catch (e) {
+			console.error("Erreur lors de la création du menu par défaut:", e);
+		}
+	}
+
+	/**
+	 * Sauvegarde les options de thème du site.
+	 */
 	async function saveTheme() {
 		if (!spaceId) return;
 
@@ -250,35 +345,42 @@
 		}
 	}
 
+	/**
+	 * Gère la création d'un nouveau bloc dans une section spécifiée.
+	 * Ouvre l'éditeur de bloc après la création.
+	 * @param blockSection La section où créer le bloc.
+	 */
 	async function handleCreateBlock(blockSection: Partial<SitePagesSectionOptions>) {
-		isCreating = true;
-
 		try {
-			const title = `bloc_${Date.now()}`;
+			const title = `Text`;
 			const itemsInSection = groupedPages[blockSection] || [];
-			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
+			const maxPos = itemsInSection.reduce((max: number, item: BlocRecord) => {
 				const currentPos = typeof item.pos === "number" ? item.pos : -1;
 				return Math.max(max, currentPos);
 			}, -1);
 			const nextPos = maxPos + 1;
 
 			const newPage = await createPad(title, blockSection, {
-				pos: nextPos
+				pos: nextPos,
+				componentType: ComponentType.bloc
 			});
 
-			currentConfigBlock = newPage.id;
+			currentBlockId = newPage.id;
+			modalConfig.blockEditorOpen = true;
 		} catch (e) {
 			showAlert(
 				`Erreur lors de la création du bloc: ${e instanceof Error ? e.message : e}`,
 				"error"
 			);
 			console.error(e);
-		} finally {
-			isCreating = false;
 		}
 	}
 
-	const deletePage = (id: string) => {
+	/**
+	 * Fonction pour supprimer une page/un bloc après confirmation.
+	 * @param id L'ID de la page/du bloc à supprimer.
+	 */
+	const deleteBlock = (id: string) => {
 		modalState.confirm = {
 			isOpen: true,
 			data: {
@@ -299,6 +401,101 @@
 		};
 	};
 
+	/**
+	 * Gère la création d'un nouveau menu dans une section spécifiée.
+	 * Ouvre l'éditeur de menu après la création.
+	 * @param menuSection La section où créer le menu.
+	 */
+	async function handleCreateMenu(menuSection: SitePagesSectionOptions) {
+		try {
+			const title = `Menu`;
+			const itemsInSection = groupedPages[menuSection] || [];
+			const maxPos = itemsInSection.reduce((max: number, item: BlocRecord) => {
+				const currentPos = typeof item.pos === "number" ? item.pos : -1;
+				return Math.max(max, currentPos);
+			}, -1);
+			const nextPos = maxPos + 1;
+
+			const newMenu = await createPad(title, menuSection, {
+				pos: nextPos,
+				componentType: ComponentType.navigationMenu,
+				componentConfig: {
+					links: []
+				}
+			});
+
+			currentMenu = newMenu as SitePagesNavigationMenuRecord;
+			modalConfig.menuEditorOpen = true;
+		} catch (e) {
+			showAlert(
+				`Erreur lors de la création du menu: ${e instanceof Error ? e.message : e}`,
+				"error"
+			);
+			console.error(e);
+		}
+	}
+
+	/**
+	 * Ferme l'éditeur de menu.
+	 */
+	function closeMenuEditor() {
+		modalConfig.menuEditorOpen = false;
+		currentMenu = null;
+	}
+
+	function closeBlockEditor() {
+		modalConfig.blockEditorOpen = false;
+		currentBlockId = null;
+	}
+
+	let pageBlockEditorComponent: { save: () => Promise<void> } | undefined;
+
+	/**
+	 * Appelle la méthode de sauvegarde exposée par le `PageBlockEditor`.
+	 * Le composant enfant est responsable de la sauvegarde et de la fermeture de la modale
+	 * en appelant sa prop `onClose` (qui est `closeBlockEditor`).
+	 */
+	async function saveBlockAndCloseEditor() {
+		if (pageBlockEditorComponent) {
+			await pageBlockEditorComponent.save();
+			closeBlockEditor();
+		} else {
+			// Si le composant n'est pas lié pour une raison quelconque, fermez simplement la modale.
+			showAlert("Erreur lors de la sauvegarde", "error");
+			closeBlockEditor();
+		}
+	}
+
+	/**
+	 * Sauvegarde un menu de navigation.
+	 * @param title Le titre du menu.
+	 * @param links Les liens de navigation du menu.
+	 */
+	async function saveMenu() {
+		if (!currentMenu) return;
+
+		try {
+			const updatedMenu = {
+				...currentMenu
+			};
+
+			await modifyRecord("site_pages", currentMenu.id, updatedMenu);
+			showAlert("Menu sauvegardé avec succès !", "success");
+			closeMenuEditor();
+		} catch (e) {
+			showAlert(
+				`Erreur lors de la sauvegarde du menu: ${e instanceof Error ? e.message : e}`,
+				"error"
+			);
+			console.error(e);
+		}
+	}
+
+	/**
+	 * Gère le dépôt d'un élément dans une nouvelle section (changement de section).
+	 * Met à jour la section et la position de l'élément déplacé.
+	 * @param state L'état du glisser-déposer.
+	 */
 	async function handleSectionDrop(state: DragDropState<SitePagesResponse>) {
 		const { draggedItem, sourceContainer, targetContainer } = state;
 
@@ -308,7 +505,7 @@
 		isUpdatingOrder = true;
 
 		const itemsInNewSection = groupedPages[newSectionKey] || [];
-		const maxPos = itemsInNewSection.reduce((max: number, item: SitePagesResponse) => {
+		const maxPos = itemsInNewSection.reduce((max: number, item: BlocRecord) => {
 			const currentPos = typeof item.pos === "number" ? item.pos : -1;
 			return Math.max(max, currentPos);
 		}, -1);
@@ -327,10 +524,13 @@
 		}
 	}
 
-	async function handleItemDrop(
-		state: DragDropState<SitePagesResponse>,
-		targetItem: SitePagesResponse
-	) {
+	/**
+	 * Gère le dépôt d'un élément pour réordonner des blocs au sein de la même section.
+	 * Met à jour les positions de tous les éléments affectés dans la section.
+	 * @param state L'état du glisser-déposer.
+	 * @param targetItem L'élément cible sur lequel l'élément a été déposé.
+	 */
+	async function handleItemDrop(state: DragDropState<BlocRecord>, targetItem: SitePagesResponse) {
 		const { draggedItem, sourceContainer, targetContainer } = state;
 
 		if (!targetContainer || !sourceContainer || sourceContainer !== targetContainer) {
@@ -387,81 +587,7 @@
 		}
 	}
 
-	function closeConfigModal() {
-		currentConfigSection = null;
-		currentConfigBlock = null;
-	}
-
-	function getCurrentTheme() {
-		return previewMode === "light" ? theme.daisyThemeLight : theme.daisyThemeDark;
-	}
-
-	function getBackgroundOptionsForSection() {
-		return allBackgroundColors;
-	}
-
-	function getTextOptionsForSection() {
-		return allTextColors;
-	}
-
-	function getSectionConfigKey(section: SitePagesSectionOptions) {
-		switch (section) {
-			case SitePagesSectionOptions.header:
-				return "header";
-			case SitePagesSectionOptions.leftSide:
-				return "leftSidebar";
-			case SitePagesSectionOptions.rightSide:
-				return "rightSidebar";
-			case SitePagesSectionOptions.footer:
-				return "footer";
-			case SitePagesSectionOptions.top:
-				return "top";
-		}
-	}
-
-	function addNavLink() {
-		const navLinks = theme.components.primaryNavLinks || [];
-
-		if (navSelectedPage && navSelectedPage !== "selectPage") {
-			const page = groupedPages.page.find((p) => p.id === navSelectedPage);
-			if (page) {
-				theme.components.primaryNavLinks = [
-					...navLinks,
-					{
-						title: page.title || `Page ${page.id.substring(0, 5)}...`,
-						url: `/${page.id}`
-					}
-				];
-				navSelectedPage = "selectPage";
-			} else {
-				showAlert("Page sélectionnée introuvable.", "error");
-			}
-		} else if (navLinkTitle.trim()) {
-			theme.components.primaryNavLinks = [
-				...navLinks,
-				{
-					title: navLinkTitle,
-					url: navLinkUrl || "#"
-				}
-			];
-			navLinkTitle = "";
-			navLinkUrl = "";
-		} else {
-			showAlert("Veuillez sélectionner une page ou entrer un titre de lien personnalisé.", "error");
-		}
-	}
-
-	function removeNavLink(index: number) {
-		if (theme.components.primaryNavLinks) {
-			theme.components.primaryNavLinks = theme.components.primaryNavLinks.filter(
-				(_, i) => i !== index
-			);
-		}
-	}
-
-	function navigateBack() {
-		goto("/dashboard/site_pages");
-	}
+	$inspect("modalConfig", modalConfig);
 </script>
 
 {#if !isLoading}
@@ -533,22 +659,14 @@
 					{:else}
 						{#if groupedPages[sectionType]?.length > 0}
 							<div class="mb-4 flex flex-col gap-y-1">
-								{#each groupedPages[sectionType] as block (block.id)}
+								{#each groupedPages[sectionType] as bloc (bloc.id)}
 									<div
 										class="bg-base-100 svelte-dnd-touch-feedback hover:ring-secondary/30 mb-2 flex flex-wrap items-center justify-between rounded-lg border p-2 shadow-sm transition-all duration-200 hover:shadow-md hover:ring-2"
-										use:draggable={{
-											container: sectionType,
-											dragData: block,
-											disabled: isUpdatingOrder,
-											attributes: {
-												draggingClass: "opacity-50 ring-2 ring-primary shadow-lg"
-											}
-										}}
 										use:droppable={{
 											container: sectionType,
 											callbacks: {
-												onDrop: (state) =>
-													handleItemDrop(state as DragDropState<SitePagesResponse>, block)
+												onDrop: (state) => handleItemDrop(state as DragDropState<BlocRecord>, bloc)
+												// FIXIT : ne pas actualiser pocketbase directement. + subscribe/unsubscribe a chaque drop !
 											},
 											attributes: {
 												dragOverClass: "outline bg-warnig outline-2 outline-offset-2 outline-accent"
@@ -558,26 +676,58 @@
 										in:fade={{ duration: 150 }}
 										out:fade={{ duration: 150 }}
 									>
-										<span class="flex flex-grow items-center gap-2 pr-2">
-											<GripVertical
-												class="text-base-content/30 group-hover:text-base-content/70 cursor-grab transition-colors"
-												size={24}
-											/>
-											<span class="flex-1 truncate" title={block.title}>{block.title}</span>
-										</span>
-										<div class="flex items-center">
-											<button
-												class="btn btn-ghost text-error btn-square btn-sm"
-												onclick={() => deletePage(block.id)}
+										<div class="flex flex-grow flex-wrap items-center gap-x-2 gap-y-1 pr-1">
+											<span
+												class="flex flex-grow gap-2"
+												use:draggable={{
+													container: sectionType,
+													dragData: bloc,
+													disabled: isUpdatingOrder,
+													attributes: {
+														draggingClass: "opacity-50 ring-2 ring-primary shadow-lg"
+													}
+												}}
 											>
-												<Trash2 size={16} />
-											</button>
-											<button
-												class="btn btn-ghost btn-square btn-sm"
-												onclick={() => (currentConfigBlock = block.id)}
-											>
-												<Pencil size={16} />
-											</button>
+												<GripVertical
+													class="text-base-content/30 group-hover:text-base-content/70 cursor-grab transition-colors"
+													size={24}
+												/>
+												<span class="flex-1 truncate">
+													{bloc.title}
+													{#if bloc.componentType === ComponentType.navigationMenu}
+														<span class="badge badge-secondary badge-xs ml-2">Menu</span>
+													{/if}
+												</span>
+											</span>
+											<div class="ms-auto flex items-center">
+												<button
+													class="btn btn-ghost text-error btn-square btn-sm"
+													onclick={() => deleteBlock(bloc.id)}
+												>
+													<Trash2 size={16} />
+												</button>
+												{#if bloc.componentType === ComponentType.navigationMenu}
+													<button
+														class="btn btn-ghost btn-square btn-sm"
+														onclick={() => {
+															currentMenu = bloc;
+															modalConfig.menuEditorOpen = true;
+														}}
+													>
+														<Pencil size={16} />
+													</button>
+												{:else}
+													<button
+														class="btn btn-ghost btn-square btn-sm"
+														onclick={() => {
+															currentBlockId = bloc.id;
+															modalConfig.blockEditorOpen = true;
+														}}
+													>
+														<Pencil size={16} />
+													</button>
+												{/if}
+											</div>
 										</div>
 									</div>
 								{/each}
@@ -585,16 +735,18 @@
 						{/if}
 
 						<button
-							class="btn btn-primary btn-sm w-full"
+							class="btn btn-primary btn-sm flex-1"
 							onclick={() => handleCreateBlock(sectionType)}
-							disabled={isCreating}
 						>
-							{#if isCreating}
-								<span class="loading loading-spinner loading-xs"></span> Création...
-							{:else}
-								<Plus size={16} />
-								Ajouter du contenu
-							{/if}
+							<Plus size={16} />
+							Ajouter du contenu
+						</button>
+						<button
+							class="btn btn-secondary btn-sm flex-1"
+							onclick={() => handleCreateMenu(sectionType)}
+						>
+							<Plus size={16} />
+							Ajouter un menu
 						</button>
 					{/if}
 				{/if}
@@ -605,7 +757,7 @@
 	<div transition:fade>
 		<!-- Header avec navigation -->
 		<div class="mb-6 flex flex-wrap items-center gap-4">
-			<button class="btn btn-ghost btn-sm" onclick={navigateBack}>
+			<button class="btn btn-ghost btn-sm" onclick={() => goto("/dashboard/site_pages")}>
 				<ArrowLeft size={16} />
 			</button>
 			<div class="flex items-center gap-3">
@@ -688,120 +840,6 @@
 			</div>
 		</Frame>
 
-		<!-- Configuration du menu de navigation -->
-		<Frame title="Menu de navigation">
-			<p class="text-base-content/60 mb-4 px-2 text-sm">
-				Ces liens apparaissent dans la barre de navigation sur grand écran et dans le menu latéral
-				sur petit écran.
-			</p>
-
-			<!-- Liste des liens existants -->
-			<div class="mb-6">
-				<h3 class="mb-4 text-lg font-medium">Liens configurés</h3>
-				{#if navLinks.length === 0}
-					<div class="py-8 text-center">
-						<p class="text-base-content/60">Aucun lien configuré</p>
-						<p class="text-base-content/50 text-sm">
-							Ajoutez des liens pour créer votre menu de navigation.
-						</p>
-					</div>
-				{:else}
-					<div class="space-y-2">
-						{#each navLinks as link, index ("navLink" + index)}
-							<div class="bg-base-100 flex items-center justify-between rounded-lg border p-3">
-								<div class="flex-1">
-									<span class="font-medium">{link.title}</span>
-									<span class="text-base-content/50 ml-2 text-sm">({link.url})</span>
-								</div>
-								<button
-									class="btn btn-ghost btn-sm text-error"
-									onclick={() => removeNavLink(index)}
-								>
-									<X size={16} />
-								</button>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-
-			<!-- Ajouter un lien -->
-			<div class="card bg-base-200 shadow-sm">
-				<div class="card-body p-4">
-					<div class="mb-4 flex flex-wrap items-center justify-between">
-						<div class="text-lg font-medium">Ajouter un lien</div>
-						<div class="tabs tabs-boxed">
-							<button
-								class="tab {navSelectedPage === '' ? 'tab-active' : ''}"
-								onclick={() => (navSelectedPage = "")}>Personnalisé</button
-							>
-							<button
-								class="tab {navSelectedPage !== '' ? 'tab-active' : ''}"
-								onclick={() => {
-									navLinkTitle = "";
-									navLinkUrl = "";
-									if (navSelectedPage === "") navSelectedPage = "selectPage";
-								}}>Page existante</button
-							>
-						</div>
-					</div>
-
-					<div class="flex flex-wrap items-end gap-4">
-						{#if navSelectedPage !== ""}
-							<!-- Sélection d'une page existante -->
-							<div class="form-control flex-1">
-								<label class="label" for="pagesSelect">
-									<span class="label-text">Sélectionner une page générale</span>
-								</label>
-								<select
-									id="pagesSelect"
-									class="select select-bordered w-full"
-									bind:value={navSelectedPage}
-								>
-									<option value="selectPage" disabled>Choisir une page...</option>
-									{#each groupedPages.page as page (page.id)}
-										<option value={page.id}
-											>{page.title || `Page sans titre (${page.id.substring(0, 5)})`}</option
-										>
-									{/each}
-								</select>
-							</div>
-						{:else}
-							<!-- Lien personnalisé -->
-							<div class="form-control min-w-56 flex-1">
-								<label class="label" for="customNavLinkTitle">
-									<span class="label-text">Titre du lien</span>
-								</label>
-								<input
-									id="customNavLinkTitle"
-									type="text"
-									class="input input-bordered"
-									bind:value={navLinkTitle}
-									placeholder="Titre du lien"
-								/>
-							</div>
-							<div class="form-control min-w-56 flex-1">
-								<label class="label" for="customNavLinkUrl">
-									<span class="label-text">URL</span>
-								</label>
-								<input
-									id="customNavLinkUrl"
-									type="text"
-									class="input input-bordered"
-									bind:value={navLinkUrl}
-									placeholder="/contact ou https://..."
-								/>
-							</div>
-						{/if}
-						<button class="btn btn-primary btn-sm ms-auto" onclick={addNavLink}>
-							<Plus size={16} />
-							Ajouter
-						</button>
-					</div>
-				</div>
-			</div>
-		</Frame>
-
 		<!-- Bouton Sauvegarder -->
 		{#if haveUnsavedChanges}
 			<div
@@ -829,11 +867,13 @@
 	</div>
 
 	<!-- Modals -->
+
+	<!-- Modal couleur des sections -->
 	{#if currentConfigSection}
 		{@const configSectionKey = getSectionConfigKey(currentConfigSection)}
 		{@const sectionStyle = configSectionKey && theme.layoutSections[configSectionKey]}
 
-		<ConfigModal
+		<ModalX
 			title={`Configuration de la section ${
 				currentConfigSection === SitePagesSectionOptions.header
 					? "Entête"
@@ -843,115 +883,105 @@
 							? "Sidebar Droite"
 							: "Pied de page"
 			}`}
-			onClose={closeConfigModal}
+			onClose={() => (currentConfigSection = null)}
+			onSave={() => (currentConfigSection = null)}
+			showCancel={false}
 		>
 			<div data-theme={getCurrentTheme()}>
-				<fieldset class="border-base-content/20 mb-4 rounded border p-4">
-					<legend class="px-2 font-medium">Apparence</legend>
+				<!-- Classe Fond (bg) -->
+				<div class="mb-8">
+					<div class="text-base-content mb-2 font-medium">Couleur de fond</div>
+					<div
+						class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
+					>
+						{#each allBackgroundColors as option (option.value)}
+							{@const isActive = sectionStyle?.bgClass === option.value}
+							{@const textClass = sectionStyle?.textClass || "text-base-content"}
 
-					<!-- Classe Fond (bg) -->
-					<div class="mb-8">
-						<div class="text-base-content mb-2 font-medium">Couleur de fond</div>
-						<div
-							class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
-						>
-							{#each getBackgroundOptionsForSection() as option (option.value)}
-								{@const isActive = sectionStyle?.bgClass === option.value}
-								{@const textClass = sectionStyle?.textClass || "text-base-content"}
-
-								<button
-									type="button"
-									class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
-										? 'ring-primary border-primary ring-2'
-										: 'border-base-300'}"
-									onclick={() => {
-										if (configSectionKey) {
-											theme.layoutSections[configSectionKey].bgClass = option.value;
-										}
-									}}
+							<button
+								type="button"
+								class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
+									? 'ring-primary border-primary ring-2'
+									: 'border-base-300'}"
+								onclick={() => {
+									if (configSectionKey) {
+										theme.layoutSections[configSectionKey].bgClass = option.value;
+									}
+								}}
+							>
+								<div
+									class="flex h-10 w-full items-center justify-center rounded {option.value} {textClass}"
+									title={option.label}
 								>
-									<div
-										class="flex h-10 w-full items-center justify-center rounded {option.value} {textClass}"
-										title={option.label}
-									>
-										<span class="text-xs font-bold">Abc</span>
-									</div>
-									<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
-								</button>
-							{/each}
-						</div>
+									<span class="text-xs font-bold">Abc</span>
+								</div>
+								<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
+							</button>
+						{/each}
 					</div>
+				</div>
 
-					<!-- Classe Texte (text) -->
-					<div>
-						<div class="text-base-content mb-2 font-medium">Couleur de texte</div>
-						<div
-							class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
-						>
-							{#each getTextOptionsForSection() as option (option)}
-								{@const isActive = sectionStyle?.textClass === option.value}
-								{@const bgClass = sectionStyle?.bgClass || "bg-base-100"}
+				<!-- Classe Texte (text) -->
+				<div>
+					<div class="text-base-content mb-2 font-medium">Couleur de texte</div>
+					<div
+						class="bg-base-200/50 grid grid-cols-3 gap-2 rounded-lg p-2 sm:grid-cols-5 md:grid-cols-6"
+					>
+						{#each allTextColors as option (option)}
+							{@const isActive = sectionStyle?.textClass === option.value}
+							{@const bgClass = sectionStyle?.bgClass || "bg-base-100"}
 
-								<button
-									type="button"
-									class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
-										? 'ring-primary border-primary ring-2'
-										: 'border-base-300'}"
-									onclick={() => {
-										if (configSectionKey) {
-											theme.layoutSections[configSectionKey].textClass = option.value;
-										}
-									}}
+							<button
+								type="button"
+								class="flex flex-col items-center rounded-lg border p-2 transition-all duration-200 {isActive
+									? 'ring-primary border-primary ring-2'
+									: 'border-base-300'}"
+								onclick={() => {
+									if (configSectionKey) {
+										theme.layoutSections[configSectionKey].textClass = option.value;
+									}
+								}}
+							>
+								<div
+									class="flex h-10 w-full items-center justify-center rounded {bgClass} {option.value}"
+									title={option.label}
 								>
-									<div
-										class="flex h-10 w-full items-center justify-center rounded {bgClass} {option.value}"
-										title={option.label}
-									>
-										<span class="text-xs font-bold">Abc</span>
-									</div>
-									<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
-								</button>
-							{/each}
-						</div>
+									<span class="text-xs font-bold">Abc</span>
+								</div>
+								<span class="mt-1 w-full truncate text-center text-xs">{option.label}</span>
+							</button>
+						{/each}
 					</div>
-				</fieldset>
+				</div>
 			</div>
-
-			<div slot="actions">
-				<button
-					class="btn btn-primary"
-					onclick={() => {
-						saveTheme();
-						closeConfigModal();
-					}}
-				>
-					Enregistrer
-				</button>
-			</div>
-		</ConfigModal>
+		</ModalX>
 	{/if}
 
-	{#if currentConfigBlock}
-		<Modal>
-			<PageBlockEditor
-				docId={currentConfigBlock}
-				onClose={() => {
-					closeConfigModal();
-				}}
-			/>
-		</Modal>
+	{#if currentBlockId && modalConfig.blockEditorOpen}
+		<ModalX onClose={closeBlockEditor} onSave={saveBlockAndCloseEditor}>
+			<PageBlockEditor bind:this={pageBlockEditorComponent} docId={currentBlockId} />
+		</ModalX>
 	{/if}
 
 	{#if navbarConfigModalOpen}
-		<ConfigModal
+		<ModalX
 			title="Configuration de la barre de navigation"
-			onClose={() => {
+			onSave={() => {
 				saveTheme();
+				navbarConfigModalOpen = false;
+			}}
+			onClose={() => {
 				navbarConfigModalOpen = false;
 			}}
 		>
 			<NavBarHeaderConfig bind:navbarHeaderConfig={theme.components.navbarHeader} />
-		</ConfigModal>
+		</ModalX>
+	{/if}
+
+	{#if currentMenu && modalConfig.menuEditorOpen}
+		<ModalX onSave={() => saveMenu} onClose={closeMenuEditor} title="Édition du menu">
+			<NavigationMenuEditor bind:currentMenu />
+		</ModalX>
 	{/if}
 {:else}
 	<div class="flex justify-center py-12">

@@ -1,22 +1,22 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
 	import { pb } from "$lib/pocketbase.svelte";
 	import { showAlert } from "$lib/shared/states.svelte";
-	import { goto } from "$app/navigation";
-	import { fade, slide } from "svelte/transition";
-	import { ArrowLeft, Palette, Sun, Moon, Eye } from "lucide-svelte";
+	import { ArrowLeft, Eye, Moon, Palette, Sun } from "lucide-svelte";
 	import { onMount } from "svelte";
+	import { fade, slide } from "svelte/transition";
 
 	import ColorSelect from "$lib/components/ColorSelect.svelte";
+	import ModalX from "$lib/components/ModalX.svelte";
 	import OptionSlider from "$lib/components/OptionSlider.svelte";
 	import PublicEventCard from "$lib/components/public/PublicEventCard.svelte";
-	import ConfigModal from "../components/ConfigModal.svelte";
 
-	import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
 	import type { PublicEventInfo } from "$lib/shared/publicStore.svelte";
+	import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
 
-	import "/src/daisy.css";
-	import { isMobile } from "$lib/utils";
 	import Frame from "$lib/components/Frame.svelte";
+	import { isMobile } from "$lib/utils";
+	import "/src/daisy.css";
 
 	let is_mobile = $derived(isMobile.current);
 	let isLoading = $state(true);
@@ -770,7 +770,7 @@
 
 	<!-- Modal de sélection des thèmes -->
 	{#if themeModalOpen}
-		<ConfigModal title="Sélection des thèmes" onClose={() => (themeModalOpen = false)}>
+		<ModalX title="Sélection des thèmes" onClose={() => (themeModalOpen = false)}>
 			<!-- Thèmes clairs -->
 			<h3 class="mb-2 flex items-center gap-2 font-medium">
 				<Sun size={18} />
@@ -803,7 +803,7 @@
 					Confirmer la sélection
 				</button>
 			</div>
-		</ConfigModal>
+		</ModalX>
 	{/if}
 {:else}
 	<div class="flex justify-center py-12">

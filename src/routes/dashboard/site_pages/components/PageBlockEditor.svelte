@@ -1,44 +1,42 @@
 <script lang="ts">
-	import { Tipex, defaultExtensions, type TipexEditor } from "@friendofsvelte/tipex";
-	import { TextAlign } from "@tiptap/extension-text-align";
-	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
-	import "@friendofsvelte/tipex/styles/Tipex.css";
-	import "@friendofsvelte/tipex/styles/ProseMirror.css";
-	import "@friendofsvelte/tipex/styles/EditLink.css";
 	import {
-		createEditableDocumentStore,
+		createDocumentEditManager,
 		INACTIVITY_TIMEOUT_MS
-	} from "$lib/shared/editableDocumentStore.svelte";
-	import * as sitePageStore from "$lib/shared/sitePageStore.svelte";
-	import type { SitePagesResponse } from "$lib/types/pocketbase";
-	import { AlertCircle, Info, Save, Eye, EyeOff } from "lucide-svelte";
-	import ColorSelect from "$lib/components/ColorSelect.svelte";
+	} from "$lib/shared/documentEditManager.svelte";
+	import type { SitePagesResponse, SitePagesRecord } from "$lib/types/pocketbase";
+	import { defaultExtensions, Tipex, type TipexEditor } from "@friendofsvelte/tipex";
+	import "@friendofsvelte/tipex/styles/EditLink.css";
+	import "@friendofsvelte/tipex/styles/ProseMirror.css";
+	import "@friendofsvelte/tipex/styles/Tipex.css";
+	import { AlertCircle, Eye, EyeOff, Info } from "lucide-svelte";
+	import * as sitePageStore from "../sitePageStore.svelte";
+	import SimpleTiptapToolbar from "$lib/components/SimpleTiptapToolbar.svelte";
+	import type { RecordModel } from "pocketbase";
 
 	// Interface pour les props
 	interface Props {
 		docId: string;
-		onClose?: () => void;
 		initialEditMode?: boolean;
 	}
 
-	const { docId, onClose: onClose, initialEditMode = true }: Props = $props();
+	const { docId, initialEditMode = true }: Props = $props();
 	const collectionName = "site_pages";
 
 	// Préparer les actions pour le store éditable
 	const sitePageActions = {
 		loadDoc: (id: string) => sitePageStore.loadDoc(id),
-		updateDoc: (id: string, data: Partial<SitePagesResponse>) => sitePageStore.updatePad(id, data),
+		updateDoc: (id: string, data: Partial<SitePagesRecord>) => sitePageStore.updatePad(id, data),
 		acquireLock: (id: string) => sitePageStore.acquirePadLock(id),
 		releaseLock: (id: string) => sitePageStore.releasePadLock(id),
 		refreshLock: (id: string) => sitePageStore.refreshPadLock(id)
 	};
 
 	// Créer l'instance du store éditable
-	const editableDoc = createEditableDocumentStore<SitePagesResponse>({
+	const editableDoc = createDocumentEditManager<RecordModel>({
 		docId,
 		collectionName,
 		actions: sitePageActions,
-		fieldsToSave: ["title", "content", "section", "componentConfig"],
+		fieldsToSave: ["title", "content", "componentConfig"],
 		initialEditMode: initialEditMode
 	});
 
@@ -63,12 +61,6 @@
 	// État temporaire (local) pour les modifications d'UI options
 	// Utilisé pour retarder les mises à jour et éviter les boucles
 	let pendingUiChanges = $state<Record<string, any>>({});
-
-	// Extensions Tipex
-	const tipexExtensions = [
-		...defaultExtensions,
-		TextAlign.configure({ types: ["heading", "paragraph"] })
-	];
 
 	// Synchroniser Tipex lorsque le contenu change via le store (ex: subscription) ET qu'on n'édite pas
 	$effect(() => {
@@ -113,7 +105,8 @@
 		return changes;
 	}
 
-	async function handleSaveAndClose() {
+	// export pour pouvoir sauver depuis le parent / le btn du modal
+	export async function save() {
 		if (!editableDoc.isEditing) return;
 
 		const changes = collectAllChanges();
@@ -138,11 +131,6 @@
 			// Pas de changements, juste libérer le verrou
 			await editableDoc.stopEditing(false);
 		}
-
-		// Appeler le callback si fourni
-		if (onClose) {
-			onClose();
-		}
 	}
 
 	function getCurrentValue(key: keyof typeof uiOptions) {
@@ -160,18 +148,22 @@
 		pendingUiChanges = { ...pendingUiChanges, [key]: value };
 
 		// Si bgColor change, mettre à jour automatiquement textColor
-		if (key === "bgColor") {
-			const selectedBgColor = bgColorOptions.find((option) => option.value === value);
-			if (selectedBgColor) {
-				pendingUiChanges = { ...pendingUiChanges, textColor: selectedBgColor.textColor };
-			}
-		}
+		// if (key === "bgColor") {
+		// 	const selectedBgColor = bgColorOptions.find((option) => option.value === value);
+		// 	if (selectedBgColor) {
+		// 		pendingUiChanges = { ...pendingUiChanges, textColor: selectedBgColor.textColor };
+		// 	}
+		// }
 
 		// Note: Les changements ne seront appliqués qu'à la sauvegarde manuelle
 	}
 </script>
 
-<div class="flex h-full w-full flex-col" role="region" aria-label="Éditeur de contenu de site">
+<div
+	class="flex h-svh w-full flex-col md:h-96"
+	role="region"
+	aria-label="Éditeur de contenu de site"
+>
 	<!-- Affichage des erreurs et status -->
 	{#if editableDoc.error}
 		<div role="alert" class="alert alert-error mb-4 shadow-md" aria-live="assertive">
@@ -251,7 +243,7 @@
 		<div class="bg-base-100 flex h-full flex-col rounded-lg border shadow-md">
 			{#if editableDoc.isEditing || editableDoc.isLockedByOther}
 				<div class="bg-base-200 flex flex-shrink-0 items-center">
-					<TipexToolbar editor={tipexEditor} onSaveAndClose={handleSaveAndClose} />
+					<SimpleTiptapToolbar editor={tipexEditor} />
 				</div>
 				<div class="flex-1 overflow-hidden">
 					<Tipex

@@ -1,7 +1,14 @@
+/*
+Function utilitaires génériques pour les opérations CRUD sur les documents. Consommé par `PageBlockEditor`, `padStore` et `sitePageStore`
+- gestion d'un cache reactifs
+- chargement initial et subscription aux changements pocketbase (qui actualise le cache)
+- wrapper générique pour les methode Pocketbase
+*/
+
+import type { RecordModel } from "pocketbase";
+import { SvelteMap } from "svelte/reactivity";
 import { pb } from "../pocketbase.svelte";
 import { getSpace } from "./";
-import type { RecordModel, RealtimeService } from "pocketbase";
-import { SvelteMap } from "svelte/reactivity";
 
 const collectionData = new SvelteMap<string, RecordModel[]>();
 
@@ -34,7 +41,7 @@ export function subscribeToCollection<T extends RecordModel>(
 			isInitialized = true;
 			// console.log(`[${collection}] Cache initialized with ${initialDocs.length} documents.`);
 			callback(); // Notifier que les données initiales sont prêtes
-		} catch (error) {
+		} catch {
 			// console.error(`[${collection}] Error initializing cache:`, error);
 			collectionData.set(collection, []);
 			isInitialized = true;
@@ -131,6 +138,7 @@ export function subscribeToCollection<T extends RecordModel>(
 }
 
 // Fonction pour charger tous les documents d'une collection
+// TODO : utiliser syncState pour l'utilisation d'un cache local
 export async function loadDocuments<T extends RecordModel>(
 	collection: string,
 	options?: { sort?: string; fields?: string; expand?: string }

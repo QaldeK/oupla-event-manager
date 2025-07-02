@@ -158,6 +158,12 @@ async function loadPublicData(spaceName: string): Promise<void> {
 			}
 		}
 
+		// const fetchMenusSite = await pb.collection("site_pages").getFullList<SitePagesRecord>({
+		// 	filter: `space="${spaceId}" && componentType="navigationMenu" `,
+		// 	sort: "pos",
+		// 	fields: "id,title,section,pos,componentConfig"
+		// });
+
 		// 3. Récupérer les événements publics
 		const fetchedEvents = await pb.collection("events").getFullList<PublicEventInfo>({
 			filter: `space="${spaceId}" && isConfirmed=true && date_event>="${new Date().toISOString().split("T")[0]}"`,

@@ -1,10 +1,5 @@
 <script lang="ts">
-	import {
-		subscribeToPagesUpdates,
-		getPages,
-		createPad,
-		deletePad
-	} from "$lib/shared/sitePageStore.svelte";
+	import { subscribeToPagesUpdates, getPages, createPad, deletePad } from "../sitePageStore.svelte";
 
 	import { showAlert, modalState } from "$lib/shared/states.svelte";
 	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
@@ -221,7 +216,10 @@
 												<Trash2 size={14} />
 											</button>
 										</div>
-										<a href={`/dashboard/site_pages/${page.id}`} class="btn btn-primary btn-sm">
+										<a
+											href={`/dashboard/site_pages/pages/${page.id}`}
+											class="btn btn-primary btn-sm"
+										>
 											<Pencil size={14} />
 											Modifier
 										</a>

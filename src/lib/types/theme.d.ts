@@ -28,7 +28,6 @@ export interface PublicSiteThemeOptions {
 	components: {
 		navbarHeader: NavbarHeaderType;
 		// sideMenu: SideMenuType;
-		primaryNavLinks: { title: string; url: string }[];
 
 		[key: string]: unknown;
 	};
@@ -90,16 +89,8 @@ export function getDefaultThemeOptions(): PublicSiteThemeOptions {
 				size: "min-h-[4rem]",
 				titleClass: ["text-fluid-2xl", "font-bold"],
 				linkClass: ["text-base-content", "font-semibold"]
-			},
-			primaryNavLinks: [
-				{
-					title: "À propos",
-					url: `about`
-				},
+			}
 
-				{ title: "Nous trouver", url: "find-us" },
-				{ title: "Proposer un événement", url: `proposition` }
-			]
 			// sideMenu: {
 			// 	enabled: false,
 			// 	pos: 0,
