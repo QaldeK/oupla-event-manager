@@ -27,7 +27,6 @@ export interface DocumentStoreActions<T extends RecordModel> {
 	acquireLock: (docId: string) => Promise<T | null>;
 	releaseLock: (docId: string) => Promise<T | null>;
 	refreshLock: (docId: string) => Promise<T | null>;
-	forceAcquireLock: (docId: string) => Promise<T | null>; // Pour prendre un verrou, même expiré
 }
 
 // Options pour la création du manager

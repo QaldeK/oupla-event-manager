@@ -21,8 +21,7 @@
 		updateDoc: sitePageStore.updatePad,
 		acquireLock: sitePageStore.acquirePadLock,
 		releaseLock: sitePageStore.releasePadLock,
-		refreshLock: sitePageStore.refreshPadLock,
-		forceAcquireLock: sitePageStore.forceAcquirePadLock
+		refreshLock: sitePageStore.refreshPadLock
 	};
 </script>
 

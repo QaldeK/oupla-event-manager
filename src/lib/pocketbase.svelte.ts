@@ -703,43 +703,6 @@ export async function releaseLock<T extends RecordModel>(
 }
 
 /**
- * Force l'acquisition d'un verrou d'édition, écrasant un verrou existant.
- * À n'utiliser que lorsque le client a déjà vérifié que le verrou est expiré.
- * @param collection Nom de la collection.
- * @param recordId ID du document à verrouiller.
- * @returns Le document mis à jour avec le nouveau verrou, ou null en cas d'erreur.
- */
-// USELESS ?
-export async function forceAcquireLock<T extends RecordModel>(
-	collection: string,
-	recordId: string
-): Promise<T | null> {
-	try {
-		const userId = pb.authStore.model?.id;
-		if (!userId) {
-			throw new Error("forceAcquireLock: Utilisateur non authentifié.");
-		}
-
-		const data = {
-			isEditing: true,
-			editingUser: userId,
-			lastEditHeartbeat: new Date().toISOString()
-		};
-
-		// Pas de filtre ici, on écrase délibérément.
-		const record = await pb
-			.collection(collection)
-			.update<T>(recordId, data, { expand: "editingUser" });
-
-		console.warn(`[Lock] Verrou forcé avec succès pour ${recordId} par ${userId}.`);
-		return record;
-	} catch (error) {
-		console.error(`[Lock] Erreur lors du forçage du verrou pour ${recordId}:`, error);
-		return null;
-	}
-}
-
-/**
  * Vérifie l'état du verrou d'un document via l'API
  * Utile pour nettoyer les verrous expirés ou détecter les conflits
  * @param collection Nom de la collection

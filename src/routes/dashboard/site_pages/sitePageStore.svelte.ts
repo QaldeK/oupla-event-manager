@@ -6,13 +6,7 @@ Interface API spécifique pour la collection `site_pages` avec ses Types
 - Fournit les fonctions de verrouillage (`acquire...Lock`, `release...Lock`, `refresh...Lock`) qui seront injectées dans le moteur `documentEditManager`.
 */
 
-import {
-	acquireLock,
-	forceAcquireLock,
-	pb,
-	refreshLock,
-	releaseLock
-} from "$lib/pocketbase.svelte";
+import { acquireLock, pb, refreshLock, releaseLock } from "$lib/pocketbase.svelte";
 import {
 	createDocument,
 	deleteDocument,
@@ -111,12 +105,4 @@ export async function refreshPadLock(
 	collection: string = COLLECTION
 ): Promise<SitePagesType | null> {
 	return await refreshLock<SitePagesType>(collection, docId);
-}
-
-// Forcer l'acquisition du verrou d'édition (par exemple, s'il a expiré)
-export async function forceAcquirePadLock(
-	docId: string,
-	collection: string = COLLECTION
-): Promise<SitePagesType | null> {
-	return await forceAcquireLock<SitePagesType>(collection, docId);
 }
