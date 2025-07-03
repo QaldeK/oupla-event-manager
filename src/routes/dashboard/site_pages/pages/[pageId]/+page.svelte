@@ -10,7 +10,8 @@
 
 	const collectionName = "site_pages";
 	const basePath = "/dashboard/site_pages/pages";
-	let initialEditMode = true;
+	// @ts-expect-error: initialEditMode may be injected via load function or parent context
+	let initialEditMode = data.initialEditMode;
 
 	type SitePageType = SitePagesResponse & RecordModel;
 
@@ -25,4 +26,6 @@
 	};
 </script>
 
-<DocumentEditor {docId} {collectionName} {documentActions} {basePath} {initialEditMode} />
+<div class="container mx-auto md:p-4" style="height: calc(100dvh - 100px);">
+	<DocumentEditor {docId} {collectionName} {documentActions} {basePath} {initialEditMode} />
+</div>
