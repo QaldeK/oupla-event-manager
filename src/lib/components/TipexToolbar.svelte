@@ -119,7 +119,7 @@
 
 {#if editor}
 	<div
-		class="border-base-300 bg-base-200 flex flex-wrap items-center gap-1 rounded-t-lg border-b p-2"
+		class="border-base-300 bg-base-200 flex w-full flex-wrap items-center gap-1 rounded-t-lg border-b p-2"
 	>
 		<!-- Style -->
 		<button
@@ -152,7 +152,7 @@
 		>
 			<Quote size={18} strokeWidth={2.5} />
 		</button>
-		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 		<!-- Titres -->
 		<button
 			title="Titre 2"
@@ -176,7 +176,7 @@
 			<Heading4 size={18} strokeWidth={2.5} />
 		</button>
 
-		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 
 		<!-- Blocs -->
 		<button
@@ -255,7 +255,7 @@
 				</li>
 			</ul>
 		</div> -->
-		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 
 		<button title="Ligne horizontale" class={btnClass} onclick={setHorizontalRule}>
 			<Minus size={18} strokeWidth={2.5} />
@@ -268,7 +268,7 @@
 			<LinkIcon size={18} strokeWidth={2.5} />
 		</button>
 
-		<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
+		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 
 		<!-- Historique -->
 		<button title="Annuler" class={btnClass} onclick={undo}>
@@ -279,15 +279,19 @@
 		</button>
 
 		{#if onSaveAndClose}
-			<div class="divider divider-vertical m-0 self-center text-gray-400">|</div>
+			<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 			<!-- Bouton Enregistrer et Fermer -->
 			<button
 				title="Enregistrer les modifications et passer en mode lecture"
-				class="btn btn-primary btn-sm"
+				class="btn btn-primary btn-sm ms-auto"
 				onclick={onSaveAndClose}
 				disabled={isLoading || isSaving}
 			>
-				<Save size={16} />
+				{#if isSaving}
+					<span class="loading"></span>
+				{:else}
+					<Save size={16} />
+				{/if}
 				<span class="hidden sm:inline">Enregistrer</span>
 			</button>
 		{/if}
