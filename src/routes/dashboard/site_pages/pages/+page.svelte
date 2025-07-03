@@ -3,11 +3,12 @@
 
 	import { showAlert, modalState } from "$lib/shared/states.svelte";
 	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
-	import { format } from "date-fns";
-	import { fr } from "date-fns/locale";
 	import { goto } from "$app/navigation";
+	import { persistedState } from "$lib/utils/local-state.svelte.js";
 
-	import { AlertCircle, Trash2, Pencil, Plus, ArrowLeft, FileText } from "lucide-svelte";
+	import { PagesList, ViewModeToggle } from "../components/index.js";
+	import { isMobile } from "$lib/utils";
+	import { AlertCircle, Plus, ArrowLeft, FileText } from "lucide-svelte";
 	import { fade } from "svelte/transition";
 
 	let isLoading = $state(true);
@@ -15,7 +16,37 @@
 	let isCreating = $state(false);
 	let error = $state<string | null>(null);
 
+	// Mode d'affichage persisté dans le localStorage
+	const viewModeStore = persistedState<"cards" | "list">("pages-view-mode", "cards");
+	let viewMode = $derived(isMobile.current ? "cards" : viewModeStore.value);
+
 	let pages = $derived.by(() => getPages());
+
+	const deletePage = (id: string) => {
+		modalState.confirm = {
+			isOpen: true,
+			data: {
+				title: "Supprimer la page",
+				message: "Êtes vous sûr de vouloir supprimer cette page ? Cette action est définitive",
+				variant: "warning",
+				onConfirm: async () => {
+					console.log("try to delete", id);
+					try {
+						await deletePad(id);
+						modalState.confirm.isOpen = false;
+						showAlert("Page supprimée", "success");
+					} catch (e) {
+						showAlert(`Erreur lors de la suppression (${e})`, "error");
+						modalState.confirm.isOpen = false;
+					}
+				}
+			}
+		};
+	};
+
+	function handleViewModeChange(mode: "cards" | "list") {
+		viewModeStore.value = mode;
+	}
 
 	// Filtrer uniquement les pages générales
 	let generalPages = $derived.by(() => {
@@ -62,32 +93,6 @@
 		}
 	}
 
-	const deletePage = (id: string) => {
-		modalState.confirm = {
-			isOpen: true,
-			data: {
-				title: "Supprimer la page",
-				message: "Êtes vous sûr de vouloir supprimer cette page ? Cette action est définitive",
-				variant: "warning",
-				onConfirm: async () => {
-					console.log("try to delete", id);
-					try {
-						await deletePad(id);
-						modalState.confirm.isOpen = false;
-						showAlert("Page supprimée", "success");
-					} catch (e) {
-						showAlert(`Erreur lors de la suppression (${e})`, "error");
-						modalState.confirm.isOpen = false;
-					}
-				}
-			}
-		};
-	};
-
-	function formatDate(dateString: string) {
-		return format(new Date(dateString), "dd MMMM yyyy à HH:mm", { locale: fr });
-	}
-
 	function navigateBack() {
 		goto("/dashboard/site_pages");
 	}
@@ -109,8 +114,8 @@
 
 	<div class="mb-8">
 		<p class="text-base-content/70 text-lg">
-			Créez et gérez vos pages de contenu statique : À propos, Contact, Conditions d'utilisation,
-			etc. Ces pages apparaîtront sur votre site public.
+			Créez et gérez vos pages de contenu statique : À propos, Contact, etc. Ces pages apparaîtront
+			sur votre site public.
 		</p>
 	</div>
 
@@ -124,10 +129,10 @@
 	<!-- Formulaire de création -->
 	<div class="card bg-base-200 mb-8 shadow-md">
 		<div class="card-body">
-			<h2 class="card-title mb-4 text-xl">
+			<div class="card-title text-fluid-lg mb-4">
 				<Plus size={20} />
 				Créer une nouvelle page
-			</h2>
+			</div>
 			<div class="flex flex-col gap-4 sm:flex-row">
 				<div class="form-control flex-1">
 					<label class="label" for="pageTitle">
@@ -143,9 +148,9 @@
 						disabled={isCreating}
 					/>
 				</div>
-				<div class="form-control">
+				<div class="form-control self-end">
 					<label class="label" for="createBtn">
-						<span class="label-text opacity-0">Action</span>
+						<span class="label-text sr-only">Créer la page</span>
 					</label>
 					<button
 						id="createBtn"
@@ -169,67 +174,23 @@
 	<!-- Liste des pages -->
 	<div class="card bg-base-100 shadow-md">
 		<div class="card-body">
-			<h2 class="card-title mb-4 text-xl">Pages existantes</h2>
+			<div class="mb-4 flex items-center justify-between">
+				<div class="card-title text-xl">Pages existantes</div>
+				<span class="not-sm:hidden">
+					<ViewModeToggle currentMode={viewMode} onModeChange={handleViewModeChange} /></span
+				>
+			</div>
 
-			{#if isLoading}
-				<div class="flex justify-center py-12">
-					<span class="loading loading-dots loading-lg"></span>
-				</div>
-			{:else if generalPages.length === 0}
-				<div class="py-12 text-center">
-					<div class="mb-4">
-						<FileText class="text-base-content/30 mx-auto h-16 w-16" />
-					</div>
-					<p class="text-base-content/70 text-lg">Aucune page générale trouvée</p>
-					<p class="text-base-content/50 mt-2 text-sm">
-						Commencez par créer votre première page avec le formulaire ci-dessus.
-					</p>
-				</div>
-			{:else}
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{#each generalPages as page (page.id)}
-						{#key page.updated}
-							<div
-								class="card bg-base-200 shadow-sm transition-all duration-300 ease-in-out hover:shadow-md"
-							>
-								<div class="card-body p-4">
-									<h3 class="card-title truncate text-lg" title={page.title}>
-										{page.title}
-									</h3>
-
-									<div class="mt-2 space-y-1">
-										<p class="text-base-content/60 text-xs">
-											Créé le {formatDate(page.created as string)}
-										</p>
-										<p class="text-base-content/60 text-xs">
-											Modifié le {formatDate(page.updated as string)}
-										</p>
-									</div>
-
-									<div class="card-actions mt-4 justify-between">
-										<div class="flex gap-2">
-											<button
-												class="btn btn-error btn-sm btn-outline"
-												onclick={() => deletePage(page.id)}
-												title="Supprimer la page"
-											>
-												<Trash2 size={14} />
-											</button>
-										</div>
-										<a
-											href={`/dashboard/site_pages/pages/${page.id}`}
-											class="btn btn-primary btn-sm"
-										>
-											<Pencil size={14} />
-											Modifier
-										</a>
-									</div>
-								</div>
-							</div>
-						{/key}
-					{/each}
-				</div>
-			{/if}
+			<PagesList
+				pages={generalPages}
+				{isLoading}
+				displayMode={viewMode}
+				onDelete={deletePage}
+				editBaseUrl="/dashboard/site_pages/pages"
+				viewBaseUrl="/dashboard/site_pages/pages"
+				emptyStateTitle="Aucune page générale trouvée"
+				emptyStateDescription="Commencez par créer votre première page avec le formulaire ci-dessus."
+			/>
 		</div>
 	</div>
 
@@ -239,12 +200,10 @@
 			<div class="card-body p-4">
 				<h3 class="text-info mb-2 font-semibold">💡 Conseils pour vos pages</h3>
 				<ul class="text-base-content/70 space-y-1 text-sm">
-					<li>• Créez des pages essentielles : À propos, Contact, Mentions légales</li>
+					<li>• Créez des pages essentielles : À propos, Contact, Nous trouver</li>
 					<li>• Utilisez des titres clairs et descriptifs</li>
 					<li>• Les pages seront accessibles via l'URL de votre site public</li>
-					<li>
-						• Vous pourrez ajouter ces pages au menu principal depuis la section "Organisation"
-					</li>
+					<li>• Vous pourrez ajouter ces pages à des menus depuis la section "Template"</li>
 				</ul>
 			</div>
 		</div>
