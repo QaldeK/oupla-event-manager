@@ -1,4 +1,9 @@
 <script lang="ts">
+	/* TODO:
+  - le btn goback doit alerté si il y a des changement non enregistré
+  - le btn "enregistré" ne ferme pas forcément l'édition
+  */
+
 	import type { TipexEditor } from "@friendofsvelte/tipex";
 	import { Tipex, defaultExtensions } from "@friendofsvelte/tipex";
 	import { formatDistanceToNow } from "date-fns";
@@ -16,7 +21,7 @@
 	import "@friendofsvelte/tipex/styles/EditLink.css";
 	import "@friendofsvelte/tipex/styles/ProseMirror.css";
 	import "@friendofsvelte/tipex/styles/Tipex.css";
-	import { Eye, SquareArrowLeft, X } from "lucide-svelte";
+	import { Eye, SquareArrowLeft } from "lucide-svelte";
 	import { onDestroy } from "svelte";
 	import type { RecordModel } from "pocketbase";
 
@@ -54,7 +59,7 @@
 	let tipexEditor: TipexEditor | undefined = $state();
 
 	// --- Store d'Édition ---
-	const editableDocStore = createDocumentEditManager<EditableDocument>({
+	const docActions = createDocumentEditManager<EditableDocument>({
 		docId,
 		collectionName,
 		actions: documentActions,
@@ -64,16 +69,16 @@
 	});
 
 	// --- Variables Réactives Dérivées ---
-	let doc = $derived(editableDocStore.doc);
-	let isLoading = $derived(editableDocStore.isLoading);
-	let isEditing = $derived(editableDocStore.isEditing);
-	let isSaving = $derived(editableDocStore.isSaving);
-	let isLockedByOther = $derived(editableDocStore.isLockedByOther);
-	let isCheckingHeartbeat = $derived(editableDocStore.isCheckingHeartbeat); // Nouvel état d'attente
-	let editorUsername = $derived(editableDocStore.editorUsername);
-	let lockStatusMessage = $derived(editableDocStore.lockStatusMessage);
-	let error = $derived(editableDocStore.error);
-	let lastActivity = $derived(editableDocStore.lastActivity);
+	let doc = $derived(docActions.doc);
+	let isLoading = $derived(docActions.isLoading);
+	let isEditing = $derived(docActions.isEditing);
+	let isSaving = $derived(docActions.isSaving);
+	let isLockedByOther = $derived(docActions.isLockedByOther);
+	let isCheckingHeartbeat = $derived(docActions.isCheckingHeartbeat); // Nouvel état d'attente
+	let editorUsername = $derived(docActions.editorUsername);
+	let lockStatusMessage = $derived(docActions.lockStatusMessage);
+	let error = $derived(docActions.error);
+	let lastActivity = $derived(docActions.lastActivity);
 
 	// Durée d'inactivité avant libération auto du verrou (10 minutes)
 	const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
@@ -81,16 +86,16 @@
 	// --- Fonctions d'Interaction UI ---
 	function handleTitleInput(event: Event) {
 		const target = event.target as HTMLInputElement;
-		editableDocStore.updateField("title", target.value);
+		docActions.updateField("title", target.value);
 	}
 
 	function handleEditorUpdate() {
-		editableDocStore.updateField("content", tipexEditor?.getHTML() ?? "");
+		docActions.updateField("content", tipexEditor?.getHTML() ?? "");
 	}
 
-	async function saveAndClose() {
+	async function save() {
 		if (!isEditing) return;
-		await editableDocStore.stopEditing(true); // true = save first
+		await docActions.saveChanges();
 	}
 
 	// --- Cycle de Vie ---
@@ -113,8 +118,22 @@
 	});
 
 	onDestroy(() => {
-		editableDocStore.dispose();
+		docActions.dispose();
 	});
+
+	function goback() {
+		if (docActions.hasChange) {
+			if (
+				window.confirm(
+					"Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter ?"
+				)
+			) {
+				goto(basePath);
+			}
+		} else {
+			goto(basePath);
+		}
+	}
 </script>
 
 <!-- SNIPPETS RÉUTILISABLES -->
@@ -127,16 +146,6 @@
 		{:else if isSaving}
 			<span class="loading loading-spinner loading-xs"></span>
 			<span class="text-base-content/70 text-xs">Enreg...</span>
-			<!-- {:else if isCheckingHeartbeat}
-			<span class="loading loading-spinner loading-xs"></span>
-			<span class="text-base-content/70 text-xs">Attente du verrou...</span>
-			<button
-				class="btn btn-ghost btn-circle btn-xs"
-				onclick={editableDocStore.cancelWaitingForLock}
-				aria-label="Annuler l'attente du verrou"
-			>
-				<X size={16} />
-			</button> -->
 		{:else if isLockedByOther}
 			<div
 				class="text-content-warning bg-warning/40 flex flex-wrap items-center gap-2 rounded-xl px-4 py-1 text-sm"
@@ -145,6 +154,8 @@
 				<Info size={14} />
 				<span> {lockStatusMessage}</span>
 			</div>
+		{:else if !docActions.hasChange}
+			<span class="text-base-content/70 text-xs">Document enregistré</span>
 		{/if}
 	</div>
 {/snippet}
@@ -157,7 +168,7 @@
 				class="tab"
 				class:tab-active={!isEditing}
 				onclick={() => {
-					if (isEditing) editableDocStore.stopEditing(true);
+					if (isEditing) docActions.stopEditing(true);
 				}}
 				disabled={isLoading || isSaving}
 				aria-selected={!isEditing}
@@ -171,7 +182,7 @@
 				class="tab"
 				class:tab-active={isEditing}
 				onclick={() => {
-					if (!isEditing) editableDocStore.startEditing();
+					if (!isEditing) docActions.startEditing();
 				}}
 				disabled={isLoading || isSaving || isCheckingHeartbeat}
 				aria-selected={isEditing}
@@ -193,9 +204,9 @@
 	aria-label="Éditeur de document"
 >
 	<!-- En-tête -->
-	<div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+	<div class="mb-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between md:mb-4">
 		<div class="flex items-center justify-between gap-4 sm:justify-start">
-			<button onclick={() => goto(basePath)} class="btn btn-square" aria-label="Retour à la liste">
+			<button onclick={goback} class="btn btn-square" aria-label="Retour à la liste">
 				<SquareArrowLeft size={24} />
 			</button>
 			{@render modeTabs("sm:hidden")}
@@ -206,7 +217,7 @@
 				{#if isEditing}
 					<input
 						type="text"
-						class="input input-bordered text-fluid-lg w-full max-w-md font-bold"
+						class="input input-bordered text-fluid-lg not-md:input-sm w-full max-w-md font-bold"
 						placeholder="Titre du document"
 						value={doc?.title ?? ""}
 						oninput={handleTitleInput}
@@ -229,7 +240,7 @@
 		<div role="alert" class="alert alert-error mb-4">
 			<Info size={24} />
 			<span>{error}</span>
-			<button class="btn btn-sm" onclick={editableDocStore.clearError}>Fermer</button>
+			<button class="btn btn-sm" onclick={docActions.clearError}>Fermer</button>
 		</div>
 	{/if}
 
@@ -265,7 +276,7 @@
 		{:else if isEditing}
 			<!-- Mode Édition -->
 			<div class="bg-base-200 flex flex-shrink-0 items-center">
-				<TipexToolbar editor={tipexEditor} onSaveAndClose={saveAndClose} {isSaving} {isLoading} />
+				<TipexToolbar editor={tipexEditor} onSaveAndClose={save} {isSaving} {isLoading} />
 			</div>
 			<div class="flex-1 overflow-hidden">
 				<Tipex

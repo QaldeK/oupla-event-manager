@@ -227,7 +227,7 @@ export function createDocumentEditManager<T extends RecordModel>(
 				const refreshedPad = await actions.refreshLock(docId);
 				if (refreshedPad && refreshedPad.editingUser === currentUserId) {
 					lastSuccess = Date.now();
-					state.doc = refreshedPad;
+					// state.doc = refreshedPad; // XXX : y a deja le subscribe...
 					resetInactivityTimerInternal();
 				} else {
 					if (refreshedPad) updateLockStatusInternal(refreshedPad);
@@ -236,6 +236,7 @@ export function createDocumentEditManager<T extends RecordModel>(
 			} catch (e) {
 				if (Date.now() - lastSuccess > HEARTBEAT_INTERVAL_MS * 2) {
 					forceStopEditingInternal("Connexion perdue. Mode lecture forcé.");
+					console.error("Erreur  de connexion, fermeture de l'édition", e);
 				}
 			}
 		};
@@ -270,7 +271,7 @@ export function createDocumentEditManager<T extends RecordModel>(
 		if (!state.doc || state.isEditing) return;
 
 		try {
-			const releasedDoc = await actions.releaseLock(docId);
+			await actions.releaseLock(docId);
 			cancelCheckForHeartbeat();
 		} catch (e) {
 			if (e instanceof ClientResponseError && e.isAbort) {
@@ -336,24 +337,30 @@ export function createDocumentEditManager<T extends RecordModel>(
 		}
 	}
 
-	async function saveChanges(force = false): Promise<void> {
+	function modification() {
 		if (!state.isEditing || !state.doc || state.isSaving) return;
-
 		const dataToSave: Partial<T> = {};
-		let hasChanges = false;
+
 		for (const field of fieldsToSave) {
 			if (state.doc[field] !== lastSavedDoc?.[field]) {
 				dataToSave[field] = state.doc[field];
-				hasChanges = true;
 			}
 		}
+		if (Object.keys(dataToSave).length > 0) return dataToSave;
+		else return null;
+	}
 
-		if (!hasChanges && !force) return;
-		if (force && !hasChanges) return;
+	async function saveChanges(force = false): Promise<void> {
+		if (!state.isEditing || !state.doc || state.isSaving) return;
+
+		const dataToSave = modification();
+		console.log(dataToSave);
+		if (!dataToSave && !force) return;
+		if (force && !dataToSave) return;
 
 		state.isSaving = true;
 		try {
-			const updatedDoc = await actions.updateDoc(docId, dataToSave);
+			const updatedDoc = await actions.updateDoc(docId, dataToSave!);
 			state.doc = updatedDoc;
 			lastSavedDoc = { ...state.doc };
 		} catch (e: any) {
@@ -455,6 +462,10 @@ export function createDocumentEditManager<T extends RecordModel>(
 		get lastActivity() {
 			return state.lastActivity;
 		},
+		get hasChange() {
+			const change = modification();
+			return change && Object.keys(change).length > 0;
+		},
 		startEditing,
 		stopEditing,
 		saveChanges,
@@ -462,7 +473,6 @@ export function createDocumentEditManager<T extends RecordModel>(
 		dispose,
 		clearError: () => {
 			state.error = null;
-		},
-		cancelWaitingForLock: cancelCheckForHeartbeat
+		}
 	};
 }
