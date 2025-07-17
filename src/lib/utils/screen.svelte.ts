@@ -72,7 +72,7 @@ export const screenDetector = {
 	 * Mode desktop (>= md breakpoint, soit 768px+)
 	 */
 	get isDesktop() {
-		return this.width >= BREAKPOINTS.md;
+		return this.width >= BREAKPOINTS.lg;
 	},
 
 	/**
