@@ -36,6 +36,11 @@
 		// Applique le lien
 		editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
 	};
+
+	const toogleBold = () => {
+		if (!editor) return;
+		editor.commands.toogleBold();
+	};
 </script>
 
 {#if editor}
@@ -46,7 +51,7 @@
 			type="button"
 			title="Gras"
 			class="{btnClass} {editor.isActive('bold') ? activeClass : ''}"
-			onclick={() => editor?.chain().focus().toggleBold().run()}
+			onclick={toogleBold}
 		>
 			<Bold size={18} strokeWidth={2.5} />
 		</button>

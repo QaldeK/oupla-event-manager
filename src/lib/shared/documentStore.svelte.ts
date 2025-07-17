@@ -141,14 +141,17 @@ export function subscribeToCollection<T extends RecordModel>(
 // TODO : utiliser syncState pour l'utilisation d'un cache local
 export async function loadDocuments<T extends RecordModel>(
 	collection: string,
-	options?: { sort?: string; fields?: string; expand?: string }
+	options?: { sort?: string; fields?: string; expand?: string; filter?: string }
 ): Promise<T[]> {
 	try {
 		console.log(`Début du chargement des documents de ${collection}...`);
 		console.log(`Filter utilisé: space = '${getSpace.id}'`);
+		const baseFilter = `space = '${getSpace.id}'`;
+		const finalFilter = options?.filter ? `${baseFilter} && ${options.filter}` : baseFilter;
+
 		const documents = await pb.collection(collection).getFullList<T>({
 			sort: `${options?.sort ?? "-created"}`,
-			filter: `space = '${getSpace.id}'`,
+			filter: finalFilter,
 			fields: `${options?.fields ?? undefined}`
 		});
 

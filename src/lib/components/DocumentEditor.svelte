@@ -1,7 +1,7 @@
 <script lang="ts">
 	/* TODO:
   - le btn goback doit alerté si il y a des changement non enregistré
-  - le btn "enregistré" ne ferme pas forcément l'édition
+  - le btn "enregistrer" ne ferme pas forcément l'édition
   */
 
 	import type { TipexEditor } from "@friendofsvelte/tipex";
@@ -18,9 +18,8 @@
 	import Pencil from "lucide-svelte/icons/pencil";
 
 	import { goto } from "$app/navigation";
-	import "@friendofsvelte/tipex/styles/EditLink.css";
-	import "@friendofsvelte/tipex/styles/ProseMirror.css";
-	import "@friendofsvelte/tipex/styles/Tipex.css";
+	import "@friendofsvelte/tipex/styles/index.css";
+
 	import { Eye, SquareArrowLeft } from "lucide-svelte";
 	import { onDestroy } from "svelte";
 	import type { RecordModel } from "pocketbase";
@@ -34,6 +33,7 @@
 			isEditing?: boolean;
 			editingUser?: string | null;
 			lastEditHeartbeat?: string;
+			lastMod?: string;
 		};
 
 	// --- Props du Composant ---
@@ -244,28 +244,6 @@
 		</div>
 	{/if}
 
-	<div class="flex flex-wrap items-center justify-between">
-		<div class="py-1">{@render statusIndicator()}</div>
-		<!-- Informations de date -->
-		{#if doc?.created || doc?.updated}
-			<div class="bg-base-100/80 text-base-content/60 ml-auto rounded-lg px-2 py-1 text-xs">
-				{#if doc.created}
-					<span title="Date de création : {new Date(doc.created).toLocaleString('fr-FR')}">
-						Créé le {new Date(doc.created).toLocaleDateString("fr-FR")}
-					</span>
-				{/if}
-				{#if doc.updated}
-					<span
-						class="ml-2"
-						title="Dernière modification : {new Date(doc.updated).toLocaleString('fr-FR')}"
-					>
-						Modifié {formatDistanceToNow(new Date(doc.updated), { addSuffix: true, locale: fr })}
-					</span>
-				{/if}
-			</div>
-		{/if}
-	</div>
-
 	<!-- Conteneur principal (Éditeur ou Lecteur) -->
 	<div class="bg-base-100 flex h-full flex-col rounded-lg border shadow-md">
 		{#if isLoading && !doc}
@@ -275,20 +253,63 @@
 			</div>
 		{:else if isEditing}
 			<!-- Mode Édition -->
-			<div class="bg-base-200 flex flex-shrink-0 items-center">
-				<TipexToolbar editor={tipexEditor} onSaveAndClose={save} {isSaving} {isLoading} />
-			</div>
 			<div class="flex-1 overflow-hidden">
 				<Tipex
 					bind:tipex={tipexEditor}
 					extensions={[...defaultExtensions]}
-					controls={false}
 					class="h-full"
 					floating={false}
 					focal={false}
 					body={doc?.content ?? ""}
 					onupdate={handleEditorUpdate}
-				/>
+				>
+					{#snippet head(tipexEditor)}
+						<div class="bg-base-200 flex flex-shrink-0 items-center">
+							<TipexToolbar editor={tipexEditor} onSaveAndClose={save} {isSaving} {isLoading} />
+						</div>
+					{/snippet}
+					<!-- Just for put control at top -->
+					{#snippet controlComponent()}{/snippet}
+					{#snippet foot()}
+						<div
+							class="text-base-content/60 flex flex-wrap items-center justify-between border-t px-2 py-1 text-xs"
+						>
+							{#key lastActivity}
+								{@const remainingMinutes = Math.max(
+									0,
+									Math.round((INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity)) / 60000)
+								)}
+								Vous serez déconnecté de l'édition après {remainingMinutes} minutes d'inactivité.
+							{/key}
+							<!-- <div class="py-1">{@render statusIndicator()}</div> -->
+							<!-- Informations de date -->
+							{#if doc?.created || doc?.lastMod}
+								<div class="ml-auto">
+									{#if doc.created}
+										<span
+											title="Date de création : {new Date(doc.created).toLocaleString('fr-FR')}"
+										>
+											Créé le {new Date(doc.created).toLocaleDateString("fr-FR")}
+										</span>
+									{/if}
+									{#if doc.lastMod}
+										<span
+											class="ml-2"
+											title="Dernière modification : {new Date(doc.lastMod).toLocaleString(
+												'fr-FR'
+											)}"
+										>
+											Modifié {formatDistanceToNow(new Date(doc.lastMod), {
+												addSuffix: true,
+												locale: fr
+											})}
+										</span>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					{/snippet}
+				</Tipex>
 			</div>
 		{:else}
 			<!-- Mode Lecture -->
@@ -299,19 +320,6 @@
 			</div>
 		{/if}
 	</div>
-
-	<!-- Informations sur l'inactivité -->
-	{#if isEditing}
-		<div class="mt-2 text-xs text-gray-500">
-			{#key lastActivity}
-				{@const remainingMinutes = Math.max(
-					0,
-					Math.round((INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity)) / 60000)
-				)}
-				Vous serez déconnecté de l'édition après {remainingMinutes} minutes d'inactivité.
-			{/key}
-		</div>
-	{/if}
 </div>
 
 <style>

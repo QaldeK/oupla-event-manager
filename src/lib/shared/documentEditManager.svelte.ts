@@ -354,13 +354,18 @@ export function createDocumentEditManager<T extends RecordModel>(
 		if (!state.isEditing || !state.doc || state.isSaving) return;
 
 		const dataToSave = modification();
-		console.log(dataToSave);
+		// console.log(dataToSave);
 		if (!dataToSave && !force) return;
 		if (force && !dataToSave) return;
 
 		state.isSaving = true;
 		try {
-			const updatedDoc = await actions.updateDoc(docId, dataToSave!);
+			// Ajouter le champ lastMod pour marquer la dernière modification réelle
+			const dataWithLastMod = {
+				...dataToSave,
+				lastMod: new Date().toISOString()
+			};
+			const updatedDoc = await actions.updateDoc(docId, dataWithLastMod as unknown as Partial<T>);
 			state.doc = updatedDoc;
 			lastSavedDoc = { ...state.doc };
 		} catch (e: any) {

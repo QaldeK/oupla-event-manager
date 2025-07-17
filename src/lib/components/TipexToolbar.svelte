@@ -30,33 +30,33 @@
 		editor?.chain().focus().toggleBold().run();
 	};
 	const toggleItalic = () => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().toggleItalic().run();
 	};
 	const setHeading = (level: 1 | 2 | 3 | 4) => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().toggleHeading({ level }).run();
 	};
 	const setParagraph = () => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().setParagraph().run();
 	};
 	// const setTextAlign = (align: 'left' | 'center' | 'right' /* | 'justify' */) =>
 	// 	editor?.chain().focus().setTextAlign(align).run();
 	const toggleBulletList = () => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().toggleBulletList().run();
 	};
 	const toggleBlockquote = () => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().toggleBlockquote().run();
 	};
 	const setHorizontalRule = () => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().setHorizontalRule().run();
 	};
 	const toggleOrderedList = () => {
-		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		// @ts-expect-error - ...
 		editor?.chain().focus().toggleOrderedList().run();
 	};
 	// const alignLeft = () => editor?.chain().focus().setTextAlign('left').run();
@@ -89,7 +89,7 @@
 
 		// Si le curseur est déjà sur un lien, on le supprime
 		if (editor.isActive("link")) {
-			// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+			// @ts-expect-error ...
 			editor.chain().focus().unsetLink().run();
 			return;
 		}
@@ -103,24 +103,24 @@
 		}
 		// Si l'URL est vide, on supprime le lien potentiel (au cas où)
 		if (url === "") {
+			// @ts-expect-error ...
 			editor.chain().focus().extendMarkRange("link").unsetLink().run();
 			return;
 		}
 
 		// Applique le lien
+		// @ts-expect-error ...
 		editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
 	};
 
 	// --- Styles des boutons ---
 	// Utilise les classes DaisyUI/Tailwind pour un style simple
-	const btnClass = "btn btn-sm btn-ghost p-1 hover:bg-base-200";
+	const btnClass = "btn btn-square btn-sm p-1 ";
 	const activeClass = "bg-base-300"; // Classe pour bouton actif
 </script>
 
 {#if editor}
-	<div
-		class="border-base-300 bg-base-200 flex w-full flex-wrap items-center gap-1 rounded-t-lg border-b p-2"
-	>
+	<div class="flex w-full flex-wrap items-center gap-2 rounded-t-lg border-b p-2">
 		<!-- Style -->
 		<button
 			title="Gras"
@@ -137,46 +137,96 @@
 			<Italic size={18} strokeWidth={2.5} />
 		</button>
 
-		<!-- Styles de Texte -->
-		<button
-			title="Paragraphe"
-			class="{btnClass} {editor.isActive('paragraph') ? activeClass : ''}"
-			onclick={setParagraph}
-		>
-			<Pilcrow size={18} strokeWidth={2.5} />
-		</button>
-		<button
-			title="Citation"
-			class="{btnClass} {editor.isActive('blockquote') ? activeClass : ''}"
-			onclick={toggleBlockquote}
-		>
-			<Quote size={18} strokeWidth={2.5} />
-		</button>
-		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
-		<!-- Titres -->
-		<button
-			title="Titre 2"
-			class="{btnClass} {editor.isActive('heading', { level: 2 }) ? activeClass : ''}"
-			onclick={() => setHeading(2)}
-		>
-			<Heading2 size={18} strokeWidth={2.5} />
-		</button>
-		<button
-			title="Titre 3"
-			class="{btnClass} {editor.isActive('heading', { level: 3 }) ? activeClass : ''}"
-			onclick={() => setHeading(3)}
-		>
-			<Heading3 size={18} strokeWidth={2.5} />
-		</button>
-		<button
-			title="Titre 4"
-			class="{btnClass} {editor.isActive('heading', { level: 4 }) ? activeClass : ''}"
-			onclick={() => setHeading(4)}
-		>
-			<Heading4 size={18} strokeWidth={2.5} />
-		</button>
-
-		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
+		<div class="dropdown dropdown-hover rounded-lg border">
+			<label class="btn btn-sm btn-soft flex cursor-pointer items-center gap-1">
+				<!-- Show current heading/paragraph icon or default -->
+				{#if editor.isActive("paragraph")}
+					<Pilcrow size={18} strokeWidth={2.5} />
+					<span class="hidden sm:inline">Paragraphe</span>
+				{:else if editor.isActive("blockquote")}
+					<Quote size={18} strokeWidth={2.5} />
+					<span class="hidden sm:inline">Citation</span>
+				{:else if editor.isActive("heading", { level: 2 })}
+					<Heading2 size={18} strokeWidth={2.5} />
+					<span class="hidden sm:inline">Titre 2</span>
+				{:else if editor.isActive("heading", { level: 3 })}
+					<Heading3 size={18} strokeWidth={2.5} />
+					<span class="hidden sm:inline">Titre 3</span>
+				{:else if editor.isActive("heading", { level: 4 })}
+					<Heading4 size={18} strokeWidth={2.5} />
+					<span class="hidden sm:inline">Titre 4</span>
+				{:else}
+					<span class="hidden sm:inline">Titre/Paragraphe</span>
+				{/if}
+				<svg class="ml-1 h-3 w-3 opacity-60" viewBox="0 0 20 20" fill="none"
+					><path
+						d="M6 8l4 4 4-4"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/></svg
+				>
+			</label>
+			<ul class="dropdown-content menu bg-base-200 rounded-box z-[1] w-36 p-2 shadow">
+				<li>
+					<button
+						title="Paragraphe"
+						class="flex w-full items-center {editor.isActive('paragraph') ? activeClass : ''}"
+						onclick={setParagraph}
+					>
+						<Pilcrow size={16} strokeWidth={2.5} />
+						<span class="ml-2">Paragraphe</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Citation"
+						class="flex w-full items-center {editor.isActive('blockquote') ? activeClass : ''}"
+						onclick={toggleBlockquote}
+					>
+						<Quote size={18} strokeWidth={2.5} />
+						<span class="ml-2">Citation</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Titre 2"
+						class="flex w-full items-center {editor.isActive('heading', { level: 2 })
+							? activeClass
+							: ''}"
+						onclick={() => setHeading(2)}
+					>
+						<Heading2 size={16} strokeWidth={2.5} />
+						<span class="ml-2">Titre 2</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Titre 3"
+						class="flex w-full items-center {editor.isActive('heading', { level: 3 })
+							? activeClass
+							: ''}"
+						onclick={() => setHeading(3)}
+					>
+						<Heading3 size={16} strokeWidth={2.5} />
+						<span class="ml-2">Titre 3</span>
+					</button>
+				</li>
+				<li>
+					<button
+						title="Titre 4"
+						class="flex w-full items-center {editor.isActive('heading', { level: 4 })
+							? activeClass
+							: ''}"
+						onclick={() => setHeading(4)}
+					>
+						<Heading4 size={16} strokeWidth={2.5} />
+						<span class="ml-2">Titre 4</span>
+					</button>
+				</li>
+			</ul>
+		</div>
 
 		<!-- Blocs -->
 		<button
@@ -255,7 +305,6 @@
 				</li>
 			</ul>
 		</div> -->
-		<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 
 		<button title="Ligne horizontale" class={btnClass} onclick={setHorizontalRule}>
 			<Minus size={18} strokeWidth={2.5} />
@@ -279,7 +328,6 @@
 		</button>
 
 		{#if onSaveAndClose}
-			<div class="divider divider-vertical m-0 self-center text-gray-400 not-md:hidden">|</div>
 			<!-- Bouton Enregistrer et Fermer -->
 			<button
 				title="Enregistrer les modifications et passer en mode lecture"
