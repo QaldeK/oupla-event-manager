@@ -38,15 +38,10 @@
 	--border: 1px;
 	--depth: 0;
 	--noise: 0;
-}
 
-@tailwind utilities;
-
-/* Variables shadcn-svelte basées sur les couleurs DaisyUI */
-:root {
 	--radius: 0.5rem;
 
-	/* Utilisation des couleurs DaisyUI pour shadcn-svelte */
+	/* Variables shadcn-svelte basées sur les couleurs DaisyUI */
 	--background: var(--color-base-100);
 	--foreground: var(--color-base-content);
 	--card: var(--color-base-100);
@@ -63,9 +58,13 @@
 	--accent-foreground: var(--color-accent-content);
 	--destructive: var(--color-error);
 	--destructive-foreground: var(--color-error-content);
-	--border: var(--color-base-300);
-	--input: var(--color-base-300);
-	--ring: var(--color-primary);
+
+	/* --- NOS VARIABLES MÉDIATRICES ---
+	  conflit sur border: daysi attent une epaisseur et shadcn une couleur...
+	*/
+	--border-shadcn: var(--color-base-300); /* Couleur pour Shadcn */
+	--input-shadcn: var(--color-base-300); /* Couleur pour Shadcn */
+	--ring-shadcn: var(--color-primary); /* Couleur pour Shadcn */
 
 	/* Variables pour les graphiques */
 	--chart-1: var(--color-primary);
@@ -76,26 +75,29 @@
 }
 
 @theme {
-	/* Ajout des couleurs shadcn-svelte au système Tailwind */
+	/* Permet d'utiliser bg-background, text-foreground, etc. */
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
 	--color-card-foreground: var(--card-foreground);
 	--color-popover: var(--popover);
 	--color-popover-foreground: var(--popover-foreground);
+
+	/* Renommer ici est important pour éviter les conflits avec les couleurs primaires/secondaires de DaisyUI */
 	--color-primary-shadcn: var(--primary);
 	--color-primary-foreground-shadcn: var(--primary-foreground);
 	--color-secondary-shadcn: var(--secondary);
 	--color-secondary-foreground-shadcn: var(--secondary-foreground);
+
 	--color-muted: var(--muted);
 	--color-muted-foreground: var(--muted-foreground);
 	--color-accent-shadcn: var(--accent);
 	--color-accent-foreground-shadcn: var(--accent-foreground);
 	--color-destructive: var(--destructive);
 	--color-destructive-foreground: var(--destructive-foreground);
-	--color-border: var(--border);
-	--color-input: var(--input);
-	--color-ring: var(--ring);
+	--color-border: var(--border-shadcn);
+	--color-input: var(--input-shadcn);
+	--color-ring: var(--ring-shadcn);
 	--color-chart-1: var(--chart-1);
 	--color-chart-2: var(--chart-2);
 	--color-chart-3: var(--chart-3);
@@ -144,14 +146,6 @@
 	p {
 		font-size: var(--fluid-base);
 		margin-bottom: 0.1rem;
-	}
-
-	*,
-	::after,
-	::before,
-	::backdrop,
-	::file-selector-button {
-		border-color: oklch(77% 0.041 260.031 / 40%); /* 40% de base-content */
 	}
 }
 
@@ -218,7 +212,37 @@
 		--tw-ring-offset-shadow: none !important;
 		--tw-ring-shadow: none !important;
 	}
+
+	/* Border color debug */
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: oklch(77% 0.041 260.031 / 40%); /* 40% de base-content */
+	}
 }
+
+/* Override spécifique pour les composants DaisyUI */
+/* .input,
+.textarea,
+.select {
+	border-color: var(--color-base-300) !important;
+} */
+
+/* Assurer que les bordures Tailwind utilisent les bonnes couleurs */
+/* .border-gray-300 {
+	border-color: var(--color-base-300) !important;
+}
+
+.border-gray-200 {
+	border-color: var(--color-base-200) !important;
+}
+
+.border-gray-100 {
+	border-color: var(--color-base-100) !important;
+}
+*/
 
 @layer utilities {
 	.text-fluid-xs {
