@@ -68,7 +68,7 @@
 </script>
 
 <!-- SNIPPET RÉCURSIF POUR AFFICHER LES ITEMS DE MENU -->
-{#snippet renderMenuItem(item, level = 0)}
+{#snippet renderMenuItem(item: import("$lib/types/publicSiteType").NavigationLink, level = 0)}
 	{@const url = generateUrl(item)}
 	{@const Icon = item.icon}
 	<li>

@@ -121,15 +121,16 @@ export interface ValidMaster extends EventType {
 	recurrence: RecurrenceConfigType;
 }
 
-export type ValidOccurrence = EventType & {
-	id: string;
-	date_event: string;
-	masterRecurrentId: string;
-	categories: string[];
-	rooms: string[];
-	tasks: TaskType[];
-	organizers: OrganizerType[];
-	dates_proposed: DateProposedType[];
-	external_proposal: ExternalProposalType;
-	other_date_query: string[];
-};
+// export type ValidOccurrence = EventType & {
+// 	id: string;
+// 	date_event: string;
+// 	masterRecurrentId: string;
+// 	categories: string[];
+// 	rooms: string[];
+// 	tasks: TaskType[];
+// 	organizers: OrganizerType[];
+// 	dates_proposed: DateProposedType[];
+// 	external_proposal: ExternalProposalType;
+// 	other_date_query: string[];
+// 	recurrence: RecurrenceConfigType;
+// };

@@ -10,6 +10,9 @@ import "tippy.js/dist/tippy.css";
 import type { OrganizerType } from "./types/event.types";
 import type { UserType } from "./types/types";
 
+// Import des types utilitaires depuis bits-ui
+export type { WithElementRef, WithoutChildren, WithoutChildrenOrChild } from "bits-ui";
+
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
@@ -198,14 +201,16 @@ export const handleOrganizerMaybehere = (params: {
 	}
 };
 
-export const convertMaybehereToOrganizer = (org: any) => ({
+export const convertMaybehereToOrganizer = (org: OrganizerType) => ({
 	id: org.id,
 	username: org.username,
 	tasks: [getSpace.defaultTask.name]
 });
 
-export const filterAndConvertOrganizers = (organizers: any[]) => {
-	return organizers.filter((org: any) => org.maybehere === "oui").map(convertMaybehereToOrganizer);
+export const filterAndConvertOrganizers = (organizers: OrganizerType[]) => {
+	return organizers
+		.filter((org: OrganizerType) => org.maybehere === "oui")
+		.map(convertMaybehereToOrganizer);
 };
 
 /**

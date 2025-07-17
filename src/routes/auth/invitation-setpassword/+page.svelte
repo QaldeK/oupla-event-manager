@@ -1,25 +1,25 @@
 <script lang="ts">
-	import { userDb } from '$lib/shared/userDb.svelte';
-	import { pb } from '$lib/pocketbase.svelte';
+	import { userDb } from "$lib/shared/userDb.svelte";
+	import { pb } from "$lib/pocketbase.svelte";
 
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 
-	let password = $state('***REMOVED***');
-	let passwordConfirm = $state('***REMOVED***');
+	let password = $state("***REMOVED***");
+	let passwordConfirm = $state("***REMOVED***");
 	let isLoading = $state(false);
 	let errors = $state({
-		password: '',
-		passwordConfirm: ''
+		password: "",
+		passwordConfirm: ""
 	});
 
 	// let token = $state('');
 	// let mail = $state('');
 	// let uname = $state('');
 
-	let token = page.url.searchParams.get('token') || '';
-	let mail = page.url.searchParams.get('mail') || '';
-	let uname = page.url.searchParams.get('uname') || '';
+	let token = page.url.searchParams.get("token") || "";
+	let mail = page.url.searchParams.get("mail") || "";
+	let uname = page.url.searchParams.get("uname") || "";
 
 	// Connexion automatique avec le token comme mot de passe
 	$effect(() => {
@@ -27,9 +27,9 @@
 			if (token && mail) {
 				try {
 					// Se connecter avec le token comme mot de passe
-					await pb.collection('users').authWithPassword(mail, token);
+					await pb.collection("users").authWithPassword(mail, token);
 				} catch (error) {
-					console.error('Erreur de connexion:', error);
+					console.error("Erreur de connexion:", error);
 					errors.password = "Le lien d'invitation est invalide ou expiré";
 				}
 			}
@@ -41,15 +41,15 @@
 	let isValid = $derived(password.length >= 8 && password === passwordConfirm);
 
 	async function handleSubmit() {
-		errors = { password: '', passwordConfirm: '' };
+		errors = { password: "", passwordConfirm: "" };
 
 		if (!isValid) {
 			if (password !== passwordConfirm) {
-				errors.passwordConfirm = 'Les mots de passe ne correspondent pas';
+				errors.passwordConfirm = "Les mots de passe ne correspondent pas";
 				return;
 			}
 			if (password.length < 8) {
-				errors.password = 'Le mot de passe doit contenir au moins 8 caractères';
+				errors.password = "Le mot de passe doit contenir au moins 8 caractères";
 				return;
 			}
 			return;
@@ -59,19 +59,26 @@
 
 		try {
 			// L'utilisateur est maintenant authentifié, on peut mettre à jour son mot de passe
-			await pb.collection('users').update(pb.authStore.model.id, {
+
+			const userId = pb.authStore.record?.id ?? pb.authStore.record?.id;
+			if (!userId) {
+				errors.password = "Impossible de trouver l'utilisateur";
+				return;
+			}
+
+			await pb.collection("users").update(userId, {
 				password,
 				passwordConfirm: password,
 				oldPassword: token,
-				invitationToken: 'used' // Effacer le token d'invitation
+				invitationToken: "used" // Effacer le token d'invitation
 				// invitationExpires: null
 			});
 			await userDb.login(mail, password);
 
-			goto('/dashboard');
+			goto("/dashboard");
 		} catch (error) {
-			console.error('Erreur:', error);
-			errors.password = 'Impossible de mettre à jour le mot de passe';
+			console.error("Erreur:", error);
+			errors.password = "Impossible de mettre à jour le mot de passe";
 		} finally {
 			isLoading = false;
 		}
@@ -127,7 +134,7 @@
 					disabled={isLoading}
 					class="group text-fluid-sm relative flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 font-semibold text-white hover:bg-blue-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50"
 				>
-					{isLoading ? 'Configuration...' : 'Valider'}
+					{isLoading ? "Configuration..." : "Valider"}
 				</button>
 			</div>
 		</form>

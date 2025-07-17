@@ -62,8 +62,10 @@
 		"@thisux/sveltednd": "^0.0.20",
 		"daisyui": "^5.0.46",
 		"date-fns": "^4.1.0",
+		"dependency-cruiser": "^16.10.4",
 		"lucide-svelte": "^0.482.0",
 		"pocketbase": "^0.25.2",
+		"rollup-plugin-visualizer": "^6.0.3",
 		"yjs": "^13.6.27"
 	}
 }

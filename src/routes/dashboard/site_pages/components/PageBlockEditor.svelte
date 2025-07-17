@@ -5,9 +5,8 @@
 	} from "$lib/shared/documentEditManager.svelte";
 	import type { SitePagesResponse, SitePagesRecord } from "$lib/types/pocketbase";
 	import { defaultExtensions, Tipex, type TipexEditor } from "@friendofsvelte/tipex";
-	import "@friendofsvelte/tipex/styles/EditLink.css";
-	import "@friendofsvelte/tipex/styles/ProseMirror.css";
-	import "@friendofsvelte/tipex/styles/Tipex.css";
+	import "@friendofsvelte/tipex/styles/index.css";
+
 	import { AlertCircle, Eye, EyeOff, Info } from "lucide-svelte";
 	import * as sitePageStore from "../sitePageStore.svelte";
 	import SimpleTiptapToolbar from "$lib/components/SimpleTiptapToolbar.svelte";
@@ -136,7 +135,7 @@
 	function getCurrentValue(key: keyof typeof uiOptions) {
 		// Utilise Object.hasOwn pour vérifier la présence de la clé de manière sécurisée
 		if (Object.hasOwn(pendingUiChanges, key)) {
-			return pendingUiChanges[key];
+			return pendingUiChanges[key as string];
 		}
 		return uiOptions[key];
 	}

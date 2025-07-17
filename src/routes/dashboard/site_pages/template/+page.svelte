@@ -6,11 +6,7 @@
 
 	// Imports des types
 	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
-	import {
-		ComponentType,
-		type NavigationLink,
-		type SitePagesNavigationMenuRecord
-	} from "$lib/types/publicSiteType";
+	import { ComponentType, type SitePagesNavigationMenuRecord } from "$lib/types/publicSiteType";
 	import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
 
 	// Imports Svelte
@@ -271,49 +267,6 @@
 	}
 
 	// --- Fonctions de manipulation des pages / blocs / menus ---
-
-	/**
-	 * Crée un menu de navigation par défaut si aucun n'existe dans la section 'leftSide'.
-	 */
-	// GARBAGE ?
-	async function createDefaultMenu() {
-		if (!spaceId) return;
-
-		try {
-			const existingMenus = groupedPages[SitePagesSectionOptions.leftSide]?.filter(
-				(item) => item.componentType === ComponentType.navigationMenu
-			);
-
-			if (existingMenus && existingMenus.length > 0) {
-				return;
-			}
-
-			const defaultLinks: NavigationLink[] = [
-				{ title: "À propos", url: "about" },
-				{ title: "Nous trouver", url: "find-us" },
-				{ title: "Proposer un événement", url: "proposition" }
-			];
-
-			const itemsInSection = groupedPages[SitePagesSectionOptions.leftSide] || [];
-			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
-				const currentPos = typeof item.pos === "number" ? item.pos : -1;
-				return Math.max(max, currentPos);
-			}, -1);
-			const nextPos = maxPos + 1;
-
-			await createPad("Menu principal", SitePagesSectionOptions.leftSide, {
-				pos: nextPos,
-				componentType: ComponentType.navigationMenu,
-				componentConfig: {
-					links: defaultLinks
-				}
-			});
-
-			console.log("Menu par défaut créé avec succès");
-		} catch (e) {
-			console.error("Erreur lors de la création du menu par défaut:", e);
-		}
-	}
 
 	/**
 	 * Sauvegarde les options de thème du site.
@@ -587,7 +540,7 @@
 		}
 	}
 
-	$inspect("modalConfig", modalConfig);
+	// $inspect("modalConfig", modalConfig);
 </script>
 
 {#if !isLoading}
@@ -665,7 +618,11 @@
 										use:droppable={{
 											container: sectionType,
 											callbacks: {
-												onDrop: (state) => handleItemDrop(state as DragDropState<BlocRecord>, bloc)
+												onDrop: (state) =>
+													handleItemDrop(
+														state as DragDropState<BlocRecord | SitePagesNavigationMenuRecord>,
+														bloc
+													)
 												// FIXIT : ne pas actualiser pocketbase directement. + subscribe/unsubscribe a chaque drop !
 											},
 											attributes: {

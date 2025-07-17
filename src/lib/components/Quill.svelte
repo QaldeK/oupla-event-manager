@@ -28,7 +28,11 @@
 </script>
 
 <svelte:head>
-	<link rel="stylesheet" href="https://unpkg.com/quill@2.0.3/dist/quill.snow.css" crossorigin />
+	<link
+		rel="stylesheet"
+		href="https://unpkg.com/quill@2.0.3/dist/quill.snow.css"
+		crossorigin="anonymous"
+	/>
 </svelte:head>
 
-<Editor {options} {onTextChange}>{@html $state.snapshot(html)}</Editor>
+<Editor {options} {onTextChange} class="">{@html $state.snapshot(html)}</Editor>

@@ -5,7 +5,7 @@
 	import UserSondagesCard from "$lib/components/UserSondagesCard.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
-	import type { UserType, ValidMaster, ValidOccurrence } from "$lib/types/types";
+	import type { DateProposedType, EventType, UserType, ValidMaster } from "$lib/types/types";
 
 	let userEvents = $derived(eventsStore.userEvents);
 	let userRecurrentEvents = $derived(eventsStore.userRecurrentEvents);
@@ -20,7 +20,7 @@
 	<div class="flex flex-col gap-8">
 		{#if recentlyCreatedEvents.length > 0}
 			<section class="my-8">
-				<RecentlyCreatedEventsCard events={recentlyCreatedEvents as any} />
+				<RecentlyCreatedEventsCard events={recentlyCreatedEvents as EventType[]} />
 			</section>
 		{/if}
 
@@ -29,7 +29,7 @@
 				<h2 class="text-fluid-xl font-bold">Vos prochains événements</h2>
 				<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 					{#each userEvents as event (event.id)}
-						<div><UserEventsCard event={event as any} /></div>
+						<div><UserEventsCard {event} /></div>
 					{/each}
 				</div>
 			</section>
@@ -42,11 +42,11 @@
 					<!-- FIXIT : manage oldDates exclusion -->
 					{#each userSondageEvents as currentEvent (currentEvent.id)}
 						<UserSondagesCard
-							currentEvent={currentEvent as any}
+							currentEvent={currentEvent as EventType}
 							{currentUser}
 							bg="bg-base-100"
 							showHeader={true}
-							dates={currentEvent.dates_proposed as any}
+							dates={currentEvent.dates_proposed as DateProposedType[]}
 						/>
 					{/each}
 				</div>
@@ -61,12 +61,9 @@
 						{@const occurrences = eventsStore.getEventsOccurences.filter(
 							(event) => event.masterRecurrentId === master.id
 						)}
-						<!-- S'assurer que RecurrentEventsCard gère bien le cas où master.recurrence est null/undefined -->
+
 						{#if master.recurrence}
-							<RecurrentEventsCard
-								master={master as ValidMaster}
-								occurrences={occurrences as ValidOccurrence[]}
-							/>
+							<RecurrentEventsCard master={master as ValidMaster} {occurrences} />
 						{/if}
 					{/each}
 				</div>

@@ -1,11 +1,11 @@
-<script>
-	import { untrack } from 'svelte';
-	import { fade } from 'svelte/transition';
+<script lang="ts">
+	import { untrack } from "svelte";
+	import { fade, slide } from "svelte/transition";
 	let { title, text } = $props();
 
 	let isExpanded = $state(false);
 	let textOverflows = $state(false);
-	let textContainer; // Référence à l'élément div du texte
+	let textContainer: HTMLDivElement; // Référence à l'élément div du texte
 
 	$effect(() => {
 		if (textContainer) {
@@ -21,7 +21,7 @@
 	class="overflow-hidden rounded-lg bg-gray-100 shadow-md"
 	onclick={textOverflows ? toggleExpand : null}
 	onkeydown={(event) => {
-		if (event.key === 'Enter' && textOverflows) {
+		if (event.key === "Enter" && textOverflows) {
 			toggleExpand();
 		}
 	}}
@@ -53,11 +53,11 @@
 	>
 		<!-- <p>{text}</p> -->
 		{#if isExpanded}
-			<p class="whitespace-pre-line text-gray-700" in:fade>
+			<p class="text-fluid-sm whitespace-pre-line text-gray-700">
 				{text}
 			</p>
 		{:else}
-			<p class="text-gray-700" in:fade>
+			<p class="text-fluid-sm text-gray-700">
 				{text}
 			</p>
 		{/if}

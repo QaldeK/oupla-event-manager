@@ -54,9 +54,9 @@
 				(org: OrganizerType) => org.tasks?.includes(task.name) ?? []
 			)}
 			{@const isUserInTask = isUserSubscribedToTask(task.name)}
-			<div class="text-fluid-sm border bg-white font-semibold shadow-xs sm:rounded-lg">
+			<div class="text-fluid-sm border bg-white font-semibold shadow-xs @xl:rounded-lg">
 				<div
-					class="text-base-content mb-2 flex justify-items-center rounded-t-lg px-4 py-1 text-center {organizersForTask.length >
+					class="text-base-content mb-1 flex justify-items-center rounded-t-lg px-4 py-1.5 text-center {organizersForTask.length >
 					0
 						? 'text-base-content'
 						: 'text-error '}"

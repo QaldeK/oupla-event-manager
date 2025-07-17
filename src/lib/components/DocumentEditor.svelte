@@ -111,11 +111,11 @@
 		};
 	});
 
-	$effect(() => {
-		if (!isEditing && tipexEditor && doc?.content !== tipexEditor.getHTML()) {
-			tipexEditor.commands.setContent(doc?.content ?? "", false);
-		}
-	});
+	// $effect(() => {
+	// 	if (!isEditing && tipexEditor && doc?.content !== tipexEditor.getHTML()) {
+	// 		tipexEditor.commands.setContent(doc?.content ?? "", false);
+	// 	}
+	// });
 
 	onDestroy(() => {
 		docActions.dispose();
@@ -154,8 +154,44 @@
 				<Info size={14} />
 				<span> {lockStatusMessage}</span>
 			</div>
-		{:else if !docActions.hasChange}
-			<span class="text-base-content/70 text-xs">Document enregistré</span>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet footDoc()}
+	<div
+		class="text-base-content/60 flex flex-wrap items-center justify-between border-t px-2 py-1 text-xs"
+	>
+		{#if isEditing}
+			{#key lastActivity}
+				{@const remainingMinutes = Math.max(
+					0,
+					Math.round((INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity)) / 60000)
+				)}
+				Vous serez déconnecté de l'édition après {remainingMinutes} minutes d'inactivité.
+			{/key}
+		{/if}
+		<div class="py-1">{@render statusIndicator()}</div>
+		<!-- Informations de date -->
+		{#if doc?.created || doc?.lastMod}
+			<div class="ml-auto">
+				{#if doc.created}
+					<span title="Date de création : {new Date(doc.created).toLocaleString('fr-FR')}">
+						Créé le {new Date(doc.created).toLocaleDateString("fr-FR")}
+					</span>
+				{/if}
+				{#if doc.lastMod}
+					<span
+						class="ml-2"
+						title="Dernière modification : {new Date(doc.lastMod).toLocaleString('fr-FR')}"
+					>
+						Modifié {formatDistanceToNow(new Date(doc.lastMod), {
+							addSuffix: true,
+							locale: fr
+						})}
+					</span>
+				{/if}
+			</div>
 		{/if}
 	</div>
 {/snippet}
@@ -229,7 +265,6 @@
 			</div>
 
 			<div class="hidden flex-shrink-0 items-center gap-2 sm:flex">
-				<!-- {@render statusIndicator()} -->
 				{@render modeTabs()}
 			</div>
 		</div>
@@ -265,57 +300,34 @@
 				>
 					{#snippet head(tipexEditor)}
 						<div class="bg-base-200 flex flex-shrink-0 items-center">
-							<TipexToolbar editor={tipexEditor} onSaveAndClose={save} {isSaving} {isLoading} />
+							<TipexToolbar
+								editor={tipexEditor}
+								onSaveAndClose={save}
+								{isSaving}
+								{isLoading}
+								hasChange={docActions.hasChange}
+							/>
 						</div>
 					{/snippet}
 					<!-- Just for put control at top -->
 					{#snippet controlComponent()}{/snippet}
 					{#snippet foot()}
-						<div
-							class="text-base-content/60 flex flex-wrap items-center justify-between border-t px-2 py-1 text-xs"
-						>
-							{#key lastActivity}
-								{@const remainingMinutes = Math.max(
-									0,
-									Math.round((INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivity)) / 60000)
-								)}
-								Vous serez déconnecté de l'édition après {remainingMinutes} minutes d'inactivité.
-							{/key}
-							<!-- <div class="py-1">{@render statusIndicator()}</div> -->
-							<!-- Informations de date -->
-							{#if doc?.created || doc?.lastMod}
-								<div class="ml-auto">
-									{#if doc.created}
-										<span
-											title="Date de création : {new Date(doc.created).toLocaleString('fr-FR')}"
-										>
-											Créé le {new Date(doc.created).toLocaleDateString("fr-FR")}
-										</span>
-									{/if}
-									{#if doc.lastMod}
-										<span
-											class="ml-2"
-											title="Dernière modification : {new Date(doc.lastMod).toLocaleString(
-												'fr-FR'
-											)}"
-										>
-											Modifié {formatDistanceToNow(new Date(doc.lastMod), {
-												addSuffix: true,
-												locale: fr
-											})}
-										</span>
-									{/if}
-								</div>
-							{/if}
-						</div>
+						{@render footDoc()}
 					{/snippet}
 				</Tipex>
 			</div>
 		{:else}
 			<!-- Mode Lecture -->
-			<div id="pad-content" role="document" class="flex-1 overflow-hidden">
-				<div class="document-content prose h-full max-w-none overflow-y-auto p-4">
+			<div
+				id="pad-content"
+				role="document"
+				class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg"
+			>
+				<div class="document-content prose max-w-none overflow-y-auto p-4">
 					{@html doc?.content || "<p><em>Ce document est vide.</em></p>"}
+				</div>
+				<div>
+					{@render footDoc()}
 				</div>
 			</div>
 		{/if}

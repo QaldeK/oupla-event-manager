@@ -153,7 +153,7 @@
 
 <div transition:fade class="@container" id={currentEvent.id}>
 	<div
-		class="transition:fade mb-8 rounded-lg border bg-white shadow-md @md:mb-4 {currentEvent.isConfirmed
+		class="transition:fade bg-base-100 mb-8 rounded-lg border shadow-md @md:mb-4 {currentEvent.isConfirmed
 			? ''
 			: 'border-l-warning/80 border-l-4'}"
 	>

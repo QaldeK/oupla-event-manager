@@ -1,7 +1,6 @@
-<script>
+<script lang="ts">
 	import flatpickr from "flatpickr";
-
-	import { Clock } from "lucide-svelte";
+	import type { Instance } from "flatpickr/dist/types/instance";
 
 	let {
 		value = $bindable(),
@@ -13,11 +12,10 @@
 	} = $props();
 
 	let fpid = `time-picker-${crypto.randomUUID()}`;
-	let fpInstance;
+	let fpInstance: Instance | undefined;
 
 	$effect(() => {
-		// @ts-ignore
-		fpInstance = flatpickr(document.getElementById(fpid), {
+		fpInstance = flatpickr(document.getElementById(fpid) as Node, {
 			enableTime: true,
 			noCalendar: true,
 			minuteIncrement: 10,
@@ -31,7 +29,7 @@
 				value = dateStr;
 			},
 			onOpen: () => {
-				if (!value) {
+				if (!value && fpInstance) {
 					fpInstance.setDate(initial);
 				}
 			}

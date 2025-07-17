@@ -43,25 +43,16 @@ import { pb } from "$lib/pocketbase.svelte";
 import type {
 	SpaceMembersResponse,
 	SpacesOptionsResponse,
+	SpacesResponse,
 	UsersResponse
 } from "$lib/types/pocketbase";
 import type {
+	PublicSpaceInfo,
 	SpaceConfig,
 	SpaceDetails,
-	SpaceOptionsType,
 	SpaceUser,
 	TaskType
 } from "$lib/types/types";
-
-// Structure pour stocker les IDs des enregistrements supprimés
-interface DeletedRecords {
-	[collectionName: string]: {
-		ids: string[];
-		timestamp: string;
-	};
-}
-
-let configId = $state();
 
 // Classe pour gérer les membres séparément
 class SpaceMembersManager {
@@ -70,7 +61,7 @@ class SpaceMembersManager {
 	async loadMembers(spaceId: string) {
 		const records = await pb
 			.collection("spaceMembers")
-			.getFullList<SpaceMembersResponse<unknown, { user: UsersResponse }>>({
+			.getFullList<SpaceMembersResponse<{ user: UsersResponse }>>({
 				filter: `space="${spaceId}"`,
 				expand: "user"
 			});
@@ -107,13 +98,22 @@ class SpaceOptionsDB {
 		try {
 			const record = await pb
 				.collection("spaces_options")
-				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceId}"`);
+				.getFirstListItem<
+					SpacesOptionsResponse<
+						unknown,
+						unknown,
+						unknown,
+						unknown,
+						unknown,
+						{ space: SpacesResponse }
+					>
+				>(`space="${spaceId}"`, {
+					expand: "space"
+				});
 
 			if (!record.public_site) {
 				throw new Error("Ce site n'est pas accessible publiquement");
 			}
-
-			const options = record.options || ({} as SpaceOptionsType);
 
 			_spaceConfig = {
 				id: record.space,
@@ -123,10 +123,7 @@ class SpaceOptionsDB {
 				rooms: [],
 				categories: [],
 				members: [], // Vide en mode public
-				tasks: {
-					list: [],
-					defaultTask: ""
-				}
+				tasks: []
 			};
 
 			return _spaceConfig;
@@ -150,7 +147,7 @@ class SpaceOptionsDB {
 
 			if (localData) {
 				console.log("Loaded initial config from localStorage", localData);
-				_spaceConfig = localData.config;
+				_spaceConfig = localData;
 			}
 
 			await this.refreshFromPocketBase(spaceId);
@@ -161,8 +158,8 @@ class SpaceOptionsDB {
 		}
 	}
 
-	async get(spaceID: string): Promise<SpaceConfig | null> {
-		const config = localStorage.getItem(`spaceOptions_${spaceID}`);
+	async get(spaceId: string): Promise<SpaceConfig | null> {
+		const config = localStorage.getItem(`spaceOptions_${spaceId}`);
 		return config ? JSON.parse(config) : null;
 	}
 
@@ -170,27 +167,33 @@ class SpaceOptionsDB {
 		localStorage.setItem(`spaceOptions_${spaceOptions.id}`, JSON.stringify(spaceOptions));
 	}
 
-	private async refreshFromPocketBase(spaceID: string): Promise<void> {
+	private async refreshFromPocketBase(spaceId: string): Promise<void> {
 		try {
 			// Charger les options de l'espace
 			const record = await pb
 				.collection("spaces_options")
-				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceID}"`, {
+				.getFirstListItem<
+					SpacesOptionsResponse<
+						unknown,
+						unknown,
+						unknown,
+						unknown,
+						unknown,
+						{ space: SpacesResponse }
+					>
+				>(`space="${spaceId}"`, {
 					expand: "space"
 				});
 
 			// Charger les membres
-			const members = await this.membersManager.loadMembers(spaceID);
+			const members = await this.membersManager.loadMembers(spaceId);
 
 			const newConfigId = record.id;
 
 			// Utiliser directement les champs dédiés
-			const rooms = record.rooms || [];
-			const categories = record.categories || [];
-			const tasks = record.tasks || {
-				list: [],
-				defaultTask: ""
-			};
+			const rooms = Array.isArray(record.rooms) ? record.rooms : [];
+			const categories = Array.isArray(record.categories) ? record.categories : [];
+			const tasks = Array.isArray(record.tasks) ? record.tasks : [];
 
 			this.optionOf = {
 				space: {
@@ -206,21 +209,20 @@ class SpaceOptionsDB {
 				name: this.optionOf.space.name,
 				description: this.optionOf.space.description,
 				rooms,
-				categories,
-				tasks,
-				members,
+				categories: categories || [],
+				tasks: tasks || [],
+				members: members || [],
 				space: this.optionOf.space
 			};
 
 			// Mise à jour du state et du localStorage uniquement si les données ont changé
-			const currentData = await this.get(spaceID);
+			const currentData = await this.get(spaceId);
 			if (
 				!currentData ||
-				JSON.stringify(currentData.config) !== JSON.stringify(newConfig) ||
-				currentData.configId !== newConfigId
+				JSON.stringify(currentData) !== JSON.stringify(newConfig) ||
+				currentData.configId !== record.id
 			) {
 				_spaceConfig = newConfig;
-				configId = newConfigId;
 				await this.set(newConfig);
 				console.log("Config updated from PocketBase");
 			}
@@ -236,21 +238,34 @@ class SpaceOptionsDB {
 		try {
 			const record = await pb
 				.collection("spaces_options")
-				.getFirstListItem<SpacesOptionsResponse<SpaceOptionsType>>(`space="${spaceId}"`, {
-					expand: "space",
-					fields: "categories,rooms,public_site,space,expand.space.name,expand.space.description"
+				.getFirstListItem<
+					SpacesOptionsResponse<
+						unknown,
+						unknown,
+						unknown,
+						unknown,
+						unknown,
+						{ space: SpacesResponse }
+					>
+				>(`space="${spaceId}"`, {
+					expand: "space"
 				});
 
 			if (!record.public_site) {
 				throw new Error("Ce site n'est pas accessible publiquement");
 			}
 
+			const spaceName = record.expand?.space?.name || "";
 			return {
 				id: record.space,
-				name: record.expand?.space?.name || "",
+				name: spaceName,
+				url: spaceName
+					.toLowerCase()
+					.replace(/[^a-z0-9]+/g, "-")
+					.replace(/^-+|-+$/g, ""),
 				description: record.expand?.space?.description || "",
-				categories: record.categories || [],
-				rooms: record.rooms || [],
+				categories: Array.isArray(record.categories) ? record.categories : [],
+				rooms: Array.isArray(record.rooms) ? record.rooms : [],
 				public_site: record.public_site
 			};
 		} catch (error) {
@@ -290,7 +305,7 @@ export const getSpace = {
 				};
 
 				// Effectuer la mise à jour
-				await pb.collection("spaces_options").update(configId, updateData);
+				await pb.collection("spaces_options").update(newConfig.configId, updateData);
 
 				// Mise à jour du state local
 				_spaceConfig = newConfig;

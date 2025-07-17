@@ -1,34 +1,31 @@
 <script lang="ts">
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import { lisibleDate } from '$lib/utils';
-	import { sendEmail } from '$lib/pocketbase.svelte';
-	import { defaultExtensions, Tipex } from '@friendofsvelte/tipex';
-	import type { Editor } from '@tiptap/core';
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { lisibleDate } from "$lib/utils";
+	import { sendEmail } from "$lib/pocketbase.svelte";
+	import { defaultExtensions, Tipex } from "@friendofsvelte/tipex";
+	import type { Editor } from "@tiptap/core";
 
-	import TipexToolbar from '$lib/components/TipexToolbar.svelte';
-	import { addDays, format, isWithinInterval } from 'date-fns';
-	import { fr } from 'date-fns/locale';
-	import '@friendofsvelte/tipex/styles/Tipex.css';
-	import '@friendofsvelte/tipex/styles/ProseMirror.css';
-	// import '@friendofsvelte/tipex/styles/Controls.css';
-	import '@friendofsvelte/tipex/styles/EditLink.css';
+	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
+	import { addDays, format, isWithinInterval } from "date-fns";
+	import { fr } from "date-fns/locale";
+	import "@friendofsvelte/tipex/styles/index.css";
 
 	const confirmedEvents = eventsStore.confirmedEvents;
 
 	const periodOptions = [
-		{ label: 'Semaine prochaine', days: 7 },
-		{ label: '30 prochains jours', days: 30 },
-		{ label: '45 prochains jours', days: 45 }
+		{ label: "Semaine prochaine", days: 7 },
+		{ label: "30 prochains jours", days: 30 },
+		{ label: "45 prochains jours", days: 45 }
 	];
 
 	let selectedPeriod = $state(30);
 
-	let introMessage = $state('Et voici les prochains événements !');
-	let outroMessage = $state('A bientot !');
+	let introMessage = $state("Et voici les prochains événements !");
+	let outroMessage = $state("A bientot !");
 
 	let includeCanceled = $state(true);
 	let canceledMessage = $state(
-		'Désolé, mais certains événements annoncés ont finalement dû être annulés...'
+		"Désolé, mais certains événements annoncés ont finalement dû être annulés..."
 	);
 	let canceledToSend = $derived(confirmedEvents.filter((event) => event.canceled));
 
@@ -38,16 +35,16 @@
 
 	let eventsToSend = $derived(futureEventsInPeriod.filter((event) => !event.isSendToNewsletter));
 
-	let preCanceled = $state('⚠'); // Gardé pour le visuel
+	let preCanceled = $state("⚠"); // Gardé pour le visuel
 
 	let generationOk = $state(false);
-	let generatedHtml = $state('');
+	let generatedHtml = $state("");
 	let editor: Editor | undefined = $state();
 	let debounceTimer: ReturnType<typeof setTimeout>;
 
 	let isSending = $state(false);
 
-	let activeTab = $state<'editor' | 'htmlPreview' | 'textPreview'>('editor'); // Ajout de l'état pour l'onglet actif
+	let activeTab = $state<"editor" | "htmlPreview" | "textPreview">("editor"); // Ajout de l'état pour l'onglet actif
 
 	let tipexExtensions = [...defaultExtensions];
 
@@ -58,7 +55,7 @@
 		confirmedEvents; // Dépendance implicite via les fonctions appelées
 
 		generationOk = false;
-		console.log('Generating newsletter...');
+		console.log("Generating newsletter...");
 		clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(() => {
 			generatedHtml = generateNewsletterHTML(); // Recalcule l'HTML
@@ -69,7 +66,7 @@
 				// Le 'false' empêche de déclencher un événement 'update' inutile ici
 				editor.commands.setContent(generatedHtml, false);
 			}
-			console.log('Newsletter HTML generated and maybe updated in editor.');
+			console.log("Newsletter HTML generated and maybe updated in editor.");
 		}, 300); // Un délai raisonnable pour éviter les régénérations trop fréquentes
 	});
 
@@ -90,7 +87,7 @@
 
 	// Fonction pour générer le contenu HTML de la newsletter
 	function generateNewsletterHTML() {
-		let htmlContent = '';
+		let htmlContent = "";
 
 		// Intro
 		htmlContent += `<p>${introMessage}</p>`;
@@ -111,7 +108,7 @@
 			htmlContent += `<hr><p><strong><em>Résumé des événements à venir</em></strong></p>`;
 			htmlContent += `<ul>`;
 			eventsToSend.forEach((event) => {
-				const formattedDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
+				const formattedDate = format(new Date(event.date_event), "EEEE dd MMMM", { locale: fr });
 				htmlContent += `<li>`;
 				htmlContent += `<em>${formattedDate}</em>`;
 				if (event.start_public) {
@@ -146,9 +143,9 @@
 	}
 
 	function generateEventHTML(event, isCanceled) {
-		const eventDate = format(new Date(event.date_event), 'EEEE dd MMMM', { locale: fr });
+		const eventDate = format(new Date(event.date_event), "EEEE dd MMMM", { locale: fr });
 		// Remove classes
-		let eventHtml = '<div>';
+		let eventHtml = "<div>";
 
 		if (isCanceled) {
 			eventHtml += `<p>`;
@@ -163,7 +160,7 @@
 			// Titre
 			eventHtml += `<h3>${event.event_title}</h3>`;
 			// Date et Heure
-			eventHtml += `<strong>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ''}</strong>`;
+			eventHtml += `<strong>${eventDate.toUpperCase()}${event?.start_public ? ` - ${event.start_public}` : ""}</strong>`;
 			// Détails
 			const detailsHtml = generateEventDetailsHTML(event);
 			if (detailsHtml) {
@@ -179,12 +176,12 @@
 			}
 		}
 
-		eventHtml += '</div>';
+		eventHtml += "</div>";
 		return eventHtml;
 	}
 
 	function generateEventDetailsHTML(event) {
-		let details = [];
+		let details: (number | string)[] = [];
 		// Remove classes from spans
 		if (!event.is_prix_libre && event.prix) {
 			details.push(`<span>Prix: ${event.prix}</span>`);
@@ -201,7 +198,7 @@
 			details.push(`<span>Durée: ${event.duree}</span>`);
 		}
 		// Separator remains
-		return details.join(' ⋅ ');
+		return details.join(" ⋅ ");
 	}
 
 	async function sendNewsletter() {
@@ -214,20 +211,20 @@
 
 		if (!currentHtml || !currentText) {
 			console.warn("Contenu HTML ou texte vide, annulation de l'envoi.");
-			alert('Le contenu de la newsletter est vide.');
+			alert("Le contenu de la newsletter est vide.");
 			return;
 		}
 
 		isSending = true;
-		console.log('Sending newsletter...');
-		console.log('HTML:', currentHtml); // Pour débogage
-		console.log('---');
-		console.log('Text:', currentText); // Pour débogage
+		console.log("Sending newsletter...");
+		console.log("HTML:", currentHtml); // Pour débogage
+		console.log("---");
+		console.log("Text:", currentText); // Pour débogage
 
 		try {
 			await sendEmail(currentHtml, currentText); // Utilise les contenus de l'éditeur
-			console.log('Newsletter envoyée avec succès.');
-			alert('Newsletter envoyée avec succès !');
+			console.log("Newsletter envoyée avec succès.");
+			alert("Newsletter envoyée avec succès !");
 			// Potentiellement marquer les événements comme envoyés ici (nécessite une logique supplémentaire)
 		} catch (error) {
 			console.error("Erreur lors de l'envoi de la newsletter:", error);
@@ -238,45 +235,45 @@
 	}
 
 	function formatPlainTextFromHtml(html: string): string {
-		if (typeof document === 'undefined' || !html) return ''; // Garde-fou pour SSR ou HTML vide
+		if (typeof document === "undefined" || !html) return ""; // Garde-fou pour SSR ou HTML vide
 
 		try {
 			const parser = new DOMParser();
-			const doc = parser.parseFromString(html, 'text/html');
-			let text = '';
+			const doc = parser.parseFromString(html, "text/html");
+			let text = "";
 
 			function walk(node: Node) {
 				if (node.nodeType === Node.TEXT_NODE) {
 					// Ajouter le contenu texte, en normalisant les espaces multiples en un seul
-					text += node.nodeValue?.replace(/\s+/g, ' ') || '';
+					text += node.nodeValue?.replace(/\s+/g, " ") || "";
 				} else if (node.nodeType === Node.ELEMENT_NODE) {
 					const element = node as HTMLElement;
 					const tagName = element.tagName.toLowerCase();
-					let childrenText = ''; // Pour capturer le texte des enfants avant de l'ajouter
+					let childrenText = ""; // Pour capturer le texte des enfants avant de l'ajouter
 
 					// --- Préfixe et formatage avant les enfants ---
 					switch (tagName) {
-						case 'h2':
-							text += '\n\n ✱ '; // Séparation et marqueur H2
+						case "h2":
+							text += "\n\n ✱ "; // Séparation et marqueur H2
 							break;
-						case 'h3':
-							text += '\n\n ■ '; // Séparation et marqueur H3 début
+						case "h3":
+							text += "\n\n ■ "; // Séparation et marqueur H3 début
 							break;
 						// case 'li':
 						// 	text += '\n• '; // Marqueur de liste
 						// 	break;
-						case 'p':
-							text += '\n\n'; // Assurer une séparation avant le paragraphe
+						case "p":
+							text += "\n\n"; // Assurer une séparation avant le paragraphe
 							break;
-						case 'hr':
-							text += '\n\n··························\n\n'; // Remplacer <hr>
+						case "hr":
+							text += "\n\n··························\n\n"; // Remplacer <hr>
 							return; // Pas d'enfants à traiter pour <hr>
-						case 'br':
-							text += '\n'; // Remplacer <br> par un saut de ligne
+						case "br":
+							text += "\n"; // Remplacer <br> par un saut de ligne
 							return; // Pas d'enfants à traiter pour <br>
-						case 'ul':
-						case 'ol':
-							text += '\n'; // Ajouter un saut de ligne avant la liste
+						case "ul":
+						case "ol":
+							text += "\n"; // Ajouter un saut de ligne avant la liste
 							break;
 						// Ignorer les div, span, strong, em, a pour le formatage structurel,
 						// mais traiter leurs enfants
@@ -287,18 +284,18 @@
 
 					// --- Suffixe et formatage après les enfants ---
 					switch (tagName) {
-						case 'h2':
-							text += '\n\n'; // Séparation après H2
+						case "h2":
+							text += "\n\n"; // Séparation après H2
 							break;
-						case 'h3':
-							text += ' ■\n\n'; // Marqueur H3 fin et séparation
+						case "h3":
+							text += " ■\n\n"; // Marqueur H3 fin et séparation
 							break;
-						case 'p':
-							text += '\n\n'; // Assurer une séparation après le paragraphe
+						case "p":
+							text += "\n\n"; // Assurer une séparation après le paragraphe
 							break;
-						case 'ul':
-						case 'ol':
-							text += '\n'; // Ajouter un saut de ligne après la liste
+						case "ul":
+						case "ol":
+							text += "\n"; // Ajouter un saut de ligne après la liste
 							break;
 					}
 				}
@@ -308,25 +305,25 @@
 
 			// --- Nettoyage final ---
 			// 1. Décoder les entités HTML (au cas où le parser ne l'aurait pas fait complètement)
-			const textarea = document.createElement('textarea');
+			const textarea = document.createElement("textarea");
 			textarea.innerHTML = text;
 			text = textarea.value;
 
 			// 2. Normaliser les espaces multiples (sauf les sauts de ligne)
-			text = text.replace(/[ \t]+/g, ' ');
+			text = text.replace(/[ \t]+/g, " ");
 
 			// 3. Supprimer les espaces juste avant les sauts de ligne
-			text = text.replace(/ +\n/g, '\n');
+			text = text.replace(/ +\n/g, "\n");
 
 			// 4. Réduire les sauts de ligne multiples à un maximum de deux
-			text = text.replace(/\n{3,}/g, '\n\n');
+			text = text.replace(/\n{3,}/g, "\n\n");
 
 			// 5. Supprimer les espaces/sauts de ligne au début et à la fin
 			text = text.trim();
 
 			return text;
 		} catch (error) {
-			console.error('Erreur lors du formatage du texte depuis HTML:', error);
+			console.error("Erreur lors du formatage du texte depuis HTML:", error);
 			// Retourner le HTML brut ou une chaîne d'erreur en cas d'échec du parsing
 			// Alternative: essayer editor.getText() comme fallback ?
 			return html; // Ou une version très basique: html.replace(/<[^>]+>/g, '');
@@ -336,12 +333,12 @@
 	// 👉 3. Rendre la prévisualisation réactive au contenu de l'éditeur
 	let editorHtmlPreview = $derived(editor ? editor.getHTML() : generatedHtml);
 	// 👉 4. (Optionnel) Prévisualisation du texte brut
-	let editorTextPreview = $state('Chargement...'); // Transformer en $state
+	let editorTextPreview = $state("Chargement..."); // Transformer en $state
 
 	// Ajouter cet $effect après la définition de editorTextPreview
 	$effect(() => {
 		const html = editor?.getHTML(); // Dépendance au contenu de l'éditeur
-		if (activeTab === 'textPreview' && html) {
+		if (activeTab === "textPreview" && html) {
 			// Calculer seulement si l'onglet texte est actif et que l'éditeur a du contenu
 			editorTextPreview = formatPlainTextFromHtml(html);
 		}
@@ -349,7 +346,7 @@
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
-{$inspect('editorTextPreview', editorTextPreview)}
+{$inspect("editorTextPreview", editorTextPreview)}
 <!-- Peut-être utile pour débugger les modifs manuelles -->
 
 <div class="period-selector">
@@ -384,7 +381,7 @@
 			class="tab"
 			aria-label="Éditeur"
 			checked
-			onclick={() => (activeTab = 'editor')}
+			onclick={() => (activeTab = "editor")}
 		/>
 		<div
 			role="tabpanel"
@@ -439,7 +436,7 @@
 			role="tab"
 			class="tab"
 			aria-label="Aperçu HTML"
-			onclick={() => (activeTab = 'htmlPreview')}
+			onclick={() => (activeTab = "htmlPreview")}
 		/>
 		<div
 			role="tabpanel"
@@ -458,7 +455,7 @@
 			role="tab"
 			class="tab"
 			aria-label="Aperçu Texte"
-			onclick={() => (activeTab = 'textPreview')}
+			onclick={() => (activeTab = "textPreview")}
 		/>
 		<div
 			role="tabpanel"

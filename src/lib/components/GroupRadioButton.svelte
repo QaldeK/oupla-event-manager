@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { tooltip } from "$lib/actions/tooltip";
 
-	import { BadgeHelp, Minus, ThumbsDown, ThumbsUp } from "lucide-svelte";
+	import { BadgeHelp, ThumbsDown, ThumbsUp } from "lucide-svelte";
 
 	interface Props {
 		value?: "oui" | "non" | "peut-être" | "";
 		onChange?: (value: "oui" | "non" | "peut-être" | "") => void;
+		size?: string;
+		variant?: string;
 	}
 
-	let { value, onChange, size = "btn-sm", variant = "" } = $props();
+	let { value, onChange, size = "btn-sm", variant = "" }: Props = $props();
 
 	const getActiveVariant = (buttonValue: string) => {
 		if (value === buttonValue) {
@@ -27,7 +29,7 @@
 	};
 </script>
 
-<div class="bg-background inline-flex items-center rounded-md border">
+<div class="inline-flex items-center rounded-md">
 	<div use:tooltip={{ content: "Je serais présent·e" }}>
 		<button
 			onclick={() => {
@@ -35,7 +37,7 @@
 				onChange?.(value);
 			}}
 			aria-label="Oui"
-			class="btn {size} rounded-e-none border-e {getActiveVariant('oui')}"
+			class="btn {size} rounded-e-none border-gray-300 {getActiveVariant('oui')}"
 		>
 			<ThumbsUp />
 		</button>
@@ -48,7 +50,7 @@
 				onChange?.(value);
 			}}
 			aria-label="Non"
-			class="btn {size} rounded-none border-e {getActiveVariant('non')}"
+			class="btn {size} rounded-none border-y border-gray-300 {getActiveVariant('non')}"
 		>
 			<ThumbsDown />
 		</button>
@@ -61,7 +63,7 @@
 				onChange?.(value);
 			}}
 			aria-label="Peut-être"
-			class="btn {size}  rounded-none border-e {getActiveVariant('peut-être')}"
+			class="btn {size}  rounded-s-none border-gray-300 {getActiveVariant('peut-être')}"
 		>
 			<BadgeHelp />
 		</button>

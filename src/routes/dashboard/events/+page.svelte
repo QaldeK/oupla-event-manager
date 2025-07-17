@@ -5,15 +5,16 @@
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
 	import { loadingState } from "$lib/shared/states.svelte";
 	import { page } from "$app/state";
+	import { SvelteMap } from "svelte/reactivity";
 
 	// Configuration du lazy loading
-	const ITEMS_PER_PAGE = 20;
+	const ITEMS_PER_PAGE = 15;
 
 	let currentPage = $state(1);
 
 	let visibleEventId = $state<string | undefined>(undefined);
 	let intersectionObserver: IntersectionObserver | undefined;
-	let currentVisibilityState = new Map<string, number>(); // 👉 État des intersections de chaque élément
+	let currentVisibilityState = new SvelteMap<string, number>(); // 👉 État des intersections de chaque élément
 
 	// Fonction pour charger des événements jusqu'à trouver un événement spécifique
 	async function loadUntilEvent(targetEventId: string): Promise<void> {
@@ -256,7 +257,7 @@
 	</div>
 
 	<!-- Sommaire des événements (fixe à droite) -->
-	<div>
+	<div class="ms-4">
 		<EventsSummary
 			{displayedEvents}
 			{allFilteredEvents}

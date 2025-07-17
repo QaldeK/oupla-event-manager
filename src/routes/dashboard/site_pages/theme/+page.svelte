@@ -770,7 +770,11 @@
 
 	<!-- Modal de sélection des thèmes -->
 	{#if themeModalOpen}
-		<ModalX title="Sélection des thèmes" onClose={() => (themeModalOpen = false)}>
+		<ModalX
+			title="Sélection des thèmes"
+			onSave={() => (themeModalOpen = false)}
+			onClose={() => (themeModalOpen = false)}
+		>
 			<!-- Thèmes clairs -->
 			<h3 class="mb-2 flex items-center gap-2 font-medium">
 				<Sun size={18} />
@@ -791,17 +795,6 @@
 				{#each daisyThemes.dark as themeItem (themeItem)}
 					{@render daisy_theme(themeItem, "dark")}
 				{/each}
-			</div>
-
-			<div slot="actions">
-				<button
-					class="btn btn-primary"
-					onclick={() => {
-						themeModalOpen = false;
-					}}
-				>
-					Confirmer la sélection
-				</button>
 			</div>
 		</ModalX>
 	{/if}

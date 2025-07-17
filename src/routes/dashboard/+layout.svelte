@@ -9,7 +9,6 @@
 	// store
 	import Alert from "$lib/components/Alert.svelte";
 	import InviteUserModal from "$lib/components/InviteUserModal.svelte";
-	// 👉 Nouveaux composants refactorisés
 	import HeaderBar from "$lib/components/HeaderBar.svelte";
 	import MobileDock from "$lib/components/MobileDock.svelte";
 	import MobileDrawer from "$lib/components/MobileDrawer.svelte";

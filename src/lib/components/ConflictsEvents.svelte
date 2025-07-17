@@ -26,9 +26,7 @@
 	}
 
 	// Fonction pour déterminer la couleur du badge en fonction du type de conflit
-	function getBadgeVariant(
-		conflictType: ConflictType
-	): "badge-warning" | "badge-error" | "badge-outline" {
+	function getBadgeVariant(conflictType: ConflictType): "badge-warning" | "badge-error" | "" {
 		switch (conflictType) {
 			case "confirmed":
 				return "badge-error";
@@ -37,7 +35,7 @@
 				return "badge-warning";
 			case "sondage":
 			case "close-unconfirmed": // Conflit proche d'un non-confirmé -> Avertissement
-				return "badge-outline";
+				return "";
 
 			default:
 				return "badge-warning"; // Par défaut, avertissement

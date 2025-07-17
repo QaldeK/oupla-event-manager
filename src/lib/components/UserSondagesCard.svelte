@@ -66,8 +66,7 @@
 							id: currentUser.id,
 							username: currentUser.username,
 							tasks: [],
-							maybehere: maybehereValue,
-							role: ""
+							maybehere: maybehereValue
 						});
 					}
 				}
@@ -162,7 +161,7 @@
 					(org: OrganizerType) => org.id === currentUser.id
 				)?.maybehere}
 
-				<div class="{bg} flex flex-col gap-2 rounded-lg p-2 shadow-sm">
+				<div class="{bg} flex flex-col gap-2 rounded-lg px-3 py-2 shadow-sm">
 					<div class="flex-1">
 						<span class="text-fluid-base font-medium">
 							{lisibleDate(dateProposal.dateStart)}

@@ -7,7 +7,7 @@
 	} from "$lib/shared/eventActionHandler.svelte";
 	import { restoreCanceledEvent } from "$lib/services/eventActions";
 	import { eventState, modalState } from "$lib/shared/states.svelte";
-	import type { EventType, ValidMaster, ValidOccurrence } from "$lib/types/event.types";
+	import type { EventType, ValidMaster } from "$lib/types/event.types";
 	import type { UserType } from "$lib/types/types";
 	import { lisibleDate } from "$lib/utils";
 
@@ -19,18 +19,18 @@
 
 	let { master, occurrences = [] } = $props<{
 		master: ValidMaster;
-		occurrences: ValidOccurrence[];
+		occurrences: EventType[];
 	}>();
 
 	let currentUser: UserType | null = $derived(userDb.current);
 
 	// déterminer si l'utilisateur est inscrit à au moins une tâche
-	const isUserSubscribed = (occurrence: ValidOccurrence): boolean => {
+	const isUserSubscribed = (occurrence: EventType): boolean => {
 		if (!currentUser || !Array.isArray(occurrence.organizers)) return false;
 		return occurrence.organizers.some((org) => org.id === currentUser?.id);
 	};
 
-	const handleSubscriptionClick = (occurrence: ValidOccurrence) => {
+	const handleSubscriptionClick = (occurrence: EventType) => {
 		if (!currentUser) return;
 		requestTaskUpdate({
 			event: occurrence as unknown as EventType,
@@ -38,7 +38,7 @@
 		});
 	};
 
-	const handleConfirmClick = async (occurrence: ValidOccurrence) => {
+	const handleConfirmClick = async (occurrence: EventType) => {
 		if (!currentUser) return;
 		const plan = await createEventActionPlan(occurrence, {
 			context: "external_action",
@@ -50,7 +50,7 @@
 		await handleEventAction(plan);
 	};
 
-	const getSubscriptionButtonText = (occurrence: ValidOccurrence): string => {
+	const getSubscriptionButtonText = (occurrence: EventType): string => {
 		if (!Array.isArray(occurrence.tasks)) return "Erreur Tâches"; // Cas d'erreur
 
 		const subscribed = isUserSubscribed(occurrence);

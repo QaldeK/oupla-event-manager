@@ -50,6 +50,7 @@
 		createEventValidator,
 		type ValidationProfile
 	} from "$lib/validation/event-validator.svelte";
+	import type { ValidationResult } from "$lib/types/validation.types";
 
 	let eventMode: EventMode = $derived.by(() => {
 		if (!eventData.id) {
@@ -492,11 +493,12 @@
 			}
 
 			// Préparer les données de validation pour eventActionHandler
-			const validationData = {
+			const validationData: ValidationResult = {
 				isValid: validator?.isValid(determineValidationProfile(shouldConfirm)) ?? false,
 				errors: validator?.errors || {},
 				hasUnassignedTasks: validator?.hasUnassignedTasks ?? false,
-				unassignedTasks: validator?.unassignedTasks || []
+				unassignedTasks: validator?.unassignedTasks || [],
+				getErrors: () => validator?.getErrors(determineValidationProfile(shouldConfirm)) || []
 			};
 
 			// Gestion spéciale pour les récurrences globales

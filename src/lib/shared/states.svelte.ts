@@ -86,6 +86,10 @@ export const modalState = $state<ModalStateType>({
 	}
 });
 
+export const isBenevoleModal = $state({
+	open: false
+});
+
 export const openTaskModal = (params: {
 	username: string;
 	tasksAvailable: TaskType[];

@@ -45,7 +45,7 @@ export async function loadDocs(filter = ""): Promise<SitePagesType[]> {
 	return await loadDocuments<SitePagesType>(COLLECTION, {
 		fields: LIST_FIELDS,
 		sort: "-pos",
-		filter: `space = '${getSpace.id}' ${filter ? `&& ${filter}` : ""}`
+		filter: filter || undefined
 	});
 }
 

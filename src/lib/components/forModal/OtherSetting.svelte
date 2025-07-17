@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Info from "$lib/components/Info.svelte";
 	import Frame from "$lib/components/Frame.svelte";
-	import type { EventFormType } from "$lib/types/event";
+	// import type { EventFormType } from "$lib/types/event.types";
 
 	let { data = $bindable() } = $props();
 

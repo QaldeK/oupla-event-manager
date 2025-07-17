@@ -1,4 +1,4 @@
-import type { EventType, OrganizerType } from "$lib/types/event.types";
+import type { EventType, ValidMaster } from "$lib/types/event.types";
 import type { UserType } from "$lib/types/types";
 import { SyncStore } from "$lib/shared/syncState.svelte";
 import { Collections } from "$lib/types/pocketbase";
@@ -139,10 +139,13 @@ class EventsStore {
 			});
 	});
 
-	allMasterEvents = $derived.by<EventType[]>(() => {
+	allMasterEvents = $derived.by<ValidMaster[]>(() => {
 		if (!this.#store.syncStore) return [];
 
-		return (this.#store.syncStore.getAll() as EventType[]).filter((e) => e.isMasterRecurrent);
+		return (this.#store.syncStore.getAll() as EventType[]).filter(
+			(e): e is ValidMaster =>
+				e.isMasterRecurrent && e.recurrence !== null && e.recurrence !== undefined
+		);
 	});
 
 	eventsWithDate = $derived.by(() => this.allEvents.filter((e) => e.date_event));

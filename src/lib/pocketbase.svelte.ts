@@ -8,6 +8,7 @@ import type {
 } from "$lib/types/pocketbase";
 import { createEventDates } from "$lib/utils";
 import type { ListOptions, ListResult, RecordModel } from "pocketbase";
+import { ClientResponseError } from "pocketbase";
 
 import type { EventType } from "./types/event.types";
 

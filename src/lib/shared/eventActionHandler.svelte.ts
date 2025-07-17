@@ -49,8 +49,9 @@ import {
 	showAlert,
 	type ConfirmModalData
 } from "$lib/shared/states.svelte";
-import type { DateProposedType, EventMode, EventType, OrganizerType } from "$lib/types/event.types";
-import type { UserType } from "$lib/types/types";
+import type { DateProposedType, EventType, UserType, OrganizerType } from "$lib/types/types";
+import type { EventMode } from "$lib/types/event.types";
+import type { ValidationResult } from "$lib/types/validation.types";
 import { filterAndConvertOrganizers, lisibleDate, lisibleTime } from "$lib/utils";
 import { validateEventStatic } from "$lib/validation/event-validator.svelte";
 
@@ -102,12 +103,7 @@ type ActionOptions = {
 	/** Fermer automatiquement le modal après l'action */
 	autoCloseModal?: boolean;
 	/** Données de validation personnalisées (pour EventModal) */
-	validationData?: {
-		isValid: boolean;
-		errors: Record<string, string>;
-		hasUnassignedTasks: boolean;
-		unassignedTasks: Array<{ name: string }>;
-	};
+	validationData?: ValidationResult;
 };
 
 type ActionExecutor = () => Promise<EventActionPlan>;
@@ -660,17 +656,13 @@ async function createEventActionPlan(
 			: conflictResults.realConflicts.length > 0;
 
 	// 3. Vérification de complétude
-	let completionCheck = null;
+	let completionCheck: ValidationResult | null = null;
 	let needsCompletion = false;
 
 	// Utiliser les données de validation personnalisées si disponibles (EventModal)
 	if (options.validationData) {
 		needsCompletion = !options.validationData.isValid;
-		completionCheck = {
-			errors: options.validationData.errors,
-			getErrors: () => Object.values(options.validationData!.errors),
-			unassignedTasks: options.validationData.unassignedTasks
-		};
+		completionCheck = options.validationData;
 	} else if (options.wantsToConfirmEvent || options.context === "external_action") {
 		// Validation complète pour les confirmations
 		completionCheck = validateEventStatic(eventData);

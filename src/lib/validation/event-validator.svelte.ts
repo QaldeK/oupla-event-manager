@@ -1,28 +1,7 @@
 import type { EventType } from "$lib/types/event.types";
 import { getUnassignedTasks } from "$lib/services/eventActions";
 import type { TaskType } from "$lib/types/event.types";
-
-// Types des règles de validation individuelles
-type ValidationRule =
-	| "title"
-	| "categories"
-	| "rooms"
-	| "tasks"
-	| "date"
-	| "timeStart"
-	| "timeEnd"
-	| "organizers"
-	| "price"
-	| "mixite"
-	| "age"
-	| "publicDescription"
-	| "publicStartTime"
-	| "recurrenceFirstDate"
-	| "recurrenceLastDate"
-	| "recurrenceOccurrences"
-	| "recurrenceTeam"
-	| "recurrenceTasks"
-	| "unassignedTasksCheck";
+import type { ValidationResult, ValidationRule } from "$lib/types/validation.types";
 
 // Nouveaux types pour les profils de validation
 export type ValidationProfile = "DRAFT" | "STANDARD_EVENT" | "RECURRENT_MASTER";
@@ -239,7 +218,7 @@ export function determineValidationProfile(event: EventType): ValidationProfile 
 export function validateEventStatic(
 	event: EventType,
 	profile: ValidationProfile = "STANDARD_EVENT"
-) {
+): ValidationResult {
 	const rulesForProfile = PROFILE_RULES[profile];
 	const errors: Partial<Record<ValidationRule, string>> = {};
 

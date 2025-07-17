@@ -202,7 +202,6 @@
 					id: benevoleId,
 					username: username,
 					maybehere: newValue,
-					role: "",
 					tasks: [] // Les tâches ne sont pas gérées ici pour les dates proposées
 				});
 			}
@@ -489,7 +488,7 @@
 							<span class="me-auto p-2 font-medium">{benevole.username}</span>
 							<div class="">
 								<GroupRadioButton
-									value={benevole.maybehere}
+									value={benevole.maybehere as "oui" | "peut-être" | "non" | ""}
 									onChange={(newValue: "oui" | "peut-être" | "non" | "") =>
 										handleMaybehereChange(benevole.id, benevole.username, newValue)}
 									size="btn-sm"

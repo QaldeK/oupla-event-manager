@@ -7,8 +7,19 @@
 
 	import { ArrowUpRight, PencilLine, Reply, Trash2 } from "lucide-svelte";
 
+	interface ExpandedMessage {
+		replyingTo?: {
+			content: string;
+			expand?: {
+				user?: {
+					username: string;
+				};
+			};
+		};
+	}
+
 	interface Props {
-		message: MessagesResponse;
+		message: MessagesResponse<ExpandedMessage>;
 		onReply: (id: string) => void;
 		scrollToReply?: (id: string) => void;
 	}

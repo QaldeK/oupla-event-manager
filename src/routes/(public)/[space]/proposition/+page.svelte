@@ -14,8 +14,8 @@
 	import { validateProposition } from "$lib/validation/proposition-validator.svelte";
 	import { Tipex, type TipexEditor } from "@friendofsvelte/tipex";
 	import SimpleTiptapToolbar from "$lib/components/SimpleTiptapToolbar.svelte";
-	import "@friendofsvelte/tipex/styles/Tipex.css";
-	import "@friendofsvelte/tipex/styles/ProseMirror.css";
+	import "@friendofsvelte/tipex/styles/index.css";
+
 	import DatePicker from "$lib/components/forModal/DatePicker.svelte";
 	import { lisibleDateShort, isMobile } from "$lib/utils";
 
@@ -819,7 +819,7 @@
 					<select
 						id="duree"
 						bind:value={formData.duree}
-						class="focus:border-primary-500 w-32 rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-700 shadow-sm focus:outline-none"
+						class="focus:border-primary-500 border-base-300 w-32 rounded-md border bg-white px-3 py-2 text-gray-700 shadow-sm focus:outline-none"
 					>
 						{#each dureeOptions as option (option)}
 							<option value={option.value}>{option.label}</option>

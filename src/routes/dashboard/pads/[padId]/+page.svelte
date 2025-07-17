@@ -30,6 +30,6 @@
 	};
 </script>
 
-<div class="container mx-auto md:p-4" style="height: calc(100dvh - 100px);">
+<div class="container mx-auto" style="height: calc(100dvh - 180px);">
 	<DocumentEditor {docId} {collectionName} {documentActions} {basePath} {initialEditMode} />
 </div>

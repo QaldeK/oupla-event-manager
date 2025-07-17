@@ -28,7 +28,6 @@ export type {
 	TaskType, // Le type d'une tâche pour un événement
 	DateProposedType,
 	ValidMaster,
-	ValidOccurrence,
 	RecurrenceTeamType,
 	RecurrenceType // Type pour les différentes options de récurrence (WEEKLY, BIWEEKLY, etc.)
 	// RecurrenceSchemaType, // Type pour le schéma de récurrence complet

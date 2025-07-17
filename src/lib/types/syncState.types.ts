@@ -12,7 +12,7 @@ export interface StoreRecord extends RecordModel {
 export interface IndexConfig {
 	path: string | string[];
 	type?: "single" | "array";
-	transform?: (record: unknown) => unknown[];
+	transform?: (record: unknown) => (string | number | undefined)[];
 }
 
 // Configuration des options de synchronisation
@@ -68,7 +68,10 @@ export interface Collection {
 		perPage?: number,
 		options?: ListOptions
 	) => Promise<ListResult<T>>;
-	getFirstListItem: <T extends StoreRecord>(filter: string, options?: Record<string, unknown>) => Promise<T>;
+	getFirstListItem: <T extends StoreRecord>(
+		filter: string,
+		options?: Record<string, unknown>
+	) => Promise<T>;
 	getFullList: <T extends StoreRecord>(options?: ListOptions) => Promise<T[]>;
 	getOne: <T extends StoreRecord>(id: string, options?: Record<string, unknown>) => Promise<T>;
 	subscribe: (

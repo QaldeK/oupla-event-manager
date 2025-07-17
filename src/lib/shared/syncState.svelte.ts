@@ -33,6 +33,10 @@ const subscribe = <T extends StoreRecord>(
 	return () => pb.collection(collectionName).unsubscribe("*");
 };
 
+const unsubscribe = (collectionName: Collections, topic: string): void => {
+	pb.collection(collectionName).unsubscribe(topic);
+};
+
 // Interface pour les données internes du store (privées)
 export interface SyncStoreState<T extends StoreRecord> {
 	byId: SvelteMap<string, T>;
@@ -87,6 +91,7 @@ export class SyncStore<T extends StoreRecord> {
 	// propriétés pour la gestion de la synchronisation
 	private db: IDBDatabase | null = null;
 	private collection: Collection | null = null;
+	private collectionName: Collections | null = null;
 	private unsubscribe?: () => void;
 	private initPromise: Promise<void>;
 
@@ -252,12 +257,14 @@ export class SyncStore<T extends StoreRecord> {
 	}
 
 	private getValueByPath(obj: T, path: string[]): string | number | undefined {
-		return path.reduce((current: any, key) => {
+		const result = path.reduce((current: unknown, key) => {
 			if (key === "*" && Array.isArray(current)) {
 				return current.flatMap((item) => item);
 			}
 			return (current as Record<string, unknown>)[key];
 		}, obj as unknown);
+
+		return typeof result === "string" || typeof result === "number" ? result : undefined;
 	}
 
 	// ---  API publique améliorée
@@ -545,13 +552,18 @@ export class SyncStore<T extends StoreRecord> {
 
 			// 3. Configurer la collection PocketBase
 			// console.log(`👉 ${this.config.name}: Configuration de la collection PocketBase`);
+			this.collectionName = collectionName;
 			this.collection = {
 				getList: (page, perPage, options) => getList(collectionName, page, perPage, options),
 				getFirstListItem: (filter, options) => getFirstListItem(collectionName, filter, options),
 				getFullList: (options) => getFullList(collectionName, options),
 				getOne: (id, options) => getOne(collectionName, id, options),
-				subscribe: (topic, callback, options) => subscribe(collectionName, callback, options),
-				unsubscribe: (topic) => pb.collection(collectionName).unsubscribe(topic)
+				subscribe: (
+					topic: string,
+					callback: (data: RecordSubscription<T>) => void,
+					options?: Record<string, unknown>
+				) => subscribe(collectionName, callback, options),
+				unsubscribe: (topic) => unsubscribe(collectionName, topic)
 			} as Collection;
 
 			// 4. Charger les données depuis IndexedDB
@@ -611,7 +623,7 @@ export class SyncStore<T extends StoreRecord> {
 							break;
 					}
 				}
-			}) as (data: RecordSubscription<T>) => void,
+			}) as (data: RecordSubscription<StoreRecord>) => void,
 			{
 				filter: this.config.sync?.filter,
 				expand: this.config.sync?.expand
@@ -622,7 +634,7 @@ export class SyncStore<T extends StoreRecord> {
 		this.unsubscribe = () => {
 			// console.log(`🧹 ${this.config.name}: Nettoyage des souscriptions`);
 			if (this.collection) {
-				this.collection.unsubscribe();
+				this.collection.unsubscribe("*");
 			}
 		};
 	}
@@ -795,7 +807,7 @@ export class SyncStore<T extends StoreRecord> {
 			} catch (error) {
 				retries++;
 				if (retries >= maxRetries) {
-					throw new Error(`Failed to initialize IndexedDB after ${maxRetries} attempts`);
+					throw new Error(`Failed to initialize IndexedDB after ${maxRetries} attempts: ${error}`);
 				}
 				// Attendre un peu avant de réessayer
 				await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -951,7 +963,7 @@ export class SyncStore<T extends StoreRecord> {
 		if (!this.isInitialized) {
 			// Si le store n'est pas initialisé, on réinitialise tout
 			await this.initDb();
-			await this.init(this.collection?.collectionName as Collections);
+			await this.init(this.collectionName as Collections);
 		}
 
 		// console.log(`🔄 ${this.config.name}: Démarrage du forceRefresh`);

@@ -12,10 +12,10 @@
 	 *   }}
 	 * />
 	 */
-	import { Textarea as ShadcnTextarea } from '$lib/components/ui/textarea';
-	import type { WithElementRef, WithoutChildren } from 'bits-ui';
+	import { Textarea as ShadcnTextarea } from "$lib/components/ui/textarea";
+	import type { WithElementRef, WithoutChildren } from "bits-ui";
 
-	import type { HTMLTextareaAttributes } from 'svelte/elements';
+	import type { HTMLTextareaAttributes } from "svelte/elements";
 
 	type TextareaProps = WithoutChildren<WithElementRef<HTMLTextareaAttributes>> & {
 		debounce?: {
@@ -25,7 +25,7 @@
 		};
 	};
 
-	let { value = $bindable(''), debounce, ...props }: TextareaProps = $props();
+	let { value = $bindable(""), debounce, ...props }: TextareaProps = $props();
 
 	let timeoutId: ReturnType<typeof setTimeout>;
 
@@ -47,8 +47,8 @@
 	});
 
 	$effect(() => {
-		if (value !== undefined) {
-			handleChange(value);
+		if (value !== undefined && value !== null) {
+			handleChange(String(value));
 		}
 	});
 </script>

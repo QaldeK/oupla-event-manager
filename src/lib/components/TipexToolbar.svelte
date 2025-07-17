@@ -21,8 +21,15 @@
 		onSaveAndClose?: () => void;
 		isSaving?: boolean;
 		isLoading?: boolean;
+		hasChange?: boolean;
 	}
-	let { editor, onSaveAndClose, isSaving = false, isLoading = false }: Props = $props();
+	let {
+		editor,
+		onSaveAndClose,
+		isSaving = false,
+		isLoading = false,
+		hasChange = false
+	}: Props = $props();
 
 	// --- Commandes Tiptap ---
 	const toggleBold = () => {
@@ -89,7 +96,6 @@
 
 		// Si le curseur est déjà sur un lien, on le supprime
 		if (editor.isActive("link")) {
-			// @ts-expect-error ...
 			editor.chain().focus().unsetLink().run();
 			return;
 		}
@@ -103,13 +109,11 @@
 		}
 		// Si l'URL est vide, on supprime le lien potentiel (au cas où)
 		if (url === "") {
-			// @ts-expect-error ...
 			editor.chain().focus().extendMarkRange("link").unsetLink().run();
 			return;
 		}
 
 		// Applique le lien
-		// @ts-expect-error ...
 		editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
 	};
 
@@ -333,7 +337,7 @@
 				title="Enregistrer les modifications et passer en mode lecture"
 				class="btn btn-primary btn-sm ms-auto"
 				onclick={onSaveAndClose}
-				disabled={isLoading || isSaving}
+				disabled={isLoading || isSaving || !hasChange}
 			>
 				{#if isSaving}
 					<span class="loading"></span>

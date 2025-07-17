@@ -11,6 +11,7 @@ Orchestrateur générique pour la gestion de l'édition sécurisée des document
 import { pb } from "$lib/pocketbase.svelte";
 import { showAlert } from "$lib/shared/states.svelte";
 import { ClientResponseError, type RecordModel, type RecordSubscription } from "pocketbase";
+import { SvelteDate } from "svelte/reactivity";
 
 // --- Constantes ---
 const HEARTBEAT_INTERVAL_MS = 60 * 1000; // 1 minute
@@ -251,7 +252,7 @@ export function createDocumentEditManager<T extends RecordModel>(
 			return;
 		}
 
-		const timeSinceHeartbeat = Date.now() - new Date(state.doc.lastEditHeartbeat).getTime();
+		const timeSinceHeartbeat = Date.now() - new SvelteDate(state.doc.lastEditHeartbeat).getTime();
 
 		console.log(`[${docId}] Temps depuis le dernier heartbeat: ${timeSinceHeartbeat}ms`);
 
@@ -469,7 +470,7 @@ export function createDocumentEditManager<T extends RecordModel>(
 		},
 		get hasChange() {
 			const change = modification();
-			return change && Object.keys(change).length > 0;
+			return !!(change && Object.keys(change).length > 0); // `!!` force le résultat à être `true` ou `false`, jamais `null`.
 		},
 		startEditing,
 		stopEditing,

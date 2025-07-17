@@ -35,14 +35,16 @@
 	const isSelected = (option: OptionType) => {
 		if (!selectedItems) return false;
 		const optionValue = getOptionValue(option);
-		return selectedItems.some((item) => getOptionValue(item) === optionValue);
+		return selectedItems.some((item: OptionType) => getOptionValue(item) === optionValue);
 	};
 
-	function toggleItem(option: any) {
+	function toggleItem(option: OptionType) {
 		const currentSelectedItems = selectedItems ?? [];
 		const optionValue = getOptionValue(option);
 		if (isSelected(option)) {
-			selectedItems = currentSelectedItems.filter((item) => getOptionValue(item) !== optionValue);
+			selectedItems = currentSelectedItems.filter(
+				(item: OptionType) => getOptionValue(item) !== optionValue
+			);
 		} else {
 			selectedItems = [...currentSelectedItems, option];
 		}
@@ -56,13 +58,13 @@
 		) {
 			const defaultOptionValue = getOptionValue(defaultOption);
 			const defaultExistsInOptions = options.some(
-				(opt) => getOptionValue(opt) === defaultOptionValue
+				(opt: OptionType) => getOptionValue(opt) === defaultOptionValue
 			);
 
 			if (defaultExistsInOptions) {
 				// Trouver l'objet option complet correspondant à defaultOption si optionsLabel est utilisé
 				const fullDefaultOption =
-					options.find((opt) => getOptionValue(opt) === defaultOptionValue) ?? defaultOption;
+					options.find((opt: any) => getOptionValue(opt) === defaultOptionValue) ?? defaultOption;
 				selectedItems = [fullDefaultOption];
 			}
 		}

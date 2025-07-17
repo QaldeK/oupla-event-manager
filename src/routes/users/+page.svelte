@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { pb } from '$lib/pocketbase.svelte';
-	import type { UsersResponse } from '$lib/types/pocketbase';
+	import { pb } from "$lib/pocketbase.svelte";
+	import type { UsersResponse } from "$lib/types/pocketbase";
+	import { ClientResponseError } from "pocketbase";
 
 	let users = $state<UsersResponse[]>([]);
 	let deleteError = $state<string | null>(null);
@@ -10,11 +11,11 @@
 	async function loadUsers() {
 		isLoading = true;
 		try {
-			const response = await pb.collection('users').getList(1, 50, {
-				sort: '-created'
+			const response = await pb.collection<UsersResponse>("users").getList(1, 50, {
+				sort: "-created"
 			});
 			users = response.items;
-		} catch (error) {
+		} catch (error: unknown) {
 			deleteError = `Erreur lors du chargement: ${error.message}`;
 		} finally {
 			isLoading = false;
@@ -23,7 +24,7 @@
 
 	async function deleteUser(userId: string) {
 		try {
-			await pb.collection('users').delete(userId);
+			await pb.collection("users").delete(userId);
 			// Si delete() réussit, on met à jour directement l'interface
 			users = users.filter((user) => user.id !== userId);
 			deleteSuccess = true;
@@ -54,7 +55,7 @@
 	<div class="success-message">Utilisateur supprimé avec succès</div>
 {/if}
 
-{#each users as user}
+{#each users as user (user.id)}
 	<div class="user-card">
 		<span>{user.username}</span>
 		<button onclick={() => deleteUser(user.id)} class="delete-btn" disabled={isLoading}>

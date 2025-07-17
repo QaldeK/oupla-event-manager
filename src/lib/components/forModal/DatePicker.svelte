@@ -87,7 +87,7 @@
 	$effect(() => {
 		if (!dateInput) return;
 
-		fp = flatpickr(dateInput, {
+		fp = flatpickr(dateInput as HTMLInputElement, {
 			defaultDate: initialValue ? initialValue : mode === "multiple" ? [] : null,
 			dateFormat: "Y-m-d",
 			altInput: true,

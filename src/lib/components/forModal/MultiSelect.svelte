@@ -53,14 +53,14 @@
 
 	function toggleOption(value: number) {
 		if (selectedValues.includes(value)) {
-			selectedValues = selectedValues.filter((v) => v !== value);
+			selectedValues = selectedValues.filter((v: number) => v !== value);
 		} else {
 			selectedValues = [...selectedValues, value].sort();
 		}
 	}
 
 	function removeOption(value: number) {
-		selectedValues = selectedValues.filter((v) => v !== value);
+		selectedValues = selectedValues.filter((v: number) => v !== value);
 	}
 
 	$effect(() => {
@@ -77,7 +77,9 @@
 
 	// Fonction pour obtenir le label à partir de la valeur
 	function getLabelForValue(value: number | string): string {
-		const option = options.find((opt) => opt.value === value);
+		const option = options.find(
+			(opt: { value: number | string; label: string }) => opt.value === value
+		);
 		return option ? option.label : "";
 	}
 </script>
@@ -87,6 +89,7 @@
 	<div
 		role="combobox"
 		aria-expanded={isOpen}
+		aria-controls="multiselect-listbox"
 		aria-haspopup="listbox"
 		tabindex="0"
 		class="input flex h-full w-full flex-wrap gap-2 rounded-md sm:w-96"
