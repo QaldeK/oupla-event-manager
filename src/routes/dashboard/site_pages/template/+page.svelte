@@ -38,8 +38,6 @@
 	// Import du CSS global
 	import "/src/daisy.css";
 
-	type BlocRecord = SitePagesNavigationMenuRecord | SitePagesResponse;
-
 	// --- Déclarations des variables d'état ($state) ---
 	let isLoading = $state(true);
 	let isUpdatingOrder = $state(false);
@@ -49,7 +47,7 @@
 	let currentConfigSection = $state<SitePagesSectionOptions | null>(null);
 	let navbarConfigModalOpen = $state(false);
 
-	let currentMenu = $state<BlocRecord | null>(null);
+	let currentMenu = $state<SitePagesResponse>();
 
 	let currentBlockId = $state<string | null>(null);
 
@@ -80,12 +78,12 @@
 
 	// Structure pour stocker les pages groupées par type
 	type GroupedPages = {
-		[SitePagesSectionOptions.header]: BlocRecord[];
-		[SitePagesSectionOptions.top]: BlocRecord[];
-		[SitePagesSectionOptions.leftSide]: BlocRecord[];
-		[SitePagesSectionOptions.rightSide]: BlocRecord[];
-		[SitePagesSectionOptions.footer]: BlocRecord[];
-		[SitePagesSectionOptions.page]: BlocRecord[];
+		[SitePagesSectionOptions.header]: SitePagesResponse[];
+		[SitePagesSectionOptions.top]: SitePagesResponse[];
+		[SitePagesSectionOptions.leftSide]: SitePagesResponse[];
+		[SitePagesSectionOptions.rightSide]: SitePagesResponse[];
+		[SitePagesSectionOptions.footer]: SitePagesResponse[];
+		[SitePagesSectionOptions.page]: SitePagesResponse[];
 	};
 
 	// Groupement des pages par type et tri par position
@@ -99,7 +97,7 @@
 			[SitePagesSectionOptions.page]: []
 		};
 
-		pages.forEach((page: BlocRecord) => {
+		pages.forEach((page: SitePagesResponse) => {
 			const pageSection = page.section;
 			if (pageSection && Object.values(SitePagesSectionOptions).includes(pageSection)) {
 				groups[pageSection as Exclude<keyof GroupedPages, "page">].push(page);
@@ -114,7 +112,7 @@
 				groups[groupKey].sort((a, b) => {
 					const posA = typeof a.pos === "number" ? a.pos : Infinity;
 					const posB = typeof b.pos === "number" ? b.pos : Infinity;
-					if (posA === posB) {
+					if (posA === posB && a.created && b.created) {
 						return new Date(a.created).getTime() - new Date(b.created).getTime();
 					}
 					return posA - posB;
@@ -307,7 +305,7 @@
 		try {
 			const title = `Text`;
 			const itemsInSection = groupedPages[blockSection] || [];
-			const maxPos = itemsInSection.reduce((max: number, item: BlocRecord) => {
+			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
 				const currentPos = typeof item.pos === "number" ? item.pos : -1;
 				return Math.max(max, currentPos);
 			}, -1);
@@ -363,7 +361,7 @@
 		try {
 			const title = `Menu`;
 			const itemsInSection = groupedPages[menuSection] || [];
-			const maxPos = itemsInSection.reduce((max: number, item: BlocRecord) => {
+			const maxPos = itemsInSection.reduce((max: number, item: SitePagesResponse) => {
 				const currentPos = typeof item.pos === "number" ? item.pos : -1;
 				return Math.max(max, currentPos);
 			}, -1);
@@ -377,7 +375,7 @@
 				}
 			});
 
-			currentMenu = newMenu as SitePagesNavigationMenuRecord;
+			currentMenu = newMenu;
 			modalConfig.menuEditorOpen = true;
 		} catch (e) {
 			showAlert(
@@ -393,7 +391,7 @@
 	 */
 	function closeMenuEditor() {
 		modalConfig.menuEditorOpen = false;
-		currentMenu = null;
+		currentMenu = undefined;
 	}
 
 	function closeBlockEditor() {
@@ -401,7 +399,7 @@
 		currentBlockId = null;
 	}
 
-	let pageBlockEditorComponent: { save: () => Promise<void> } | undefined;
+	let pageBlockEditorComponent: { save: () => Promise<void> } | undefined = $state();
 
 	/**
 	 * Appelle la méthode de sauvegarde exposée par le `PageBlockEditor`.
@@ -458,7 +456,7 @@
 		isUpdatingOrder = true;
 
 		const itemsInNewSection = groupedPages[newSectionKey] || [];
-		const maxPos = itemsInNewSection.reduce((max: number, item: BlocRecord) => {
+		const maxPos = itemsInNewSection.reduce((max: number, item: SitePagesResponse) => {
 			const currentPos = typeof item.pos === "number" ? item.pos : -1;
 			return Math.max(max, currentPos);
 		}, -1);
@@ -483,7 +481,10 @@
 	 * @param state L'état du glisser-déposer.
 	 * @param targetItem L'élément cible sur lequel l'élément a été déposé.
 	 */
-	async function handleItemDrop(state: DragDropState<BlocRecord>, targetItem: SitePagesResponse) {
+	async function handleItemDrop(
+		state: DragDropState<SitePagesResponse>,
+		targetItem: SitePagesResponse
+	) {
 		const { draggedItem, sourceContainer, targetContainer } = state;
 
 		if (!targetContainer || !sourceContainer || sourceContainer !== targetContainer) {
@@ -619,10 +620,7 @@
 											container: sectionType,
 											callbacks: {
 												onDrop: (state) =>
-													handleItemDrop(
-														state as DragDropState<BlocRecord | SitePagesNavigationMenuRecord>,
-														bloc
-													)
+													handleItemDrop(state as DragDropState<SitePagesResponse>, bloc)
 												// FIXIT : ne pas actualiser pocketbase directement. + subscribe/unsubscribe a chaque drop !
 											},
 											attributes: {
@@ -936,8 +934,8 @@
 	{/if}
 
 	{#if currentMenu && modalConfig.menuEditorOpen}
-		<ModalX onSave={() => saveMenu} onClose={closeMenuEditor} title="Édition du menu">
-			<NavigationMenuEditor bind:currentMenu />
+		<ModalX onSave={saveMenu} onClose={closeMenuEditor} title="Édition du menu">
+			<NavigationMenuEditor bind:currentMenu={currentMenu as SitePagesNavigationMenuRecord} />
 		</ModalX>
 	{/if}
 {:else}

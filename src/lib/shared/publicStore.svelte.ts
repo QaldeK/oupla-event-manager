@@ -1,10 +1,13 @@
 import { pb } from "$lib/pocketbase.svelte";
-import type {
-	SitePagesResponse,
-	SpacesOptionsResponse,
-	SpacesResponse
-} from "$lib/types/pocketbase";
+import type { SitePagesResponse } from "$lib/types/pocketbase";
 import { getDefaultThemeOptions, type PublicSiteThemeOptions } from "$lib/types/theme.d";
+import {
+	ComponentType,
+	type SitePageResponse,
+	type NavigationMenuResponse,
+	type BlocResponse,
+	type PageResponse
+} from "$lib/types/publicSiteType";
 
 // Type d'informations publiques sur un espace
 export interface PublicSpaceInfo {
@@ -16,18 +19,6 @@ export interface PublicSpaceInfo {
 	rooms: string[];
 	public_site: boolean;
 }
-
-// export interface PublicSpaceInfo extends SpacesResponse { // Étendre SpacesResponse est plus sûr
-// Tu peux ajouter des champs spécifiques ici si nécessaire,
-// mais hériter de SpacesResponse est souvent suffisant.
-// id: string;
-// name: string;
-// title?: string; // title n'existe pas dans SpacesResponse par défaut
-// description: string;
-// categories: string[]; // Vient de spaces_options
-// rooms: string[]; // Vient de spaces_options
-// public_site: boolean; // Vient de spaces_options
-// }
 
 // Type pour un événement public (avec uniquement les champs nécessaires)
 export interface PublicEventInfo {
@@ -59,7 +50,7 @@ export interface PublicEventInfo {
 // Store pour les données publiques
 let spaceInfo = $state<PublicSpaceInfo | null>(null);
 let spaceEvents = $state<PublicEventInfo[]>([]);
-let layoutSitePages = $state<SitePagesResponse[]>([]);
+let layoutSitePages = $state<(SitePageResponse | SitePagesResponse)[]>([]);
 let isLoading = $state(false);
 let error = $state<string | null>(null);
 let themeOptions = $state<PublicSiteThemeOptions>(getDefaultThemeOptions()); // Initialiser avec les défauts
@@ -67,104 +58,26 @@ let currentSpaceName: string | null = $state(null); // Pour suivre l'espace actu
 
 const layoutSections = ["leftSide", "top", "rightSide", "footer"];
 // --- Main Loading Function ---
+// Désormais, le store ne charge plus les infos d'espace ni le thème : ils sont préchargés par le layout.
+// Le store se concentre sur les événements et autres données dynamiques.
+
 /**
- * Charge toutes les données publiques nécessaires pour un espace donné.
- * Inclut les infos de l'espace, les options de thème, les événements, et les pages de layout.
- * @param spaceName - Le nom (slug) ou l'ID de l'espace.
+ * Charge les événements publics et les pages de layout pour un espace donné.
+ * @param spaceId - L'ID de l'espace (doit être fourni par le layout ou la page)
  */
-async function loadPublicData(spaceName: string): Promise<void> {
-	if (!spaceName || spaceName === currentSpaceName) {
-		if (spaceName === currentSpaceName) return; // Strictement éviter le rechargement si même nom
+async function loadPublicEventsAndLayout(spaceId: string): Promise<void> {
+	if (!spaceId || spaceId === currentSpaceName) {
+		if (spaceId === currentSpaceName) return; // Strictement éviter le rechargement si même espace
 	}
 
-	// 👉 Gérer l'état global de chargement/erreur ici
 	isLoading = true;
 	error = null;
-	currentSpaceName = spaceName;
+	currentSpaceName = spaceId;
 
 	try {
-		// Nettoyer le store avant de charger de nouvelles données
 		clearStore();
-		// 1. Récupérer l'ID et les infos de base de l'espace
-		const fetchedSpaceInfo = await pb
-			.collection("spaces")
-			.getFirstListItem<SpacesResponse>(`name="${spaceName}"`);
 
-		spaceInfo = {
-			id: fetchedSpaceInfo.id,
-			name: fetchedSpaceInfo.name,
-			url: fetchedSpaceInfo.name, // Utiliser le nom comme URL par défaut
-			description: fetchedSpaceInfo.description || "",
-			categories: [],
-			rooms: [],
-			public_site: false
-		};
-		if (!spaceInfo) {
-			throw new Error(`Espace "${spaceName}" non trouvé.`);
-		}
-		const spaceId = spaceInfo.id;
-		console.log("spaceId", spaceId);
-
-		// 2. Récupérer les options et vérifier l'accès public
-		try {
-			const fetchedSpaceOptions = await pb
-				.collection("spaces_options")
-				.getFirstListItem<SpacesOptionsResponse>(`space="${spaceId}"`, {
-					// expand: 'space',
-					fields:
-						"categories,rooms,public_site,space,expand.space.name,expand.space.description,publicSiteTheme"
-				});
-
-			const loadedTheme = fetchedSpaceOptions?.publicSiteTheme as
-				| Partial<PublicSiteThemeOptions>
-				| undefined;
-
-			themeOptions = {
-				...getDefaultThemeOptions(),
-				...(loadedTheme ?? {}),
-				// Assurer la fusion profonde pour les objets imbriqués
-				eventCard: {
-					...getDefaultThemeOptions().eventCard,
-					...(loadedTheme?.eventCard ?? {})
-				},
-				layoutSections: {
-					...getDefaultThemeOptions().layoutSections,
-					...(loadedTheme?.layoutSections ?? {})
-				},
-				components: {
-					...getDefaultThemeOptions().components,
-					...(loadedTheme?.components ?? {})
-				}
-			};
-
-			if (themeOptions && themeOptions.defaultMode === "dark") {
-				themeOptions.daisyTheme = themeOptions.daisyThemeDark;
-			}
-
-			// On pourrait aussi stocker categories/rooms/public_site dans spaceInfo si nécessaire
-			if (spaceInfo) {
-				spaceInfo.categories = Array.isArray(fetchedSpaceOptions.categories)
-					? fetchedSpaceOptions.categories
-					: [];
-				spaceInfo.rooms = Array.isArray(fetchedSpaceOptions.rooms) ? fetchedSpaceOptions.rooms : [];
-				spaceInfo.public_site = fetchedSpaceOptions.public_site || false;
-			}
-		} catch (e: unknown) {
-			if (typeof e === "object" && e !== null && "status" in e && e.status === 404) {
-				console.warn(`[PublicStore] Options not found for space ${spaceId}. Using default theme.`);
-				themeOptions = getDefaultThemeOptions(); // Assurer les défauts si options non trouvées
-			} else {
-				throw e; // Relancer les autres erreurs de chargement des options
-			}
-		}
-
-		// const fetchMenusSite = await pb.collection("site_pages").getFullList<SitePagesRecord>({
-		// 	filter: `space="${spaceId}" && componentType="navigationMenu" `,
-		// 	sort: "pos",
-		// 	fields: "id,title,section,pos,componentConfig"
-		// });
-
-		// 3. Récupérer les événements publics
+		// 1. Récupérer les événements publics
 		const fetchedEvents = await pb.collection("events").getFullList<PublicEventInfo>({
 			filter: `space="${spaceId}" && isConfirmed=true && date_event>="${new Date().toISOString().split("T")[0]}"`,
 			sort: "date_event,start_public",
@@ -173,27 +86,65 @@ async function loadPublicData(spaceName: string): Promise<void> {
 		});
 
 		spaceEvents = fetchedEvents as PublicEventInfo[];
-		// console.log(`[publicStore] ${events.length} événements chargés.`);
 
-		// 5. Récupérer les SitePages pour le layout
+		// 2. Récupérer les SitePages pour le layout
 		const sectionsFilter = layoutSections.map((s) => `section="${s}"`).join(" || ");
 		const fetchedLayoutPages = await pb.collection("site_pages").getFullList<SitePagesResponse>({
 			filter: `space="${spaceId}" && (${sectionsFilter})`,
-			// Le tri par pos sera fait dans le composant via $derived, mais peut rester ici
 			sort: "pos",
-			fields: "id,title,content,section,componentConfig,pos"
+			fields: "id,title,content,section,componentConfig,componentType,pos"
 		});
 
-		layoutSitePages = fetchedLayoutPages;
+		layoutSitePages = fetchedLayoutPages.map((page) => {
+			if (page.componentType && page.componentConfig) {
+				return typeSitePageComponent(page);
+			}
+			return page;
+		});
 	} catch (err) {
-		console.error("Erreur dans publicStore.loadPublicData:", err);
+		console.error("Erreur dans publicStore.loadPublicEventsAndLayout:", err);
 		error =
 			err instanceof Error ? err.message : "Une erreur inconnue est survenue lors du chargement";
-		// Le store a déjà été vidé au début
 	} finally {
-		// 👉 Marquer la fin du chargement global
 		isLoading = false;
-		console.log(`[publicStore] loadPublicData terminé. isLoading: ${isLoading}, error: ${error}`);
+	}
+}
+
+// --- Utility Functions ---
+
+/**
+ * Convertit une SitePagesResponse en type discriminé selon son componentType
+ */
+function typeSitePageComponent(page: SitePagesResponse): SitePageResponse | SitePagesResponse {
+	if (!page.componentType || !page.componentConfig) {
+		return page;
+	}
+
+	switch (page.componentType) {
+		case ComponentType.navigationMenu:
+			return {
+				...page,
+				componentType: ComponentType.navigationMenu,
+				componentConfig: page.componentConfig as NavigationMenuResponse["componentConfig"]
+			} as NavigationMenuResponse;
+
+		case ComponentType.bloc:
+			return {
+				...page,
+				componentType: ComponentType.bloc,
+				componentConfig: page.componentConfig as BlocResponse["componentConfig"]
+			} as BlocResponse;
+
+		case ComponentType.page:
+			return {
+				...page,
+				componentType: ComponentType.page,
+				componentConfig: page.componentConfig as PageResponse["componentConfig"]
+			} as PageResponse;
+
+		default:
+			// Si le type n'est pas reconnu, retourner tel quel
+			return page;
 	}
 }
 
@@ -240,7 +191,7 @@ export const publicStore = {
 	},
 
 	// Méthodes exposées
-	loadPublicData, // Expose la fonction de chargement principale
+	loadPublicEventsAndLayout,
 	clearStore,
 	clearStoreAll
 };

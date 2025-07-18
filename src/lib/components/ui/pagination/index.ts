@@ -1,5 +1,5 @@
-export { default as Pagination } from './Pagination.svelte';
-export { default as LazyLoader } from './LazyLoader.svelte';
+export { default as Pagination } from "./Pagination.svelte";
+export { default as LazyLoader } from "./LazyLoader.svelte";
 
 export interface PaginationConfig {
 	pageSize: number;

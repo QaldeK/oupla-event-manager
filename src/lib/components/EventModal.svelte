@@ -241,7 +241,7 @@
 	});
 
 	let hasSondageValidation = $state(eventState.pendingSondageValidation || false);
-	$inspect("hasSondageValidation", hasSondageValidation);
+	// $inspect("hasSondageValidation", hasSondageValidation);
 	// instance unique de calcul des conflit pour ce modal
 	const conflictCalculator = new ConflictCalculator();
 
@@ -557,7 +557,7 @@
 	};
 </script>
 
-{$inspect("eventData", eventData)}
+<!-- {$inspect("eventData", eventData)} -->
 <!-- {$inspect('rteam', eventData.recurrence.recurrenceTeam)} -->
 <!-- {$inspect('eOrg', eventData.organizers)} -->
 <!-- {$inspect('activeTabDate', activeTabDate)} -->

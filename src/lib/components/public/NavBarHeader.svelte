@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Sun, Moon, Menu } from 'lucide-svelte';
-	import type { NavbarHeaderType } from '$lib/types/theme.d';
+	import { Sun, Moon, Menu } from "lucide-svelte";
+	import type { NavbarHeaderType } from "$lib/types/theme.d";
 
 	interface Props {
 		siteName: string;
@@ -12,7 +12,7 @@
 
 	let { siteName, url, config, toggleThemeMode, toggleSidebar }: Props = $props();
 	let menuButtonClass = $derived(
-		`cursor-pointer mx-4 btn-ghost btn-square lg:hidden ${config.linkClass?.join(' ')}`
+		`cursor-pointer mx-4 btn-ghost btn-square lg:hidden ${config.linkClass?.join(" ")}`
 	);
 </script>
 

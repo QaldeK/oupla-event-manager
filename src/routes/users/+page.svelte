@@ -15,8 +15,9 @@
 				sort: "-created"
 			});
 			users = response.items;
-		} catch (error: unknown) {
-			deleteError = `Erreur lors du chargement: ${error.message}`;
+		} catch (error) {
+			const err = error as ClientResponseError;
+			deleteError = `Erreur lors du chargement: ${err.message}`;
 		} finally {
 			isLoading = false;
 		}
@@ -30,7 +31,8 @@
 			deleteSuccess = true;
 			setTimeout(() => (deleteSuccess = false), 3000);
 		} catch (error) {
-			deleteError = `Erreur lors de la suppression: ${error.message}`;
+			const err = error as ClientResponseError;
+			deleteError = `Erreur lors de la suppression: ${err.message}`;
 			setTimeout(() => (deleteError = null), 3000);
 		}
 	}

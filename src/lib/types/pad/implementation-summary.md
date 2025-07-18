@@ -3,17 +3,14 @@
 ## Structure des fichiers créés
 
 1. **Types et Configuration**:
-
    - `src/lib/types/pad/pad.types.ts`: Définition des types pour les collections PocketBase
    - `src/lib/types/pad/README.md`: Documentation sur la configuration des collections PocketBase
    - `src/lib/types/pad/package.json.updates.md`: Instructions pour ajouter les dépendances nécessaires
 
 2. **Store et Services**:
-
    - `src/lib/shared/padStore.svelte.ts`: Services pour manipuler les pads avec PocketBase
 
 3. **Composants**:
-
    - `src/lib/components/pad/PadEditor.svelte`: Composant principal de l'éditeur collaboratif
 
 4. **Routes**:
@@ -24,13 +21,11 @@
 ## Fonctionnalités implémentées
 
 1. **Gestion des pads**:
-
    - Création de nouveaux pads
    - Affichage de la liste des pads
    - Édition d'un pad existant
 
 2. **Collaboration en temps réel**:
-
    - Synchronisation des modifications entre utilisateurs via PocketBase
    - Curseurs collaboratifs (position et nom des utilisateurs)
    - Propagation des modifications en temps réel

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { cn } from '$lib/utils.js';
-	import { type WithElementRef } from 'bits-ui';
+	import { cn } from "$lib/utils.js";
+	import { type WithElementRef } from "bits-ui";
 
-	import type { HTMLAttributes } from 'svelte/elements';
+	import type { HTMLAttributes } from "svelte/elements";
 
 	let {
 		ref = $bindable(null),
@@ -14,7 +14,7 @@
 
 <span
 	bind:this={ref}
-	class={cn('text-fluid-sm ml-auto tracking-widest opacity-60', className)}
+	class={cn("text-fluid-sm ml-auto tracking-widest opacity-60", className)}
 	{...restProps}
 >
 	{@render children?.()}

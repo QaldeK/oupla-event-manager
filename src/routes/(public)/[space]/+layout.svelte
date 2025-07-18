@@ -3,26 +3,35 @@
 	import { publicStore } from "$lib/shared/publicStore.svelte";
 
 	import NavBarHeader from "$lib/components/public/NavBarHeader.svelte";
+	import type { PageData } from "./$types";
 
 	import { page } from "$app/state";
 	import { Menu } from "lucide-svelte";
 	import "/src/daisy.css";
-	// 👉 Importer le type SitePagesResponse
+	// 👉 Importer les types discriminés
 	import type { SitePagesResponse } from "$lib/types/pocketbase";
-	import { type SitePagesNavigationMenuRecord } from "$lib/types/publicSiteType";
+	import {
+		type SitePageResponse,
+		ComponentType,
+		hasLinks,
+		getTypedComponentConfig
+	} from "$lib/types/publicSiteType";
 	import type { PublicSiteThemeOptions } from "$lib/types/theme";
 	import type { NavbarHeaderType } from "$lib/types/theme.d";
 	import { slugify } from "$lib/utils";
 
-	let { children } = $props();
+	const { children, data } = $props<{ data: PageData }>();
 
 	let isLeftSidebarOpen = $state(false);
 
 	let isLoading = $derived(publicStore.isLoading);
 	let storeError = $derived(publicStore.error);
-	let spaceInfo = $derived(publicStore.spaceInfo);
 
-	let themeOptions = $derived(publicStore.themeOptions); // Récupère les options du thème
+	// Utiliser les données préchargées du layout
+	let spaceInfo = data.spaceInfo;
+	let spaceName = spaceInfo?.name ?? "";
+
+	let themeOptions = data.themeOptions;
 	let layoutSiteBlock = $derived(publicStore.layoutSitePages);
 
 	let theme = $state();
@@ -47,64 +56,48 @@
 	});
 
 	let blockBySection = $derived.by(() => {
-		const groups: Record<string, SitePagesResponse[]> = {
+		const groups: Record<string, (SitePageResponse | SitePagesResponse)[]> = {
 			leftSide: [],
 			top: [],
 			rightSide: [],
 			footer: []
 		};
 		if (layoutSiteBlock) {
-			console.log("[pagesBySection] layoutSitePages contient:", layoutSiteBlock.length, "éléments"); // 👉 DEBUG
+			// console.log("[pagesBySection] layoutSitePages contient:", layoutSiteBlock.length, "éléments"); // 👉 DEBUG
 			for (const block of layoutSiteBlock) {
 				// Vérifier que la section existe dans 'groups' avant d'ajouter
-				// 👉 DEBUG: Log chaque page et sa section avant le tri
-				// console.log(`[pagesBySection] Traitement page ID: ${block.id}, Section: ${block.section}`);
 				if (block.section && block.section in groups) {
 					groups[block.section].push(block);
 				}
 			}
-		}
-		// Trier par pos DANS chaque groupe (le store les récupère déjà triées, mais double sécurité)
-		for (const key in groups) {
-			groups[key].sort((a, b) => (a.pos || 0) - (b.pos || 0));
 		}
 		return groups;
 	});
 
 	// --- Effet pour charger les données publiques ---
 
+	// Charger dynamiquement les événements et layout pages pour l'espace courant
 	$effect(() => {
-		const spaceName = page.params.space; // Lire le paramètre de la route
-		console.log("[Layout Effect] Déclenché pour space:", spaceName);
-
-		if (!spaceName) {
-			console.warn("[Layout Effect] Nom d'espace manquant.");
-			publicStore.clearStore(); // S'assurer que le store est vide
-			// Gérer la redirection si nécessaire
-			// setTimeout(() => goto('/'), 3000);
-			return; // Arrêter l'effet si pas de nom d'espace
-		}
-		// S'assurer que le store est nettoyé si on change d'espace
-		if (spaceInfo && spaceInfo.name !== spaceName) {
+		if (!spaceInfo?.id) {
 			publicStore.clearStore();
+			return;
 		}
-		if (!publicStore.isLoading && (!spaceInfo || spaceInfo.name !== spaceName)) {
-			publicStore.loadPublicData(spaceName);
-		}
+		publicStore.loadPublicEventsAndLayout(spaceInfo.id);
 	});
 
 	let initialPathname = $state(page.url.pathname); // Stocker le pathname initial
 
 	// --- Effet pour fermer la sidebar à la navigation ---
-	$effect(() => {
-		const currentPathname = page.url.pathname;
-		if (currentPathname !== initialPathname) {
-			isLeftSidebarOpen = false;
-			initialPathname = currentPathname; // Mettre à jour pour la prochaine navigation
-		}
-	});
-
 	// GARBAGE ?
+
+	// $effect(() => {
+	// 	const currentPathname = page.url.pathname;
+	// 	if (currentPathname !== initialPathname) {
+	// 		isLeftSidebarOpen = false;
+	// 		initialPathname = currentPathname; // Mettre à jour pour la prochaine navigation
+	// 	}
+	// });
+
 	$effect(() => {
 		if (themeOptions) {
 			const themeToApply =
@@ -140,34 +133,47 @@
 			? `${sectionStyle.bgClass || "bg-base-100"} ${sectionStyle.textClass || "text-base-content"}`
 			: "bg-base-100 text-base-content";
 	}
-
-	$inspect(layoutSiteBlock, "layoutSitePages brut du store"); // 👉 DEBUG: Voir les données brutes
 </script>
 
 <!-- Block de contenu ou Menu pour les sidebar, header, footer -->
-{#snippet block(block: SitePagesResponse | SitePagesNavigationMenuRecord)}
-	<div class="card mb-4 shadow-sm {block.componentConfig?.bgColor}">
-		<div class="card-body">
-			{#if block.title}
-				<h3 class="card-title">{block.title}</h3>
-			{/if}
-			{#if block.content}
-				<div class="prose max-w-none">
-					{@html block.content}
-				</div>
-			{/if}
-			{#if block.componentType === "navigationMenu" && block.componentConfig && block.componentConfig.links && block.componentConfig.links.length > 0}
-				<ul class="menu bg-base-200 rounded-box">
-					{#each block.componentConfig.links as item, index (index + item.title)}
-						<li><a href={item.url}>{item.title}</a></li>
-					{/each}
-				</ul>
-			{/if}
+{#snippet block(block: SitePageResponse | SitePagesResponse)}
+	{@const config = getTypedComponentConfig(block)}
+	{#if block.componentType === ComponentType.bloc}
+		<div class="card mb-4 shadow-sm {config?.bgColor || ''}">
+			<div class="card-body">
+				{#if block.title && (!block.componentType || config?.showTitle !== false)}
+					<h3 class="card-title">{block.title}</h3>
+				{/if}
+
+				{#if block.content}
+					<div class="prose max-w-none">
+						{@html block.content}
+					</div>
+				{/if}
+			</div>
 		</div>
-	</div>
+	{:else if hasLinks(block)}
+		{@const navConfig = block.componentConfig}
+		{#if navConfig.showTitle}
+			<h3>{block.title}</h3>
+		{/if}
+		<ul class="menu menu-lg {navConfig.bgColor} {navConfig.textColor}">
+			{#each navConfig.links as item, index (index + item.title)}
+				<li class="font-semibold">
+					<!-- FIXIT URL -->
+					<a href="/{spaceName}{item.url}" class={navConfig.textColor || ""}>
+						{#if item.icon}
+							<span class="icon">{item.icon}</span>
+						{/if}
+						{item.title}
+					</a>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 {/snippet}
 
-{#if publicStore.isLoading}
+{#if isLoading}
 	<div class="flex min-h-screen items-center justify-center">
 		<div class="text-center">
 			<span class="loading loading-dots loading-lg"></span>
@@ -286,7 +292,7 @@
 						class="min-h-full w-72 p-4 pt-28 shadow-lg lg:pt-24 {getSectionClasses('leftSidebar')}"
 						role="navigation"
 					>
-						{#each blockBySection.leftSide as page (page.id)}
+						{#each blockBySection.leftSide as page (page.pos)}
 							{@render block(page)}
 						{/each}
 					</aside>

@@ -10,6 +10,32 @@
 	const btnClass = "btn btn-sm btn-ghost p-1 hover:bg-base-200";
 	const activeClass = "bg-base-300";
 
+	// --- Actions extraites avec gestion des types ---
+
+	const toggleBold = () => {
+		if (!editor) return;
+		// @ts-expect-error - Les commandes TipTap fonctionnent mais les types ne sont pas parfaits
+		editor.chain().focus().toggleBold().run();
+	};
+
+	const toggleItalic = () => {
+		if (!editor) return;
+		// @ts-expect-error - fonctionnel
+		editor.chain().focus().toggleItalic().run();
+	};
+
+	const toggleBulletList = () => {
+		if (!editor) return;
+		// @ts-expect-error - fonctionnel
+		editor.chain().focus().toggleBulletList().run();
+	};
+
+	const setHorizontalRule = () => {
+		if (!editor) return;
+		// @ts-expect-error - fonctionnel
+		editor.chain().focus().setHorizontalRule().run();
+	};
+
 	// Fonction pour ajouter/supprimer un lien
 	const toggleLinkAction = () => {
 		if (!editor) return;
@@ -20,26 +46,14 @@
 			return;
 		}
 
-		// Sinon, on demande l'URL et on crée le lien
-		const url = prompt("Entrez l'URL du lien :", ""); // Utilise prompt pour la simplicité
+		const url = prompt("Entrez l'URL du lien :", "");
 
-		// Si l'utilisateur annule ou ne met rien (on pourrait valider l'URL ici)
-		if (url === null) {
-			return; // Ne fait rien si l'utilisateur annule
-		}
-		// Si l'URL est vide, on supprime le lien potentiel (au cas où)
+		if (url === null) return;
 		if (url === "") {
 			editor.chain().focus().extendMarkRange("link").unsetLink().run();
 			return;
 		}
-
-		// Applique le lien
 		editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-	};
-
-	const toogleBold = () => {
-		if (!editor) return;
-		editor.commands.toogleBold();
 	};
 </script>
 
@@ -51,7 +65,7 @@
 			type="button"
 			title="Gras"
 			class="{btnClass} {editor.isActive('bold') ? activeClass : ''}"
-			onclick={toogleBold}
+			onclick={toggleBold}
 		>
 			<Bold size={18} strokeWidth={2.5} />
 		</button>
@@ -59,7 +73,7 @@
 			type="button"
 			title="Italique"
 			class="{btnClass} {editor.isActive('italic') ? activeClass : ''}"
-			onclick={() => editor?.chain().focus().toggleItalic().run()}
+			onclick={toggleItalic}
 		>
 			<Italic size={18} strokeWidth={2.5} />
 		</button>
@@ -67,16 +81,11 @@
 			type="button"
 			title="Liste à puces"
 			class="{btnClass} {editor.isActive('bulletList') ? activeClass : ''}"
-			onclick={() => editor?.chain().focus().toggleBulletList().run()}
+			onclick={toggleBulletList}
 		>
 			<List size={18} strokeWidth={2.5} />
 		</button>
-		<button
-			title="Ligne horizontale"
-			class={btnClass}
-			type="button"
-			onclick={() => editor?.chain().focus().setHorizontalRule().run()}
-		>
+		<button title="Ligne horizontale" class={btnClass} type="button" onclick={setHorizontalRule}>
 			<Minus size={18} strokeWidth={2.5} />
 		</button>
 		<button

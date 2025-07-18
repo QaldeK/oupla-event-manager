@@ -1,527 +1,530 @@
 /// <reference path="../pb_data/types.d.ts" />
-migrate((app) => {
-  const collection = new Collection({
-    "createRule": "@request.auth.id != '' && @collection.spaceMembers.user ?= @request.auth.id && @collection.spaceMembers.space ?= space.id ",
-    "deleteRule": "@request.auth.id != '' && @collection.spaceMembers.user ?= @request.auth.id && @collection.spaceMembers.space ?= space.id",
-    "fields": [
-      {
-        "autogeneratePattern": "[a-z0-9]{15}",
-        "hidden": false,
-        "id": "text3208210256",
-        "max": 15,
-        "min": 15,
-        "name": "id",
-        "pattern": "^[a-z0-9]+$",
-        "presentable": false,
-        "primaryKey": true,
-        "required": true,
-        "system": true,
-        "type": "text"
-      },
-      {
-        "cascadeDelete": false,
-        "collectionId": "x9nemirbltqou9s",
-        "hidden": false,
-        "id": "relation695386426",
-        "maxSelect": 1,
-        "minSelect": 0,
-        "name": "space",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "relation"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text1781385543",
-        "max": 255,
-        "min": 0,
-        "name": "event_title",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": true,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "autodate2990389176",
-        "name": "created",
-        "onCreate": true,
-        "onUpdate": false,
-        "presentable": false,
-        "system": false,
-        "type": "autodate"
-      },
-      {
-        "hidden": false,
-        "id": "autodate3332085495",
-        "name": "updated",
-        "onCreate": true,
-        "onUpdate": true,
-        "presentable": false,
-        "system": false,
-        "type": "autodate"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text2170479147",
-        "max": 10,
-        "min": 10,
-        "name": "date_event",
-        "pattern": "",
-        "presentable": true,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "bool4057886235",
-        "name": "isConfirmed",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "hidden": false,
-        "id": "bool4208731335",
-        "name": "isPublic",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "hidden": false,
-        "id": "bool1369756112",
-        "name": "isPublished",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "hidden": false,
-        "id": "bool2027588219",
-        "name": "isSendToNewsletter",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "hidden": false,
-        "id": "bool2085137391",
-        "name": "isMasterRecurrent",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "hidden": false,
-        "id": "bool3629124496",
-        "name": "isRecurrent",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "cascadeDelete": true,
-        "collectionId": "y2bmoym46ud46vm",
-        "hidden": false,
-        "id": "relation423292442",
-        "maxSelect": 1,
-        "minSelect": 0,
-        "name": "masterRecurrentId",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "relation"
-      },
-      {
-        "hidden": false,
-        "id": "bool3851113217",
-        "name": "canceled",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text3658200307",
-        "max": 5,
-        "min": 5,
-        "name": "time_start",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text3665647835",
-        "max": 5,
-        "min": 5,
-        "name": "time_end",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text4051417485",
-        "max": 5,
-        "min": 5,
-        "name": "start_public",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text1325076566",
-        "max": 5,
-        "min": 5,
-        "name": "start_event",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "json1357457025",
-        "maxSize": 0,
-        "name": "external_proposal",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "hidden": false,
-        "id": "json2441432270",
-        "maxSize": 2000000,
-        "name": "dates_proposed",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text1843675174",
-        "max": 0,
-        "min": 0,
-        "name": "description",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "exceptDomains": null,
-        "hidden": false,
-        "id": "url917281265",
-        "name": "link",
-        "onlyDomains": null,
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "url"
-      },
-      {
-        "hidden": false,
-        "id": "json630777325",
-        "maxSize": 2000000,
-        "name": "other_date_query",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text2105242618",
-        "max": 255,
-        "min": 0,
-        "name": "age_advice",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "bool375941123",
-        "name": "is_age_no_restriction",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "hidden": false,
-        "id": "bool2315890383",
-        "name": "is_prix_libre",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text4159695454",
-        "max": 25,
-        "min": 0,
-        "name": "prix",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "bool1975839045",
-        "name": "isMixiteChoisie",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "bool"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text244120034",
-        "max": 50,
-        "min": 0,
-        "name": "mixite",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "convertURLs": false,
-        "hidden": false,
-        "id": "editor1961219530",
-        "maxSize": 0,
-        "name": "desc_public",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "editor"
-      },
-      {
-        "hidden": false,
-        "id": "file3309110367",
-        "maxSelect": 3,
-        "maxSize": 5242880,
-        "mimeTypes": [
-          "image/png",
-          "image/webp",
-          "image/gif",
-          "image/jpeg"
-        ],
-        "name": "image",
-        "presentable": false,
-        "protected": false,
-        "required": false,
-        "system": false,
-        "thumbs": null,
-        "type": "file"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text2220277813",
-        "max": 25,
-        "min": 0,
-        "name": "duree",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "json3533388796",
-        "maxSize": 2000000,
-        "name": "organizers",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text3693624885",
-        "max": 0,
-        "min": 0,
-        "name": "reportedTo",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "autogeneratePattern": "",
-        "hidden": false,
-        "id": "text486659184",
-        "max": 0,
-        "min": 0,
-        "name": "reportedFrom",
-        "pattern": "",
-        "presentable": false,
-        "primaryKey": false,
-        "required": false,
-        "system": false,
-        "type": "text"
-      },
-      {
-        "hidden": false,
-        "id": "json2090932886",
-        "maxSize": 2000000,
-        "name": "rooms",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "hidden": false,
-        "id": "json989021800",
-        "maxSize": 2000000,
-        "name": "categories",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "hidden": false,
-        "id": "json532148769",
-        "maxSize": 2000000,
-        "name": "recurrence",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "hidden": false,
-        "id": "json1347970455",
-        "maxSize": 0,
-        "name": "tasks",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "json"
-      },
-      {
-        "cascadeDelete": false,
-        "collectionId": "y2bmoym46ud46vm",
-        "hidden": false,
-        "id": "relation1629290822",
-        "maxSelect": 999,
-        "minSelect": 0,
-        "name": "inConflictWith",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "relation"
-      },
-      {
-        "hidden": false,
-        "id": "date591627108",
-        "max": "",
-        "min": "",
-        "name": "dateStart",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "date"
-      },
-      {
-        "hidden": false,
-        "id": "date3865544202",
-        "max": "",
-        "min": "",
-        "name": "dateEnd",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "date"
-      },
-      {
-        "cascadeDelete": false,
-        "collectionId": "_pb_users_auth_",
-        "hidden": false,
-        "id": "relation3725765462",
-        "maxSelect": 1,
-        "minSelect": 0,
-        "name": "created_by",
-        "presentable": false,
-        "required": false,
-        "system": false,
-        "type": "relation"
-      }
-    ],
-    "id": "pbc_3434440329",
-    "indexes": [
-      "CREATE INDEX `idx_nN4JGsJmsQ` ON `events_past` (`date_event`)",
-      "CREATE INDEX `idx_bfFYn6FmCz` ON `events_past` (`space`)"
-    ],
-    "listRule": "  // Événements publics et publiés\n    (isPublished = true && isConfirmed = true) ||\n    // OU événements créés par l'utilisateur externe\n    (@request.auth.id != \"\" && created_by = @request.auth.id) ||\n    // OU membre de l'espace avec accès complet\n    (@collection.spaceMembers.user ?= @request.auth.id && \n     @collection.spaceMembers.space ?= space.id && \n     @collection.spaceMembers.role != \"external\")",
-    "name": "events_past",
-    "system": false,
-    "type": "base",
-    "updateRule": "(@request.auth.id != \"\" && @collection.spaceMembers.user ?= @request.auth.id && @collection.spaceMembers.space ?= space.id) ||\n(@request.auth.id != \"\" && created_by = @request.auth.id && @collection.spaceMembers.role = \"external\")",
-    "viewRule": " (isPublished = true && isConfirmed = true) ||\n    (@request.auth.id != \"\" && created_by = @request.auth.id) ||\n    (@collection.spaceMembers.user ?= @request.auth.id && \n     @collection.spaceMembers.space ?= space.id && \n     @collection.spaceMembers.role != \"external\")"
-  });
+migrate(
+	(app) => {
+		const collection = new Collection({
+			createRule:
+				"@request.auth.id != '' && @collection.spaceMembers.user ?= @request.auth.id && @collection.spaceMembers.space ?= space.id ",
+			deleteRule:
+				"@request.auth.id != '' && @collection.spaceMembers.user ?= @request.auth.id && @collection.spaceMembers.space ?= space.id",
+			fields: [
+				{
+					autogeneratePattern: "[a-z0-9]{15}",
+					hidden: false,
+					id: "text3208210256",
+					max: 15,
+					min: 15,
+					name: "id",
+					pattern: "^[a-z0-9]+$",
+					presentable: false,
+					primaryKey: true,
+					required: true,
+					system: true,
+					type: "text"
+				},
+				{
+					cascadeDelete: false,
+					collectionId: "x9nemirbltqou9s",
+					hidden: false,
+					id: "relation695386426",
+					maxSelect: 1,
+					minSelect: 0,
+					name: "space",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "relation"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text1781385543",
+					max: 255,
+					min: 0,
+					name: "event_title",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: true,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "autodate2990389176",
+					name: "created",
+					onCreate: true,
+					onUpdate: false,
+					presentable: false,
+					system: false,
+					type: "autodate"
+				},
+				{
+					hidden: false,
+					id: "autodate3332085495",
+					name: "updated",
+					onCreate: true,
+					onUpdate: true,
+					presentable: false,
+					system: false,
+					type: "autodate"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text2170479147",
+					max: 10,
+					min: 10,
+					name: "date_event",
+					pattern: "",
+					presentable: true,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "bool4057886235",
+					name: "isConfirmed",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					hidden: false,
+					id: "bool4208731335",
+					name: "isPublic",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					hidden: false,
+					id: "bool1369756112",
+					name: "isPublished",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					hidden: false,
+					id: "bool2027588219",
+					name: "isSendToNewsletter",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					hidden: false,
+					id: "bool2085137391",
+					name: "isMasterRecurrent",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					hidden: false,
+					id: "bool3629124496",
+					name: "isRecurrent",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					cascadeDelete: true,
+					collectionId: "y2bmoym46ud46vm",
+					hidden: false,
+					id: "relation423292442",
+					maxSelect: 1,
+					minSelect: 0,
+					name: "masterRecurrentId",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "relation"
+				},
+				{
+					hidden: false,
+					id: "bool3851113217",
+					name: "canceled",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text3658200307",
+					max: 5,
+					min: 5,
+					name: "time_start",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text3665647835",
+					max: 5,
+					min: 5,
+					name: "time_end",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text4051417485",
+					max: 5,
+					min: 5,
+					name: "start_public",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text1325076566",
+					max: 5,
+					min: 5,
+					name: "start_event",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "json1357457025",
+					maxSize: 0,
+					name: "external_proposal",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					hidden: false,
+					id: "json2441432270",
+					maxSize: 2000000,
+					name: "dates_proposed",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text1843675174",
+					max: 0,
+					min: 0,
+					name: "description",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					exceptDomains: null,
+					hidden: false,
+					id: "url917281265",
+					name: "link",
+					onlyDomains: null,
+					presentable: false,
+					required: false,
+					system: false,
+					type: "url"
+				},
+				{
+					hidden: false,
+					id: "json630777325",
+					maxSize: 2000000,
+					name: "other_date_query",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text2105242618",
+					max: 255,
+					min: 0,
+					name: "age_advice",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "bool375941123",
+					name: "is_age_no_restriction",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					hidden: false,
+					id: "bool2315890383",
+					name: "is_prix_libre",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text4159695454",
+					max: 25,
+					min: 0,
+					name: "prix",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "bool1975839045",
+					name: "isMixiteChoisie",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "bool"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text244120034",
+					max: 50,
+					min: 0,
+					name: "mixite",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					convertURLs: false,
+					hidden: false,
+					id: "editor1961219530",
+					maxSize: 0,
+					name: "desc_public",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "editor"
+				},
+				{
+					hidden: false,
+					id: "file3309110367",
+					maxSelect: 3,
+					maxSize: 5242880,
+					mimeTypes: ["image/png", "image/webp", "image/gif", "image/jpeg"],
+					name: "image",
+					presentable: false,
+					protected: false,
+					required: false,
+					system: false,
+					thumbs: null,
+					type: "file"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text2220277813",
+					max: 25,
+					min: 0,
+					name: "duree",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "json3533388796",
+					maxSize: 2000000,
+					name: "organizers",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text3693624885",
+					max: 0,
+					min: 0,
+					name: "reportedTo",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					autogeneratePattern: "",
+					hidden: false,
+					id: "text486659184",
+					max: 0,
+					min: 0,
+					name: "reportedFrom",
+					pattern: "",
+					presentable: false,
+					primaryKey: false,
+					required: false,
+					system: false,
+					type: "text"
+				},
+				{
+					hidden: false,
+					id: "json2090932886",
+					maxSize: 2000000,
+					name: "rooms",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					hidden: false,
+					id: "json989021800",
+					maxSize: 2000000,
+					name: "categories",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					hidden: false,
+					id: "json532148769",
+					maxSize: 2000000,
+					name: "recurrence",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					hidden: false,
+					id: "json1347970455",
+					maxSize: 0,
+					name: "tasks",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "json"
+				},
+				{
+					cascadeDelete: false,
+					collectionId: "y2bmoym46ud46vm",
+					hidden: false,
+					id: "relation1629290822",
+					maxSelect: 999,
+					minSelect: 0,
+					name: "inConflictWith",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "relation"
+				},
+				{
+					hidden: false,
+					id: "date591627108",
+					max: "",
+					min: "",
+					name: "dateStart",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "date"
+				},
+				{
+					hidden: false,
+					id: "date3865544202",
+					max: "",
+					min: "",
+					name: "dateEnd",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "date"
+				},
+				{
+					cascadeDelete: false,
+					collectionId: "_pb_users_auth_",
+					hidden: false,
+					id: "relation3725765462",
+					maxSelect: 1,
+					minSelect: 0,
+					name: "created_by",
+					presentable: false,
+					required: false,
+					system: false,
+					type: "relation"
+				}
+			],
+			id: "pbc_3434440329",
+			indexes: [
+				"CREATE INDEX `idx_nN4JGsJmsQ` ON `events_past` (`date_event`)",
+				"CREATE INDEX `idx_bfFYn6FmCz` ON `events_past` (`space`)"
+			],
+			listRule:
+				'  // Événements publics et publiés\n    (isPublished = true && isConfirmed = true) ||\n    // OU événements créés par l\'utilisateur externe\n    (@request.auth.id != "" && created_by = @request.auth.id) ||\n    // OU membre de l\'espace avec accès complet\n    (@collection.spaceMembers.user ?= @request.auth.id && \n     @collection.spaceMembers.space ?= space.id && \n     @collection.spaceMembers.role != "external")',
+			name: "events_past",
+			system: false,
+			type: "base",
+			updateRule:
+				'(@request.auth.id != "" && @collection.spaceMembers.user ?= @request.auth.id && @collection.spaceMembers.space ?= space.id) ||\n(@request.auth.id != "" && created_by = @request.auth.id && @collection.spaceMembers.role = "external")',
+			viewRule:
+				' (isPublished = true && isConfirmed = true) ||\n    (@request.auth.id != "" && created_by = @request.auth.id) ||\n    (@collection.spaceMembers.user ?= @request.auth.id && \n     @collection.spaceMembers.space ?= space.id && \n     @collection.spaceMembers.role != "external")'
+		});
 
-  return app.save(collection);
-}, (app) => {
-  const collection = app.findCollectionByNameOrId("pbc_3434440329");
+		return app.save(collection);
+	},
+	(app) => {
+		const collection = app.findCollectionByNameOrId("pbc_3434440329");
 
-  return app.delete(collection);
-})
+		return app.delete(collection);
+	}
+);

@@ -3,7 +3,7 @@ type Serializer<T> = {
 	stringify: (object: T) => string;
 };
 
-type StorageType = 'local' | 'session';
+type StorageType = "local" | "session";
 
 interface Options<T> {
 	storage?: StorageType;
@@ -16,12 +16,12 @@ interface Options<T> {
 }
 
 function getStorage(type: StorageType) {
-	return type === 'local' ? localStorage : sessionStorage;
+	return type === "local" ? localStorage : sessionStorage;
 }
 
 export function persistedState<T>(key: string, initialValue: T, options: Options<T> = {}) {
 	const {
-		storage = 'local',
+		storage = "local",
 		serializer = JSON,
 		syncTabs = true,
 		onWriteError = console.error,
@@ -30,7 +30,7 @@ export function persistedState<T>(key: string, initialValue: T, options: Options
 		beforeWrite = (v: T) => v
 	} = options;
 
-	const browser = typeof window !== 'undefined' && typeof document !== 'undefined';
+	const browser = typeof window !== "undefined" && typeof document !== "undefined";
 	const storageArea = browser ? getStorage(storage) : null;
 
 	let storedValue: T;
@@ -54,8 +54,8 @@ export function persistedState<T>(key: string, initialValue: T, options: Options
 		}
 	}
 
-	if (syncTabs && typeof window !== 'undefined' && storage === 'local') {
-		window.addEventListener('storage', (event) => {
+	if (syncTabs && typeof window !== "undefined" && storage === "local") {
+		window.addEventListener("storage", (event) => {
 			if (event.key === key && event.storageArea === localStorage) {
 				try {
 					const newValue = event.newValue ? serializer.parse(event.newValue) : initialValue;

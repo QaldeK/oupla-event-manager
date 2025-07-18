@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { SyncStore } from '$lib/shared/syncState.svelte';
-	import type { StoreRecord } from '$lib/types/syncState.types';
+	import type { SyncStore } from "$lib/shared/syncState.svelte";
+	import type { StoreRecord } from "$lib/types/syncState.types";
 
 	interface Props {
 		store: SyncStore<StoreRecord>;
@@ -12,8 +12,8 @@
 	let {
 		store,
 		threshold = 90, // Pourcentage de scroll avant chargement
-		loadingMessage = 'Chargement...',
-		endMessage = 'Fin des résultats'
+		loadingMessage = "Chargement...",
+		endMessage = "Fin des résultats"
 	}: Props = $props();
 
 	let container: HTMLElement;
@@ -38,8 +38,8 @@
 		);
 
 		// Créer un élément sentinel
-		const sentinel = document.createElement('div');
-		sentinel.style.height = '1px';
+		const sentinel = document.createElement("div");
+		sentinel.style.height = "1px";
 		container.appendChild(sentinel);
 		observer.observe(sentinel);
 

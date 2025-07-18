@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { eventsStore } from '$lib/shared/eventsStore.svelte';
-	import { eventState, modalState } from '$lib/shared/states.svelte';
-	import { showAlert } from '$lib/shared/states.svelte';
-	import { ChevronDown, PencilIcon } from 'lucide-svelte';
+	import { eventsStore } from "$lib/shared/eventsStore.svelte";
+	import { eventState, modalState } from "$lib/shared/states.svelte";
+	import { showAlert } from "$lib/shared/states.svelte";
+	import { ChevronDown, PencilIcon } from "lucide-svelte";
 
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 
 	let { currentEvent, hasAuth } = $props();
 
@@ -14,8 +14,8 @@
 			eventState.is = masterEvent;
 			modalState.event = true;
 		} else {
-			console.error('Master recurrent event not found in store:', currentEvent.masterRecurrentId);
-			showAlert('Événement récurrent principal introuvable.', 'error');
+			console.error("Master recurrent event not found in store:", currentEvent.masterRecurrentId);
+			showAlert("Événement récurrent principal introuvable.", "error");
 		}
 	};
 

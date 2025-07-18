@@ -1,7 +1,6 @@
 <script lang="ts">
 	import DropDownModEvent from "$lib/components/DropDownModEvent.svelte";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-	import { pb } from "$lib/pocketbase.svelte";
 	import { restoreCanceledEvent } from "$lib/services/eventActions";
 	import { eventState, messageSheet, modalState, showAlert, userDb } from "$lib/shared";
 	import {

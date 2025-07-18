@@ -38,7 +38,7 @@ function createLogEntry({
 
 		if (details) logRecord.set("details", details);
 
-		$app.save(logRecord); 
+		$app.save(logRecord);
 	} catch (err) {
 		console.error(`Failed to create log entry (action: ${action}): ${JSON.stringify(err)}`);
 	}

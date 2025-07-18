@@ -46,6 +46,13 @@ import type {
 	SpacesResponse,
 	UsersResponse
 } from "$lib/types/pocketbase";
+
+// Type local pour garantir la présence de expand.space
+type SpacesOptionsWithExpand = SpacesOptionsResponse & {
+	expand?: {
+		space?: SpacesResponse;
+	};
+};
 import type {
 	PublicSpaceInfo,
 	SpaceConfig,
@@ -98,16 +105,7 @@ class SpaceOptionsDB {
 		try {
 			const record = await pb
 				.collection("spaces_options")
-				.getFirstListItem<
-					SpacesOptionsResponse<
-						unknown,
-						unknown,
-						unknown,
-						unknown,
-						unknown,
-						{ space: SpacesResponse }
-					>
-				>(`space="${spaceId}"`, {
+				.getFirstListItem<SpacesOptionsWithExpand>(`space="${spaceId}"`, {
 					expand: "space"
 				});
 
@@ -172,16 +170,7 @@ class SpaceOptionsDB {
 			// Charger les options de l'espace
 			const record = await pb
 				.collection("spaces_options")
-				.getFirstListItem<
-					SpacesOptionsResponse<
-						unknown,
-						unknown,
-						unknown,
-						unknown,
-						unknown,
-						{ space: SpacesResponse }
-					>
-				>(`space="${spaceId}"`, {
+				.getFirstListItem<SpacesOptionsWithExpand>(`space="${spaceId}"`, {
 					expand: "space"
 				});
 
@@ -238,16 +227,7 @@ class SpaceOptionsDB {
 		try {
 			const record = await pb
 				.collection("spaces_options")
-				.getFirstListItem<
-					SpacesOptionsResponse<
-						unknown,
-						unknown,
-						unknown,
-						unknown,
-						unknown,
-						{ space: SpacesResponse }
-					>
-				>(`space="${spaceId}"`, {
+				.getFirstListItem<SpacesOptionsWithExpand>(`space="${spaceId}"`, {
 					expand: "space"
 				});
 

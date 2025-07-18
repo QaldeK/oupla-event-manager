@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { Plus, X, GripVertical, ArrowDownIcon, ArrowUp } from "lucide-svelte";
+	import { Plus, X, ArrowDownIcon, ArrowUp } from "lucide-svelte";
 	import type { SitePagesNavigationMenuRecord } from "$lib/types/publicSiteType";
 	import { SitePagesSectionOptions } from "$lib/types/pocketbase";
 	import { getPages } from "../sitePageStore.svelte";
-	import { flip } from "svelte/animate";
-	import { fade } from "svelte/transition";
 
 	interface Props {
 		currentMenu: SitePagesNavigationMenuRecord;
@@ -41,6 +39,18 @@
 				newLinkUrl = "";
 			}
 		} else if (linkType === "page" && selectedPageId !== "selectPage") {
+			// D'abord, vérifier s'il s'agit d'un lien spécial
+			const specialLink = specialLinks.find((link) => link.url === selectedPageId);
+			if (specialLink) {
+				currentMenu.componentConfig.links.push({
+					title: specialLink.title,
+					url: specialLink.url
+				});
+				selectedPageId = "selectPage";
+				return;
+			}
+
+			// Sinon, rechercher dans les pages créées par l'utilisateur
 			const selectedPage = availablePages.find((page) => page.id === selectedPageId);
 			if (selectedPage) {
 				currentMenu.componentConfig.links.push({
@@ -63,7 +73,7 @@
 		currentMenu.componentConfig.links.splice(to, 0, movedLink);
 	}
 
-	$inspect("links", currentMenu.componentConfig.links);
+	// $inspect("links", currentMenu.componentConfig.links);
 </script>
 
 <div class="">
@@ -206,6 +216,9 @@
 							bind:value={selectedPageId}
 						>
 							<option value="selectPage" disabled>Choisir une page...</option>
+							{#each specialLinks as page (page.url)}
+								<option value={page.url}>{page.title}</option>
+							{/each}
 							{#each availablePages as page (page.id)}
 								<option value={page.id}>
 									{page.title || `Page sans titre (${page.id.substring(0, 5)}...)`}

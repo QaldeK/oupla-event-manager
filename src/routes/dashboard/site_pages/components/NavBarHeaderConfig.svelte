@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Pour les icônes
-	import type { NavbarHeaderType } from '$lib/types/theme.d';
+	import type { NavbarHeaderType } from "$lib/types/theme.d";
 
 	interface Props {
 		navbarHeaderConfig: NavbarHeaderType;
@@ -10,17 +10,17 @@
 
 	// Options de taille pour la NavBar
 	const sizeOptions = [
-		{ value: 'min-h-[3rem]', label: 'Petite' },
-		{ value: 'min-h-[4rem]', label: 'Moyenne' },
-		{ value: 'min-h-[5rem]', label: 'Grande' }
+		{ value: "min-h-[3rem]", label: "Petite" },
+		{ value: "min-h-[4rem]", label: "Moyenne" },
+		{ value: "min-h-[5rem]", label: "Grande" }
 	];
 
 	// Options de taille pour le texte du titre
 	const textSizeOptions = [
-		{ value: 'text-fluid-base', label: 'Normal' },
-		{ value: 'text-fluid-lg', label: 'Grand' },
-		{ value: 'text-fluid-xl', label: 'Très grand' },
-		{ value: 'text-fluid-2xl', label: 'Énorme' }
+		{ value: "text-fluid-base", label: "Normal" },
+		{ value: "text-fluid-lg", label: "Grand" },
+		{ value: "text-fluid-xl", label: "Très grand" },
+		{ value: "text-fluid-2xl", label: "Énorme" }
 	];
 
 	// Fonctions d'aide pour gérer les classes
@@ -86,23 +86,23 @@
 			<select
 				id="textSize"
 				class="select"
-				value={navbarHeaderConfig.titleClass.find((c) => c.startsWith('text-fluid-')) ||
-					'text-fluid-xl'}
+				value={navbarHeaderConfig.titleClass.find((c) => c.startsWith("text-fluid-")) ||
+					"text-fluid-xl"}
 				onchange={(e) => {
 					const target = e.target as HTMLSelectElement;
 					// Remplacer la classe de taille existante
 					const oldSizeClass = navbarHeaderConfig.titleClass.find((c) =>
-						c.startsWith('text-fluid-')
+						c.startsWith("text-fluid-")
 					);
 					if (oldSizeClass) {
 						navbarHeaderConfig.titleClass = navbarHeaderConfig.titleClass.filter(
-							(c) => !c.startsWith('text-fluid-')
+							(c) => !c.startsWith("text-fluid-")
 						);
 					}
 					navbarHeaderConfig.titleClass = [...navbarHeaderConfig.titleClass, target.value];
 				}}
 			>
-				{#each textSizeOptions as option, index ('option' + index)}
+				{#each textSizeOptions as option, index ("option" + index)}
 					<option value={option.value}>{option.label}</option>
 				{/each}
 			</select>
@@ -113,9 +113,9 @@
 			<input
 				type="checkbox"
 				class="toggle toggle-primary me-2"
-				checked={hasClass(navbarHeaderConfig.titleClass, 'font-bold')}
+				checked={hasClass(navbarHeaderConfig.titleClass, "font-bold")}
 				onchange={() => {
-					navbarHeaderConfig.titleClass = toggleClass(navbarHeaderConfig.titleClass, 'font-bold');
+					navbarHeaderConfig.titleClass = toggleClass(navbarHeaderConfig.titleClass, "font-bold");
 				}}
 				title="Mettre le titre en gras"
 			/>
@@ -127,9 +127,9 @@
 			<input
 				type="checkbox"
 				class="toggle toggle-primary me-2"
-				checked={hasClass(navbarHeaderConfig.titleClass, 'uppercase')}
+				checked={hasClass(navbarHeaderConfig.titleClass, "uppercase")}
 				onchange={() => {
-					navbarHeaderConfig.titleClass = toggleClass(navbarHeaderConfig.titleClass, 'uppercase');
+					navbarHeaderConfig.titleClass = toggleClass(navbarHeaderConfig.titleClass, "uppercase");
 				}}
 				title="Mettre le titre en majuscules"
 			/>

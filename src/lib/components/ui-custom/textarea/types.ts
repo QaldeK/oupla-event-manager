@@ -1,4 +1,4 @@
-import type { HTMLTextareaAttributes } from 'svelte/elements';
+import type { HTMLTextareaAttributes } from "svelte/elements";
 
 export interface DebounceOptions {
 	enabled?: boolean;

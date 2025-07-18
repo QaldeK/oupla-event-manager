@@ -1,34 +1,43 @@
 /// <reference path="../pb_data/types.d.ts" />
-migrate((app) => {
-  const collection = app.findCollectionByNameOrId("y2bmoym46ud46vm")
+migrate(
+	(app) => {
+		const collection = app.findCollectionByNameOrId("y2bmoym46ud46vm");
 
-  // update field
-  collection.fields.addAt(36, new Field({
-    "hidden": false,
-    "id": "9ik9jwls",
-    "maxSize": 2000000,
-    "name": "recurrenceTeam",
-    "presentable": false,
-    "required": false,
-    "system": false,
-    "type": "json"
-  }))
+		// update field
+		collection.fields.addAt(
+			36,
+			new Field({
+				hidden: false,
+				id: "9ik9jwls",
+				maxSize: 2000000,
+				name: "recurrenceTeam",
+				presentable: false,
+				required: false,
+				system: false,
+				type: "json"
+			})
+		);
 
-  return app.save(collection)
-}, (app) => {
-  const collection = app.findCollectionByNameOrId("y2bmoym46ud46vm")
+		return app.save(collection);
+	},
+	(app) => {
+		const collection = app.findCollectionByNameOrId("y2bmoym46ud46vm");
 
-  // update field
-  collection.fields.addAt(36, new Field({
-    "hidden": false,
-    "id": "9ik9jwls",
-    "maxSize": 2000000,
-    "name": "reccurenceTeam",
-    "presentable": false,
-    "required": false,
-    "system": false,
-    "type": "json"
-  }))
+		// update field
+		collection.fields.addAt(
+			36,
+			new Field({
+				hidden: false,
+				id: "9ik9jwls",
+				maxSize: 2000000,
+				name: "reccurenceTeam",
+				presentable: false,
+				required: false,
+				system: false,
+				type: "json"
+			})
+		);
 
-  return app.save(collection)
-})
+		return app.save(collection);
+	}
+);

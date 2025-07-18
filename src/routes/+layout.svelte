@@ -1,6 +1,6 @@
 <script>
-	import '../app.css';
-	import Alert from '$lib/components/Alert.svelte';
+	import "../app.css";
+	import Alert from "$lib/components/Alert.svelte";
 </script>
 
 <header>

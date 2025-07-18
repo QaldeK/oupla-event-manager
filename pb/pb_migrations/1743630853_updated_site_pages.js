@@ -1,38 +1,47 @@
 /// <reference path="../pb_data/types.d.ts" />
-migrate((app) => {
-  const collection = app.findCollectionByNameOrId("pbc_446563808")
+migrate(
+	(app) => {
+		const collection = app.findCollectionByNameOrId("pbc_446563808");
 
-  // update field
-  collection.fields.addAt(10, new Field({
-    "hidden": false,
-    "id": "number2161764012",
-    "max": 100,
-    "min": null,
-    "name": "pos",
-    "onlyInt": true,
-    "presentable": false,
-    "required": false,
-    "system": false,
-    "type": "number"
-  }))
+		// update field
+		collection.fields.addAt(
+			10,
+			new Field({
+				hidden: false,
+				id: "number2161764012",
+				max: 100,
+				min: null,
+				name: "pos",
+				onlyInt: true,
+				presentable: false,
+				required: false,
+				system: false,
+				type: "number"
+			})
+		);
 
-  return app.save(collection)
-}, (app) => {
-  const collection = app.findCollectionByNameOrId("pbc_446563808")
+		return app.save(collection);
+	},
+	(app) => {
+		const collection = app.findCollectionByNameOrId("pbc_446563808");
 
-  // update field
-  collection.fields.addAt(10, new Field({
-    "hidden": false,
-    "id": "number2161764012",
-    "max": 100,
-    "min": 1,
-    "name": "pos",
-    "onlyInt": true,
-    "presentable": false,
-    "required": false,
-    "system": false,
-    "type": "number"
-  }))
+		// update field
+		collection.fields.addAt(
+			10,
+			new Field({
+				hidden: false,
+				id: "number2161764012",
+				max: 100,
+				min: 1,
+				name: "pos",
+				onlyInt: true,
+				presentable: false,
+				required: false,
+				system: false,
+				type: "number"
+			})
+		);
 
-  return app.save(collection)
-})
+		return app.save(collection);
+	}
+);

@@ -43,12 +43,12 @@ export function debounce(
 		}, wait);
 	}
 
-	node.addEventListener('input', handleInput);
+	node.addEventListener("input", handleInput);
 
 	return {
 		destroy() {
 			clearTimeout(timeoutId);
-			node.removeEventListener('input', handleInput);
+			node.removeEventListener("input", handleInput);
 		},
 		update(newOptions: typeof options) {
 			options = newOptions;
