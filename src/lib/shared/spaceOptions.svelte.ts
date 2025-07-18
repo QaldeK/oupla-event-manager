@@ -275,7 +275,10 @@ let _spaceConfig = $state<SpaceConfig>({
 	rooms: [],
 	categories: [],
 	members: [],
-	tasks: []
+	tasks: [],
+	newsletterMembers: "",
+	newsletterPublic: "",
+	mailContactSpace: ""
 });
 
 export const getSpace = {
