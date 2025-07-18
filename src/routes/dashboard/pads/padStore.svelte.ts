@@ -32,7 +32,7 @@ export function subscribeToPadsUpdates(callback: () => void): () => void {
 	});
 }
 
-// Fonction pour obtenir les pads actuels
+// Fonction réactive pour obtenir les pads actuels
 export function getPads(): PadsType[] {
 	return getCollectionData<PadsType>(COLLECTION);
 }

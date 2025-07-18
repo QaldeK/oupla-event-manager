@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { subscribeToPagesUpdates, getPages, createPad, deletePad } from "../sitePageStore.svelte";
+	import { createPad, deletePad, getPages, subscribeToPagesUpdates } from "../sitePageStore.svelte";
 
-	import { showAlert, modalState } from "$lib/shared/states.svelte";
-	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
 	import { goto } from "$app/navigation";
+	import { modalState, showAlert } from "$lib/shared/states.svelte";
+	import { SitePagesSectionOptions, type SitePagesResponse } from "$lib/types/pocketbase";
 	import { persistedState } from "$lib/utils/local-state.svelte.js";
 
-	import { PagesList, ViewModeToggle } from "../components/index.js";
 	import { isMobile } from "$lib/utils";
-	import { AlertCircle, Plus, ArrowLeft, FileText } from "lucide-svelte";
+	import { AlertCircle, ArrowLeftSquare, FileText, Plus } from "lucide-svelte";
 	import { fade } from "svelte/transition";
+	import { PagesList, ViewModeToggle } from "../components/index.js";
 
 	let isLoading = $state(true);
 	let newPageTitle = $state("");
@@ -84,7 +84,7 @@
 			const newPage = await createPad(newPageTitle, SitePagesSectionOptions.page);
 			newPageTitle = "";
 			// Rediriger vers la page nouvellement créée
-			goto(`/dashboard/site_pages/${newPage.id}`);
+			goto(`/dashboard/site_pages/pages/${newPage.id}?editMode=true`);
 		} catch (e) {
 			showAlert("Erreur lors de la création de la page", "error");
 			console.error(e);
@@ -101,8 +101,8 @@
 <div transition:fade>
 	<!-- Header avec navigation -->
 	<div class="mb-6 flex flex-wrap items-center gap-4">
-		<button class="btn btn-ghost btn-sm" onclick={navigateBack}>
-			<ArrowLeft size={16} />
+		<button class="btn btn-square" onclick={navigateBack}>
+			<ArrowLeftSquare />
 		</button>
 		<div class="flex items-center gap-3">
 			<div class="bg-primary/10 rounded-lg p-2">

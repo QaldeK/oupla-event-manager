@@ -1,11 +1,13 @@
-<script lang="ts">
-	import type { SitePagesResponse } from "$lib/types/pocketbase";
+<script
+	lang="ts"
+	generics="T extends { id: string; title: string; created: string; updated: string }"
+>
 	import { format } from "date-fns";
 	import { fr } from "date-fns/locale";
 	import { Trash2, Pencil, Eye, FileText } from "lucide-svelte";
 
 	interface Props {
-		pages: SitePagesResponse[];
+		pages: T[];
 		isLoading?: boolean;
 		displayMode?: "cards" | "list";
 		onDelete?: (id: string) => void;
