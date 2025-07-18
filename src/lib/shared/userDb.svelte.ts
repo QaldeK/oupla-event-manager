@@ -51,7 +51,7 @@ class UserDB {
 	}
 
 	get currentSpace() {
-		return this.userData?.currentSpace || "";
+		return this.userData?.currentSpace ?? null;
 	}
 
 	get currentRole() {
@@ -89,6 +89,7 @@ class UserDB {
 					role: space.role
 				};
 			}),
+			// FIXIT : déterminer correctement l'espace en cours... gérer le multispace de manière générale.
 			currentSpace: memberOfResponse[0]?.expand?.space,
 			currentRole: memberOfResponse[0]?.role
 		};

@@ -3,9 +3,7 @@
 	import { pb } from "$lib/pocketbase.svelte";
 	import { showAlert } from "$lib/shared/states.svelte";
 	import { ArrowLeft, Eye, Moon, Palette, Sun } from "lucide-svelte";
-	import { onMount } from "svelte";
 	import { fade, slide } from "svelte/transition";
-
 	import ColorSelect from "$lib/components/ColorSelect.svelte";
 	import ModalX from "$lib/components/ModalX.svelte";
 	import OptionSlider from "$lib/components/OptionSlider.svelte";
@@ -18,10 +16,15 @@
 	import { isMobile } from "$lib/utils";
 	import "/src/daisy.css";
 
+	import type { PageProps } from "./$types";
+	let { data }: PageProps = $props();
+
 	let is_mobile = $derived(isMobile.current);
-	let isLoading = $state(true);
-	let theme = $state<PublicSiteThemeOptions>(getDefaultThemeOptions());
-	let initialTheme = $state<PublicSiteThemeOptions | null>(null);
+	let isLoading = $state(false);
+
+	// On clone le thème pour permettre l'édition sans affecter la source layout
+	let theme = $state<PublicSiteThemeOptions>(JSON.parse(JSON.stringify(data.theme)));
+	let initialTheme = $state<PublicSiteThemeOptions | null>(JSON.parse(JSON.stringify(data.theme)));
 	let themeModalOpen = $state(false);
 	let previewMode = $state<"light" | "dark">("light");
 
@@ -29,8 +32,8 @@
 		initialTheme ? JSON.stringify(theme) !== JSON.stringify(initialTheme) : false
 	);
 
-	let optionsRecordId = $state<string | null>(null);
-	let spaceId = $state<string | null>(null);
+	let optionsRecordId = $state<string | null>(data.optionsRecordId ?? null);
+	let spaceId = $state<string | null>(data.spaceId ?? null);
 
 	const daisyThemes = {
 		light: [
@@ -255,80 +258,7 @@
 		dateStart: null
 	};
 
-	onMount(async () => {
-		spaceId = await getCurrentAdminSpaceId();
-
-		if (!spaceId) {
-			showAlert("Impossible de déterminer votre espace. Vérifiez vos permissions.", "error");
-			return;
-		}
-
-		try {
-			const optionsRecord = await pb
-				.collection("spaces_options")
-				.getFirstListItem(`space = "${spaceId}"`);
-			optionsRecordId = optionsRecord.id;
-
-			const loadedTheme = optionsRecord?.publicSiteTheme as
-				| Partial<PublicSiteThemeOptions>
-				| undefined;
-			theme = {
-				...getDefaultThemeOptions(),
-				...(loadedTheme ?? {}),
-				eventCard: {
-					...getDefaultThemeOptions().eventCard,
-					...(loadedTheme?.eventCard ?? {})
-				},
-				layoutSections: {
-					...getDefaultThemeOptions().layoutSections,
-					...(loadedTheme?.layoutSections ?? {})
-				},
-				components: {
-					...getDefaultThemeOptions().components,
-					...(loadedTheme?.components ?? {})
-				}
-			};
-
-			if (!theme.daisyThemeLight) {
-				theme.daisyThemeLight = theme.daisyTheme || "light";
-			}
-			if (!theme.daisyThemeDark) {
-				theme.daisyThemeDark = theme.daisyTheme || "dark";
-			}
-			initialTheme = JSON.parse(JSON.stringify(theme));
-		} catch (e: unknown) {
-			if (typeof e === "object" && e !== null && "status" in e && e.status === 404) {
-				console.log(`Aucune option d'apparence existante trouvée pour l'espace ${spaceId}.`);
-				theme = getDefaultThemeOptions();
-				optionsRecordId = null;
-				initialTheme = JSON.parse(JSON.stringify(theme));
-			} else {
-				console.error("Erreur lors du chargement des options d'apparence:", e);
-				showAlert(
-					`Erreur chargement: ${typeof e === "object" && e !== null && "message" in e && e.message}`,
-					"error"
-				);
-				theme = getDefaultThemeOptions();
-				initialTheme = JSON.parse(JSON.stringify(theme));
-			}
-		} finally {
-			isLoading = false;
-		}
-	});
-
-	async function getCurrentAdminSpaceId(): Promise<string | null> {
-		const user = pb.authStore.record;
-		if (!user) return null;
-		try {
-			const memberRecord = await pb
-				.collection("spaceMembers")
-				.getFirstListItem(`user = "${user.id}" && role = "admin"`);
-			return memberRecord?.space || null;
-		} catch {
-			console.warn("L'utilisateur admin n'est associé à aucun espace via spaceMembers.");
-			return null;
-		}
-	}
+	// Suppression de la logique de chargement redondante (tout est dans le layout)
 
 	async function saveTheme() {
 		if (!spaceId) return;

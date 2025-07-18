@@ -11,7 +11,6 @@
 
 	// Imports Svelte
 	import { goto } from "$app/navigation";
-	import { onMount } from "svelte";
 	import { flip } from "svelte/animate";
 	import { fade, slide } from "svelte/transition";
 
@@ -38,8 +37,11 @@
 	// Import du CSS global
 	import "/src/daisy.css";
 
+	import type { PageProps } from "./$types";
+	let { data }: PageProps = $props();
+
 	// --- Déclarations des variables d'état ($state) ---
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let isUpdatingOrder = $state(false);
 	let error = $state<string | null>(null);
 
@@ -58,13 +60,13 @@
 		menuEditorOpen: false
 	});
 
-	// Variables pour la gestion du thème
-	let theme = $state<PublicSiteThemeOptions>(getDefaultThemeOptions());
-	let initialTheme = $state<PublicSiteThemeOptions | null>(null);
+	// Variables pour la gestion du thème (récupérées depuis le layout)
+	let theme = $state<PublicSiteThemeOptions>(JSON.parse(JSON.stringify(data.theme)));
+	let initialTheme = $state<PublicSiteThemeOptions | null>(JSON.parse(JSON.stringify(data.theme)));
 
-	// Variables liées à Pocketbase
-	let optionsRecordId = $state<string | null>(null);
-	let spaceId = $state<string | null>(null);
+	// Variables liées à Pocketbase (récupérées depuis le layout)
+	let optionsRecordId = $state<string | null>(data.optionsRecordId ?? null);
+	let spaceId = $state<string | null>(data.spaceId ?? null);
 
 	// Variable pour le mode de prévisualisation du thème
 	let previewMode = $state<"light" | "dark">("light");
@@ -149,92 +151,13 @@
 		{ value: "text-secondary", label: "Secondaire", color: "secondary" }
 	];
 
-	// --- Hooks de cycle de vie (onMount, $effect) ---
-	onMount(async () => {
-		spaceId = await getCurrentAdminSpaceId();
-
-		if (!spaceId) {
-			showAlert("Impossible de déterminer votre espace. Vérifiez vos permissions.", "error");
-			return;
-		}
-
-		try {
-			const optionsRecord = await pb
-				.collection("spaces_options")
-				.getFirstListItem(`space = "${spaceId}"`);
-			optionsRecordId = optionsRecord.id;
-
-			const loadedTheme = optionsRecord?.publicSiteTheme as
-				| Partial<PublicSiteThemeOptions>
-				| undefined;
-			theme = {
-				...getDefaultThemeOptions(),
-				...(loadedTheme ?? {}),
-				eventCard: {
-					...getDefaultThemeOptions().eventCard,
-					...(loadedTheme?.eventCard ?? {})
-				},
-				layoutSections: {
-					...getDefaultThemeOptions().layoutSections,
-					...(loadedTheme?.layoutSections ?? {})
-				},
-				components: {
-					...getDefaultThemeOptions().components,
-					...(loadedTheme?.components ?? {})
-				}
-			};
-
-			if (!theme.daisyThemeLight) {
-				theme.daisyThemeLight = theme.daisyTheme || "light";
-			}
-			if (!theme.daisyThemeDark) {
-				theme.daisyThemeDark = theme.daisyTheme || "dark";
-			}
-			initialTheme = JSON.parse(JSON.stringify(theme));
-		} catch (e: unknown) {
-			if (typeof e === "object" && e !== null && "status" in e && e.status === 404) {
-				console.log(`Aucune option d'apparence existante trouvée pour l'espace ${spaceId}.`);
-				theme = getDefaultThemeOptions();
-				optionsRecordId = null;
-				initialTheme = JSON.parse(JSON.stringify(theme));
-			} else {
-				console.error("Erreur lors du chargement des options d'apparence:", e);
-				showAlert(
-					`Erreur chargement: ${typeof e === "object" && e !== null && "message" in e && e.message}`,
-					"error"
-				);
-				theme = getDefaultThemeOptions();
-				initialTheme = JSON.parse(JSON.stringify(theme));
-			}
-		} finally {
-			isLoading = false;
-		}
-	});
-
+	// --- Souscription aux updates des pages ---
 	$effect(() => {
 		const unsubscribe = subscribeToPagesUpdates(() => {});
 		return unsubscribe;
 	});
 
 	// --- Fonctions utilitaires et de lecture de données ---
-
-	/**
-	 * Récupère l'ID de l'espace admin courant.
-	 * @returns L'ID de l'espace admin ou null si non trouvé.
-	 */
-	async function getCurrentAdminSpaceId(): Promise<string | null> {
-		const user = pb.authStore.record;
-		if (!user) return null;
-		try {
-			const memberRecord = await pb
-				.collection("spaceMembers")
-				.getFirstListItem(`user = "${user.id}" && role = "admin"`);
-			return memberRecord?.space || null;
-		} catch {
-			console.warn("L'utilisateur admin n'est associé à aucun espace via spaceMembers.");
-			return null;
-		}
-	}
 
 	/**
 	 * Retourne le thème actuel (light/dark) pour la prévisualisation.
@@ -810,11 +733,24 @@
 							theme = getDefaultThemeOptions();
 						}
 					}}
-					class="btn btn-ghost"
+					class="btn btn-ghost ml-auto"
 				>
 					Annuler
 				</button>
-				<button type="button" onclick={saveTheme} class="btn btn-primary">
+				<button
+					type="button"
+					onclick={() => {
+						if (data.userRole === "admin") {
+							saveTheme();
+						} else {
+							showAlert(
+								"Vous n'avez pas les droits pour modifier la configuration de ce site.",
+								"error"
+							);
+						}
+					}}
+					class="btn btn-primary"
+				>
 					Enregistrer les modifications
 				</button>
 			</div>
