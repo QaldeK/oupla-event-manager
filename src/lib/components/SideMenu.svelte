@@ -3,19 +3,7 @@
 	import type { ComponentProps } from "svelte";
 
 	import { goto } from "$app/navigation";
-	import {
-		AlertTriangle,
-		Calendar,
-		CalendarPlus,
-		CalendarSearch,
-		Clock,
-		Globe,
-		Mail,
-		RefreshCw,
-		Settings,
-		UserPlus,
-		Users
-	} from "lucide-svelte";
+	import { Calendar, CalendarSearch, Clock, Users } from "lucide-svelte";
 
 	const eventsItems = [
 		{

@@ -14,8 +14,12 @@ import {
 	Settings,
 	UserPlus,
 	Palette,
-	PanelsTopLeft
+	PanelsTopLeft,
+	ExternalLink
 } from "lucide-svelte";
+import { getSpace } from "./spaceOptions.svelte";
+
+const spaceName = getSpace.name;
 
 // --- INTERFACES ---
 
@@ -29,6 +33,8 @@ export interface ActionItem {
 	action: "openEventModal" | "openInviteModal"; // Actions spécifiques et typées
 	iconClass?: string;
 }
+
+export type NavigationItem = MenuItem | ActionItem;
 
 /**
  * Un élément qui navigue vers une nouvelle URL.
@@ -49,7 +55,10 @@ export interface MenuItem {
  * Construit une URL complète (chemin + paramètres) à partir d'un objet MenuItem.
  * @returns La chaîne de l'URL (ex: "/dashboard/events?status=pending").
  */
-export function generateUrl(item: MenuItem): string {
+export function generateUrl(item: NavigationItem): string {
+	if (!("path" in item)) {
+		return "#"; // ActionItem n'a pas de chemin, retourne un fragment vide
+	}
 	const url = new URL(item.path, "http://localhost"); // La base est arbitraire, on ne veut que le pathname + search
 	if (item.params) {
 		Object.entries(item.params).forEach(([key, value]) => {
@@ -166,6 +175,11 @@ export const otherMenuItems: MenuItem[] = [
 				label: "Template",
 				icon: PanelsTopLeft,
 				path: "/dashboard/site_pages/template"
+			},
+			{
+				label: "Visiter",
+				icon: ExternalLink,
+				path: `/${spaceName}` // FIXIT race condition
 			}
 		]
 	},

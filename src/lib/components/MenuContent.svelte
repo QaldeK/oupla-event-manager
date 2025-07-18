@@ -15,6 +15,9 @@
 		type MenuItem
 	} from "$lib/shared/navigation";
 
+	// Type d\'union pour représenter un item de navigation ou d\'action
+	type NavigationItem = MenuItem | ActionItem;
+
 	interface Props {
 		isCompact?: boolean;
 		onItemClick?: () => void;
@@ -28,13 +31,15 @@
 	let currentPathname = $derived(page.url.pathname);
 
 	// Vérifie si un item de navigation correspond EXACTEMENT à l'URL actuelle
-	function isItemActive(item: MenuItem): boolean {
+	function isItemActive(item: NavigationItem): boolean {
+		if (!("path" in item)) return false; // Les ActionItem n'ont pas de chemin et ne peuvent pas être "actifs"
 		return generateUrl(item) === currentFullUrl;
 	}
 
 	// Vérifie si un groupe de sous-menus doit être déplié
-	function shouldShowSubItems(item: MenuItem): boolean {
-		if (!item.subItems) return false;
+	function shouldShowSubItems(item: NavigationItem): boolean {
+		// Seuls les MenuItem peuvent avoir des sous-éléments et un chemin
+		if (!("subItems" in item) || !item.subItems || !("path" in item)) return false;
 
 		// Déplie si on est sur la page parente ou une de ses sous-pages
 		if (currentPathname.startsWith(item.path)) {
@@ -42,7 +47,8 @@
 		}
 
 		// Déplie si un des enfants est la page active
-		return item.subItems.some(isItemActive);
+		// Nous savons que item.subItems contient des MenuItem, et isItemActive peut désormais gérer NavigationItem
+		return item.subItems.some((subItem: MenuItem) => isItemActive(subItem));
 	}
 
 	// Gère tous les clics : soit une navigation, soit une action
@@ -68,8 +74,8 @@
 </script>
 
 <!-- SNIPPET RÉCURSIF POUR AFFICHER LES ITEMS DE MENU -->
-{#snippet renderMenuItem(item: import("$lib/types/publicSiteType").NavigationLink, level = 0)}
-	{@const url = generateUrl(item)}
+{#snippet renderMenuItem(item: NavigationItem, level = 0)}
+	{@const url = "path" in item ? generateUrl(item) : "#"}
 	{@const Icon = item.icon}
 	<li>
 		<a href={url} class={[isItemActive(item) && "bg-base-300"]} onclick={() => handleClick(item)}>
@@ -78,7 +84,7 @@
 		</a>
 
 		<!-- Appel récursif si des sous-items existent et doivent être montrés -->
-		{#if item.subItems && shouldShowSubItems(item)}
+		{#if "subItems" in item && item.subItems && shouldShowSubItems(item)}
 			<ul class="menu-sub {isCompact ? 'compact-subitem' : ''}">
 				{#each item.subItems as subItem (subItem.label)}
 					{@render renderMenuItem(subItem, level + 1)}
