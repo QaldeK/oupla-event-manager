@@ -486,15 +486,26 @@ export const updateAllOccurrences = async (masterEvent: EventType) => {
 };
 
 //::: Email send
-export async function sendEmail(html: string, text: string, recipient: string) {
+export async function sendEmail(
+	subject: string,
+	html: string,
+	text: string,
+	recipient: string,
+	replyTo: string
+) {
 	try {
 		// Encoder le HTML pour éviter les problèmes de caractères spéciaux
 		const response = await pb.send("/api/send_email", {
 			method: "POST",
+			headers: {
+				"Content-Type": "application/json" // Ajout de l'en-tête Content-Type
+			},
 			body: {
-				html: html,
-				text: text,
-				recipient: recipient
+				subject: subject, // Ajout du sujet
+				htmlContent: html, // Renommé pour correspondre au backend
+				textContent: text, // Renommé pour correspondre au backend
+				recipients: [recipient], // Transformé en tableau de destinataires
+				replyTo: replyTo
 			}
 		});
 
@@ -504,6 +515,7 @@ export async function sendEmail(html: string, text: string, recipient: string) {
 		}
 	} catch (error) {
 		console.error("Erreur lors de l'envoi de l'email:", error);
+		throw error; // Re-throw the error to be handled by the caller
 	}
 }
 

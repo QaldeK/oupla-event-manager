@@ -116,24 +116,23 @@ function getAdminEmails() {
  * @param {string} htmlContent - Contenu HTML de l'email.
  * @param {string} textContent - Contenu Text de l'email. Optionnel. Généré automatiquement si absent.
  */
-function sendEmail(recipients, subject, htmlContent, textContent = "") {
+
+function sendEmail(recipients, subject, htmlContent, textContent = "", replyTo = null) {
 	if (!textContent) {
 		textContent = generatePlainText(htmlContent); // Générer si non fourni
 	}
-
-	function sendEmail(recipients, subject, htmlContent, textContent, replyTo = null) {
-		// Créer un objet MailerMessage
-		const message = new MailerMessage({
-			from: {
-				address: $app.settings().meta.senderAddress,
-				name: $app.settings().meta.senderName
-			},
-			to: recipients.map((r) => ({ address: r })),
-			subject: subject,
-			html: htmlContent,
-			text: textContent,
-			// headers: replyTo ? { "Reply-To": replyTo } : {},
-		});
+	// Créer un objet MailerMessage
+	const message = new MailerMessage({
+		from: {
+			address: $app.settings().meta.senderAddress,
+			name: $app.settings().meta.senderName
+		},
+		to: recipients.map((r) => ({ address: r })),
+		subject: subject,
+		html: htmlContent,
+		text: textContent,
+		headers: replyTo ? { "Reply-To": replyTo } : {}
+	});
 
 	try {
 		$app.newMailClient().send(message);

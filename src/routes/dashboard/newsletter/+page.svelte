@@ -10,6 +10,7 @@
 	import { addDays, format, isWithinInterval } from "date-fns";
 	import { fr } from "date-fns/locale";
 	import "@friendofsvelte/tipex/styles/index.css";
+	import { Send } from "lucide-svelte";
 
 	const confirmedEvents = eventsStore.confirmedEvents;
 
@@ -20,6 +21,8 @@
 	];
 
 	let selectedPeriod = $state(30);
+
+	let newsletterSubject = $state("Les prochains événements !");
 
 	let introMessage = $state("Et voici les prochains événements !");
 	let outroMessage = $state("A bientot !");
@@ -210,6 +213,12 @@
 		// Calculer le texte brut directement ici
 		const currentText = formatPlainTextFromHtml(currentHtml);
 
+		if (!newsletterSubject.trim()) {
+			console.warn("Sujet de la newsletter vide, annulation de l'envoi.");
+			alert("Le sujet de la newsletter est vide.");
+			return;
+		}
+
 		if (!currentHtml || !currentText) {
 			console.warn("Contenu HTML ou texte vide, annulation de l'envoi.");
 			alert("Le contenu de la newsletter est vide.");
@@ -226,7 +235,7 @@
 			const recipient = getSpace.newsletterPublic;
 			const replyTo = getSpace.mailContactSpace;
 			console.log("recipient", recipient, "contact", replyTo);
-			await sendEmail(currentHtml, currentText, recipient, replyTo);
+			await sendEmail(newsletterSubject, currentHtml, currentText, recipient, replyTo);
 			alert("Newsletter envoyée avec succès !");
 			// Potentiellement marquer les événements comme envoyés ici (nécessite une logique supplémentaire)
 		} catch (error) {
@@ -351,119 +360,126 @@
 <!-- {$inspect(generatedHtml)} -->
 {$inspect("editorTextPreview", editorTextPreview)}
 <!-- Peut-être utile pour débugger les modifs manuelles -->
-
-<div class="period-selector">
-	<!-- ... reste du fieldset inchangé ... -->
-	<fieldset>
-		<legend>Evénements à inclure dans la newsletters</legend>
-		<div>
-			{#each periodOptions as option (option.days)}
-				<label>
-					<input type="radio" name="period" value={option.days} bind:group={selectedPeriod} />
-					<!-- 👉 Génère à nouveau si la période change -->
-					{option.label}
-				</label>
-			{/each}
-		</div>
-		<label class="flex cursor-pointer items-center rounded-lg px-3 py-2 hover:bg-gray-200"
-			><input type="checkbox" class="checkbox checkbox-sm" bind:checked={includeCanceled} />
-			<span class="ml-2 cursor-pointer text-gray-600">Prévenir des annulations</span>
-			<!-- ml-2 pour espacement -->
-		</label>
-	</fieldset>
-</div>
-
-<div class="mt-4">
-	<!-- Wrapper pour les onglets -->
-	<div role="tablist" class="tabs tabs-lifted">
-		<!-- Onglet Éditeur -->
-		<input
-			type="radio"
-			name="content_tabs"
-			role="tab"
-			class="tab"
-			aria-label="Éditeur"
-			checked
-			onclick={() => (activeTab = "editor")}
-		/>
-		<div
-			role="tabpanel"
-			class="tab-content bg-base-100 border-base-300 rounded-box overflow-hidden p-0"
-			style="min-height: 400px; height: 70vh; border-top-left-radius: 0;"
-		>
-			{#if generationOk || editor}
-				<Tipex
-					body={generatedHtml}
-					bind:tipex={editor}
-					extensions={tipexExtensions}
-					class="h-full w-full"
-					focal={false}
-				>
-					{#snippet head(tipexInstance)}
-						<!-- Barre d'outils personnalisée -->
-						<TipexToolbar editor={tipexInstance} />
-					{/snippet}
-					<!-- snippet vide, juste pour que les controls soient dans le head, sans les controle par defaut. -->
-					{#snippet controlComponent()}{/snippet}
-					<!-- Le contenu de l'éditeur (ProseMirror) sera dans la section par défaut -->
-					{#snippet foot()}
-						<div class="border-base-300 bg-base-200 flex items-center justify-end border-t p-2">
-							<button
-								class="btn btn-sm btn-primary"
-								onclick={sendNewsletter}
-								disabled={isSending || !editor || !editorHtmlPreview}
-							>
-								{#if isSending}
-									<span class="loading loading-spinner loading-xs"></span>
-									Envoi...
-								{:else}
-									Envoyer la Newsletter
-								{/if}
-							</button>
-						</div>
-					{/snippet}
-				</Tipex>
-			{:else}
-				<div class="bg-base-200 flex h-full items-center justify-center">
-					<span class="loading loading-dots loading-lg"></span>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Onglet Prévisualisation HTML -->
-		<input
-			type="radio"
-			name="content_tabs"
-			role="tab"
-			class="tab"
-			aria-label="Aperçu HTML"
-			onclick={() => (activeTab = "htmlPreview")}
-		/>
-		<div
-			role="tabpanel"
-			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;"
-		>
-			<div class="prose prose-sm max-w-none">
-				{@html editorHtmlPreview}
+<div class="h-11/12">
+	<div class="period-selector">
+		<!-- ... reste du fieldset inchangé ... -->
+		<fieldset>
+			<legend>Evénements à inclure dans la newsletters</legend>
+			<div>
+				{#each periodOptions as option (option.days)}
+					<label>
+						<input type="radio" name="period" value={option.days} bind:group={selectedPeriod} />
+						<!-- 👉 Génère à nouveau si la période change -->
+						{option.label}
+					</label>
+				{/each}
 			</div>
-		</div>
+			<label class="flex cursor-pointer items-center rounded-lg px-3 py-2 hover:bg-gray-200"
+				><input type="checkbox" class="checkbox checkbox-sm" bind:checked={includeCanceled} />
+				<span class="ml-2 cursor-pointer text-gray-600">Prévenir des annulations</span>
+				<!-- ml-2 pour espacement -->
+				<span class="ml-2 cursor-pointer text-gray-600"> </span></label
+			>
+		</fieldset>
+	</div>
 
-		<!-- Onglet Prévisualisation Texte -->
-		<input
-			type="radio"
-			name="content_tabs"
-			role="tab"
-			class="tab"
-			aria-label="Aperçu Texte"
-			onclick={() => (activeTab = "textPreview")}
-		/>
-		<div
-			role="tabpanel"
-			class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
-			style="min-height: 400px; height: 70vh;"
+	<div class="mb-4 flex flex-wrap items-center gap-4">
+		<label for="newsletterSubject" class="label flex flex-1 gap-2">
+			<span class="label-text">Sujet:</span>
+			<input
+				type="text"
+				id="newsletterSubject"
+				class="input input-bordered min-w-2xs flex-1"
+				bind:value={newsletterSubject}
+				placeholder="Sujet de votre newsletter"
+			/>
+		</label>
+		<button
+			class="btn btn-primary ml-auto"
+			onclick={sendNewsletter}
+			disabled={isSending || !editor || !editorHtmlPreview}
 		>
-			<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
+			{#if isSending}
+				<span class="loading loading-spinner loading-xs"></span>
+				Envoi...
+			{:else}
+				<Send size={18} />
+				Envoyer
+			{/if}
+		</button>
+	</div>
+
+	<div class="mt-4">
+		<!-- Wrapper pour les onglets -->
+		<div role="tablist" class="tabs tabs-lifted">
+			<!-- Onglet Éditeur -->
+			<input
+				type="radio"
+				name="content_tabs"
+				role="tab"
+				class="tab"
+				aria-label="Éditeur"
+				checked
+				onclick={() => (activeTab = "editor")}
+			/>
+			<div role="tabpanel" class="tab-content bg-base-100 rounded-box min-h-[400px] p-0">
+				<div class="bg-base-200 sticky top-0 z-20"></div>
+				{#if generationOk || editor}
+					<Tipex
+						body={generatedHtml}
+						bind:tipex={editor}
+						extensions={tipexExtensions}
+						focal={false}
+					>
+						{#snippet head()}
+							<TipexToolbar {editor} />
+						{/snippet}
+						<!-- snippet vide, juste pour que les controls soient dans le head, sans les controle par defaut. -->
+						{#snippet controlComponent()}{/snippet}
+						<!-- Le contenu de l'éditeur (ProseMirror) sera dans la section par défaut -->
+					</Tipex>
+				{:else}
+					<div class="bg-base-200 flex h-full items-center justify-center">
+						<span class="loading loading-dots loading-lg"></span>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Onglet Prévisualisation HTML -->
+			<input
+				type="radio"
+				name="content_tabs"
+				role="tab"
+				class="tab"
+				aria-label="Aperçu HTML"
+				onclick={() => (activeTab = "htmlPreview")}
+			/>
+			<div
+				role="tabpanel"
+				class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
+				style="min-height: 400px; height: 70vh;"
+			>
+				<div class="prose prose-sm max-w-none">
+					{@html editorHtmlPreview}
+				</div>
+			</div>
+
+			<!-- Onglet Prévisualisation Texte -->
+			<input
+				type="radio"
+				name="content_tabs"
+				role="tab"
+				class="tab"
+				aria-label="Aperçu Texte"
+				onclick={() => (activeTab = "textPreview")}
+			/>
+			<div
+				role="tabpanel"
+				class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
+				style="min-height: 400px; height: 70vh;"
+			>
+				<pre class="text-sm whitespace-pre-wrap">{editorTextPreview}</pre>
+			</div>
 		</div>
 	</div>
 </div>
@@ -511,25 +527,17 @@
 		flex-wrap: wrap;
 	}
 
-	:global(.tipex .ProseMirror) {
-		padding: 0.75rem 1rem;
-		/* Retirer le border-radius du haut car la toolbar l'a maintenant */
-		border-top-left-radius: 0;
-		border-top-right-radius: 0;
-		/* Assurer une hauteur minimale */
-		min-height: 100%; /* S'étend pour remplir le parent scrollable */
-		/* La hauteur et l'overflow sont gérés par .tipex-editor-section */
+	:global(.tiptap) {
 		outline: none;
-		background-color: white;
 		/* Important: S'assurer qu'il n'y a pas d'overflow caché ici qui pourrait interférer */
-		overflow: visible;
+		overflow: auto;
 	}
 
 	/* 👉 Ajustement pour que le wrapper Tipex n'ait pas de padding inutile */
 	:global(.tipex-editor-wrap) {
 		display: flex;
 		flex-direction: column;
-		height: 100%; /* Pour que le calcul de hauteur de ProseMirror fonctionne */
+		height: 75dvh; /* Pour que le calcul de hauteur de ProseMirror fonctionne */
 	}
 
 	/* 👉 Ajustement pour que la section éditeur prenne la place restante */
