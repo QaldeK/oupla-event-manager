@@ -393,7 +393,6 @@
 					body={generatedHtml}
 					bind:tipex={editor}
 					extensions={tipexExtensions}
-					controls={false}
 					class="h-full w-full"
 					focal={false}
 				>
@@ -401,12 +400,11 @@
 						<!-- Barre d'outils personnalisée -->
 						<TipexToolbar editor={tipexInstance} />
 					{/snippet}
+					<!-- snippet vide, juste pour que les controls soient dans le head, sans les controle par defaut. -->
+					{#snippet controlComponent()}{/snippet}
 					<!-- Le contenu de l'éditeur (ProseMirror) sera dans la section par défaut -->
 					{#snippet foot()}
-						<div
-							class="border-base-300 bg-base-100/80 flex items-center justify-between border-t p-2 backdrop-blur-sm"
-						>
-							<span class="text-xs text-gray-500">Modifiez le contenu si nécessaire</span>
+						<div class="border-base-300 bg-base-200 flex items-center justify-end border-t p-2">
 							<button
 								class="btn btn-sm btn-primary"
 								onclick={sendNewsletter}

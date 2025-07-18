@@ -85,10 +85,9 @@
 		publicStore.loadPublicEventsAndLayout(spaceInfo.id);
 	});
 
-	let initialPathname = $state(page.url.pathname); // Stocker le pathname initial
-
 	// --- Effet pour fermer la sidebar à la navigation ---
 	// GARBAGE ?
+	// let initialPathname = $state(page.url.pathname); // Stocker le pathname initial
 
 	// $effect(() => {
 	// 	const currentPathname = page.url.pathname;
