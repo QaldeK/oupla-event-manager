@@ -3,7 +3,7 @@
 		createDocumentEditManager,
 		INACTIVITY_TIMEOUT_MS
 	} from "$lib/shared/documentEditManager.svelte";
-	import type { SitePagesResponse, SitePagesRecord } from "$lib/types/pocketbase";
+	import type { SitePagesRecord } from "$lib/types/pocketbase";
 	import { defaultExtensions, Tipex, type TipexEditor } from "@friendofsvelte/tipex";
 	import "@friendofsvelte/tipex/styles/index.css";
 
@@ -39,12 +39,23 @@
 		initialEditMode: initialEditMode
 	});
 
+	let doc = $derived(editableDoc.doc);
+	let isLoading = $derived(editableDoc.isLoading);
+	let isEditing = $derived(editableDoc.isEditing);
+	let isLockedByOther = $derived(editableDoc.isLockedByOther);
+	let error = $derived(editableDoc.error);
+	let lockStatusMessage = $derived(editableDoc.lockStatusMessage);
+
 	// États locaux
 	let tipexEditor: TipexEditor | undefined = $state();
+	let editedTitle = $state("");
 
-	// États dérivés
-	let title = $derived(editableDoc.doc?.title ?? "");
-	let content = $derived(editableDoc.doc?.content ?? "");
+	// Synchroniser editedTitle avec doc.title quand le doc change
+	$effect(() => {
+		if (doc) editedTitle = doc.title ?? "";
+	});
+
+	let content = $derived(doc?.content ?? "");
 
 	let uiOptions = $derived.by(() => {
 		const defaultOptions = {
@@ -53,83 +64,33 @@
 			textColor: "text-base-content"
 		};
 
-		if (!editableDoc.doc) return defaultOptions;
-		return { ...defaultOptions, ...(editableDoc.doc.componentConfig || {}) };
+		if (!doc) return defaultOptions;
+		return { ...defaultOptions, ...(doc.componentConfig || {}) };
 	});
 
 	// État temporaire (local) pour les modifications d'UI options
 	// Utilisé pour retarder les mises à jour et éviter les boucles
-	let pendingUiChanges = $state<Record<string, any>>({});
+	let pendingUiChanges = $state<Record<string, unknown>>({});
 
-	// Synchroniser Tipex lorsque le contenu change via le store (ex: subscription) ET qu'on n'édite pas
+	// Synchronisation du contenu Tipex uniquement quand on passe en lecture
 	$effect(() => {
-		if (!tipexEditor || editableDoc.isLoading || editableDoc.isEditing) {
-			return;
-		}
-
-		const currentStoreContent = editableDoc.doc?.content ?? "";
-		if (tipexEditor.getHTML() !== currentStoreContent) {
-			console.log(`[PageBlockEditor ${docId}] Syncing Tipex with store content.`);
-			tipexEditor.commands.setContent(currentStoreContent, false);
+		if (!isEditing && tipexEditor && doc?.content !== tipexEditor.getHTML()) {
+			tipexEditor.commands.setContent(doc?.content ?? "", false);
 		}
 	});
 
 	// Nettoyage à la destruction du composant
-	$effect(() => {
-		return () => {
-			editableDoc.dispose();
-		};
-	});
+	$effect(() => () => editableDoc.dispose());
 
-	function collectAllChanges() {
-		if (!editableDoc.doc) return {};
-
-		const changes: Partial<SitePagesResponse> = {};
-
-		// Récupérer les valeurs actuelles de l'éditeur et du titre
-		if (title !== editableDoc.doc.title) {
-			changes.title = title;
-		}
-
-		if (tipexEditor && tipexEditor.getHTML() !== editableDoc.doc.content) {
-			changes.content = tipexEditor.getHTML();
-		}
-
-		// Intégrer les modifications d'UI en attente
-		if (Object.keys(pendingUiChanges).length > 0) {
-			const currentUiPage = editableDoc.doc.componentConfig || {};
-			changes.componentConfig = { ...currentUiPage, ...pendingUiChanges };
-		}
-
-		return changes;
+	// Handler pour la modification du titre
+	function handleTitleInput(event: Event) {
+		const value = (event.target as HTMLInputElement).value;
+		editedTitle = value;
+		editableDoc.updateField("title", value);
 	}
 
-	// export pour pouvoir sauver depuis le parent / le btn du modal
 	export async function save() {
-		if (!editableDoc.isEditing) return;
-
-		const changes = collectAllChanges();
-
-		// Ne sauvegarder que s'il y a des changements
-		if (Object.keys(changes).length > 0) {
-			try {
-				// Mise à jour du document avec tous les changements en une seule fois
-				await sitePageActions.updateDoc(docId, changes);
-				console.log("[PageBlockEditor] Sauvegarde manuelle réussie");
-
-				// Réinitialiser les changements en attente
-				pendingUiChanges = {};
-
-				// Libérer le verrou (sans sauvegarde supplémentaire, déjà fait)
-				await editableDoc.stopEditing(false);
-			} catch (error) {
-				console.error("[PageBlockEditor] Erreur lors de la sauvegarde:", error);
-				// L'erreur sera affichée via l'état error du store
-			}
-		} else {
-			// Pas de changements, juste libérer le verrou
-			await editableDoc.stopEditing(false);
-		}
+		await editableDoc.saveChanges();
 	}
 
 	function getCurrentValue(key: keyof typeof uiOptions) {
@@ -140,21 +101,11 @@
 		return uiOptions[key];
 	}
 
-	function updateUIOption(key: string, value: any) {
+	function updateUIOption(key: string, value: unknown) {
 		if (!editableDoc.doc) return;
-
-		// Mise à jour locale uniquement, pas de sauvegarde immédiate
-		pendingUiChanges = { ...pendingUiChanges, [key]: value };
-
-		// Si bgColor change, mettre à jour automatiquement textColor
-		// if (key === "bgColor") {
-		// 	const selectedBgColor = bgColorOptions.find((option) => option.value === value);
-		// 	if (selectedBgColor) {
-		// 		pendingUiChanges = { ...pendingUiChanges, textColor: selectedBgColor.textColor };
-		// 	}
-		// }
-
-		// Note: Les changements ne seront appliqués qu'à la sauvegarde manuelle
+		const currentConfig = editableDoc.doc.componentConfig || {};
+		const newConfig = { ...currentConfig, [key]: value };
+		editableDoc.updateField("componentConfig", newConfig);
 	}
 </script>
 
@@ -164,50 +115,56 @@
 	aria-label="Éditeur de contenu de site"
 >
 	<!-- Affichage des erreurs et status -->
-	{#if editableDoc.error}
+	{#if error}
 		<div role="alert" class="alert alert-error mb-4 shadow-md" aria-live="assertive">
 			<AlertCircle />
-			<span>{editableDoc.error}</span>
+			<span>{error}</span>
 			<button class="btn btn-sm btn-ghost" onclick={editableDoc.clearError}>Fermer</button>
-		</div>
-	{/if}
-	{#if editableDoc.isLockedByOther && !editableDoc.error}
-		<div role="alert" class="alert alert-warning mb-4 shadow-md" aria-live="assertive">
-			<Info />
-			<span>{editableDoc.lockStatusMessage} (Mode lecture seule)</span>
 		</div>
 	{/if}
 
 	<!-- Entête avec titre -->
-	<div class="bg-base-200 mb-4 flex flex-wrap items-center justify-between gap-4 rounded-t-lg p-3">
-		<div class="flex flex-grow flex-wrap items-center gap-2">
-			<input
-				type="text"
-				class="input input-bordered flex-grow text-lg font-semibold sm:min-w-[300px]"
-				placeholder="Titre du bloc/page"
-				value={title}
-				disabled={!editableDoc.isEditing || editableDoc.isLoading || editableDoc.isSaving}
-				aria-label="Titre du contenu"
-			/>
+	{#if isLockedByOther || !isEditing}
+		<!-- Affichage lecture seule si lock pris par un autre utilisateur -->
+		<div class="mb-2 flex flex-wrap items-center justify-between gap-4">
+			<div class="flex flex-grow flex-wrap items-center gap-2">
+				<div class="truncate text-lg font-semibold sm:min-w-[300px]">
+					{editedTitle}
+				</div>
+			</div>
 		</div>
-		<!-- Option Afficher le titre -->
-		<div class="form-control">
-			<label class="label cursor-pointer justify-start gap-4">
-				<span class="label-text font-medium">Afficher le titre</span>
+	{:else}
+		<!-- Mode édition -->
+		<div class="mb-2 flex flex-wrap items-center justify-between gap-4">
+			<div class="flex flex-grow flex-wrap items-center gap-2">
 				<input
-					type="checkbox"
-					class="toggle toggle-primary"
-					checked={getCurrentValue("showTitle")}
-					onclick={() => updateUIOption("showTitle", !getCurrentValue("showTitle"))}
+					type="text"
+					class="input input-bordered flex-grow text-lg font-semibold sm:min-w-[300px]"
+					placeholder="Titre du bloc/page"
+					bind:value={editedTitle}
+					oninput={handleTitleInput}
+					aria-label="Titre du contenu"
 				/>
-				{#if getCurrentValue("showTitle")}
-					<Eye size={16} />
-				{:else}
-					<EyeOff size={16} />
-				{/if}
-			</label>
+			</div>
+			<!-- Option Afficher le titre -->
+			<div class="form-control">
+				<label class="label cursor-pointer justify-start gap-4">
+					<span class="label-text font-medium">Afficher le titre</span>
+					<input
+						type="checkbox"
+						class="toggle toggle-primary"
+						checked={getCurrentValue("showTitle")}
+						onclick={() => updateUIOption("showTitle", !getCurrentValue("showTitle"))}
+					/>
+					{#if getCurrentValue("showTitle")}
+						<Eye size={16} />
+					{:else}
+						<EyeOff size={16} />
+					{/if}
+				</label>
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- Panneau d'options UI -->
 	<!-- <div class="border-base-300 bg-base-200 mb-4 rounded-md border p-4 shadow-sm">
@@ -228,7 +185,7 @@
 	</div> -->
 
 	<!-- Indicateur de chargement global -->
-	{#if editableDoc.isLoading && !editableDoc.doc}
+	{#if isLoading && !doc}
 		<div class="flex min-h-[300px] items-center justify-center p-10">
 			<span class="loading loading-dots loading-lg"></span>
 			<span class="ml-4">Chargement du contenu...</span>
@@ -238,31 +195,73 @@
 			<AlertCircle /> <span>Document non trouvé ou erreur de chargement.</span>
 		</div>
 	{:else}
-		<!-- Wrapper pour l'éditeur Tipex -->
+		<!-- Wrapper pour l'éditeur ou l'aperçu -->
 		<div class="bg-base-100 flex h-full flex-col rounded-lg border shadow-md">
-			{#if editableDoc.isEditing || editableDoc.isLockedByOther}
-				<div class="bg-base-200 flex flex-shrink-0 items-center">
-					<SimpleTiptapToolbar editor={tipexEditor} />
+			{#if isLockedByOther || !isEditing}
+				<!-- Aperçu lecture seule si lock pris OU si lock dispo mais pas encore repris -->
+				<div class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg">
+					<div class="prose max-w-none overflow-y-auto p-4">
+						{@html content || "<p><em>Ce bloc est vide.</em></p>"}
+					</div>
+					{#if isLockedByOther}
+						<div>
+							<div
+								role="alert"
+								class="alert alert-warning rounded-t-none rounded-b-md"
+								aria-live="assertive"
+							>
+								<Info />
+								<span>{lockStatusMessage} (Mode lecture seule)</span>
+							</div>
+						</div>
+					{:else}
+						<div
+							class="alert alert-info flex items-center justify-between rounded-t-none rounded-b-md"
+						>
+							<Info />
+							<span
+								>{lockStatusMessage || "Le document est maintenant disponible pour édition."}</span
+							>
+							<button
+								class="btn btn-outline btn-sm ml-4"
+								onclick={() => editableDoc.startEditing()}
+							>
+								Éditer
+							</button>
+						</div>
+					{/if}
 				</div>
+			{:else}
+				<!-- Mode édition -->
 				<div class="flex-1 overflow-hidden">
 					<Tipex
 						bind:tipex={tipexEditor}
 						extensions={[...defaultExtensions]}
-						controls={false}
 						class="h-full"
 						body={content}
 						autofocus={false}
 						floating={false}
 						focal={false}
-					></Tipex>
+						onupdate={() => {
+							if (isEditing && tipexEditor) {
+								editableDoc.updateField("content", tipexEditor.getHTML());
+							}
+						}}
+					>
+						{#snippet head(tipexEditor)}
+							<!-- Barre d'outils personnalisée -->
+							<SimpleTiptapToolbar editor={tipexEditor} />
+						{/snippet}
+						{#snippet controlComponent()}{/snippet}
+						{#snippet foot()}
+							<div class="text-base-content/60 p-1 text-xs">
+								Déconnexion automatique après {Math.round(INACTIVITY_TIMEOUT_MS / 60000)} min d'inactivité.
+							</div>
+						{/snippet}
+					</Tipex>
 				</div>
 			{/if}
 		</div>
-		{#if editableDoc.isEditing}
-			<div class="text-base-content/70 mt-2 text-xs">
-				Déconnexion automatique après {Math.round(INACTIVITY_TIMEOUT_MS / 60000)} min d'inactivité.
-			</div>
-		{/if}
 	{/if}
 </div>
 
