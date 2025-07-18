@@ -11,7 +11,9 @@ export interface SpaceConfig {
 	categories: string[];
 	members: SpaceUser[];
 	tasks: TaskType[];
-
+	newsletterPublic: string;
+	newsletterMembers: string;
+	mailContactSpace: string;
 	space?: {
 		id: string;
 		name: string;

@@ -121,16 +121,19 @@ function sendEmail(recipients, subject, htmlContent, textContent = "") {
 		textContent = generatePlainText(htmlContent); // Générer si non fourni
 	}
 
-	const message = new MailerMessage({
-		from: {
-			address: $app.settings().meta.senderAddress,
-			name: $app.settings().meta.senderName
-		},
-		to: recipients.map((r) => ({ address: r })),
-		subject: subject,
-		html: htmlContent,
-		text: textContent
-	});
+	function sendEmail(recipients, subject, htmlContent, textContent, replyTo = null) {
+		// Créer un objet MailerMessage
+		const message = new MailerMessage({
+			from: {
+				address: $app.settings().meta.senderAddress,
+				name: $app.settings().meta.senderName
+			},
+			to: recipients.map((r) => ({ address: r })),
+			subject: subject,
+			html: htmlContent,
+			text: textContent,
+			// headers: replyTo ? { "Reply-To": replyTo } : {},
+		});
 
 	try {
 		$app.newMailClient().send(message);

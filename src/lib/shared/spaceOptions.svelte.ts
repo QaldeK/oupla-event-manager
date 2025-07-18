@@ -121,7 +121,9 @@ class SpaceOptionsDB {
 				rooms: [],
 				categories: [],
 				members: [], // Vide en mode public
-				tasks: []
+				tasks: [],
+				newsletterPublic: "",
+				newsletterMembers: ""
 			};
 
 			return _spaceConfig;
@@ -183,6 +185,9 @@ class SpaceOptionsDB {
 			const rooms = Array.isArray(record.rooms) ? record.rooms : [];
 			const categories = Array.isArray(record.categories) ? record.categories : [];
 			const tasks = Array.isArray(record.tasks) ? record.tasks : [];
+			const newsletterPublic = record.newsletterPublic;
+			const newsletterMembers = record.newsletterMembers;
+			const mailContactSpace = record.mailContactSpace;
 
 			this.optionOf = {
 				space: {
@@ -201,6 +206,9 @@ class SpaceOptionsDB {
 				categories: categories || [],
 				tasks: tasks || [],
 				members: members || [],
+				newsletterMembers,
+				newsletterPublic,
+				mailContactSpace,
 				space: this.optionOf.space
 			};
 
@@ -346,6 +354,18 @@ export const getSpace = {
 
 	get members() {
 		return _spaceConfig.members;
+	},
+
+	get newsletterPublic() {
+		return _spaceConfig.newsletterPublic;
+	},
+
+	get newsletterMembers() {
+		return _spaceConfig.newsletterMembers;
+	},
+
+	get mailContactSpace() {
+		return _spaceConfig.mailContactSpace;
 	}
 };
 

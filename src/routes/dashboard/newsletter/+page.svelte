@@ -3,6 +3,7 @@
 	import { lisibleDate } from "$lib/utils";
 	import { sendEmail } from "$lib/pocketbase.svelte";
 	import { defaultExtensions, Tipex } from "@friendofsvelte/tipex";
+	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import type { Editor } from "@tiptap/core";
 
 	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
@@ -217,13 +218,15 @@
 
 		isSending = true;
 		console.log("Sending newsletter...");
-		console.log("HTML:", currentHtml); // Pour débogage
-		console.log("---");
-		console.log("Text:", currentText); // Pour débogage
+		// console.log("HTML:", currentHtml); // Pour débogage
+		// console.log("---");
+		// console.log("Text:", currentText); // Pour débogage
 
 		try {
-			await sendEmail(currentHtml, currentText); // Utilise les contenus de l'éditeur
-			console.log("Newsletter envoyée avec succès.");
+			const recipient = getSpace.newsletterPublic;
+			const replyTo = getSpace.mailContactSpace;
+			console.log("recipient", recipient, "contact", replyTo);
+			await sendEmail(currentHtml, currentText, recipient, replyTo);
 			alert("Newsletter envoyée avec succès !");
 			// Potentiellement marquer les événements comme envoyés ici (nécessite une logique supplémentaire)
 		} catch (error) {

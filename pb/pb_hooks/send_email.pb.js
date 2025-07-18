@@ -30,6 +30,7 @@ routerAdd("POST", "/api/send_email", (e) => {
 	let recipients = payload.recipients || [];
 	let recipientGroups = payload.recipientGroups || [];
 	let fallbackRecipientGroups = payload.fallbackRecipientGroups || [];
+	let replyTo = payload.replyTo;
 	const context = payload.context || {}; // Récupérer l'objet context
 
 	logger.info("Parsed payload", { payload: JSON.stringify(payload) });
@@ -120,7 +121,7 @@ routerAdd("POST", "/api/send_email", (e) => {
 	// --- Envoi ---
 	if (recipientsArray.length > 0) {
 		try {
-			utils.sendEmail(recipientsArray, subject, htmlContent, finalTextContent);
+			utils.sendEmail(recipientsArray, subject, htmlContent, finalTextContent, replyTo);
 			return e.json(200, {
 				message: "Email sent successfully.",
 				recipientCount: recipientsArray.length
