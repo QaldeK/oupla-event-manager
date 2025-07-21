@@ -12,7 +12,7 @@ import type {
 } from "$lib/types/syncState.types";
 import type { ListResult, RecordSubscription } from "pocketbase";
 
-import { SvelteMap } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 
 const subscribe = <T extends StoreRecord>(
 	collectionName: Collections,
@@ -44,7 +44,7 @@ export interface SyncStoreState<T extends StoreRecord> {
 	error: SyncError | null;
 	isSyncing: boolean;
 	lastSync: Date | null;
-	updatedRecords: Set<string>; // Pour trackUpdates
+	updatedRecords: SvelteSet<string>; // Pour trackUpdates
 	isInitialized: boolean;
 }
 
@@ -63,7 +63,7 @@ export class SyncStore<T extends StoreRecord> {
 		error: null as SyncError | null,
 		isSyncing: false,
 		lastSync: null as Date | null,
-		updatedRecords: new Set<string>(), // FIXIT : SvelteSet ?
+		updatedRecords: new SvelteSet<string>(), // FIXIT : SvelteSet ?
 		isInitialized: false
 	});
 
@@ -323,7 +323,7 @@ export class SyncStore<T extends StoreRecord> {
 	 * @param indexName Nom de l'index
 	 * @returns Map des enregistrements groupés par valeur d'index
 	 */
-	private indexCaches = new Map<
+	private indexCaches = new SvelteMap<
 		string,
 		{
 			timestamp: number;

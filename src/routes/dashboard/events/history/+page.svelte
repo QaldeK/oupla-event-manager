@@ -67,11 +67,11 @@
 			<p class="text-gray-600">Aucun événement passé trouvé</p>
 		</div>
 	{:else}
-		{#each Array.from(months.entries()) as [monthKey, events]}
+		{#each Array.from(months.entries()) as [monthKey, events], index (index)}
 			<div class="mb-8">
 				<h2 class="text-fluid-xl mb-4 font-semibold">{formatMonth(monthKey)}</h2>
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{#each events as event}
+					{#each events as event (event.id)}
 						<div class="rounded-lg bg-white p-4 shadow transition-shadow hover:shadow-md">
 							<h3 class="font-medium text-gray-900">{event.event_title}</h3>
 							<p class="text-fluid-sm mt-1 text-gray-600">
