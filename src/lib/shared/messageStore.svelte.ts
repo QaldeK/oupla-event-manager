@@ -78,6 +78,10 @@ class MessageStoreClass {
 			return [];
 		}
 
+		// le query builder ne sait pas que la liste d'IDs de l'index a changé.
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		const _ = this.#store.syncStore.allRecords;
+
 		return this.#store.syncStore
 			.query()
 			.byIndex("byEvent", id)
