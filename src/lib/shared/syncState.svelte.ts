@@ -327,4 +327,98 @@ export class SyncStore<T extends StoreRecord> {
 			this.store.updatedRecords.add(record.id);
 		}
 	}
+
+	// --- Pagination Locale ---
+
+	#pagination = $state({
+		pageSize: 20,
+		currentPage: 1
+	});
+
+	// Propriétés publiques et réactives pour l'état de la pagination
+	readonly totalRecords = $derived(this.allRecords.length);
+	readonly totalPages = $derived(Math.ceil(this.totalRecords / this.#pagination.pageSize));
+	readonly currentPage = $derived(this.#pagination.currentPage);
+	readonly pageSize = $derived(this.#pagination.pageSize);
+
+	// Le tableau des enregistrements pour la page actuelle
+	readonly paginatedRecords = $derived.by(() => {
+		const start = (this.#pagination.currentPage - 1) * this.#pagination.pageSize;
+		const end = start + this.#pagination.pageSize;
+		return this.allRecords.slice(start, end);
+	});
+
+	// Méthodes publiques pour contrôler la pagination
+	setPage(page: number): void {
+		if (page > 0 && page <= this.totalPages) {
+			this.#pagination.currentPage = page;
+		}
+	}
+
+	nextPage(): void {
+		this.setPage(this.#pagination.currentPage + 1);
+	}
+
+	previousPage(): void {
+		this.setPage(this.#pagination.currentPage - 1);
+	}
+
+	setPageSize(size: number): void {
+		if (size > 0) {
+			this.#pagination.pageSize = size;
+			this.#pagination.currentPage = 1; // Revenir à la première page
+		}
+	}
+
+	// --- Lazy Loader Factory ---
+
+	/**
+	 * Crée une vue "lazy-loaded" et triée des données du store.
+	 * @param options - Configuration pour le tri et la taille des lots.
+	 * @returns Un objet réactif pour contrôler et afficher les données lazy-loadées.
+	 */
+	createLazyLoader(options: { sortFn: (a: T, b: T) => number; batchSize?: number }) {
+		const { sortFn, batchSize = 20 } = options;
+
+		// 1. L'état interne du loader, spécifique à CETTE instance
+		const loaderState = $state({
+			loadedCount: batchSize
+		});
+
+		// 2. Un signal dérivé qui contient TOUS les enregistrements, mais triés selon la fonction fournie.
+		const sortedSource = $derived.by(() => {
+			// On crée une copie pour ne pas muter `allRecords`
+			return [...this.allRecords].sort(sortFn);
+		});
+
+		// 3. Les enregistrements actuellement visibles, basés sur le tri et le `loadedCount`
+		const records = $derived.by(() => {
+			return sortedSource.slice(0, loaderState.loadedCount);
+		});
+
+		// 4. Un booléen pour savoir s'il y a plus à charger
+		const hasMore = $derived(loaderState.loadedCount < sortedSource.length);
+
+		// 5. Les méthodes pour interagir avec ce loader
+		const loadMore = () => {
+			if (hasMore) {
+				loaderState.loadedCount = Math.min(
+					loaderState.loadedCount + batchSize,
+					sortedSource.length
+				);
+			}
+		};
+
+		const reset = () => {
+			loaderState.loadedCount = batchSize;
+		};
+
+		// On retourne l'API publique de ce loader
+		return {
+			records: records,
+			hasMore: hasMore,
+			loadMore,
+			reset
+		};
+	}
 }
