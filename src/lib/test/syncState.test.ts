@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { SyncStore } from "$lib/shared/syncState.svelte";
 import type { StoreRecord, StoreConfig } from "$lib/types/syncState.types";
-import { IndexedDbManager } from "$lib/shared/indexedDbManager.svelte";
-import { PocketBaseSyncer } from "$lib/shared/pocketbaseSyncer.svelte";
 
 // --- MOCKING AREA ---
 // Nous créons des objets qui contiendront nos fonctions mockées.
