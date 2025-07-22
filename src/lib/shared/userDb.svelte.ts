@@ -90,8 +90,9 @@ class UserDB {
 				};
 			}),
 			// FIXIT : déterminer correctement l'espace en cours... gérer le multispace de manière générale.
-			currentSpace: memberOfResponse[0]?.expand?.space,
-			currentRole: memberOfResponse[0]?.role
+			// FIXIT : déterminer correctement l'espace en cours... gérer le multispace de manière générale.
+			currentSpace: memberOfResponse[0]?.expand?.space || null,
+			currentRole: memberOfResponse[0]?.role || null
 		};
 	}
 

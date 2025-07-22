@@ -33,13 +33,9 @@
 	let { children } = $props();
 
 	// ::: states
-
-	// XXX :  passer currentUser et currentSpace en simple let non reactive ?
-	let isInitializing = $state(false);
 	let isInitialized = $state(false);
-
 	let initPromise = $state<Promise<void>>();
-	let error = $state<Error | null>(null);
+
 	let currentSpace = $state<{
 		id: string;
 		name: string;
@@ -66,16 +62,16 @@
 
 	// Fonction d'initialisation
 	async function initializeApp() {
-		if (isInitializing) return;
-		isInitializing = true;
-
 		try {
+			if (!pb.authStore.isValid) {
+				throw new Error("Session invalide");
+			}
 			// 1. Initialiser les données utilisateur
 			await userDb.initializeUserData();
 
 			const spaceData = userDb.currentSpace;
-			if (!spaceData || typeof spaceData === "string") {
-				throw new Error("Vous êtes inscrit à aucun espace");
+			if (!spaceData) {
+				throw new Error("Vous n'êtes associé à aucun espace de travail.");
 			}
 			currentSpace = spaceData;
 
@@ -87,17 +83,18 @@
 
 			// Initialiser le contexte
 			currentUser = {
-				id: pb.authStore.record?.id || "",
-				username: pb.authStore.record?.username || "",
-				role: pb.authStore.record?.role || ""
+				id: userDb.id,
+				username: userDb.current?.username || "",
+				role: userDb.currentRole || ""
 			};
 			isInitialized = true;
 		} catch (err) {
-			console.error("Erreur lors de l'initialisation :", err);
-			// Nettoyer l'auth
+			console.error("Erreur contrôlée lors de l'initialisation :", err);
+			// Nettoyer l'auth pour éviter les boucles de redirection
 			pb.authStore.clear();
+			userDb.logout();
 			// Lancer une erreur qui sera affichée à l'utilisateur
-			throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
+			throw new Error(err instanceof Error ? err.message : "Une erreur inconnue est survenue.");
 		}
 	}
 
@@ -106,7 +103,6 @@
 		if (isInitialized && currentSpace?.id) {
 			// Délai de 1 seconde pour ne pas impacter l'expérience utilisateur
 			setTimeout(() => {
-				// Chargement différé du messageStore et des notifications
 				if (currentSpace?.id) {
 					messageStore.init(currentSpace.id);
 					loadNotifications(currentSpace.id);
@@ -117,12 +113,12 @@
 
 	// ::: effect
 	// Lancer l'initialisation
-	// XXX utilisation de effect.pre ?
-	$effect.pre(() => {
+	$effect(() => {
 		if (!pb.authStore.isValid) {
 			goto("/login");
+		} else {
+			initPromise = initializeApp();
 		}
-		initPromise = initializeApp();
 	});
 
 	// :::_setContext
@@ -183,14 +179,13 @@
 
 			// 2. Réinitialiser les états locaux
 			isInitialized = false;
-			isInitializing = false;
+
 			currentSpace = null;
 			currentUser = {
 				id: "",
 				username: "",
 				role: ""
 			};
-			error = null;
 
 			// 4. Nettoyer l'authentification
 			pb.authStore.clear();
@@ -224,57 +219,45 @@
 	{:then}
 		{#if isInitialized}
 			<div class="bg-base-100 flex min-h-screen flex-col">
-				{#if error}
-					<div class="fixed inset-0 z-50 flex items-center justify-center">
-						<div class="rounded-lg bg-white p-6 shadow-lg">
-							<h2 class="text-fluid-xl mb-4 font-bold text-red-600">Erreur d'initialisation</h2>
-							<p class="text-base-content">{error.message}</p>
-							<button class="btn btn-primary" onclick={() => goto("/login")}>
-								Retour à la connexion
-							</button>
-						</div>
-					</div>
+				{#if !isMobile}
+					<HeaderBar
+						{sidebarState}
+						onToggleSidebar={handleToggleSidebar}
+						onRefresh={handleRefresh}
+						onLogout={handleLogout}
+					/>
 				{:else}
-					{#if !isMobile}
-						<HeaderBar
-							{sidebarState}
-							onToggleSidebar={handleToggleSidebar}
-							onRefresh={handleRefresh}
-							onLogout={handleLogout}
-						/>
-					{:else}
-						<MobileDock
-							onToggleSidebar={handleToggleSidebar}
-							onRefresh={handleRefresh}
-							onLogout={handleLogout}
-						/>
-						<MobileDrawer
-							bind:isOpen={mobileDrawerOpen}
-							onClose={() => {
-								mobileDrawerOpen = false;
-							}}
-						/>
-					{/if}
-
-					<!-- Mode desktop avec sidebar classique -->
-					<div id="global-app" class="min-h-screen {isMobile ? 'pb-20' : 'pt-16'}">
-						<!-- Sidebar desktop -->
-						{#if !isMobile}
-							<Sidebar {sidebarState} />
-						{/if}
-						<!-- Contenu principal -->
-						<main
-							class={[
-								sidebarState.isCompact && !isMobile && "ml-20",
-								!sidebarState.isCompact && !isMobile && "ml-64"
-							]}
-						>
-							<div class="container mx-auto p-4 md:p-8" style="min-height: calc(100dvh - 100px);">
-								{@render children()}
-							</div>
-						</main>
-					</div>
+					<MobileDock
+						onToggleSidebar={handleToggleSidebar}
+						onRefresh={handleRefresh}
+						onLogout={handleLogout}
+					/>
+					<MobileDrawer
+						bind:isOpen={mobileDrawerOpen}
+						onClose={() => {
+							mobileDrawerOpen = false;
+						}}
+					/>
 				{/if}
+
+				<!-- Mode desktop avec sidebar classique -->
+				<div id="global-app" class="min-h-screen {isMobile ? 'pb-20' : 'pt-16'}">
+					<!-- Sidebar desktop -->
+					{#if !isMobile}
+						<Sidebar {sidebarState} />
+					{/if}
+					<!-- Contenu principal -->
+					<main
+						class={[
+							sidebarState.isCompact && !isMobile && "ml-20",
+							!sidebarState.isCompact && !isMobile && "ml-64"
+						]}
+					>
+						<div class="container mx-auto p-4 md:p-8" style="min-height: calc(100dvh - 100px);">
+							{@render children()}
+						</div>
+					</main>
+				</div>
 			</div>
 		{/if}
 
@@ -303,13 +286,20 @@
 
 		<Alert />
 	{:catch error}
-		<div class="fixed inset-0 z-50 flex items-center justify-center">
-			<div class="rounded-lg bg-white p-6 shadow-lg">
-				<h2 class="text-fluid-xl mb-4 font-bold text-red-600">Session expirée</h2>
-				<p class="text-base-content">{error.message}</p>
-				<button class="btn btn-primary" onclick={() => goto("/login")}>
-					Retour à la connexion
-				</button>
+		<script lang="ts">
+			$effect(() => {
+				const timer = setTimeout(() => {
+					goto("/login");
+				}, 4000);
+				return () => clearTimeout(timer);
+			});
+		</script>
+		<div class="bg-base-100 fixed inset-0 z-50 flex items-center justify-center">
+			<div class="bg-base-200 rounded-lg p-6 text-center shadow-lg">
+				<h2 class="text-fluid-xl text-error mb-4 font-bold">Erreur de session</h2>
+				<p class="text-base-content mb-4">{error.message}</p>
+				<p class="text-sm">Vous allez être redirigé vers la page de connexion.</p>
+				<span class="loading loading-dots loading-md mt-4"></span>
 			</div>
 		</div>
 	{/await}
