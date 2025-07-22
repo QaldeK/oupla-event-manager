@@ -55,7 +55,7 @@ class UserDB {
 	}
 
 	get currentRole() {
-		if (!this.userData!.currentSpace) return null;
+		if (!this.userData?.currentSpace) return null;
 		return (
 			this.userData!.memberOf?.find((space) => space.id === this.userData!.currentSpace!.id)
 				?.role || null
