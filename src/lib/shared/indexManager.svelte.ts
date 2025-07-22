@@ -36,8 +36,14 @@ import type { StoreRecord, IndexConfig } from "$lib/types/syncState.types";
  * Gère la création, la mise à jour et l'interrogation d'index en mémoire.
  * Classe TypeScript pure, découplée de l'état Svelte.
  */
+/**
+ * Utilisation délibérée de Map/Set standards pour raisons de performance.
+ * Ce fichier est un utilitaire pur, pas un store réactif.
+ * La réactivité est gérée par le composant parent.
+ */
+/* eslint-disable svelte/prefer-svelte-reactivity */
 export class IndexManager<T extends StoreRecord> {
-	private indexedRecords: Map<string, Map<string | number, string[]>> = new Map();
+	private indexedRecords: Map<string, Map<string | number, Set<string>>> = new Map();
 
 	constructor(private indexesConfig: Record<string, IndexConfig> = {}) {
 		this.initializeIndexes();
@@ -82,12 +88,10 @@ export class IndexManager<T extends StoreRecord> {
 				if (value === undefined || value === null) continue;
 
 				if (!index.has(value)) {
-					index.set(value, []);
+					index.set(value, new Set());
 				}
-				const recordIds = index.get(value)!;
-				if (!recordIds.includes(record.id)) {
-					recordIds.push(record.id);
-				}
+				// L'utilisation d'un Set gère automatiquement les doublons et offre une insertion en O(1).
+				index.get(value)!.add(record.id);
 			}
 		}
 	}
@@ -112,11 +116,8 @@ export class IndexManager<T extends StoreRecord> {
 	 * @returns Un tableau d'enregistrements correspondants.
 	 */
 	public getByIndex(indexName: string, key: string | number, allRecordsMap: Map<string, T>): T[] {
-		const index = this.indexedRecords.get(indexName);
-		if (!index) return [];
-
-		const recordIds = index.get(key) || [];
-		return recordIds.map((id) => allRecordsMap.get(id)).filter(Boolean) as T[];
+		const recordIds = this.getIdsByIndex(indexName, key);
+		return [...recordIds].map((id) => allRecordsMap.get(id)).filter(Boolean) as T[];
 	}
 
 	/**
@@ -124,7 +125,9 @@ export class IndexManager<T extends StoreRecord> {
 	 * @param allRecordsMap - La Map contenant tous les enregistrements pour la résolution des IDs.
 	 */
 	public query(allRecordsMap: Map<string, T>): QueryBuilder<T> {
-		return new QueryBuilder<T>((indexName, key) => this.getByIndex(indexName, key, allRecordsMap));
+		return new QueryBuilder<T>(allRecordsMap, (indexName, key) =>
+			this.getIdsByIndex(indexName, key)
+		);
 	}
 
 	/**
@@ -134,20 +137,25 @@ export class IndexManager<T extends StoreRecord> {
 		this.initializeIndexes();
 	}
 
+	private getIdsByIndex(indexName: string, key: string | number): Set<string> {
+		const index = this.indexedRecords.get(indexName);
+		if (!index) return new Set();
+		return index.get(key) || new Set();
+	}
+
 	// --- Méthodes privées (logique d'assistance extraite de SyncStore) ---
 
 	/**
 	 * Parcourt un index donné et supprime toutes les références à un recordId.
 	 * Note : C'est une opération coûteuse car elle scanne toutes les clés de l'index.
 	 */
-	private cleanupIndexReferences(recordId: string, index: Map<string | number, string[]>): void {
+	private cleanupIndexReferences(recordId: string, index: Map<string | number, Set<string>>): void {
 		for (const [key, recordIds] of index.entries()) {
-			const pos = recordIds.indexOf(recordId);
-			if (pos > -1) {
-				recordIds.splice(pos, 1);
-			}
+			// La suppression dans un Set est en O(1), beaucoup plus rapide que indexOf + splice.
+			recordIds.delete(recordId);
+
 			// Si un index de clé devient vide, on le supprime
-			if (recordIds.length === 0) {
+			if (recordIds.size === 0) {
 				index.delete(key);
 			}
 		}
@@ -180,53 +188,85 @@ export class IndexManager<T extends StoreRecord> {
 }
 
 /**
- * Permet de construire des requêtes chaînées sur les index.
+ * Permet de construire des requêtes chaînées sur les index, tout en préservant la réactivité de Svelte.
  */
-export class QueryBuilder<T> {
-	private results: T[] | null = null;
+export class QueryBuilder<T extends StoreRecord> {
+	private allRecordsMap: Map<string, T>;
+	private getIdsByIndexFn: (indexName: string, key: string | number) => Set<string>;
 
-	constructor(private getByIndexFn: (indexName: string, key: string | number) => T[]) {}
+	private resultIds: Set<string> | null = null;
+	private sortCompareFn: ((a: T, b: T) => number) | null = null;
+	private takeCount: number | null = null;
+
+	constructor(
+		allRecordsMap: Map<string, T>,
+		getIdsByIndexFn: (indexName: string, key: string | number) => Set<string>
+	) {
+		this.allRecordsMap = allRecordsMap;
+		this.getIdsByIndexFn = getIdsByIndexFn;
+	}
 
 	/**
 	 * Filtre les résultats par un index et une clé.
 	 * Si c'est le premier filtre, il définit le jeu de résultats initial.
-	 * Si des filtres précédents existent, il effectue une intersection.
+	 * Si des filtres précédents existent, il effectue une intersection des IDs.
 	 */
 	public byIndex(indexName: string, key: string | number): this {
-		const records = this.getByIndexFn(indexName, key);
-		if (this.results === null) {
-			this.results = records;
+		const ids = this.getIdsByIndexFn(indexName, key);
+		if (this.resultIds === null) {
+			this.resultIds = new Set(ids);
 		} else {
-			const newIds = new Set(records.map((r) => (r as any).id));
-			this.results = this.results.filter((r) => newIds.has((r as any).id));
+			this.resultIds = new Set([...this.resultIds].filter((id) => ids.has(id)));
 		}
 		return this;
 	}
 
 	/**
-	 * Trie le jeu de résultats actuel.
+	 * Définit une fonction de tri qui sera appliquée à l'exécution.
 	 */
 	public sort(compareFn: (a: T, b: T) => number): this {
-		if (this.results) {
-			this.results.sort(compareFn);
-		}
+		this.sortCompareFn = compareFn;
 		return this;
 	}
 
 	/**
-	 * Garde seulement les N premiers résultats.
+	 * Définit le nombre maximum de résultats à retourner.
 	 */
 	public take(count: number): this {
-		if (this.results) {
-			this.results = this.results.slice(0, count);
-		}
+		this.takeCount = count;
 		return this;
 	}
 
 	/**
-	 * Exécute la requête et retourne le tableau de résultats final.
+	 * Exécute la requête :
+	 * 1. Résout les IDs en enregistrements (crée la dépendance réactive avec la `Map` de Svelte).
+	 * 2. Applique le tri.
+	 * 3. Applique la limite.
+	 * @returns Le tableau de résultats final.
 	 */
 	public exec(): T[] {
-		return this.results || [];
+		let records: T[];
+
+		if (this.resultIds === null) {
+			// Si aucun filtre `byIndex` n'a été appliqué, on peut opérer sur tous les enregistrements.
+			// La réactivité est alors dépendante de la collection entière.
+			records = Array.from(this.allRecordsMap.values());
+		} else {
+			// La réactivité est déclenchée ici car on accède à `this.allRecordsMap.get()`,
+			// qui est une méthode suivie par le SvelteMap réactif.
+			records = [...this.resultIds].map((id) => this.allRecordsMap.get(id)).filter(Boolean) as T[];
+		}
+
+		// Appliquer le tri
+		if (this.sortCompareFn) {
+			records.sort(this.sortCompareFn);
+		}
+
+		// Appliquer la limite
+		if (this.takeCount !== null) {
+			records = records.slice(0, this.takeCount);
+		}
+
+		return records;
 	}
 }

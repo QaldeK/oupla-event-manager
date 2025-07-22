@@ -1,13 +1,15 @@
-import type { Collection, StoreRecord, SyncOptions } from "$lib/types/syncState.types";
+import type { StoreRecord, SyncOptions } from "$lib/types/syncState.types";
 import { pb } from "$lib/pocketbase.svelte";
-import type { RecordSubscription } from "pocketbase";
+import type { RecordService, RecordSubscription } from "pocketbase";
 
 /**
  * Gère la communication et la synchronisation avec une collection PocketBase.
  * Classe TypeScript pure, sans état Svelte.
  */
+
+/* eslint-disable svelte/prefer-svelte-reactivity */
 export class PocketBaseSyncer<T extends StoreRecord> {
-	private collection: Collection | null = null;
+	private collection: RecordService<T> | null = null;
 	private pbUnsubscribe: (() => void) | null = null;
 	private lastSyncTime: Date | null = null;
 
@@ -28,7 +30,7 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	 * @param collection - L'objet collection de PocketBase.
 	 * @param lastSync - La date de la dernière synchronisation réussie.
 	 */
-	public async start(collection: Collection, lastSync: Date | null): Promise<void> {
+	public async start(collection: RecordService<T>, lastSync: Date | null): Promise<void> {
 		this.collection = collection;
 		this.lastSyncTime = lastSync;
 
@@ -121,7 +123,7 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	public async sync(isFullRefresh: boolean = false): Promise<void> {
 		if (!this.collection) {
 			this.onError(new Error("Syncer not started"), "sync");
-			return null;
+			return;
 		}
 
 		const syncTime = new Date();

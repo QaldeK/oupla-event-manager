@@ -1,35 +1,11 @@
-import { getFullList, getList, getOne } from "$lib/pocketbase.svelte";
-import type { Collections } from "$lib/types/pocketbase";
-import type { Collection, StoreConfig, StoreRecord, SyncError } from "$lib/types/syncState.types";
-import type { RecordSubscription } from "pocketbase";
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { pb } from "$lib/pocketbase.svelte";
 import { IndexedDbManager } from "$lib/shared/indexedDbManager.svelte";
 import { IndexManager, QueryBuilder } from "$lib/shared/indexManager.svelte";
 import { PocketBaseSyncer } from "$lib/shared/pocketbaseSyncer.svelte";
-import { pb } from "$lib/pocketbase.svelte";
-
-// NOTE: J'ai remis les fonctions subscribe/unsubscribe ici pour garder les dépendances PB centralisées
-// dans ce fichier, comme dans l'original.
-const subscribe = <T extends StoreRecord>(
-	collectionName: Collections,
-	callback: (data: RecordSubscription<T>) => void,
-	options?: { filter?: string; expand?: string }
-): (() => void) => {
-	pb.collection(collectionName).subscribe(
-		"*",
-		(data: RecordSubscription<T>) => {
-			if (["create", "update", "delete"].includes(data.action)) {
-				callback(data);
-			}
-		},
-		options
-	);
-	return () => pb.collection(collectionName).unsubscribe("*");
-};
-
-const unsubscribe = (collectionName: Collections, topic: string): void => {
-	pb.collection(collectionName).unsubscribe(topic);
-};
+import type { Collections } from "$lib/types/pocketbase";
+import type { Collection, StoreConfig, StoreRecord, SyncError } from "$lib/types/syncState.types";
+import type { RecordService } from "pocketbase";
+import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
 
 export class SyncStore<T extends StoreRecord> {
 	// L'état interne, utilisant les types réactifs de Svelte 5
@@ -90,22 +66,27 @@ export class SyncStore<T extends StoreRecord> {
 				}
 
 				// Créer l'objet 'collection' pour les appels à PocketBase
-				this.setupCollectionApi(collectionName);
+				const pbCollection = pb.collection(this.collectionName) as RecordService<T>;
 
 				// Créer et configurer le syncer
-				this.setupSyncer(collectionName);
+				this.syncer = new PocketBaseSyncer<T>(
+					this.config.sync || { mode: "manual" },
+					collectionName
+				);
 
-				// --- CORRECTION MAJEURE DE LA LOGIQUE DE SYNCHRO ---
-				// On détermine s'il faut faire une synchro complète ou incrémentielle
+				this.syncer.onRecordsReceived = (records) => this.processBatchUpdate(records);
+				this.syncer.onRecordDeleted = (recordId) => this.handleRecordDeletion(recordId);
+				this.syncer.onSyncComplete = (syncDate) => this.saveLastSync(syncDate);
+				this.syncer.onError = (error, context) => this.handleError(error, context);
+
 				let lastSyncDate = this.loadLastSync();
-				// Si le cache en mémoire est vide, on force une synchro complète
-				// en ignorant la date de la dernière synchro. C'est la logique clé qui manquait.
+				// Si le cache en mémoire est vide, on force une synchro complète en ignorant la date de la dernière synchro.
 				if (this.store.byId.size === 0) {
 					lastSyncDate = null;
 				}
 
 				if (this.syncer) {
-					await this.syncer.start(this.collection!, lastSyncDate);
+					await this.syncer.start(pbCollection, lastSyncDate);
 				}
 
 				// Configurer la synchro par intervalle si nécessaire
@@ -225,27 +206,6 @@ export class SyncStore<T extends StoreRecord> {
 		await this.dbManager.clear();
 	}
 
-	private setupCollectionApi(collectionName: Collections): void {
-		this.collection = {
-			getFullList: (options) => getFullList<T>(collectionName, options),
-			getList: (page, perPage, options) => getList<T>(collectionName, page, perPage, options),
-			getOne: (id, options) => getOne<T>(collectionName, id, options),
-			subscribe: (topic, callback, options) => subscribe(collectionName, callback as any, options),
-			unsubscribe: (topic) => unsubscribe(collectionName, topic),
-			// getFirstListItem est moins utilisé, on le laisse avec un type de retour simple
-			getFirstListItem: () => Promise.resolve({} as T)
-		};
-	}
-
-	private setupSyncer(collectionName: string): void {
-		this.syncer = new PocketBaseSyncer<T>(this.config.sync || { mode: "manual" }, collectionName);
-
-		this.syncer.onRecordsReceived = (records) => this.processBatchUpdate(records);
-		this.syncer.onRecordDeleted = (recordId) => this.handleRecordDeletion(recordId);
-		this.syncer.onSyncComplete = (syncDate) => this.saveLastSync(syncDate);
-		this.syncer.onError = (error, context) => this.handleError(error, context);
-	}
-
 	private setupIntervalSync(): void {
 		const interval = this.config.sync?.interval ?? 60000;
 		setInterval(async () => {
@@ -264,7 +224,7 @@ export class SyncStore<T extends StoreRecord> {
 	private loadLastSync(): Date | null {
 		const lastSyncStr = localStorage.getItem(this.LAST_SYNC_KEY);
 		if (lastSyncStr) {
-			const date = new Date(lastSyncStr);
+			const date = new SvelteDate(lastSyncStr);
 			this.store.lastSync = date;
 			return date;
 		}
@@ -272,7 +232,7 @@ export class SyncStore<T extends StoreRecord> {
 	}
 
 	private saveLastSync(date?: Date): void {
-		const dateToSave = date || new Date();
+		const dateToSave = date || new SvelteDate();
 		this.store.lastSync = dateToSave;
 		localStorage.setItem(this.LAST_SYNC_KEY, dateToSave.toISOString());
 	}
@@ -280,7 +240,7 @@ export class SyncStore<T extends StoreRecord> {
 	private handleError(error: unknown, context: string): void {
 		const syncError: SyncError = {
 			message: `${context}: ${error instanceof Error ? error.message : String(error)}`,
-			timestamp: new Date(),
+			timestamp: new SvelteDate(),
 			details: error
 		};
 		console.error(`❌ Erreur dans SyncStore [${context}]`, syncError);
@@ -314,7 +274,7 @@ export class SyncStore<T extends StoreRecord> {
 		if (excess <= 0) return;
 
 		const recordsToRemove = Array.from(this.store.byId.values())
-			.sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime())
+			.sort((a, b) => new SvelteDate(a.updated).getTime() - new SvelteDate(b.updated).getTime())
 			.slice(0, excess);
 
 		for (const record of recordsToRemove) {

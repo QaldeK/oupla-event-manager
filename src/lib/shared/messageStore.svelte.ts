@@ -1,5 +1,5 @@
 import { SyncStore } from "$lib/shared/syncState.svelte";
-import type { MessagesRecord, MessagesResponse, UsersResponse } from "$lib/types/pocketbase";
+import type { MessagesResponse, UsersResponse } from "$lib/types/pocketbase";
 import { Collections } from "$lib/types/pocketbase";
 
 /*
@@ -77,9 +77,6 @@ class MessageStoreClass {
 			console.warn("messageStore is not initialized yet.");
 			return [];
 		}
-		// Pour redeclancher getByIndex lorsqu'un nouveau message est crée
-		// $derived.by` ne peut pas savoir que le contenu retourné par `query()` dépend de `allRecords`.
-		const allMessage = this.#store.syncStore.allRecords;
 
 		return this.#store.syncStore
 			.query()

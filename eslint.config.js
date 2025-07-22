@@ -24,6 +24,11 @@ export default ts.config(
 		}
 	},
 	{
+		rules: {
+			"@typescript-eslint/no-explicit-any": "off"
+		}
+	},
+	{
 		files: ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js"],
 		ignores: ["eslint.config.js", "svelte.config.js"],
 

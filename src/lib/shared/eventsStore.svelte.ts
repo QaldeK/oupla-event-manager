@@ -34,6 +34,10 @@ export interface EventsStoreInitConfig {
 
 const userId = $derived(userDb?.current?.id);
 
+//IMPROVE: Pour des performances accrues et une meilleure scalabilité, il serait pertinent d'ajouter des index dans la configuration du SyncStore.
+// Cela permettrait d'utiliser IndexManager pour des accès rapides aux sous-ensembles d'événements (ex: confirmés, récurrents, etc.) au lieu de filtrer manuellement tout le tableau.
+// À envisager si le volume d'événements augmente ou si la réactivité devient critique.
+
 class EventsStore {
 	#store = $state({
 		syncStore: null as SyncStore<EventStoreRecord> | null,
