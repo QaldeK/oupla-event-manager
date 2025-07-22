@@ -1,0 +1,42 @@
+digraph {
+	graph [bb="0,0,506.62,130.5",
+		rankdir=TB
+	];
+	node [label="\N",
+		shape=box,
+		style=rounded
+	];
+	subgraph cluster_legend {
+		graph [bb="8,8,416,122.5",
+			color=lightgrey,
+			label=Légende,
+			lheight=0.23,
+			lp="212,110.25",
+			lwidth=0.65,
+			style=filled
+		];
+		component	[fillcolor=white,
+			height=0.5,
+			label=Composant,
+			pos="55,53",
+			style=filled,
+			width=1.0868];
+		ts_imports	[fillcolor=lightyellow,
+			height=1.0278,
+			label="Les fichiers .ts sont affichés à l'intérieur des nœuds
+state: fichiers d'état (états partagés)
+type: fichiers de types TypeScript
+\
+utilitaires: fonctions partagées",
+			pos="260,53",
+			shape=note,
+			style=filled,
+			width=4.0972];
+	}
+	"+page"	[fillcolor=lightcoral,
+		height=0.5,
+		label="users/+page",
+		pos="466,53",
+		style=filled,
+		width=1.1285];
+}

@@ -1,0 +1,88 @@
+digraph {
+	graph [bb="0,0,781.88,390.5",
+		rankdir=TB
+	];
+	node [label="\N",
+		shape=box,
+		style=rounded
+	];
+	subgraph cluster_legend {
+		graph [bb="8,246.25,416,360.75",
+			color=lightgrey,
+			label=Légende,
+			lheight=0.23,
+			lp="212,348.5",
+			lwidth=0.65,
+			style=filled
+		];
+		component	[fillcolor=white,
+			height=0.5,
+			label=Composant,
+			pos="55,291.25",
+			style=filled,
+			width=1.0868];
+		ts_imports	[fillcolor=lightyellow,
+			height=1.0278,
+			label="Les fichiers .ts sont affichés à l'intérieur des nœuds
+state: fichiers d'état (états partagés)
+type: fichiers de types TypeScript
+\
+utilitaires: fonctions partagées",
+			pos="260,291.25",
+			shape=note,
+			style=filled,
+			width=4.0972];
+	}
+	MenuContent	[fillcolor=lightcoral,
+		height=1.1528,
+		label="{MenuContent | screen.svelte.ts: screenDetector\lstate:navigation.ts: confMenuItems, eventsMenuItems, gener...\lstate:states.svelte.js.ts: \
+modalState\l}",
+		pos="601,41.5",
+		rects="420.12,58,781.88,82.5 420.12,0.5,781.88,58",
+		shape=record,
+		style=filled,
+		width=5.0243];
+	Sidebar	[fillcolor="#f0f0f0",
+		height=0.51389,
+		label=Sidebar,
+		pos="554,137.5",
+		rects="525.38,119.5,582.62,155.5",
+		shape=record,
+		style=filled,
+		width=0.79514];
+	Sidebar -> MenuContent	[color=blue,
+		pos="e,574.24,82.65 557.26,119.26 560.24,111.63 564.49,102.22 569.2,92.634"];
+	Sidebar -> MenuContent	[color=blue,
+		pos="e,587.61,82.65 567.98,119.26 572.58,111.71 577.69,102.42 582.52,92.936"];
+	"+layout@dashboard"	[fillcolor=pink,
+		height=2.7569,
+		label="{dashboard/+layout | props: children\lnotificationsAndLogs.ts: clearNotifications, loadNotifications\lpocketbase.svelte.ts: pb\lscreen.svelte.ts: \
+screenDetector\lstate:eventsStore.svelte.ts: eventsStore\lstate:messageStore.svelte.ts: messageStore\lstate:spaceOptions.svelte.ts: \
+getSpace, loadSpaceOptions\lstate:states.svelte.ts: loadingState, messageSheet, modalState\lstate:userDb.svelte.ts: userDb\ltype:\
+types.ts: CurrentUser\l}",
+		pos="602,291.25",
+		rects="426,365.5,778,390 426,192.5,778,365.5",
+		shape=record,
+		style=filled,
+		width=4.8889];
+	"+layout@dashboard" -> Sidebar	[color=blue,
+		pos="e,554.97,155.7 564.44,192 561.78,182.88 559.41,174.23 557.52,166.65"];
+	"+layout@dashboard" -> Sidebar	[color=blue,
+		pos="e,563.91,155.7 577.41,192 574.26,182.77 571.12,174.02 568.18,166.38"];
+	MobileDrawer	[fillcolor="#f0f0f0",
+		height=0.51389,
+		label=MobileDrawer,
+		pos="649,137.5",
+		rects="600.88,119.5,697.12,155.5",
+		shape=record,
+		style=filled,
+		width=1.3368];
+	"+layout@dashboard" -> MobileDrawer	[color=blue,
+		pos="e,639.2,155.7 625.95,192 629.03,182.77 632.12,174.02 635,166.38"];
+	"+layout@dashboard" -> MobileDrawer	[color=blue,
+		pos="e,648.14,155.7 638.91,192 641.48,182.99 643.77,174.43 645.6,166.92"];
+	MobileDrawer -> MenuContent	[color=blue,
+		pos="e,614.82,82.65 634.83,119.26 630.1,111.63 624.84,102.22 619.86,92.634"];
+	MobileDrawer -> MenuContent	[color=blue,
+		pos="e,628.19,82.65 645.56,119.26 642.5,111.63 638.15,102.22 633.34,92.634"];
+}

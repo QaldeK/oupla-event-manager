@@ -14,6 +14,7 @@
 
 - **Language**: French for comments, documentation, and UI text
 - **Components**: Use Svelte 5 runes (`$state`, `$derived`, `$effect`, `$props`, `$bindable`)
+- **CSR**: We work on client side rendering sveltekit project
 - **Types**: Use strict TypeScript typing, always define interfaces for props
 - **Naming**: Clear, explicit; use camelCase for variables, PascalCase for components
 - **Reactivity**: Use classes with `$state` for shared reactive state

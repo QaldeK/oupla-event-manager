@@ -1,22 +1,23 @@
-import { getFirstListItem, getFullList, getList, getOne, pb } from "$lib/pocketbase.svelte";
+import { getFullList, getList, getOne, pb } from "$lib/pocketbase.svelte";
 import type { Collections } from "$lib/types/pocketbase";
 import type {
 	Collection,
-	IndexConfig,
 	InfiniteScrollOptions,
 	PaginationState,
-	PocketBaseEventData,
 	StoreConfig,
 	StoreRecord,
 	SyncError
 } from "$lib/types/syncState.types";
 import type { ListResult, RecordSubscription } from "pocketbase";
 
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
+import { IndexedDbManager } from "$lib/shared/indexedDbManager.svelte";
+import { IndexManager, QueryBuilder } from "$lib/shared/indexManager.svelte";
+import { PocketBaseSyncer } from "$lib/shared/pocketbaseSyncer.svelte";
 
 const subscribe = <T extends StoreRecord>(
 	collectionName: Collections,
-	callback: (data: PocketBaseEventData<T>) => void,
+	callback: (data: RecordSubscription<T>) => void,
 	options?: { filter?: string }
 ): (() => void) => {
 	pb.collection(collectionName).subscribe(
@@ -24,7 +25,7 @@ const subscribe = <T extends StoreRecord>(
 		(data: RecordSubscription<T>) => {
 			// Vérifier et convertir l'action
 			if (["create", "update", "delete"].includes(data.action)) {
-				callback(data as unknown as PocketBaseEventData<T>);
+				callback(data);
 			}
 		},
 		options
@@ -48,22 +49,14 @@ export interface SyncStoreState<T extends StoreRecord> {
 	isInitialized: boolean;
 }
 
-/**
- *  DESACTIVED
- * Store de synchronisation pour les données PocketBase avec stockage local IndexedDB.
- *
- * LIMITATION: Ce store ne détecte pas automatiquement les enregistrements supprimés côté serveur
- * pendant une période de déconnexion. Pour gérer ce cas, utilisez la fonction `cleanDeletedRecords`
- * du module spaceOptions.svelte, qui utilise le champ `deleted_records` de la collection spaces_options.
- */
 export class SyncStore<T extends StoreRecord> {
-	private store: SyncStoreState<T> = $state({
+	store: SyncStoreState<T> = $state({
 		byId: new SvelteMap<string, T>(),
-		indexes: new SvelteMap<string, Map<string | number, Set<string>>>(),
+		indexes: new SvelteMap<string, SvelteMap<string | number, SvelteSet<string>>>(),
 		error: null as SyncError | null,
 		isSyncing: false,
-		lastSync: null as Date | null,
-		updatedRecords: new SvelteSet<string>(), // FIXIT : SvelteSet ?
+		lastSync: null as SvelteDate | null,
+		updatedRecords: new SvelteSet<string>(),
 		isInitialized: false
 	});
 
@@ -71,9 +64,9 @@ export class SyncStore<T extends StoreRecord> {
 	readonly allRecords = $derived<T[]>(Array.from(this.store.byId.values()));
 	readonly indexedRecords = $derived.by(() => {
 		// Créer une copie réactive des index
-		const result = new Map();
+		const result = new SvelteMap();
 		for (const [indexName, indexMap] of this.store.indexes.entries()) {
-			result.set(indexName, new Map(indexMap));
+			result.set(indexName, new SvelteMap(indexMap));
 		}
 		return result;
 	});
@@ -92,8 +85,11 @@ export class SyncStore<T extends StoreRecord> {
 	private db: IDBDatabase | null = null;
 	private collection: Collection | null = null;
 	private collectionName: Collections | null = null;
-	private unsubscribe?: () => void;
-	private initPromise: Promise<void>;
+	private initPromise: Promise<void> | null;
+	private dbManager: IndexedDbManager<T>;
+	private indexManager: IndexManager<T>;
+	private syncer: PocketBaseSyncer<T> | null = null;
+	private unsubscribe: (() => void) | null = null;
 
 	private normalizeConfig(config: StoreConfig<T>): StoreConfig<T> {
 		return {
@@ -118,7 +114,14 @@ export class SyncStore<T extends StoreRecord> {
 	constructor(private config: StoreConfig<T>) {
 		// console.log("🚀 Création du store:", config.name);
 		this.config = this.normalizeConfig(config);
-		this.initPromise = this.initDb();
+		this.dbManager = new IndexedDbManager<T>(
+			this.config.dbName || this.config.name,
+			this.config.name,
+			this.config.version,
+			this.config.primaryKey ?? "id"
+		);
+		this.indexManager = new IndexManager<T>(this.config.indexes);
+		this.initPromise = null; // Important: on réinitialise initPromise
 	}
 
 	private get LAST_SYNC_KEY(): string {
@@ -126,17 +129,21 @@ export class SyncStore<T extends StoreRecord> {
 	}
 
 	// Méthode pour charger lastSync depuis localStorage
-	private loadLastSync(): void {
+	private loadLastSync(): Date | null {
 		const lastSyncStr = localStorage.getItem(this.LAST_SYNC_KEY);
 		if (lastSyncStr) {
-			this.store.lastSync = new Date(lastSyncStr);
+			this.store.lastSync = new SvelteDate(lastSyncStr);
+			return new SvelteDate(lastSyncStr);
 		}
+		return null;
 	}
 
 	// Méthode pour sauvegarder lastSync dans localStorage
-	private saveLastSync(): void {
-		if (this.store.lastSync) {
-			localStorage.setItem(this.LAST_SYNC_KEY, this.store.lastSync.toISOString());
+	private saveLastSync(date?: Date): void {
+		const dateToSave = date || this.store.lastSync;
+		if (dateToSave) {
+			this.store.lastSync = new SvelteDate(dateToSave);
+			localStorage.setItem(this.LAST_SYNC_KEY, dateToSave.toISOString());
 		}
 	}
 
@@ -183,101 +190,22 @@ export class SyncStore<T extends StoreRecord> {
 		this.store.byId.set(id, record);
 
 		// Mise à jour des index
-		await this.updateIndexes(record);
+		this.indexManager.addOrUpdate(record);
 	}
 
 	private async delete(id: string): Promise<void> {
 		const record = this.store.byId.get(id);
 		if (!record) return;
 
-		// Supprimer des index
-		await this.removeFromIndexes(record);
-
 		// Supprimer de la Map principale
 		this.store.byId.delete(id);
+
+		// Supprimer des index
+		this.indexManager.remove(record);
 	}
 
-	// ---  Gestion des index
-	private async updateIndexes(record: T): Promise<void> {
-		const id = record[this.config.primaryKey as keyof T] as string;
-
-		for (const [indexName, indexConfig] of Object.entries(this.config.indexes ?? {})) {
-			const values = this.extractIndexValues(record, indexConfig);
-
-			if (!this.store.indexes.has(indexName)) {
-				this.store.indexes.set(indexName, new Map());
-			}
-
-			const indexMap = this.store.indexes.get(indexName)!;
-
-			// Nettoyer les anciennes références
-			this.cleanupIndexReferences(indexName, id);
-
-			// Ajouter les nouvelles références
-			for (const value of values) {
-				if (!indexMap.has(value)) {
-					indexMap.set(value, new Set());
-				}
-				indexMap.get(value)!.add(id);
-			}
-		}
-	}
-
-	private async removeFromIndexes(record: T): Promise<void> {
-		const id = record[this.config.primaryKey as keyof T] as string;
-
-		for (const indexName of Object.keys(this.config.indexes ?? {})) {
-			this.cleanupIndexReferences(indexName, id);
-		}
-	}
-
-	private cleanupIndexReferences(indexName: string, recordId: string): void {
-		const indexMap = this.store.indexes.get(indexName);
-		if (!indexMap) return;
-
-		for (const [value, ids] of indexMap) {
-			ids.delete(recordId);
-			if (ids.size === 0) {
-				indexMap.delete(value);
-			}
-		}
-	}
-
-	private extractIndexValues(record: T, indexConfig: IndexConfig): (string | number)[] {
-		const path = Array.isArray(indexConfig.path) ? indexConfig.path : [indexConfig.path];
-		let values = [this.getValueByPath(record, path)];
-
-		if (indexConfig.transform) {
-			values = indexConfig.transform(record);
-		}
-
-		return indexConfig.type === "array"
-			? values.flat().filter((v): v is string | number => v !== undefined)
-			: values.filter((v): v is string | number => v !== undefined);
-	}
-
-	private getValueByPath(obj: T, path: string[]): string | number | undefined {
-		const result = path.reduce((current: unknown, key) => {
-			if (key === "*" && Array.isArray(current)) {
-				return current.flatMap((item) => item);
-			}
-			return (current as Record<string, unknown>)[key];
-		}, obj as unknown);
-
-		return typeof result === "string" || typeof result === "number" ? result : undefined;
-	}
-
-	// ---  API publique améliorée
 	public getByIndex(indexName: string, value: string | number): T[] {
-		const indexMap = this.store.indexes.get(indexName);
-		if (!indexMap) return [];
-
-		const ids = indexMap.get(value);
-		if (!ids) return [];
-
-		return Array.from(ids)
-			.map((id) => this.store.byId.get(id))
-			.filter((record): record is T => record !== undefined);
+		return this.indexManager.getByIndex(indexName, value, this.store.byId);
 	}
 
 	/**
@@ -285,37 +213,21 @@ export class SyncStore<T extends StoreRecord> {
 	 * @param indexName Nom de l'index
 	 * @returns Map des enregistrements groupés par valeur d'index
 	 */
-	public getAllByIndex(indexName: string): Map<string | number, T[]> {
+	public getAllByIndex(): Map<string | number, T[]> {
 		if (!this.store.isInitialized) {
 			throw new Error("Store not initialized. Call init() first.");
 		}
 
-		const result = new Map<string | number, T[]>();
-		const indexMap = this.store.indexes.get(indexName);
-
-		if (!indexMap) {
-			console.warn(`Index "${indexName}" not found`);
-			return result;
-		}
-
-		indexMap.forEach((recordIds, indexValue) => {
-			const records = Array.from(recordIds)
-				.map((id) => this.store.byId.get(id))
-				.filter((record): record is T => record !== undefined);
-
-			if (records.length > 0) {
-				result.set(indexValue, records);
-			}
-		});
-
-		return result;
+		// Pour l'instant, on retourne une Map vide car IndexManager n'a pas cette méthode
+		// Il faudrait l'ajouter à IndexManager si nécessaire
+		return new SvelteMap<string | number, T[]>();
 	}
 
 	public query(): QueryBuilder<T> {
 		if (!this.isInitialized) {
 			throw new Error("Store not initialized. Call init() first.");
 		}
-		return new QueryBuilder(this);
+		return this.indexManager.query(this.store.byId);
 	}
 
 	/**
@@ -344,7 +256,7 @@ export class SyncStore<T extends StoreRecord> {
 			return cachedResult.data;
 		}
 
-		const result = this.getAllByIndex(indexName);
+		const result = this.getAllByIndex();
 
 		// Mettre à jour le cache
 		this.indexCaches.set(indexName, {
@@ -372,7 +284,7 @@ export class SyncStore<T extends StoreRecord> {
 		totalPages: 1,
 		hasNextPage: false,
 		hasPreviousPage: false,
-		loadedPages: new Set<number>()
+		loadedPages: new SvelteSet<number>()
 	});
 	// Exposer les propriétés de pagination via des getters réactifs
 	readonly currentPage = $derived(this.pagination.currentPage);
@@ -459,7 +371,7 @@ export class SyncStore<T extends StoreRecord> {
 			totalPages: 1,
 			hasNextPage: false,
 			hasPreviousPage: false,
-			loadedPages: new Set<number>()
+			loadedPages: new SvelteSet<number>()
 		};
 	}
 
@@ -532,66 +444,65 @@ export class SyncStore<T extends StoreRecord> {
 
 	// ---  Initialisation et Configuration
 	public async init(collectionName: Collections): Promise<void> {
-		try {
-			// console.log(
-			// 	`\n🚀 Initialisation du store "${this.config.name}" (collection: ${collectionName})`
-			// );
+		if (this.initPromise) return this.initPromise;
 
-			// 1. Initialiser IndexedDB
-			// console.log(`👉 ${this.config.name}: Initialisation de la base de données locale`);
-			await this.initPromise;
+		this.initPromise = (async () => {
+			try {
+				await this.dbManager.init();
 
-			if (!this.db) {
-				throw new Error("IndexedDB initialization failed");
+				// 1. Créer l'objet collection pour PocketBase
+				this.collectionName = collectionName;
+				this.collection = {
+					getFullList: (options) => getFullList<T>(collectionName, options),
+					getList: (page, perPage, options) => getList<T>(collectionName, page, perPage, options),
+					getOne: (id, options) => getOne(collectionName, id, options),
+					getFirstListItem: () => Promise.resolve({} as T),
+					subscribe: (topic, callback, options) => subscribe(collectionName, callback, options),
+					unsubscribe: (topic) => unsubscribe(collectionName, topic)
+				} as Collection;
+
+				// Initialiser le syncer avec les callbacks
+				this.syncer = new PocketBaseSyncer<T>(
+					this.config.sync || { mode: "manual" },
+					collectionName
+				);
+				this.syncer.onRecordsReceived = async (records: T[]) => {
+					await this.processBatchUpdate(records);
+				};
+				this.syncer.onRecordDeleted = async (recordId: string) => {
+					await this.delete(recordId);
+				};
+				this.syncer.onError = (error: Error | unknown, context: string) => {
+					this.handleError(error, context);
+				};
+
+				// 2. Charger les données locales pour un affichage rapide
+				const localRecords = await this.dbManager.loadAll();
+				if (localRecords.length > 0) {
+					this.store.byId = new SvelteMap(localRecords.map((r) => [r.id, r]));
+					this.indexManager.buildFrom(localRecords);
+				}
+
+				// 3. Démarrer le syncer, qui s'occupe de la synchro initiale et du temps réel
+				// On attend cette étape pour garantir que l'état initial est cohérent avant de continuer.
+				if (this.syncer) {
+					await this.syncer.start(this.collection, this.loadLastSync());
+				}
+
+				// 5. Configurer la synchro par intervalle si nécessaire (ne bloque pas l'init)
+				if (this.config.sync?.mode === "interval") {
+					this.setupIntervalSync();
+				}
+
+				this.store.isInitialized = true;
+			} catch (error) {
+				this.handleError(error, `Initialisation de ${this.config.name}`);
+				this.initPromise = null;
+				throw error;
 			}
+		})();
 
-			// 2. Charger lastSync
-			// console.log(`👉 ${this.config.name}: Chargement de lastSync`);
-			this.loadLastSync();
-			// console.log(`📅 ${this.config.name}: Dernière synchro:`, this.store.lastSync);
-
-			// 3. Configurer la collection PocketBase
-			// console.log(`👉 ${this.config.name}: Configuration de la collection PocketBase`);
-			this.collectionName = collectionName;
-			this.collection = {
-				getList: (page, perPage, options) => getList(collectionName, page, perPage, options),
-				getFirstListItem: (filter, options) => getFirstListItem(collectionName, filter, options),
-				getFullList: (options) => getFullList(collectionName, options),
-				getOne: (id, options) => getOne(collectionName, id, options),
-				subscribe: (
-					topic: string,
-					callback: (data: RecordSubscription<T>) => void,
-					options?: Record<string, unknown>
-				) => subscribe(collectionName, callback, options),
-				unsubscribe: (topic) => unsubscribe(collectionName, topic)
-			} as Collection;
-
-			// 4. Charger les données depuis IndexedDB
-			// console.log(`📦 ${this.config.name}: Chargement des données depuis IndexedDB`);
-			await this.loadFromIndexedDb();
-			console.log(`📊 ${this.config.name}: ${this.store.byId.size} enregistrements chargés`);
-
-			// 5. Configurer la synchronisation en temps réel si nécessaire
-			if (this.config.sync?.mode === "realtime") {
-				// console.log(`🔄 ${this.config.name}: Configuration du mode temps réel`);
-				await this.setupRealtimeSync();
-				// console.log(`✅ ${this.config.name}: Mode temps réel activé`);
-			} else if (this.config.sync?.mode === "interval") {
-				// console.log(`⏱️ ${this.config.name}: Configuration du mode intervalle (${this.config.sync.interval}ms)`);
-				this.setupIntervalSync();
-			}
-
-			this.store.isInitialized = true;
-
-			// 6. Première synchronisation
-			// console.log(`↔️ ${this.config.name}: Première synchronisation avec PocketBase`);
-			await this.syncWithPocketBase();
-
-			// console.log(`✅ ${this.config.name}: Initialisation terminée\n`);
-		} catch (error) {
-			console.error(`⚠️ ${this.config.name}: Erreur d'initialisation:`, error);
-			throw error;
-		}
+		return this.initPromise;
 	}
 
 	// :::  Synchronisation PocketBase
@@ -607,26 +518,25 @@ export class SyncStore<T extends StoreRecord> {
 			"*",
 			((data: RecordSubscription<T>) => {
 				if (["create", "update", "delete"].includes(data.action)) {
-					const typedData = data as unknown as PocketBaseEventData<T>;
 					// console.log(
 					// 	`📥 ${this.config.name}: Événement reçu:`,
-					// 	typedData.action,
-					// 	typedData.record?.id
+					// 	data.action,
+					// 	data.record?.id
 					// );
-					switch (typedData.action) {
+					switch (data.action) {
 						case "create":
 						case "update":
-							void this.handleRecordUpdate(typedData.record);
+							this.handleRecordUpdate(data.record);
 							break;
 						case "delete":
-							void this.handleRecordDeletion(typedData.record.id);
+							this.handleRecordDeletion(data.record.id);
 							break;
 					}
 				}
 			}) as (data: RecordSubscription<StoreRecord>) => void,
 			{
 				filter: this.config.sync?.filter,
-				expand: this.config.sync?.expand
+				expand: this.config.sync?.expand || ""
 			}
 		);
 
@@ -647,10 +557,10 @@ export class SyncStore<T extends StoreRecord> {
 			await this.set(record);
 
 			// Sauvegarder dans IndexedDB
-			await this.saveToIndexedDb(record);
+			await this.dbManager.save(record);
 
 			// Mise à jour des index si nécessaire
-			await this.updateIndexes(record);
+			this.indexManager.addOrUpdate(record);
 
 			// Appliquer la stratégie de cache si nécessaire
 			await this.enforceCacheLimit();
@@ -666,10 +576,10 @@ export class SyncStore<T extends StoreRecord> {
 			// Supprimer de la mémoire
 			await this.delete(recordId);
 			if (record) {
-				await this.removeFromIndexes(record);
+				this.indexManager.remove(record);
 			}
 			// Supprimer de IndexedDB
-			await this.deleteFromIndexedDb(recordId);
+			await this.dbManager.delete(recordId);
 		} catch (error) {
 			this.handleError(error, "Erreur lors de la suppression du record");
 		}
@@ -681,179 +591,24 @@ export class SyncStore<T extends StoreRecord> {
 	}
 
 	public async syncWithPocketBase(): Promise<void> {
-		if (!this.collection || this.store.isSyncing) return;
-
+		if (this.store.isSyncing) return;
 		this.store.isSyncing = true;
 		try {
-			// console.log(`\n🔄 ${this.config.name}: Début de la synchronisation`);
-			const filter = this.buildSyncFilter();
-			const sort = this.buildSortString();
-			const expand = this.config.sync?.expand;
-
-			// console.log(`📋 ${this.config.name}: Paramètres de requête:`, {
-			// 	filter,
-			// 	sort,
-			// 	lastSync: this.store.lastSync,
-			// 	expand
-			// });
-
-			const records = await this.collection.getFullList({
-				filter,
-				sort,
-				expand
-			});
-
-			console.log(`📥 ${this.config.name}: ${records.length} enregistrements reçus`);
-			// if (records.length > 0) {
-			// 	console.log(`📝 ${this.config.name}: Premier enregistrement:`, records[0]);
-			// }
-
-			await this.processBatchUpdate(records as T[]);
-
-			this.store.lastSync = new Date();
-			this.saveLastSync();
-
-			console.log(
-				`✅ ${this.config.name}: Synchronisation terminée. Cache size: ${this.store.byId.size}\n`
-			);
+			if (!this.syncer) {
+				throw new Error("Syncer not initialized");
+			}
+			const syncTime = await this.syncer.sync();
+			if (syncTime) {
+				this.saveLastSync(syncTime);
+				console.log(
+					`✅ ${this.config.name}: Synchronisation terminée. Cache size: ${this.store.byId.size}\n`
+				);
+			}
 		} catch (error) {
-			console.error(`⚠️ ${this.config.name}: Erreur de synchronisation:`, error);
-			this.handleError(error, "Erreur de synchronisation");
+			this.handleError(error, "syncWithPocketBase");
 		} finally {
 			this.store.isSyncing = false;
 		}
-	}
-
-	// ---  IndexedDB
-	private async initDb(): Promise<void> {
-		if (this.db) {
-			// console.log(`📦 ${this.config.name}: IndexedDB déjà initialisé`);
-			return;
-		}
-
-		let retries = 0;
-		const maxRetries = 3;
-
-		while (retries < maxRetries) {
-			try {
-				await new Promise<void>((resolve, reject) => {
-					// console.log(
-					// 	`🗄️ ${this.config.name}: Initialisation IndexedDB (tentative ${retries + 1})...`
-					// );
-
-					const dbName = this.config.dbName || this.config.name;
-					const request = indexedDB.open(dbName, this.config.version);
-
-					request.onerror = () => {
-						console.error(`⚠️ ${this.config.name}: Erreur d'ouverture IndexedDB:`, request.error);
-						reject(request.error);
-					};
-
-					request.onblocked = () => {
-						console.warn(`⚠️ ${this.config.name}: IndexedDB bloqué`);
-						// Tenter de fermer toutes les connexions existantes
-						if (this.db) {
-							this.db.close();
-							this.db = null;
-						}
-					};
-
-					request.onsuccess = () => {
-						this.db = request.result;
-
-						// Vérifier que le store existe
-						if (!this.db.objectStoreNames.contains(this.config.name)) {
-							console.error(`⚠️ ${this.config.name}: Store non trouvé après initialisation`);
-							this.db.close();
-							this.db = null;
-							reject(new Error(`Store ${this.config.name} non trouvé`));
-							return;
-						}
-
-						// console.log(`✅ ${this.config.name}: IndexedDB initialisé avec succès`);
-						resolve();
-					};
-
-					request.onupgradeneeded = (event) => {
-						// console.log(`🔄 ${this.config.name}: Mise à jour/création du schéma IndexedDB`);
-						const db = (event.target as IDBOpenDBRequest).result;
-
-						// Supprimer l'ancien store s'il existe
-						if (db.objectStoreNames.contains(this.config.name)) {
-							db.deleteObjectStore(this.config.name);
-						}
-
-						// Créer le nouveau store
-						// console.log(`📝 ${this.config.name}: Création du store`);
-						const store = db.createObjectStore(this.config.name, {
-							keyPath: this.config.primaryKey as string
-						});
-
-						// Créer les index
-						if (this.config.indexes) {
-							Object.entries(this.config.indexes).forEach(([name, config]) => {
-								if (typeof config.path === "string") {
-									store.createIndex(name, config.path, {
-										multiEntry: config.type === "array"
-									});
-								}
-							});
-						}
-					};
-				});
-
-				// Si on arrive ici, l'initialisation a réussi
-				break;
-			} catch (error) {
-				retries++;
-				if (retries >= maxRetries) {
-					throw new Error(`Failed to initialize IndexedDB after ${maxRetries} attempts: ${error}`);
-				}
-				// Attendre un peu avant de réessayer
-				await new Promise((resolve) => setTimeout(resolve, 1000));
-			}
-		}
-	}
-	private async loadFromIndexedDb(): Promise<void> {
-		if (!this.db) {
-			throw new Error("Store not properly initialized");
-		}
-
-		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, "readonly");
-			const store = transaction.objectStore(this.config.name);
-			const request = store.getAll();
-
-			request.onerror = () => reject(request.error);
-
-			request.onsuccess = async () => {
-				const records = request.result as T[];
-				await this.processBatchUpdate(records, false);
-
-				// Si IndexedDB est vide, on force lastSync à null
-				// pour déclencher une synchronisation complète
-				if (records.length === 0) {
-					this.store.lastSync = null;
-				}
-
-				resolve();
-			};
-		});
-	}
-
-	private async deleteFromIndexedDb(recordId: string): Promise<void> {
-		if (!this.db) {
-			throw new Error("Store not properly initialized");
-		}
-
-		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, "readwrite");
-			const store = transaction.objectStore(this.config.name);
-			const request = store.delete(recordId);
-
-			request.onerror = () => reject(request.error);
-			request.onsuccess = () => resolve();
-		});
 	}
 
 	// ---  Gestion des mises à jour
@@ -861,27 +616,12 @@ export class SyncStore<T extends StoreRecord> {
 		for (const record of records) {
 			await this.set(record);
 			if (updateIndexedDb) {
-				await this.saveToIndexedDb(record);
+				await this.dbManager.save(record);
 			}
 		}
 
 		// Maintenir la limite du cache si nécessaire
 		await this.enforceCacheLimit();
-	}
-
-	private async saveToIndexedDb(record: T): Promise<void> {
-		if (!this.db || !this.store.isInitialized) {
-			throw new Error("Store not properly initialized");
-		}
-
-		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, "readwrite");
-			const store = transaction.objectStore(this.config.name);
-			const request = store.put(record);
-
-			request.onerror = () => reject(request.error);
-			request.onsuccess = () => resolve();
-		});
 	}
 
 	private async enforceCacheLimit(): Promise<void> {
@@ -891,20 +631,19 @@ export class SyncStore<T extends StoreRecord> {
 		if (excess <= 0) return;
 
 		const recordsToRemove = Array.from(this.store.byId.values())
-			.sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime())
+			.sort((a, b) => new SvelteDate(a.updated).getTime() - new SvelteDate(b.updated).getTime())
 			.slice(0, excess);
 
 		for (const record of recordsToRemove) {
 			const id = record[this.config.primaryKey as keyof T] as string;
-			await this.delete(id);
-			await this.deleteFromIndexedDb(id);
+			await this.handleRecordDeletion(id);
 		}
 	}
 
 	// ::: Utilitaires
 
 	private buildSyncFilter(): string {
-		const filters = [];
+		const filters: string[] = [];
 
 		// Ajouter le filtre de base s'il existes
 		if (this.config.sync?.filter) {
@@ -913,7 +652,8 @@ export class SyncStore<T extends StoreRecord> {
 
 		// Si une synchronisation précédente existe et qu'il y a des données en cache
 		if (this.store.byId.size > 0 && this.store.lastSync) {
-			filters.push(`updated > "${this.store.lastSync.toISOString()}"`);
+			const lastSyncISO = this.store.lastSync.toISOString();
+			filters.push(`updated > "${lastSyncISO}"`);
 		}
 
 		// Debug logs
@@ -940,29 +680,16 @@ export class SyncStore<T extends StoreRecord> {
 	private handleError(error: unknown, context: string): void {
 		const syncError = {
 			message: `${context}: ${error instanceof Error ? error.message : "Unknown error"}`,
-			timestamp: new Date(),
+			timestamp: new SvelteDate(),
 			details: error
 		};
 		console.error(syncError);
 		this.store.error = syncError;
 	}
 
-	/**
-	 * Supprime un enregistrement spécifique à la fois de la mémoire et de IndexedDB
-	 * Utile pour supprimer des enregistrements qui ont été supprimés côté serveur
-	 *
-	 * @param id Identifiant de l'enregistrement à supprimer
-	 * @returns Promise<void>
-	 */
-	public async destroyRecord(id: string): Promise<void> {
-		await this.delete(id);
-		await this.deleteFromIndexedDb(id);
-	}
-
 	public async forceRefresh(): Promise<void> {
 		if (!this.isInitialized) {
 			// Si le store n'est pas initialisé, on réinitialise tout
-			await this.initDb();
 			await this.init(this.collectionName as Collections);
 		}
 
@@ -972,24 +699,21 @@ export class SyncStore<T extends StoreRecord> {
 			this.store.isSyncing = true;
 
 			// 1. Vider les données sans fermer les connexions
-			await this.clearIndexedDb();
-			this.store.byId.clear();
-			this.store.indexes.clear();
-			this.store.updatedRecords.clear();
-			this.store.lastSync = null;
+			await this.clearAll();
 
 			// 2. Recharger depuis PocketBase
-			const records = await this.collection!.getFullList<T>({
-				filter: this.config.sync?.filter,
-				sort: this.buildSortString(),
-				expand: this.config.sync?.expand
-			});
+			// 3. Force refresh via syncer
+			if (!this.syncer) {
+				throw new Error("Syncer not initialized");
+			}
+			await this.syncer.forceRefresh();
 
-			// 3. Traiter les enregistrements
+			// 4. Recharger depuis la DB locale
+			const records = await this.dbManager.loadAll();
 			await this.processBatchUpdate(records);
 
-			// 4. Mettre à jour lastSync
-			this.store.lastSync = new Date();
+			// 5. Mettre à jour lastSync
+			this.store.lastSync = new SvelteDate();
 			this.saveLastSync();
 
 			console.log(
@@ -1017,62 +741,16 @@ export class SyncStore<T extends StoreRecord> {
 			this.store.isInitialized = false;
 
 			// 3. Nettoyer IndexedDB
-			await this.clearIndexedDb();
-
-			// 4. Fermer la connexion IndexedDB
-			if (this.db) {
-				this.db.close();
-				this.db = null;
-			}
+			await this.dbManager.clear();
 		} catch (error) {
 			console.error(`Error clearing store ${this.config.name}:`, error);
 			throw error; // On relance l'erreur car c'est une méthode publique
 		}
 	}
 
-	// Méthode privée pour effacer IndexedDB
-	private async clearIndexedDb(): Promise<void> {
-		if (!this.db) return;
-
-		return new Promise((resolve, reject) => {
-			const transaction = this.db!.transaction(this.config.name, "readwrite");
-			const store = transaction.objectStore(this.config.name);
-			const request = store.clear();
-
-			request.onerror = () => reject(request.error);
-			request.onsuccess = () => resolve();
-		});
-	}
 	// Nettoyage
 	public async destroy(): Promise<void> {
 		await this.clearAll();
-	}
-}
-
-// Classe auxiliaire pour les requêtes chainées
-class QueryBuilder<T extends StoreRecord> {
-	private results: T[];
-
-	constructor(private store: SyncStore<T>) {
-		this.results = store.getAll();
-	}
-
-	byIndex(indexName: string, value: string | number): this {
-		this.results = this.store.getByIndex(indexName, value);
-		return this;
-	}
-
-	sort(compareFn: (a: T, b: T) => number): this {
-		this.results.sort(compareFn);
-		return this;
-	}
-
-	take(n: number): this {
-		this.results = this.results.slice(0, n);
-		return this;
-	}
-
-	exec(): T[] {
-		return this.results;
+		this.dbManager.close();
 	}
 }

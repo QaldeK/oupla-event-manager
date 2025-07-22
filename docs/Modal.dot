@@ -1,0 +1,102 @@
+digraph {
+	graph [bb="0,0,1356.5,426",
+		rankdir=TB
+	];
+	node [label="\N",
+		shape=box,
+		style=rounded
+	];
+	subgraph cluster_legend {
+		graph [bb="308,286.25,716,400.75",
+			color=lightgrey,
+			label=Légende,
+			lheight=0.23,
+			lp="512,388.5",
+			lwidth=0.65,
+			style=filled
+		];
+		component	[fillcolor=white,
+			height=0.5,
+			label=Composant,
+			pos="355,331.25",
+			style=filled,
+			width=1.0868];
+		ts_imports	[fillcolor=lightyellow,
+			height=1.0278,
+			label="Les fichiers .ts sont affichés à l'intérieur des nœuds
+state: fichiers d'état (états partagés)
+type: fichiers de types TypeScript
+\
+utilitaires: fonctions partagées",
+			pos="560,331.25",
+			shape=note,
+			style=filled,
+			width=4.0972];
+	}
+	Modal	[fillcolor=lightcoral,
+		height=0.56944,
+		label="Modal\nprops: children, padding \= true",
+		pos="504,20.5",
+		style=filled,
+		width=2.5764];
+	CreateBenevole	[fillcolor=white,
+		height=0.79861,
+		label="CreateBenevole\npocketbase.svelte.ts: pb\nstate:states.svelte.ts: isBenevoleModal",
+		pos="113,138.75",
+		style=filled,
+		width=3.1389];
+	CreateBenevole -> Modal	[color=blue,
+		pos="e,410.84,33.328 153.92,109.62 174.94,98.139 201.18,85.579 226,77 281.86,57.697 346.68,44.076 399.71,35.16"];
+	CreateBenevole -> Modal	[color=blue,
+		pos="e,410.77,36.023 170.46,109.62 192.94,98.139 219.18,85.579 244,77 294.18,59.66 351.58,46.906 399.7,38.028"];
+	"+page@dashboard/config"	[fillcolor=pink,
+		height=0.79861,
+		label="dashboard/config/+page\nstate:states.svelte.ts: showAlert\ntype:event.types.ts: TaskType",
+		pos="337,138.75",
+		style=filled,
+		width=2.5868];
+	"+page@dashboard/config" -> Modal	[color=blue,
+		pos="e,470.22,41.373 371.55,109.61 397.46,90.735 432.96,66.052 460.74,47.614"];
+	"+page@dashboard/config" -> Modal	[color=blue,
+		pos="e,480.68,41.373 383.3,109.61 411.38,90.9 446.42,66.483 471.57,48.099"];
+	EventModal	[fillcolor=white,
+		height=1.7153,
+		label="EventModal\ndebounce.ts: debounce\npocketbase.svelte.ts: pb\nstate:eventActionHandler.svelte.ts: createEventActionPlan, handleEventAction\nstate:\
+states.svelte.ts: eventState, getOrganizersPossibles, m...\ntype:event.types.ts: type DateProposedType, type Recurrenc...\ntype:\
+validation.types.ts: ValidationResult",
+		pos="671,138.75",
+		style=filled,
+		width=6.1806];
+	EventModal -> Modal	[color=blue,
+		pos="e,527.15,41.25 576.36,76.561 561.9,66.461 547.9,56.485 536.1,47.857"];
+	EventModal -> Modal	[color=blue,
+		pos="e,537.59,41.25 589.84,76.561 574.99,66.261 560.04,56.09 546.85,47.346"];
+	"+layout@dashboard"	[fillcolor=pink,
+		height=2.6319,
+		label="dashboard/+layout\nprops: children\nnotificationsAndLogs.ts: clearNotifications, loadNotifications\npocketbase.svelte.ts: pb\nscreen.svelte.ts: \
+screenDetector\nstate:eventsStore.svelte.ts: eventsStore\nstate:messageStore.svelte.ts: messageStore\nstate:spaceOptions.svelte.ts: \
+getSpace, loadSpaceOptions\nstate:states.svelte.ts: loadingState, messageSheet, modalState\nstate:userDb.svelte.ts: userDb\ntype:\
+types.ts: CurrentUser",
+		pos="902,331.25",
+		style=filled,
+		width=4.8889];
+	"+layout@dashboard" -> EventModal	[color=blue,
+		pos="e,738.7,200.81 781.1,236.12 769.62,226.65 758.2,217.17 747.31,208.04"];
+	"+layout@dashboard" -> EventModal	[color=blue,
+		pos="e,751.39,200.81 794.6,236.12 783.13,226.65 771.55,217.17 760.32,208.04"];
+	DateSondageModal	[fillcolor=white,
+		height=1.4861,
+		label="DateSondageModal\npocketbase.svelte.ts: updateEvent\nstate:eventActionHandler.svelte.ts: createEventActionPlan, handleEventAction\nstate:\
+states.svelte.ts: eventState, modalState, showAlert\nstate:userDb.svelte.ts: userDb\ntype:types.ts: DateProposedType, EventType",
+		pos="1134,138.75",
+		style=filled,
+		width=6.1806];
+	"+layout@dashboard" -> DateSondageModal	[color=blue,
+		pos="e,1063.6,192.5 1009.9,236.12 1025,223.7 1040.3,211.25 1054.8,199.62"];
+	"+layout@dashboard" -> DateSondageModal	[color=blue,
+		pos="e,1075.9,192.5 1023.4,236.12 1038.5,223.7 1053.5,211.25 1067.4,199.62"];
+	DateSondageModal -> Modal	[color=blue,
+		pos="e,596.88,32.087 930.36,84.805 918.08,82.013 905.89,79.382 894,77 797.76,57.722 687.12,42.901 608.28,33.443"];
+	DateSondageModal -> Modal	[color=blue,
+		pos="e,597.08,30.481 948.34,84.805 936.08,82.013 923.89,79.382 912,77 809.72,56.514 691.19,41.06 608.28,31.729"];
+}

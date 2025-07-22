@@ -1,3 +1,5 @@
+// This file runs before each test file.
+import "fake-indexeddb/auto";
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 
@@ -14,5 +16,3 @@ Object.defineProperty(window, "matchMedia", {
 		dispatchEvent: vi.fn()
 	}))
 });
-
-// add more mocks here if you need them

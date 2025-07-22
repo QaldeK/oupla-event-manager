@@ -32,7 +32,6 @@ pb/.env*
 _pb_bak
 .directory
 *_bak
-test
 
 # llm
 .aider*

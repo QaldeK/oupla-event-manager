@@ -33,10 +33,11 @@ export default defineConfig({
 				extends: "./vite.config.ts",
 
 				test: {
-					name: "server",
-					environment: "node",
+					name: "server-or-lib", // Renommons-le pour plus de clarté
+					environment: "jsdom", // MODIFICATION: node -> jsdom
 					include: ["src/**/*.{test,spec}.{js,ts}"],
-					exclude: ["src/**/*.svelte.{test,spec}.{js,ts}"]
+					exclude: ["src/**/*.svelte.{test,spec}.{js,ts}"],
+					setupFiles: ["./vitest-setup-client.ts"] // AJOUT: On charge le setup ici aussi
 				}
 			}
 		]

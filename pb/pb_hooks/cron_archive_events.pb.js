@@ -1,6 +1,6 @@
 // Définition du cron pour l'archivage des événements
-// S'exécute tous les jours à minuit : "0 2 1 * *" / valeur de test : * * * * *
-cronAdd("archive_events", "0 2 1 * *", async () => {
+// S'exécute tous les jours à minuit : "0 2 1 * *" / valeur de test : * * * * * / toute les 2 heures : 0 */2 * * *
+cronAdd("archive_events", "0 */2 * * *", async () => {
 	console.log(`👉 [${new Date().toISOString()}] Archivage des événements en cours...`);
 
 	const today = new Date().toISOString().split("T")[0];
