@@ -10,7 +10,9 @@ const mockDbManager = {
 	loadAll: vi.fn().mockResolvedValue([]),
 	save: vi.fn().mockResolvedValue(undefined),
 	clear: vi.fn().mockResolvedValue(undefined),
-	close: vi.fn()
+	close: vi.fn(),
+	getAllIds: vi.fn(),
+	deleteMany: vi.fn()
 };
 
 const mockSyncer = {
@@ -18,10 +20,11 @@ const mockSyncer = {
 	stop: vi.fn(),
 	forceRefresh: vi.fn().mockResolvedValue(undefined),
 	// Ces placeholders seront remplacés par les vrais callbacks du SyncStore
-	onRecordsReceived: (records: StoreRecord[]) => {},
-	onRecordDeleted: (id: string) => {},
-	onSyncComplete: (date: Date) => {},
-	onError: (err: any, ctx: string) => {}
+	onRecordsReceived: (_records: StoreRecord[]) => {},
+	onRecordDeleted: (_id: string) => {},
+	onSyncComplete: (_date: Date) => {},
+	onError: (_err: any, _ctx: string) => {},
+	onPruneNeeded: vi.fn()
 };
 
 // Ici, on dit à Vitest : "chaque fois que le code importe ces modules,
@@ -214,5 +217,57 @@ describe("SyncStore - Refactored", () => {
 			"À la fin, le store doit contenir tous les enregistrements"
 		).toHaveLength(3);
 		expect(store.get("3")?.name).toBe("Événement C");
+	});
+
+	it("devrait nettoyer les enregistrements locaux absents du serveur lors de la synchro", async () => {
+		// --- ARRANGE ---
+		// 1. Simuler une DB locale avec 3 enregistrements
+		const localData = [testRecords[0], testRecords[1], testRecords[2]];
+		mockDbManager.loadAll.mockResolvedValue(localData);
+
+		// 2. Simuler que le serveur ne contient que les IDs 1 et 3 (le 2 a été supprimé)
+		const remoteIds = ["1", "3"];
+		mockDbManager.getAllIds = vi.fn().mockResolvedValue(["1", "2", "3"]);
+		mockDbManager.deleteMany = vi.fn().mockResolvedValue(undefined);
+
+		// 3. On mock le syncer pour qu'il appelle onPruneNeeded
+		mockSyncer.start.mockImplementation(async () => {
+			await mockSyncer.onPruneNeeded(remoteIds);
+			await mockSyncer.onRecordsReceived([testRecords[0], testRecords[2]]);
+			mockSyncer.onSyncComplete(new Date("2024-01-05T00:00:00Z"));
+		});
+
+		// --- ACT ---
+		await store.init("testRecords" as any);
+
+		// --- ASSERT ---
+		// Vérifier que deleteMany a été appelé avec l'ID à supprimer
+		expect(mockDbManager.deleteMany).toHaveBeenCalledWith(["2"]);
+
+		// Vérifier que le store ne contient plus que les enregistrements présents côté serveur
+		const all = store.getAll();
+		expect(all).toHaveLength(2);
+		expect(all.map((r) => r.id)).toEqual(expect.arrayContaining(["1", "3"]));
+		expect(all.map((r) => r.id)).not.toContain("2");
+	});
+
+	it("ne doit pas nettoyer si tous les IDs locaux sont présents côté serveur", async () => {
+		const localData = [testRecords[0], testRecords[1], testRecords[2]];
+		mockDbManager.loadAll.mockResolvedValue(localData);
+
+		const remoteIds = ["1", "2", "3"];
+		mockDbManager.getAllIds = vi.fn().mockResolvedValue(["1", "2", "3"]);
+		mockDbManager.deleteMany = vi.fn();
+
+		mockSyncer.start.mockImplementation(async () => {
+			await mockSyncer.onPruneNeeded(remoteIds);
+			await mockSyncer.onRecordsReceived(localData);
+			mockSyncer.onSyncComplete(new Date("2024-01-06T00:00:00Z"));
+		});
+
+		await store.init("testRecords" as any);
+
+		expect(mockDbManager.deleteMany).not.toHaveBeenCalled();
+		expect(store.getAll()).toHaveLength(3);
 	});
 });

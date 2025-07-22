@@ -74,6 +74,7 @@ export class SyncStore<T extends StoreRecord> {
 					collectionName
 				);
 
+				this.syncer.onPruneNeeded = (remoteIds) => this._pruneLocalRecords(remoteIds);
 				this.syncer.onRecordsReceived = (records) => this.processBatchUpdate(records);
 				this.syncer.onRecordDeleted = (recordId) => this.handleRecordDeletion(recordId);
 				this.syncer.onSyncComplete = (syncDate) => this.saveLastSync(syncDate);
@@ -195,6 +196,35 @@ export class SyncStore<T extends StoreRecord> {
 		this.store.byId.delete(recordId);
 		this.indexManager.remove(record);
 		await this.dbManager.delete(recordId);
+	}
+
+	private async _pruneLocalRecords(remoteIds: string[]): Promise<void> {
+		const localIds = await this.dbManager.getAllIds();
+
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const remoteIdSet = new Set(remoteIds);
+
+		const idsToDelete = localIds.filter((id) => !remoteIdSet.has(id));
+
+		if (idsToDelete.length === 0) {
+			return; // Pas de nettoyage nécessaire
+		}
+
+		console.log(
+			`[SyncStore: ${this.config.name}] Nettoyage de ${idsToDelete.length} enregistrement(s) obsolète(s).`
+		);
+
+		// 1. Suppression optimisée de la base de données locale
+		await this.dbManager.deleteMany(idsToDelete);
+
+		// 2. Mise à jour de l'état en mémoire et des index
+		for (const id of idsToDelete) {
+			const recordToDelete = this.store.byId.get(id);
+			if (recordToDelete) {
+				this.store.byId.delete(id);
+				this.indexManager.remove(recordToDelete);
+			}
+		}
 	}
 
 	private async clearLocalData(): Promise<void> {

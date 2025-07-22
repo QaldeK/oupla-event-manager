@@ -16,6 +16,7 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	// Callbacks pour communiquer avec le propriétaire (par exemple, SyncStore)
 	public onRecordsReceived: (records: T[]) => Promise<void> = async () => {};
 	public onRecordDeleted: (recordId: string) => Promise<void> = async () => {};
+	public onPruneNeeded: (remoteIds: string[]) => Promise<void> = async () => {};
 	public onSyncComplete: (syncDate: Date) => void = () => {};
 
 	public onError: (error: Error | unknown, context: string) => void = () => {};
@@ -127,10 +128,17 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 		}
 
 		const syncTime = new Date();
-		const syncFilter = this.buildSyncFilter(isFullRefresh);
-		const sortString = this.buildSortString();
 
 		try {
+			// 1. Phase de nettoyage (uniquement pour les synchros standards, pas pour un refresh complet)
+			if (!isFullRefresh) {
+				await this._pruneStaleRecords();
+			}
+
+			// 2. Phase de récupération des données modifiées
+			const syncFilter = this.buildSyncFilter(isFullRefresh);
+			const sortString = this.buildSortString();
+
 			const results = await this.collection.getFullList<T>({
 				filter: syncFilter,
 				sort: sortString,
@@ -140,13 +148,13 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 			if (results.length > 0) {
 				await this.onRecordsReceived(results);
 			}
-			// Notifier le propriétaire que la synchro est terminée avec succès
-			this.onSyncComplete(syncTime);
 
-			// On met à jour l'heure de synchro interne pour la prochaine fois
-			this.lastSyncTime = syncTime;
+			// 3. Notifier le propriétaire que la synchro est terminée avec succès
+			this.onSyncComplete(syncTime);
+			this.lastSyncTime = syncTime; // Mettre à jour l'heure pour la prochaine synchro
 		} catch (error) {
-			this.onError(error, "sync-fetch");
+			// Si le nettoyage ou la récupération échoue, on log l'erreur mais on ne met pas à jour la date de synchro.
+			this.onError(error, "sync-process");
 		}
 	}
 
@@ -179,5 +187,34 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 			return this.syncOptions.sort.join(",");
 		}
 		return this.syncOptions.sort || "";
+	}
+
+	/**
+	 * Récupère tous les IDs distants et demande au propriétaire de nettoyer les enregistrements locaux qui n'existent plus.
+	 * @private
+	 */
+	private async _pruneStaleRecords(): Promise<void> {
+		if (!this.collection) return;
+
+		try {
+			// Appliquer le filtre de base pour ne récupérer que les IDs pertinents (ex: ceux de l'utilisateur courant)
+			const baseFilter = this.syncOptions.filter || "";
+
+			// Récupérer uniquement les IDs de tous les enregistrements distants. Très performant.
+			const remoteRecords = await this.collection.getFullList<{ id: string }>({
+				fields: "id",
+				filter: baseFilter
+			});
+
+			const remoteIds = remoteRecords.map((r) => r.id);
+
+			// Demander au propriétaire (SyncStore) de nettoyer les données locales
+			await this.onPruneNeeded(remoteIds);
+		} catch (error) {
+			this.onError(error, "prune-records");
+			// Lancer une exception pour arrêter le processus de synchro si le nettoyage échoue.
+			// C'est plus sûr pour éviter une synchronisation partielle.
+			throw error;
+		}
 	}
 }

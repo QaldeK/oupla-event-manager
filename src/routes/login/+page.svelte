@@ -64,7 +64,6 @@
 					<p class="text-error text-center">{message}</p>
 				{/if}
 			</div>
-			```
 		</div>
 	{/if}
 </div>

@@ -129,6 +129,29 @@ export class IndexedDbManager<T extends StoreRecord> {
 	}
 
 	/**
+	 * Supprime plusieurs enregistrements par leurs IDs dans une seule transaction
+	 */
+	async deleteMany(recordIds: string[]): Promise<void> {
+		if (!this.db || recordIds.length === 0) {
+			return;
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction([this.storeName], "readwrite");
+			transaction.oncomplete = () => resolve();
+			transaction.onerror = () => {
+				console.error(`⚠️ IndexedDbManager: Erreur de suppression multiple:`, transaction.error);
+				reject(transaction.error);
+			};
+
+			const objectStore = transaction.objectStore(this.storeName);
+			for (const recordId of recordIds) {
+				objectStore.delete(recordId);
+			}
+		});
+	}
+
+	/**
 	 * Vide complètement le store IndexedDB
 	 */
 	async clear(): Promise<void> {
