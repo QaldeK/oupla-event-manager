@@ -14,6 +14,8 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	// Callbacks pour communiquer avec le propriétaire (par exemple, SyncStore)
 	public onRecordsReceived: (records: T[]) => Promise<void> = async () => {};
 	public onRecordDeleted: (recordId: string) => Promise<void> = async () => {};
+	public onSyncComplete: (syncDate: Date) => void = () => {};
+
 	public onError: (error: Error | unknown, context: string) => void = () => {};
 
 	constructor(
@@ -120,7 +122,7 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	 * Effectue une requête de synchronisation pour récupérer les enregistrements nouveaux ou modifiés.
 	 * @returns La date à laquelle la synchronisation a été effectuée.
 	 */
-	public async sync(): Promise<Date | null> {
+	public async sync(): Promise<void> {
 		if (!this.collection) {
 			this.onError(new Error("Syncer not started"), "sync");
 			return null;
@@ -138,15 +140,15 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 			});
 
 			if (results.length > 0) {
-				// Notifie le propriétaire avec les nouveaux enregistrements
 				await this.onRecordsReceived(results);
 			}
+			// Notifier le propriétaire que la synchro est terminée avec succès
+			this.onSyncComplete(syncTime);
 
-			// Retourne l'heure de la synchro pour que le propriétaire puisse la sauvegarder
-			return syncTime;
+			// On met à jour l'heure de synchro interne pour la prochaine fois
+			this.lastSyncTime = syncTime;
 		} catch (error) {
 			this.onError(error, "sync-fetch");
-			return null; // En cas d'erreur, on ne retourne pas de date de synchro valide
 		}
 	}
 
@@ -161,7 +163,7 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 		if (this.lastSyncTime) {
 			// Le format de date de PocketBase requiert un espace et non un 'T'
 			const lastSyncISO = this.lastSyncTime.toISOString().replace("T", " ");
-			syncTimeFilter = `updated >= "${lastSyncISO}"`;
+			syncTimeFilter = `updated > "${lastSyncISO}"`;
 		}
 
 		if (baseFilter && syncTimeFilter) {

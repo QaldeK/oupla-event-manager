@@ -1,146 +1,220 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { SyncStore } from "$lib/shared/syncState.svelte";
 import type { StoreRecord, StoreConfig } from "$lib/types/syncState.types";
-import * as pocketbase from "$lib/pocketbase.svelte";
+import { IndexedDbManager } from "$lib/shared/indexedDbManager.svelte";
+import { PocketBaseSyncer } from "$lib/shared/pocketbaseSyncer.svelte";
 
-// Type de test simple qui étend StoreRecord
+// --- MOCKING AREA ---
+// Nous créons des objets qui contiendront nos fonctions mockées.
+// Cela nous permet de les réinitialiser et de les espionner facilement dans nos tests.
+const mockDbManager = {
+	init: vi.fn().mockResolvedValue(undefined),
+	loadAll: vi.fn().mockResolvedValue([]),
+	save: vi.fn().mockResolvedValue(undefined),
+	clear: vi.fn().mockResolvedValue(undefined),
+	close: vi.fn()
+};
+
+const mockSyncer = {
+	start: vi.fn().mockResolvedValue(undefined),
+	stop: vi.fn(),
+	forceRefresh: vi.fn().mockResolvedValue(undefined),
+	// Ces placeholders seront remplacés par les vrais callbacks du SyncStore
+	onRecordsReceived: (records: StoreRecord[]) => {},
+	onRecordDeleted: (id: string) => {},
+	onSyncComplete: (date: Date) => {},
+	onError: (err: any, ctx: string) => {}
+};
+
+// Ici, on dit à Vitest : "chaque fois que le code importe ces modules,
+// utilise nos versions mockées à la place".
+vi.mock("$lib/shared/indexedDbManager.svelte", () => ({
+	// Le constructeur de la classe mockée retourne notre objet mocké.
+	IndexedDbManager: vi.fn().mockImplementation(() => mockDbManager)
+}));
+
+vi.mock("$lib/shared/pocketbaseSyncer.svelte", () => ({
+	// Idem pour le PocketBaseSyncer. On utilise un setter pour capturer les callbacks.
+	PocketBaseSyncer: vi.fn().mockImplementation(() => {
+		return new Proxy(mockSyncer, {
+			set: (target, property, value) => {
+				// Permet au SyncStore d'assigner ses callbacks à notre mock
+				target[property as keyof typeof mockSyncer] = value;
+				return true;
+			}
+		});
+	})
+}));
+
+// Mock minimal pour pb.svelte, car il est encore importé pour subscribe/unsubscribe
+vi.mock("$lib/pocketbase.svelte", () => ({
+	pb: {
+		collection: vi.fn(() => ({
+			subscribe: vi.fn(() => () => {}), // Retourne une fonction de désinscription
+			unsubscribe: vi.fn()
+		}))
+	}
+}));
+
+// --- TEST DATA ---
 interface TestRecord extends StoreRecord {
-	id: string;
-	created: string;
-	updated: string;
 	name: string;
 	category: string;
-	priority: number;
 }
-
-// Données de test
 const testRecords: TestRecord[] = [
 	{
 		id: "1",
 		created: "2024-01-01T00:00:00Z",
-		updated: "2024-01-01T00:00:00Z",
+		updated: "2024-01-01T01:00:00Z",
 		collectionId: "test",
-		collectionName: "testRecords",
+		collectionName: "test",
 		name: "Événement A",
-		category: "conference",
-		priority: 1
+		category: "conference"
 	},
 	{
 		id: "2",
 		created: "2024-01-02T00:00:00Z",
-		updated: "2024-01-02T00:00:00Z",
+		updated: "2024-01-02T01:00:00Z",
 		collectionId: "test",
-		collectionName: "testRecords",
+		collectionName: "test",
 		name: "Événement B",
-		category: "workshop",
-		priority: 2
+		category: "workshop"
 	},
 	{
 		id: "3",
 		created: "2024-01-03T00:00:00Z",
-		updated: "2024-01-03T00:00:00Z",
+		updated: "2024-01-03T01:00:00Z",
 		collectionId: "test",
-		collectionName: "testRecords",
+		collectionName: "test",
 		name: "Événement C",
-		category: "conference",
-		priority: 1
+		category: "conference"
 	}
 ];
 
-// Mock des dépendances externes
-vi.mock("$lib/pocketbase.svelte", () => ({
-	// On simule la fonction que SyncStore appelle réellement
-	getFullList: vi.fn().mockImplementation((collectionName: string) => {
-		if (collectionName === "testRecords") {
-			return Promise.resolve(testRecords);
-		}
-		return Promise.resolve([]);
-	}),
-	// On simule les autres fonctions pour éviter les erreurs, même si on ne les teste pas ici
-	getList: vi.fn().mockResolvedValue({ items: [], totalItems: 0 }),
-	getOne: vi.fn().mockResolvedValue(null),
-	subscribe: vi.fn(() => () => {}), // retourne une fonction de désinscription
-	unsubscribe: vi.fn()
-}));
-
-describe("SyncStore - Scénario d'initialisation", () => {
+// --- TEST SUITE ---
+describe("SyncStore - Refactored", () => {
 	let store: SyncStore<TestRecord>;
-	const dbName = "testStore";
+	const dbName = "testStoreRefactored";
 
-	// Ce `beforeEach` s'exécutera AVANT chaque test `it()`
 	beforeEach(async () => {
-		// 1. Nettoyer les mocks et le localStorage, c'est une bonne pratique
+		// Réinitialise tous les mocks avant chaque test pour un état propre
 		vi.clearAllMocks();
 		localStorage.clear();
 
-		// 2. Supprimer la base de données du test précédent. C'est l'étape CRUCIALE.
-		// On attend que la suppression soit terminée pour garantir un état propre.
-		await new Promise<void>((resolve, reject) => {
+		// C'est une bonne pratique de s'assurer que la base de données de test est propre
+		await new Promise<void>((resolve) => {
 			const request = indexedDB.deleteDatabase(dbName);
 			request.onsuccess = () => resolve();
-			request.onerror = () => reject(request.error);
-			request.onblocked = () => {
-				console.warn(
-					"La base de données IndexedDB est bloquée, impossible de la supprimer proprement."
-				);
-				resolve(); // On continue malgré tout
-			};
+			request.onerror = () => resolve(); // On continue même en cas d'erreur
+			request.onblocked = () => resolve();
 		});
 
-		// 3. Maintenant que l'environnement est propre, on crée l'instance pour le test
 		const config: StoreConfig<TestRecord> = {
-			name: dbName, // Utilisons notre variable pour être cohérents
+			name: dbName,
 			version: 1,
-			indexes: {
-				byCategory: { path: "category" },
-				byPriority: { path: "priority" }
-			},
-			sync: { mode: "manual" }
+			indexes: { byCategory: { path: "category" } },
+			sync: { mode: "realtime" } // Mode realtime pour que le syncer soit bien créé
 		};
 		store = new SyncStore<TestRecord>(config);
 	});
 
-	// `afterEach` est utile pour le nettoyage final si nécessaire
 	afterEach(async () => {
-		if (store) await store.destroy();
+		if (store) {
+			await store.destroy();
+		}
 	});
 
-	it("devrait partir d'un état vide, charger les données depuis la source, et les rendre accessibles", async () => {
-		// **PHASE 1 : VÉRIFIER L'ÉTAT INITIAL**
-		// On s'assure que notre nettoyage a fonctionné
-		expect(store.isInitialized, "Le store ne doit pas être initialisé au départ").toBe(false);
-		expect(store.getAll(), "Le store doit être vide au départ").toHaveLength(0);
+	it("devrait initialiser depuis une source distante quand le cache local est vide", async () => {
+		// --- ARRANGE ---
+		// 1. Simuler une DB vide au chargement
+		mockDbManager.loadAll.mockResolvedValue([]);
 
-		// **PHASE 2 : ACTION**
-		// On lance l'initialisation qui doit déclencher la récupération des données
+		// 2. Simuler que le syncer va renvoyer nos données de test
+		// On modifie l'implémentation de `start` pour ce test spécifique
+		mockSyncer.start.mockImplementation(async () => {
+			// Le syncer appelle le callback avec les données reçues
+			await mockSyncer.onRecordsReceived(testRecords);
+			// Et notifie la fin de la synchronisation
+			mockSyncer.onSyncComplete(new Date("2024-01-04T00:00:00Z"));
+		});
+
+		// --- ACT ---
 		await store.init("testRecords" as any);
 
-		// **PHASE 3 : VÉRIFICATION DE L'ÉTAT FINAL**
-		// Le store doit maintenant être initialisé et rempli
+		// --- ASSERT ---
+		// Vérifier que le store est bien initialisé
 		expect(store.isInitialized, "Le store doit être marqué comme initialisé").toBe(true);
+
+		// Vérifier les interactions avec les dépendances
+		expect(mockDbManager.init, "Doit initialiser la DB locale").toHaveBeenCalled();
+		expect(mockDbManager.loadAll, "Doit essayer de charger depuis la DB locale").toHaveBeenCalled();
+		expect(mockSyncer.start, "Doit démarrer le processus de synchronisation").toHaveBeenCalled();
+		// L'argument `lastSync` doit être null car le cache est vide
+		expect(mockSyncer.start).toHaveBeenCalledWith(expect.anything(), null);
+		// Vérifier que les données reçues ont bien été sauvegardées
 		expect(
-			pocketbase.getFullList,
-			"Le store doit appeler la source de données"
-		).toHaveBeenCalledWith(
-			"testRecords",
-			expect.anything() // On ne se soucie pas des options passées, juste du nom de la collection
-		);
+			mockDbManager.save,
+			"Doit sauvegarder les nouveaux enregistrements dans la DB"
+		).toHaveBeenCalledWith(testRecords);
 
-		// On vérifie que les données sont maintenant bien stockées en interne
-		expect(store.getAll(), "Le store doit contenir les enregistrements de la source").toHaveLength(
-			3
-		);
+		// Vérifier l'état final du store
+		expect(store.getAll(), "Le store doit contenir les 3 enregistrements").toHaveLength(3);
+		expect(store.get("1")?.name).toBe("Événement A");
 
-		// Et enfin, on vérifie que les index ont été construits correctement
+		// Vérifier que la date de synchro a été mise à jour dans localStorage
+		expect(localStorage.getItem(`${dbName}_lastSync`)).toBe("2024-01-04T00:00:00.000Z");
+
+		// Vérifier que les fonctionnalités (index) sont opérationnelles
 		const conferenceEvents = store.getByIndex("byCategory", "conference");
-		expect(conferenceEvents, "L'index 'byCategory' doit fonctionner").toHaveLength(2);
-		expect(conferenceEvents.map((r) => r.name)).toEqual(
-			expect.arrayContaining(["Événement A", "Événement C"])
-		);
+		expect(conferenceEvents, "L'index 'byCategory' doit renvoyer 2 événements").toHaveLength(2);
+		expect(conferenceEvents.map((e) => e.id)).toEqual(expect.arrayContaining(["1", "3"]));
+	});
 
-		const priority1Events = store.getByIndex("byPriority", 1);
-		expect(priority1Events, "L'index 'byPriority' doit fonctionner avec des nombres").toHaveLength(
-			2
-		);
+	it("devrait initialiser depuis le cache local puis synchroniser les nouveautés", async () => {
+		// --- ARRANGE ---
+		// 1. Simuler une DB locale qui contient déjà 2 enregistrements
+		const localData = [testRecords[0], testRecords[1]];
+		mockDbManager.loadAll.mockResolvedValue(localData);
+
+		// 2. Simuler une date de dernière synchronisation dans localStorage
+		const lastSyncDate = new Date("2024-01-02T12:00:00Z");
+		localStorage.setItem(`${dbName}_lastSync`, lastSyncDate.toISOString());
+
+		// 3. Simuler que le syncer ne renvoie que le 3ème enregistrement (le seul plus récent)
+		const newData = [testRecords[2]];
+		mockSyncer.start.mockImplementation(async () => {
+			await mockSyncer.onRecordsReceived(newData);
+			mockSyncer.onSyncComplete(new Date("2024-01-04T00:00:00Z"));
+		});
+
+		// --- ACT ---
+		await store.init("testRecords" as any);
+
+		// --- ASSERT ---
+
+		expect(
+			mockDbManager.loadAll,
+			"Doit bien tenter de charger les données depuis la DB locale"
+		).toHaveBeenCalled();
+		// On vérifie que le syncer a été appelé avec la bonne date, ce qui prouve
+		// que le store a bien pris en compte les données locales et la date de synchro.
+		expect(
+			mockSyncer.start,
+			"Le syncer doit démarrer avec la date de dernière synchro"
+		).toHaveBeenCalledWith(expect.anything(), lastSyncDate);
+
+		// Vérifier que seules les nouvelles données ont été sauvegardées
+		expect(
+			mockDbManager.save,
+			"Seuls les nouveaux enregistrements doivent être sauvegardés"
+		).toHaveBeenCalledWith(newData);
+
+		// Vérifier l'état final du store
+		expect(store.isInitialized, "Le store doit être initialisé").toBe(true);
+		expect(
+			store.getAll(),
+			"À la fin, le store doit contenir tous les enregistrements"
+		).toHaveLength(3);
+		expect(store.get("3")?.name).toBe("Événement C");
 	});
 });
