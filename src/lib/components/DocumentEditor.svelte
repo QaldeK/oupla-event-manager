@@ -8,6 +8,7 @@
 	import { Tipex, defaultExtensions } from "@friendofsvelte/tipex";
 	import { formatDistanceToNow } from "date-fns";
 	import { fr } from "date-fns/locale";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
 	import { createDocumentEditManager } from "$lib/shared/documentEditManager.svelte";
@@ -323,9 +324,10 @@
 				role="document"
 				class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg"
 			>
-				<div class="document-content prose max-w-none overflow-y-auto p-4">
-					{@html doc?.content || "<p><em>Ce document est vide.</em></p>"}
-				</div>
+				<div
+					class="document-content prose max-w-none overflow-y-auto p-4"
+					use:safeHtml={{ html: doc?.content || "<p><em>Ce document est vide.</em></p>" }}
+				></div>
 				<div>
 					{@render footDoc()}
 				</div>

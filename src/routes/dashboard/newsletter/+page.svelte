@@ -5,6 +5,7 @@
 	import { defaultExtensions, Tipex } from "@friendofsvelte/tipex";
 	import { getSpace } from "$lib/shared/spaceOptions.svelte";
 	import type { Editor } from "@tiptap/core";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	import TipexToolbar from "$lib/components/TipexToolbar.svelte";
 	import { addDays, format, isWithinInterval } from "date-fns";
@@ -358,7 +359,7 @@
 </script>
 
 <!-- {$inspect(generatedHtml)} -->
-{$inspect("editorTextPreview", editorTextPreview)}
+<!-- {$inspect("editorTextPreview", editorTextPreview)} -->
 <!-- Peut-être utile pour débugger les modifs manuelles -->
 <div class="h-11/12">
 	<div class="period-selector">
@@ -459,9 +460,10 @@
 				class="tab-content bg-base-100 border-base-300 rounded-box flex-grow overflow-auto p-4"
 				style="min-height: 400px; height: 70vh;"
 			>
-				<div class="prose prose-sm max-w-none">
-					{@html editorHtmlPreview}
-				</div>
+				<div
+					class="prose prose-sm max-w-none"
+					use:safeHtml={{ html: editorHtmlPreview, allowLink: true }}
+				></div>
 			</div>
 
 			<!-- Onglet Prévisualisation Texte -->
@@ -485,8 +487,6 @@
 </div>
 
 <style>
-	/* 👉 2. Ajouter les styles globaux pour l'éditeur Tipex */
-
 	/* Assurer que les h2, h3, h4 ont des marges par défaut raisonnables dans Tiptap */
 	:global(.tipex .ProseMirror h2) {
 		margin-top: 1.5em;

@@ -11,6 +11,7 @@
 	import * as sitePageStore from "../sitePageStore.svelte";
 	import SimpleTiptapToolbar from "$lib/components/SimpleTiptapToolbar.svelte";
 	import type { RecordModel } from "pocketbase";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	// Interface pour les props
 	interface Props {
@@ -200,9 +201,10 @@
 			{#if isLockedByOther || !isEditing}
 				<!-- Aperçu lecture seule si lock pris OU si lock dispo mais pas encore repris -->
 				<div class="flex flex-1 flex-col justify-between overflow-hidden rounded-lg">
-					<div class="prose max-w-none overflow-y-auto p-4">
-						{@html content || "<p><em>Ce bloc est vide.</em></p>"}
-					</div>
+					<div
+						class="prose max-w-none overflow-y-auto p-4"
+						use:safeHtml={{ html: content || "<p><em>Ce bloc est vide.</em></p>" }}
+					></div>
 					{#if isLockedByOther}
 						<div>
 							<div

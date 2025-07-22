@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Editor } from "@tadashi/svelte-editor-quill";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	interface Props {
 		html: string | undefined;
@@ -35,4 +36,6 @@
 	/>
 </svelte:head>
 
-<Editor {options} {onTextChange} class="">{@html $state.snapshot(html)}</Editor>
+<Editor {options} {onTextChange} class="">
+	<span use:safeHtml={{ html: $state.snapshot(html) }}></span>
+</Editor>

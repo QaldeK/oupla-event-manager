@@ -4,6 +4,7 @@
 
 	import NavBarHeader from "$lib/components/public/NavBarHeader.svelte";
 	import type { PageData } from "./$types";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	import { page } from "$app/state";
 	import { Menu } from "lucide-svelte";
@@ -146,7 +147,7 @@
 
 				{#if block.content}
 					<div class="prose max-w-none">
-						{@html block.content}
+						<span use:safeHtml={{ html: block.content }}></span>
 					</div>
 				{/if}
 			</div>

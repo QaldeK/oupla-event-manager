@@ -5,6 +5,7 @@
 	import type { PublicEventInfo } from "$lib/shared/publicStore.svelte";
 	import type { PublicSiteThemeOptions } from "$lib/types/theme.d";
 	import { isMobile } from "$lib/utils";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	interface Props {
 		event: PublicEventInfo;
@@ -257,7 +258,7 @@
 						style:overflow-wrap="break-word"
 						style:hyphens="auto"
 					>
-						<div>{@html event.desc_public}</div>
+						<div use:safeHtml={{ html: event.desc_public }}></div>
 						{#if !isExpanded && hasOverflow}
 							<div
 								class="{cardOptions.bgClass} pointer-events-none absolute -right-4 bottom-0 -left-4 h-8 blur-lg"

@@ -18,6 +18,7 @@
 	import OrganizersHeader from "./OrganizersHeader.svelte";
 	import TasksDisplay from "./TasksDisplay.svelte";
 	import TopAlert from "./TopAlert.svelte";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	// ::: context & props
 	interface Props {
@@ -281,7 +282,11 @@
 					{#if currentEvent.description}
 						<ExpandableCard title="à propos..." text={currentEvent.description} />
 					{/if}
-
+					{#if currentEvent.desc_public}
+						<ExpandableCard title="description publique">
+							<div use:safeHtml={currentEvent.desc_public}></div>
+						</ExpandableCard>
+					{/if}
 					<!-- ::: external_proposal -->
 					{#if !hasDate && currentEvent.external_proposal?.period_preference && currentEvent.external_proposal.period_preference.length > 0}
 						<ExpandableCard

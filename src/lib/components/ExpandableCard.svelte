@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { untrack } from "svelte";
-	import { fade, slide } from "svelte/transition";
-	let { title, text } = $props();
+	import type { Snippet } from "svelte";
+
+	interface Props {
+		title: string;
+		text?: string;
+		children?: Snippet;
+	}
+	let { title, text, children }: Props = $props();
 
 	let isExpanded = $state(false);
 	let textOverflows = $state(false);
@@ -51,15 +57,20 @@
 			? 'cursor-pointer'
 			: 'cursor-default'}"
 	>
-		<!-- <p>{text}</p> -->
-		{#if isExpanded}
-			<p class="text-fluid-sm whitespace-pre-line text-gray-700">
-				{text}
-			</p>
-		{:else}
-			<p class="text-fluid-sm text-gray-700">
-				{text}
-			</p>
+		{#if text}
+			{#if isExpanded}
+				<p class="text-fluid-sm whitespace-pre-line text-gray-700">
+					{text}
+				</p>
+			{:else}
+				<p class="text-fluid-sm text-gray-700">
+					{text}
+				</p>
+			{/if}
+		{:else if children}
+			<div class="text-fluid-sm text-gray-700" class:whitespace-pre-line={isExpanded}>
+				<div>{@render children()}</div>
+			</div>
 		{/if}
 	</div>
 </div>

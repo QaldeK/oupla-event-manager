@@ -2,6 +2,7 @@
 	import { modalState } from "$lib/shared/states.svelte";
 	import { AlertOctagon, AlertTriangle, Info } from "lucide-svelte";
 	import Modal from "./Modal.svelte";
+	import { safeHtml } from "$lib/actions/safeHtml";
 
 	// --- États dérivés des données du modal ---
 	let title = $derived(modalState.confirm.data.title);
@@ -80,7 +81,7 @@
 			<div class="flex flex-col gap-4 p-2">
 				<p class="text-fluid-lg font-semibold not-sm:text-center">{title}</p>
 				<p class="text-fluid-base flex-grow">
-					{@html message}
+					<span use:safeHtml={{ html: message }}></span>
 				</p>
 			</div>
 		</div>
