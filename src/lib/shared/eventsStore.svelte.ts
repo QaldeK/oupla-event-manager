@@ -8,6 +8,7 @@ import {
 	type EventConflictInfo,
 	type EventTimeInfo
 } from "$lib/services/eventConflicts";
+import { SvelteSet, SvelteMap } from "svelte/reactivity";
 
 // Type compatible avec StoreRecord pour SyncStore
 type EventStoreRecord = {
@@ -36,6 +37,7 @@ const userId = $derived(userDb?.current?.id);
 class EventsStore {
 	#store = $state({
 		syncStore: null as SyncStore<EventStoreRecord> | null,
+		recentEventsLoader: null as ReturnType<SyncStore<EventStoreRecord>["createLazyLoader"]> | null,
 		isInitialized: false,
 		error: null as Error | null,
 		initPromise: null as Promise<void> | null,
@@ -69,6 +71,10 @@ class EventsStore {
 			try {
 				await syncStore.init(Collections.Events);
 				this.#store.syncStore = syncStore;
+				this.#store.recentEventsLoader = syncStore.createLazyLoader({
+					batchSize: 6,
+					sortFn: (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime()
+				});
 				this.#store.mode = mode;
 				this.#store.isInitialized = true;
 			} catch (err: unknown) {
@@ -94,35 +100,30 @@ class EventsStore {
 		}
 	}
 
-	async clearAndDestroy() {
-		try {
-			// Arrêter toutes les souscriptions en cours
-			if (this.#store.syncStore) {
-				await this.#store.syncStore.destroy();
-			}
-
-			// Réinitialiser complètement le store
-			this.#store = {
-				syncStore: null,
-				isInitialized: false,
-				error: null,
-				initPromise: null,
-				mode: null
-			};
-		} catch (error) {
-			console.error("Erreur lors de la destruction du store:", error);
-			// Forcer la réinitialisation même en cas d'erreur
-			this.#store.isInitialized = false;
-			this.#store.syncStore = null;
-		}
-	}
-
 	// :::  getters
 
-	allEvents = $derived.by<EventType[]>(() => {
-		if (!this.#store.syncStore) return [];
+	// Optimisation : Calcul centralisé de toutes les catégories d'événements en une seule passe
+	#categorizedEvents = $derived.by(() => {
+		if (!this.#store.syncStore) {
+			return {
+				all: [] as EventType[],
+				master: [] as ValidMaster[],
+				withDate: [] as EventType[],
+				withoutDate: [] as EventType[],
+				confirmed: [] as EventType[],
+				unconfirmed: [] as EventType[],
+				confirmable: [] as EventType[],
+				withSondage: [] as EventType[],
+				withoutDateProposition: [] as EventType[],
+				withoutOrganizers: [] as EventType[],
+				occurences: [] as EventType[]
+			};
+		}
 
-		return (this.#store.syncStore.getAll() as EventType[])
+		const allRecords = this.#store.syncStore.allRecords as EventType[];
+
+		// Tri et filtre des événements principaux
+		const all = allRecords
 			.filter((e) => !e.isMasterRecurrent)
 			.sort((a: EventType, b: EventType) => {
 				const dateA = a.dateStart || a.date_event;
@@ -137,205 +138,205 @@ class EventsStore {
 				const timeB = b.time_start || "00:00";
 				return timeA.localeCompare(timeB);
 			});
-	});
 
-	allMasterEvents = $derived.by<ValidMaster[]>(() => {
-		if (!this.#store.syncStore) return [];
-
-		return (this.#store.syncStore.getAll() as EventType[]).filter(
+		// Événements maîtres (récurrents)
+		const master = allRecords.filter(
 			(e): e is ValidMaster =>
 				e.isMasterRecurrent && e.recurrence !== null && e.recurrence !== undefined
 		);
+
+		// Initialisation des catégories
+		const categorized = {
+			all,
+			master,
+			withDate: [] as EventType[],
+			withoutDate: [] as EventType[],
+			confirmed: [] as EventType[],
+			unconfirmed: [] as EventType[],
+			confirmable: [] as EventType[],
+			withSondage: [] as EventType[],
+			withoutDateProposition: [] as EventType[],
+			withoutOrganizers: [] as EventType[],
+			occurences: [] as EventType[]
+		};
+
+		// Parcours unique pour catégoriser tous les événements
+		for (const event of all) {
+			// Catégorisation par date
+			if (event.date_event) {
+				categorized.withDate.push(event);
+				// Les événements confirmables sont ceux avec date mais non confirmés
+				if (!event.isConfirmed) {
+					categorized.confirmable.push(event);
+				}
+				// Les occurrences sont ceux avec date et récurrents
+				if (event.isRecurrent) {
+					categorized.occurences.push(event);
+				}
+			} else {
+				categorized.withoutDate.push(event);
+			}
+
+			// Catégorisation par statut de confirmation
+			if (event.isConfirmed) {
+				categorized.confirmed.push(event);
+			} else {
+				categorized.unconfirmed.push(event);
+			}
+
+			// Catégorisation par organisateurs
+			if (Array.isArray(event.organizers) && event.organizers.length === 0) {
+				categorized.withoutOrganizers.push(event);
+			}
+
+			// Catégorisation par dates proposées (sondages)
+			if (Array.isArray(event.dates_proposed)) {
+				if ((event.dates_proposed?.length ?? 0) > 0) {
+					categorized.withSondage.push(event);
+				} else if (event.dates_proposed?.length === 0) {
+					categorized.withoutDateProposition.push(event);
+				}
+			}
+		}
+
+		return categorized;
 	});
 
-	eventsWithDate = $derived.by(() => this.allEvents.filter((e) => e.date_event));
-
-	eventsWithoutDate = $derived.by(() => this.allEvents.filter((e) => !e.date_event));
-
-	confirmedEvents = $derived<EventType[]>(this.allEvents.filter((e) => e.isConfirmed));
-
-	unconfirmedEvents = $derived<EventType[]>(this.allEvents.filter((e) => !e.isConfirmed));
-
-	confirmableEvents = $derived<EventType[]>(this.eventsWithDate.filter((e) => !e.isConfirmed));
-
-	eventsWithSondage = $derived<EventType[]>(
-		this.eventsWithoutDate.filter(
-			(e) => Array.isArray(e.dates_proposed) && (e.dates_proposed?.length ?? 0) > 0
-		)
-	);
-
-	eventsWithoutDateProposition = $derived<EventType[]>(
-		this.eventsWithoutDate.filter(
-			(e) => Array.isArray(e.dates_proposed) && e.dates_proposed?.length === 0
-		)
-	);
-
-	eventsWithoutOrganizers = $derived<EventType[]>(
-		this.allEvents.filter((e) => {
-			return Array.isArray(e.organizers) && e.organizers.length === 0;
-		})
-	);
-
-	getEventsOccurences = $derived<EventType[]>(this.eventsWithDate.filter((e) => e.isRecurrent));
+	// Exposition des propriétés dérivées optimisées
+	allEvents = $derived(this.#categorizedEvents.all);
+	allMasterEvents = $derived(this.#categorizedEvents.master);
+	eventsWithDate = $derived(this.#categorizedEvents.withDate);
+	eventsWithoutDate = $derived(this.#categorizedEvents.withoutDate);
+	confirmedEvents = $derived(this.#categorizedEvents.confirmed);
+	unconfirmedEvents = $derived(this.#categorizedEvents.unconfirmed);
+	confirmableEvents = $derived(this.#categorizedEvents.confirmable);
+	eventsWithSondage = $derived(this.#categorizedEvents.withSondage);
+	eventsWithoutDateProposition = $derived(this.#categorizedEvents.withoutDateProposition);
+	eventsWithoutOrganizers = $derived(this.#categorizedEvents.withoutOrganizers);
+	getEventsOccurences = $derived(this.#categorizedEvents.occurences);
 
 	getEventById = $derived.by(() => (id: string): EventType | undefined => {
 		if (!this.#store.syncStore) return undefined;
 		return this.#store.syncStore.get(id) as EventType | undefined;
 	});
 
-	// 👉 Système de pagination simple pour optimiser les performances
-	#pagination = $state({
-		pageSize: 20,
-		currentPage: 1,
-		totalPages: 1,
-		totalItems: 0
-	});
-
-	get pagination() {
-		return this.#pagination;
-	}
-
-	// Version paginée des événements principaux pour optimiser l'affichage
 	paginatedAllEvents = $derived.by(() => {
-		const events = this.allEvents;
-		this.#pagination.totalItems = events.length;
-		this.#pagination.totalPages = Math.ceil(events.length / this.#pagination.pageSize);
-
-		const startIndex = (this.#pagination.currentPage - 1) * this.#pagination.pageSize;
-		const endIndex = startIndex + this.#pagination.pageSize;
-
-		return events.slice(startIndex, endIndex);
+		// Note : `paginatedRecords` est déjà trié par `allEvents`
+		return (this.#store.syncStore?.paginatedRecords as EventType[]) ?? [];
 	});
 
-	// Méthodes de navigation dans la pagination
-	setPage(page: number) {
-		if (page >= 1 && page <= this.#pagination.totalPages) {
-			this.#pagination.currentPage = page;
+	// 2. Exposer l'état de la pagination pour l'UI
+	pagination = $derived.by(() => {
+		if (!this.#store.syncStore) {
+			return { currentPage: 1, totalPages: 1, pageSize: 20, totalRecords: 0 };
 		}
-	}
+		return {
+			currentPage: this.#store.syncStore.currentPage,
+			totalPages: this.#store.syncStore.totalPages,
+			pageSize: this.#store.syncStore.pageSize,
+			totalRecords: this.#store.syncStore.totalRecords
+		};
+	});
 
+	// 3. Exposer les méthodes de contrôle
+	setPage(page: number) {
+		this.#store.syncStore?.setPage(page);
+	}
 	nextPage() {
-		this.setPage(this.#pagination.currentPage + 1);
+		this.#store.syncStore?.nextPage();
 	}
-
 	previousPage() {
-		this.setPage(this.#pagination.currentPage - 1);
+		this.#store.syncStore?.previousPage();
 	}
-
 	setPageSize(size: number) {
-		this.#pagination.pageSize = size;
-		this.#pagination.currentPage = 1; // Reset à la première page
+		this.#store.syncStore?.setPageSize(size);
 	}
 
-	// Récupère les événements où l'utilisateur est organisateur
-	userEvents = $derived(
-		this.allEvents.filter(
-			(event) =>
-				!event.isRecurrent && event.date_event && event.organizers?.some((org) => org.id === userId)
-		)
-	);
+	// --- LAZY LOAD POUR ÉVÉNEMENTS RÉCENTS (maintenant ultra-simple) ---
 
-	// Récupère les événements récurrents où l'utilisateur est dans l'équipe
-	userRecurrentEvents = $derived(
-		this.allMasterEvents.filter((event) =>
-			event.recurrence?.recurrenceTeam?.some((member) => member?.id === userId)
-		)
+	// On expose simplement les propriétés du loader que l'on a créé
+	recentlyCreatedEvents = $derived.by(
+		() => (this.#store.recentEventsLoader?.records as EventType[]) ?? []
 	);
+	hasMoreRecentEvents = $derived.by(() => this.#store.recentEventsLoader?.hasMore ?? false);
+	loadMoreRecentEvents = () => {
+		this.#store.recentEventsLoader?.loadMore();
+	};
+	resetRecentEventsPagination = () => {
+		this.#store.recentEventsLoader?.reset();
+	};
 
-	// Récupère les sondages auxquels l'utilisateur a répondu
-	userSondageEvents = $derived(
-		this.eventsWithSondage.filter((event) =>
-			event.dates_proposed?.some((dateProposal) =>
+	// --- SERVICE USER EVENTS ---
+
+	// Optimisation : Calcul centralisé des événements utilisateur
+	#userCategorizedEvents = $derived.by(() => {
+		if (!userId) {
+			return {
+				userEvents: [] as EventType[],
+				userRecurrentEvents: [] as ValidMaster[],
+				userSondageEvents: [] as EventType[],
+				otherSondageEvents: [] as EventType[]
+			};
+		}
+
+		const userEvents: EventType[] = [];
+		const userRecurrentEvents: ValidMaster[] = [];
+		const userSondageEvents: EventType[] = [];
+		const userSondageEventIds = new SvelteSet<string>();
+
+		// Parcours des événements principaux pour les organisateurs
+		for (const event of this.#categorizedEvents.all) {
+			if (
+				!event.isRecurrent &&
+				event.date_event &&
+				event.organizers?.some((org) => org.id === userId)
+			) {
+				userEvents.push(event);
+			}
+		}
+
+		// Parcours des événements maîtres pour les équipes récurrentes
+		for (const event of this.#categorizedEvents.master) {
+			if (event.recurrence?.recurrenceTeam?.some((member) => member?.id === userId)) {
+				userRecurrentEvents.push(event);
+			}
+		}
+
+		// Parcours des sondages pour les réponses utilisateur
+		for (const event of this.#categorizedEvents.withSondage) {
+			const hasUserResponse = event.dates_proposed?.some((dateProposal) =>
 				dateProposal.organizers?.some(
 					(org) => org.id === userId && (org.maybehere === "oui" || org.maybehere === "peut-être")
 				)
-			)
-		)
-	);
+			);
 
-	// Récupère les autres sondages actuels (où l'utilisateur n'a pas répondu)
-	otherSondageEvents = $derived(() => {
-		if (!userId) return [];
-		const responded = new Set(this.userSondageEvents.map((e) => e.id));
-		return this.eventsWithSondage.filter((event) => !responded.has(event.id));
-	});
-
-	// État pour la pagination des événements récents
-	#recentEventsState = $state({
-		pageSize: 6,
-		currentPage: 1
-	});
-
-	// Récupère tous les événements récents triés par date de création
-	#allRecentEvents = $derived.by(() => {
-		if (!this.#store.syncStore) return [];
-
-		return this.#store.syncStore
-			.getAll()
-			.filter((e) => !e.isRecurrent || (e.isRecurrent && e.isMasterRecurrent))
-			.sort((a, b) => {
-				const dateA = new Date(a.created!);
-				const dateB = new Date(b.created!);
-				return dateB.getTime() - dateA.getTime(); // Plus récent en premier
-			});
-	});
-
-	// Récupère les derniers événements créés avec pagination
-	recentlyCreatedEvents = $derived.by(() => {
-		const oneMonthAgo = new Date();
-		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
-		// Prendre les événements du dernier mois en priorité
-		const recentEvents = this.#allRecentEvents.filter((event) => {
-			const createdDate = new Date(event.created!);
-			return createdDate >= oneMonthAgo;
-		});
-
-		// Si moins d'événements du dernier mois que demandé, compléter avec tous les événements
-		const eventsToShow =
-			recentEvents.length >= this.#recentEventsState.pageSize
-				? recentEvents
-				: this.#allRecentEvents;
-
-		const startIndex = 0;
-		const endIndex = this.#recentEventsState.pageSize * this.#recentEventsState.currentPage;
-
-		return eventsToShow.slice(startIndex, endIndex);
-	});
-
-	// Indique s'il y a plus d'événements à charger
-	hasMoreRecentEvents = $derived.by(() => {
-		const totalEvents = this.#allRecentEvents.length;
-		const currentlyShown = this.#recentEventsState.pageSize * this.#recentEventsState.currentPage;
-		return currentlyShown < totalEvents;
-	});
-
-	// Fonction pour charger plus d'événements récents
-	loadMoreRecentEvents = () => {
-		this.#recentEventsState.currentPage += 1;
-	};
-
-	// Fonction pour réinitialiser la pagination des événements récents
-	resetRecentEventsPagination = () => {
-		this.#recentEventsState.currentPage = 1;
-	};
-
-	// USELESS
-	getEventsByDate = $derived.by<Map<string, EventType[]>>(() => {
-		const eventsByDateMap = new Map<string, EventType[]>();
-		for (const event of this.allEvents) {
-			if (event.date_event) {
-				if (!eventsByDateMap.has(event.date_event)) {
-					eventsByDateMap.set(event.date_event, []); // Initialiser un tableau vide si la date n'existe pas
-				}
-				eventsByDateMap.get(event.date_event)!.push(event); // Ajouter l'événement au tableau de la date correspondante
+			if (hasUserResponse) {
+				userSondageEvents.push(event);
+				userSondageEventIds.add(event.id);
 			}
 		}
-		return eventsByDateMap;
+
+		// Autres sondages (sans réponse utilisateur)
+		const otherSondageEvents = this.#categorizedEvents.withSondage.filter(
+			(event) => !userSondageEventIds.has(event.id)
+		);
+
+		return {
+			userEvents,
+			userRecurrentEvents,
+			userSondageEvents,
+			otherSondageEvents
+		};
 	});
 
-	getEventsByDateTime = $derived.by<Map<string, EventConflictInfo[]>>(() => {
-		const eventsByDateMap = new Map<string, EventConflictInfo[]>();
+	// Exposition des propriétés utilisateur optimisées
+	userEvents = $derived(this.#userCategorizedEvents.userEvents);
+	userRecurrentEvents = $derived(this.#userCategorizedEvents.userRecurrentEvents);
+	userSondageEvents = $derived(this.#userCategorizedEvents.userSondageEvents);
+	otherSondageEvents = $derived(this.#userCategorizedEvents.otherSondageEvents);
+
+	getEventsByDateTime = $derived.by<SvelteMap<string, EventConflictInfo[]>>(() => {
+		const eventsByDateMap = new SvelteMap<string, EventConflictInfo[]>();
 
 		// horaire par defaut inséré ensuite si non renseigné
 		const getDefaultTimes = (isStart: boolean) => {
@@ -446,11 +447,13 @@ class EventsStore {
 		return eventsByDateMap;
 	});
 
-	eventTimeInfoMap = $derived.by<Map<string, EventTimeInfo[]>>(() => {
-		if (!this.#store.isInitialized) return new Map();
+	eventTimeInfoMap = $derived.by<SvelteMap<string, EventTimeInfo[]>>(() => {
+		if (!this.#store.isInitialized) return new SvelteMap();
 		// Assure-toi que allEvents contient bien les champs nécessaires
 		// (id, title, rooms, organizers, isConfirmed, dateStart, dateEnd, date_event, time_start, time_end, dates_proposed)
-		return buildEventTimeInfoMap(this.allEvents);
+		const result = buildEventTimeInfoMap(this.allEvents);
+		// Conversion vers SvelteMap si nécessaire
+		return result instanceof Map ? new SvelteMap(result) : result;
 	});
 
 	get isInitialized(): boolean {
@@ -465,11 +468,13 @@ class EventsStore {
 	 * Trouve tous les groupes d'événements qui se chevauchent pour chaque date
 	 * @returns Une Map avec des clés au format "date_groupe" et des tableaux d'événements en conflit
 	 */
-	getOverlappingEventGroups = $derived.by<Map<string, EventConflictInfo[][]>>(() => {
-		if (!this.#store.isInitialized) return new Map();
+	getOverlappingEventGroups = $derived.by<SvelteMap<string, EventConflictInfo[][]>>(() => {
+		if (!this.#store.isInitialized) return new SvelteMap();
 
 		const allEvents = this.allEvents;
-		return getOverlappingEventGroups(allEvents);
+		const result = getOverlappingEventGroups(allEvents);
+		// Conversion vers SvelteMap si nécessaire
+		return result instanceof Map ? new SvelteMap(result) : result;
 	});
 
 	/**
@@ -484,14 +489,18 @@ class EventsStore {
 	/**
 	 * Méthode de nettoyage pour détruire l'instance de SyncStore et réinitialiser l'état.
 	 */
-	destroy(): void {
+	async destroy() {
 		if (this.#store.syncStore) {
-			this.#store.syncStore.destroy();
-			this.#store.syncStore = null;
+			await this.#store.syncStore.destroy();
 		}
+
+		// Réinitialiser complètement l'état
+		this.#store.syncStore = null;
+		this.#store.recentEventsLoader = null;
 		this.#store.isInitialized = false;
 		this.#store.error = null;
 		this.#store.initPromise = null;
+		this.#store.mode = null;
 	}
 }
 

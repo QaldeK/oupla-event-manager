@@ -1,6 +1,38 @@
 import type { StoreRecord, IndexConfig } from "$lib/types/syncState.types";
 
 /**
+ * IndexManager
+ * --------------
+ * Objectif :
+ *   Fournit une gestion efficace des index en mémoire pour des collections d'enregistrements,
+ *   permettant des recherches rapides par clé, ainsi que la création, mise à jour et suppression d'index.
+ *
+ * Utilisation :
+ *   1. Instancier IndexManager avec une configuration d'index :
+ *        const manager = new IndexManager<MyRecordType>(indexesConfig);
+ *
+ *   2. Construire les index à partir d'une liste d'enregistrements :
+ *        manager.buildFrom(recordsArray);
+ *
+ *   3. Ajouter ou mettre à jour un enregistrement dans les index :
+ *        manager.addOrUpdate(record);
+ *
+ *   4. Supprimer un enregistrement des index :
+ *        manager.remove(record);
+ *
+ *   5. Interroger les index pour retrouver des enregistrements :
+ *        const results = manager.getByIndex("indexName", key, allRecordsMap);
+ *
+ *   6. Utiliser le QueryBuilder pour des requêtes chaînées :
+ *        const results = manager.query(allRecordsMap)
+ *                              .byIndex("indexA", keyA)
+ *                              .byIndex("indexB", keyB)
+ *                              .sort((a, b) => a.date - b.date)
+ *                              .take(10)
+ *                              .exec();
+ */
+
+/**
  * Gère la création, la mise à jour et l'interrogation d'index en mémoire.
  * Classe TypeScript pure, découplée de l'état Svelte.
  */
