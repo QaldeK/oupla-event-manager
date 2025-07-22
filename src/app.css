@@ -146,6 +146,8 @@
 	p {
 		font-size: var(--fluid-base);
 		margin-bottom: 0.1rem;
+		white-space: normal; /* Autorise le retour à la ligne normal */
+		overflow-wrap: break-word;
 	}
 }
 
