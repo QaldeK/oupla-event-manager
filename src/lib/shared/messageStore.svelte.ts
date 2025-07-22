@@ -66,14 +66,6 @@ class MessageStoreClass {
 			console.error("Failed to initialize messageStore (Class):", error);
 		}
 	}
-	async clearAndDestroy(): Promise<void> {
-		if (this.#store.syncStore) {
-			await this.#store.syncStore.clearAll();
-			this.#store.syncStore = null;
-		}
-		this.#store.isInitialized = false;
-		this.#store.error = null;
-	}
 
 	/**
 	 * Retourne les messages d'un événement spécifique.
@@ -86,6 +78,7 @@ class MessageStoreClass {
 			return [];
 		}
 		// Pour redeclancher getByIndex lorsqu'un nouveau message est crée
+		// $derived.by` ne peut pas savoir que le contenu retourné par `query()` dépend de `allRecords`.
 		const allMessage = this.#store.syncStore.allRecords;
 
 		return this.#store.syncStore
@@ -108,10 +101,12 @@ class MessageStoreClass {
 	/**
 	 * Méthode de nettoyage pour détruire l'instance de SyncStore et réinitialiser l'état.
 	 */
-	destroy(): void {
-		this.#store.syncStore?.destroy();
-		this.#store.syncStore = null; // Réinitialiser l'instance
-		this.#store.isInitialized = false; // Réinitialiser l'état
+	async destroy(): Promise<void> {
+		if (this.#store.syncStore) {
+			await this.#store.syncStore.destroy();
+			this.#store.syncStore = null;
+		}
+		this.#store.isInitialized = false;
 		this.#store.error = null;
 	}
 }

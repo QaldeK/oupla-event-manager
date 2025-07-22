@@ -65,11 +65,7 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 			this.onError(new Error("Syncer not started"), "forceRefresh");
 			return;
 		}
-		// On sauvegarde temporairement la date de synchro pour la restaurer après
-		const originalLastSync = this.lastSyncTime;
-		this.lastSyncTime = null; // Forcer une récupération complète
-		await this.sync();
-		this.lastSyncTime = originalLastSync; // Restaurer la date originale
+		await this.sync(true);
 	}
 
 	/**
@@ -122,14 +118,14 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	 * Effectue une requête de synchronisation pour récupérer les enregistrements nouveaux ou modifiés.
 	 * @returns La date à laquelle la synchronisation a été effectuée.
 	 */
-	public async sync(): Promise<void> {
+	public async sync(isFullRefresh: boolean = false): Promise<void> {
 		if (!this.collection) {
 			this.onError(new Error("Syncer not started"), "sync");
 			return null;
 		}
 
 		const syncTime = new Date();
-		const syncFilter = this.buildSyncFilter();
+		const syncFilter = this.buildSyncFilter(isFullRefresh);
 		const sortString = this.buildSortString();
 
 		try {
@@ -155,12 +151,12 @@ export class PocketBaseSyncer<T extends StoreRecord> {
 	/**
 	 * Construit la chaîne de filtre pour la requête PocketBase.
 	 */
-	private buildSyncFilter(): string {
+	private buildSyncFilter(isFullRefresh: boolean = false): string {
 		const baseFilter = this.syncOptions.filter || "";
 		let syncTimeFilter = "";
 
 		// Si on a une date de dernière synchro, on ne récupère que les éléments plus récents
-		if (this.lastSyncTime) {
+		if (this.lastSyncTime && !isFullRefresh) {
 			// Le format de date de PocketBase requiert un espace et non un 'T'
 			const lastSyncISO = this.lastSyncTime.toISOString().replace("T", " ");
 			syncTimeFilter = `updated > "${lastSyncISO}"`;

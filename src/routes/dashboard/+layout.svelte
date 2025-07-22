@@ -176,7 +176,7 @@
 	async function handleLogout() {
 		try {
 			// 1. Détruire tous les stores
-			await Promise.all([eventsStore.clearAndDestroy(), messageStore.clearAndDestroy()]);
+			await Promise.all([eventsStore.destroy(), messageStore.destroy()]);
 
 			// Nettoyer les notifications
 			clearNotifications();
