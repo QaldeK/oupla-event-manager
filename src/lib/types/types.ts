@@ -56,26 +56,23 @@ export type {
 export * from "./pocketbase";
 // export * from '$lib/types/event.types';
 
+export interface UserCurrentSpace {
+	id: string;
+	name: string;
+	public_name: string;
+	role: string;
+	description?: string;
+	since?: string;
+}
+
 export interface UserType {
 	id: string;
 	username: string;
 	email: string;
 	currentRole: string;
 	verified: boolean;
-	memberOf: Array<{
-		id: string;
-		name: string;
-		role: string;
-		description?: string;
-		since?: string;
-	}>;
-	currentSpace: {
-		id: string;
-		name: string;
-		role: string;
-		description?: string;
-		since?: string;
-	} | null;
+	memberOf: UserCurrentSpace[];
+	currentSpace: UserCurrentSpace | null;
 }
 
 export interface SpaceMember {
@@ -96,4 +93,16 @@ export interface CurrentUser {
 	id: string;
 	username: string;
 	role: string;
+}
+
+export interface ExpandedMessage {
+	user?: {
+		username: string;
+	};
+	replyingTo?: {
+		content: string;
+		user?: {
+			username: string;
+		};
+	};
 }

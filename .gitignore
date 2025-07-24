@@ -33,7 +33,8 @@ _pb_bak
 .directory
 *_bak
 
-# llm
+llm
+docs
 .aider*
 !.aiderules
 

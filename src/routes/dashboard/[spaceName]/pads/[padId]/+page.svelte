@@ -6,13 +6,17 @@
 	import type { PadsResponse } from "$lib/types/pocketbase";
 	import type { DocumentStoreActions } from "$lib/shared/documentEditManager.svelte";
 	import type { RecordModel } from "pocketbase";
+	import { getContext } from "svelte";
+	import { type UserCurrentSpace } from "$lib/types/types";
+
+	const currentSpace: UserCurrentSpace = getContext("currentSpace");
 
 	export let data: PageData;
 	const docId = data.pad.id as string;
 	let initialEditMode = false;
 
 	const collectionName = "pads";
-	const basePath = "/dashboard/pads";
+	const basePath = `/dashboard/${currentSpace.name}/pads`;
 
 	// Le type `PadsType` est un alias pour `PadsResponse & RecordModel`
 	// qui est utilisé en interne par `padStore` pour garantir la compatibilité

@@ -2,18 +2,23 @@
 	import { fade } from "svelte/transition";
 	import { Settings, Palette, Layout, FileText } from "lucide-svelte";
 	import { goto } from "$app/navigation";
+	import { getContext } from "svelte";
+	import { type UserCurrentSpace } from "$lib/types/types";
+
+	// Récupérer le contexte de l'espace courant
+	const currentSpace: UserCurrentSpace = getContext("currentSpace");
 
 	// Navigation vers les sous-pages
 	function navigateToPages() {
-		goto("/dashboard/site_pages/pages");
+		goto(`/dashboard/${currentSpace.name}/site_pages/pages`);
 	}
 
 	function navigateToTheme() {
-		goto("/dashboard/site_pages/theme");
+		goto(`/dashboard/${currentSpace.name}/site_pages/theme`);
 	}
 
 	function navigateToTemplate() {
-		goto("/dashboard/site_pages/template");
+		goto(`/dashboard/${currentSpace.name}/site_pages/template`);
 	}
 </script>
 

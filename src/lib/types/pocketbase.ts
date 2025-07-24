@@ -202,6 +202,7 @@ export type MessagesRecord = {
 	space: RecordIdString
 	updated?: IsoDateString
 	user: RecordIdString
+	users_concerned?: RecordIdString[]
 }
 
 export type PadsRecord = {
@@ -277,6 +278,7 @@ export type SpacesRecord<Tdeleted_records = unknown> = {
 	id: string
 	inscription?: SpacesInscriptionOptions
 	name: string
+	public_name: string
 	updated?: IsoDateString
 }
 
@@ -284,6 +286,7 @@ export type SpacesOptionsRecord<Tcategories = unknown, Toptions = unknown, Tpubl
 	categories?: null | Tcategories
 	created?: IsoDateString
 	id: string
+	mailContactSpace?: string
 	mailSend?: HTMLString
 	newsletterMembers?: string
 	newsletterPublic?: string

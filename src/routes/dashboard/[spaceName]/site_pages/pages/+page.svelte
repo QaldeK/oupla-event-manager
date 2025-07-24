@@ -10,6 +10,12 @@
 	import { AlertCircle, ArrowLeftSquare, FileText, Plus } from "lucide-svelte";
 	import { fade } from "svelte/transition";
 	import { PagesList, ViewModeToggle } from "../components/index.js";
+	import { type UserCurrentSpace } from "$lib/types/types";
+
+	import { getContext } from "svelte";
+
+	// Récupérer le contexte de l'espace courant
+	const currentSpace: UserCurrentSpace = getContext("currentSpace");
 
 	let isLoading = $state(true);
 	let newPageTitle = $state("");
@@ -84,7 +90,7 @@
 			const newPage = await createPad(newPageTitle, SitePagesSectionOptions.page);
 			newPageTitle = "";
 			// Rediriger vers la page nouvellement créée
-			goto(`/dashboard/site_pages/pages/${newPage.id}?editMode=true`);
+			goto(`/dashboard/${currentSpace.name}/site_pages/pages/${newPage.id}?editMode=true`);
 		} catch (e) {
 			showAlert("Erreur lors de la création de la page", "error");
 			console.error(e);
@@ -94,7 +100,7 @@
 	}
 
 	function navigateBack() {
-		goto("/dashboard/site_pages");
+		goto(`/dashboard/${currentSpace.name}/site_pages`);
 	}
 </script>
 
@@ -103,7 +109,7 @@
 	<div class="mb-6 flex flex-wrap items-center gap-4">
 		<button class="btn btn-square" onclick={navigateBack}>
 			<ArrowLeftSquare />
-		</button>
+		</button>a
 		<div class="flex items-center gap-3">
 			<div class="bg-primary/10 rounded-lg p-2">
 				<FileText class="text-primary h-5 w-5" />
@@ -186,8 +192,8 @@
 				{isLoading}
 				displayMode={viewMode}
 				onDelete={deletePage}
-				editBaseUrl="/dashboard/site_pages/pages"
-				viewBaseUrl="/dashboard/site_pages/pages"
+				editBaseUrl={`/dashboard/${currentSpace.name}/site_pages/pages`}
+				viewBaseUrl={`/dashboard/${currentSpace.name}/site_pages/pages`}
 				emptyStateTitle="Aucune page générale trouvée"
 				emptyStateDescription="Commencez par créer votre première page avec le formulaire ci-dessus."
 			/>

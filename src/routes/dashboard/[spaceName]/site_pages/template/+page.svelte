@@ -635,7 +635,7 @@
 	<div transition:fade>
 		<!-- Header avec navigation -->
 		<div class="mb-6 flex flex-wrap items-center gap-4">
-			<button class="btn btn-ghost btn-sm" onclick={() => goto("/dashboard/site_pages")}>
+			<button class="btn btn-ghost btn-sm" onclick={() => goto("..")}>
 				<ArrowLeft size={16} />
 			</button>
 			<div class="flex items-center gap-3">

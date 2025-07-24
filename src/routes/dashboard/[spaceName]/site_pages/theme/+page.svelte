@@ -292,7 +292,7 @@
 	}
 
 	function navigateBack() {
-		goto("/dashboard/site_pages");
+		goto("..");
 	}
 </script>
 

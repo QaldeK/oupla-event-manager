@@ -50,17 +50,6 @@ class UserDB {
 		return this.userData !== null;
 	}
 
-	get currentSpace() {
-		return this.userData?.currentSpace ?? null;
-	}
-
-	get currentRole() {
-		if (!this.userData?.currentSpace) return null;
-		return (
-			this.userData!.memberOf?.find((space) => space.id === this.userData!.currentSpace!.id)
-				?.role || null
-		);
-	}
 	get memberOf() {
 		return this.userData?.memberOf || [];
 	}
@@ -86,13 +75,10 @@ class UserDB {
 				return {
 					id: space.expand.space.id,
 					name: space.expand.space.name,
+					public_name: space.expand.space.public_name,
 					role: space.role
 				};
-			}),
-			// FIXIT : déterminer correctement l'espace en cours... gérer le multispace de manière générale.
-			// FIXIT : déterminer correctement l'espace en cours... gérer le multispace de manière générale.
-			currentSpace: memberOfResponse[0]?.expand?.space || null,
-			currentRole: memberOfResponse[0]?.role || null
+			})
 		};
 	}
 
@@ -108,8 +94,6 @@ class UserDB {
 			const currentAuth = {
 				...userInfo,
 				memberOf: userInfo.memberOf,
-				currentSpace: userInfo.currentSpace,
-				currentRole: userInfo.currentRole,
 				collectionName: "users",
 				collectionId: ""
 			};

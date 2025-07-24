@@ -1,225 +1,142 @@
 <script lang="ts">
-	// composants
-	import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
-	import DateSondageModal from "$lib/components/DateSondageModal.svelte";
-	import EventModal from "$lib/components/EventModal.svelte";
-	import MessageSheet from "$lib/components/MessageSheet.svelte";
-	// import ReportEvent from '$lib/components/ReportEvent.svelte';
-	import TaskDialog from "$lib/components/TaskDialog.svelte";
-	// store
-	import Alert from "$lib/components/Alert.svelte";
-	import InviteUserModal from "$lib/components/InviteUserModal.svelte";
+	// Composants
 	import HeaderBar from "$lib/components/HeaderBar.svelte";
-	import MobileDock from "$lib/components/MobileDock.svelte";
-	import MobileDrawer from "$lib/components/MobileDrawer.svelte";
-	import Sidebar from "$lib/components/Sidebar.svelte";
-	// 👉 Utilitaire pour la détection d'écran
+	import UserMenuMobile from "$lib/components/UserMenuMobile.svelte";
+	import Alert from "$lib/components/Alert.svelte";
+
+	// Stores et utilitaires
 	import { pb } from "$lib/pocketbase.svelte";
-	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { messageStore } from "$lib/shared/messageStore.svelte";
-	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
-	import { loadingState, messageSheet, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
-	import type { CurrentUser } from "$lib/types/types";
-	import { clearNotifications, loadNotifications } from "$lib/utils/notificationsAndLogs";
+	import { globalLogsStore } from "$lib/shared/globalLogsStore.svelte";
+	import { globalMessagesStore } from "$lib/shared/globalMessagesStore.svelte";
+	import { notificationSystem } from "$lib/shared/notificationSystem.svelte";
+	import { loadingState } from "$lib/shared/states.svelte";
 	import { screenDetector } from "$lib/utils/screen.svelte";
 
 	import { goto } from "$app/navigation";
-
-	import { setContext } from "svelte";
-
+	import { onMount } from "svelte";
 	import { fade } from "svelte/transition";
 
 	let { children } = $props();
 
-	// ::: states
+	// États locaux
 	let isInitialized = $state(false);
 	let initPromise = $state<Promise<void>>();
 
-	let currentSpace = $state<{
-		id: string;
-		name: string;
-		role: string;
-		description?: string;
-		since?: string;
-	} | null>(null);
-	let currentUser = $state<CurrentUser>({
-		id: "",
-		username: "",
-		role: ""
-	});
-
 	let isMobile = $derived(screenDetector.isMobile);
-	let isMedium = $derived(screenDetector.isMedium);
-	let isLarge = $derived(screenDetector.isLarge);
+	let mobileMenuOpen = $state(false);
 
+	// Sidebar state pour compatibilité avec HeaderBar
 	let sidebarState = $state({
 		isCompact: false
 	});
 
-	// 👉 State pour le drawer mobile
-	let mobileDrawerOpen = $state(false);
-
-	// Fonction d'initialisation
-	async function initializeApp() {
+	// Fonction d'initialisation pour la page dashboard
+	async function initializeDashboard() {
 		try {
 			if (!pb.authStore.isValid) {
 				throw new Error("Session invalide");
 			}
-			// 1. Initialiser les données utilisateur
+
+			// S'assurer que userDb est initialisé
 			await userDb.initializeUserData();
 
-			const spaceData = userDb.currentSpace;
-			if (!spaceData) {
-				throw new Error("Vous n'êtes associé à aucun espace de travail.");
+			// Initialiser les nouveaux stores
+			try {
+				// Initialiser le store de logs global
+				await globalLogsStore.init();
+
+				// Récupérer les messages du dashboard
+				await globalMessagesStore.messages;
+
+				// Initialiser le système de notification
+				await notificationSystem.init();
+
+				console.log("[Dashboard] Stores initialisés avec succès");
+			} catch (error) {
+				console.warn("Impossible d'initialiser les stores du dashboard:", error);
+				// Continue même en cas d'erreur
 			}
-			currentSpace = spaceData;
 
-			// Initialiser les stores principaux en parallèle
-			await Promise.all([
-				loadSpaceOptions(currentSpace.id),
-				eventsStore.init({ spaceId: currentSpace.id, mode: "internal" })
-			]);
-
-			// Initialiser le contexte
-			currentUser = {
-				id: userDb.id,
-				username: userDb.current?.username || "",
-				role: userDb.currentRole || ""
-			};
 			isInitialized = true;
 		} catch (err) {
-			console.error("Erreur contrôlée lors de l'initialisation :", err);
-			// Nettoyer l'auth pour éviter les boucles de redirection
+			console.error("Erreur lors de l'initialisation du dashboard:", err);
+			// Rediriger vers login en cas d'erreur d'authentification
 			pb.authStore.clear();
 			userDb.logout();
-			// Lancer une erreur qui sera affichée à l'utilisateur
-			throw new Error(err instanceof Error ? err.message : "Une erreur inconnue est survenue.");
+			goto("/login");
 		}
 	}
 
-	// Chargement différé des stores secondaires après l'initialisation principale
-	$effect(() => {
-		if (isInitialized && currentSpace?.id) {
-			// Délai de 1 seconde pour ne pas impacter l'expérience utilisateur
-			setTimeout(() => {
-				if (currentSpace?.id) {
-					messageStore.init(currentSpace.id);
-					loadNotifications(currentSpace.id);
-				}
-			}, 1000);
-		}
-	});
-
-	// ::: effect
-	// Lancer l'initialisation
-	$effect(() => {
+	// Initialisation au montage
+	onMount(() => {
 		if (!pb.authStore.isValid) {
 			goto("/login");
 		} else {
-			initPromise = initializeApp();
+			initPromise = initializeDashboard();
 		}
 	});
 
-	// :::_setContext
-	$effect(() => {
-		if (isInitialized) {
-			setContext("currentSpace", currentSpace);
-			setContext("currentUser", currentUser);
-			setContext("tasks", getSpace.tasks);
-		}
-	});
-
-	// Effet pour initialiser et mettre à jour la sidebar en fonction de la taille de l'écran
-	$effect(() => {
-		if (isMedium) {
-			sidebarState.isCompact = true;
-		} else if (isLarge) {
-			sidebarState.isCompact = false;
-		}
-	});
-
-	// ::: function
-
-	// forcer le rachraichissement depuis pocketbase (reset idb eventsStore)
+	// Fonctions pour HeaderBar
 	async function handleRefresh() {
 		try {
-			await eventsStore.forceRefresh();
-			// Optionnel : afficher un message de succès
+			// Forcer le rechargement des messages
+			await globalMessagesStore.refresh;
+			console.log("[Dashboard] Données rafraîchies");
 		} catch (error) {
-			// Gérer l'erreur (par exemple, afficher un message d'erreur)
 			console.error("Erreur lors du refresh:", error);
 		}
 	}
-	// 👉 Méthodes pour manipuler la sidebar avec gestion mobile
-	let sidebarActions = {
-		toggle() {
-			if (isMobile) {
-				// Mobile : bascule le drawer
-				mobileDrawerOpen = !mobileDrawerOpen;
-			} else {
-				// Desktop : bascule entre compact et large
-				sidebarState.isCompact = !sidebarState.isCompact;
-			}
-		},
-		close() {
-			if (isMobile) {
-				mobileDrawerOpen = false;
-			}
-		}
-	};
 
 	async function handleLogout() {
 		try {
-			// 1. Détruire tous les stores
-			await Promise.all([eventsStore.destroy(), messageStore.destroy()]);
+			// Nettoyer les nouveaux stores
+			await globalLogsStore.reset();
+			globalMessagesStore.reset();
+			notificationSystem.reset();
 
-			// Nettoyer les notifications
-			clearNotifications();
-
-			// 2. Réinitialiser les états locaux
-			isInitialized = false;
-
-			currentSpace = null;
-			currentUser = {
-				id: "",
-				username: "",
-				role: ""
-			};
-
-			// 4. Nettoyer l'authentification
+			// Nettoyer l'authentification
 			pb.authStore.clear();
-			userDb.logout(); // S'assurer que userDb est aussi nettoyé
+			userDb.logout();
 
-			// 5. Rediriger
+			// Rediriger vers login
 			goto("/login");
 		} catch (error) {
 			console.error("Erreur lors de la déconnexion:", error);
-			// Forcer un nettoyage même en cas d'erreur
+			// Forcer le nettoyage même en cas d'erreur
+			await globalLogsStore.reset();
+			globalMessagesStore.reset();
+			notificationSystem.reset();
 			pb.authStore.clear();
 			userDb.logout();
 			goto("/login");
 		}
 	}
 
-	// 👉 Fonctions helper pour les actions du header/dock
+	// Fonction pour toggle sidebar (pas vraiment utilisée ici mais requise par HeaderBar)
 	function handleToggleSidebar() {
-		sidebarActions.toggle();
+		if (isMobile) {
+			mobileMenuOpen = !mobileMenuOpen;
+		} else {
+			sidebarState.isCompact = !sidebarState.isCompact;
+		}
 	}
 </script>
 
 <div data-theme="my-corporate">
 	{#await initPromise}
 		<div class="flex min-h-screen items-center justify-center">
-			<div class="text-center">
-				<div class="mb-4 text-2xl font-semibold">Chargement...</div>
-				<div class="text-base-content">Initialisation de votre espace</div>
+			<div class="text-base-content space-y-8 text-center">
+				<span class="loading loading-spinner loading-lg"></span>
+				<div class="text-2xl font-semibold">Chargement...</div>
+				<div class="">Initialisation du tableau de bord</div>
 			</div>
 		</div>
 	{:then}
 		{#if isInitialized}
 			<div class="bg-base-100 flex min-h-screen flex-col">
 				{#if !isMobile}
+					<!-- HeaderBar pour desktop -->
 					<HeaderBar
 						{sidebarState}
 						onToggleSidebar={handleToggleSidebar}
@@ -227,61 +144,22 @@
 						onLogout={handleLogout}
 					/>
 				{:else}
-					<MobileDock
-						onToggleSidebar={handleToggleSidebar}
-						onRefresh={handleRefresh}
-						onLogout={handleLogout}
-					/>
-					<MobileDrawer
-						bind:isOpen={mobileDrawerOpen}
-						onClose={() => {
-							mobileDrawerOpen = false;
-						}}
-					/>
+					<!-- Version mobile simplifiée -->
+					<div class="navbar border-base-300 bg-base-100/80 border-b backdrop-blur-sm">
+						<div class="flex-1">
+							<span class="text-lg font-semibold">Oupla Event Manager</span>
+						</div>
+						<div class="flex-none">
+							<UserMenuMobile onRefresh={handleRefresh} onLogout={handleLogout} />
+						</div>
+					</div>
 				{/if}
 
-				<!-- Mode desktop avec sidebar classique -->
-				<div id="global-app" class="min-h-screen {isMobile ? 'pb-20' : 'pt-16'}">
-					<!-- Sidebar desktop -->
-					{#if !isMobile}
-						<Sidebar {sidebarState} />
-					{/if}
-					<!-- Contenu principal -->
-					<main
-						class={[
-							sidebarState.isCompact && !isMobile && "ml-20",
-							!sidebarState.isCompact && !isMobile && "ml-64"
-						]}
-					>
-						<div class="container mx-auto p-4 md:p-8" style="min-height: calc(100dvh - 100px);">
-							{@render children()}
-						</div>
-					</main>
-				</div>
+				<!-- Contenu principal -->
+				<main class={isMobile ? "" : "pt-16"}>
+					{@render children()}
+				</main>
 			</div>
-		{/if}
-
-		<!-- Modales -->
-		{#if modalState.event}
-			<EventModal />
-		{/if}
-		{#if modalState.report}
-			<!-- <ReportEvent /> -->
-		{/if}
-		{#if modalState.dateSondage}
-			<DateSondageModal />
-		{/if}
-		{#if modalState.tasks.isOpen}
-			<TaskDialog />
-		{/if}
-		{#if modalState.inviteUser}
-			<InviteUserModal />
-		{/if}
-		{#if modalState.confirm.isOpen}
-			<ConfirmDialog />
-		{/if}
-		{#if messageSheet.isOpen}
-			<MessageSheet />
 		{/if}
 
 		<Alert />
@@ -304,6 +182,7 @@
 		</div>
 	{/await}
 </div>
+
 {#if loadingState.is}
 	<div transition:fade class="absolute inset-0 z-50 flex items-center justify-center bg-black/60">
 		<span class="loading loading-spinner loading-lg"></span>

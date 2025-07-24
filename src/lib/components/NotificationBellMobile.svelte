@@ -1,9 +1,5 @@
 <script lang="ts">
-	import { notificationState } from "$lib/shared/states.svelte";
-	import {
-		markNotificationsAsRead,
-		generateNotificationMessage
-	} from "$lib/utils/notificationsAndLogs";
+	import { notificationSystem } from "$lib/shared/notificationSystem.svelte";
 	import { Bell, X } from "lucide-svelte";
 	import { fade } from "svelte/transition";
 	import * as Drawer from "$lib/components/ui/drawer";
@@ -18,8 +14,8 @@
 
 	function toggleNotifications() {
 		isOpen = !isOpen;
-		if (isOpen && notificationState.unreadCount > 0) {
-			markNotificationsAsRead();
+		if (isOpen && notificationSystem.unreadCount > 0) {
+			notificationSystem.markAsRead();
 		}
 	}
 
@@ -28,21 +24,15 @@
 	}
 
 	function formatRelativeTime(dateString: string): string {
-		const date = new Date(dateString);
-		const now = new Date();
-		const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+		return notificationSystem.formatRelativeTime(dateString);
+	}
 
-		if (diffInSeconds < 60) {
-			return "À l'instant";
-		} else if (diffInSeconds < 3600) {
-			const minutes = Math.floor(diffInSeconds / 60);
-			return `Il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
-		} else if (diffInSeconds < 86400) {
-			const hours = Math.floor(diffInSeconds / 3600);
-			return `Il y a ${hours} heure${hours > 1 ? "s" : ""}`;
+	function generateMessage(notification: any): string {
+		// Déterminer si c'est un log ou un message
+		if ("action" in notification) {
+			return notificationSystem.generateLogMessage(notification);
 		} else {
-			const days = Math.floor(diffInSeconds / 86400);
-			return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
+			return notificationSystem.generateMessageNotification(notification);
 		}
 	}
 </script>
@@ -55,12 +45,12 @@
 		aria-label="Notifications"
 	>
 		<Bell size={20} />
-		{#if notificationState.unreadCount > 0}
+		{#if notificationSystem.unreadCount > 0}
 			<div
 				class="bg-error absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs text-white"
 				transition:fade
 			>
-				{notificationState.unreadCount > 9 ? "9+" : notificationState.unreadCount}
+				{notificationSystem.unreadCount > 9 ? "9+" : notificationSystem.unreadCount}
 			</div>
 		{/if}
 	</button>
@@ -83,18 +73,18 @@
 
 		<!-- Contenu des notifications -->
 		<div class="flex-1 overflow-y-auto">
-			{#if !notificationState.isInitialized}
+			{#if !notificationSystem.isInitialized}
 				<div class="p-4 text-center">
 					<div class="loading loading-spinner loading-sm"></div>
 					<p class="text-base-content/70 mt-2 text-sm">Chargement...</p>
 				</div>
-			{:else if notificationState.logs.length === 0}
+			{:else if notificationSystem.recentActivity.length === 0}
 				<div class="p-8 text-center">
 					<Bell size={32} class="text-base-content/50 mx-auto mb-2" />
 					<p class="text-base-content/70 text-sm">Aucune notification</p>
 				</div>
 			{:else}
-				{#each notificationState.logs as notification (notification.id)}
+				{#each notificationSystem.recentActivity as notification (notification.id)}
 					<div
 						class="border-base-300 hover:bg-base-200 cursor-pointer border-b p-4 transition-colors"
 						transition:fade
@@ -102,7 +92,7 @@
 						<div class="flex items-start gap-3">
 							<div class="flex-1">
 								<p class="text-base-content text-sm">
-									{generateNotificationMessage(notification)}
+									{generateMessage(notification)}
 								</p>
 								<p class="text-base-content/60 mt-1 text-xs">
 									{formatRelativeTime(notification.created)}
@@ -115,7 +105,7 @@
 		</div>
 
 		<!-- Footer -->
-		{#if notificationState.logs.length > 0}
+		{#if notificationSystem.recentActivity.length > 0}
 			<div class="border-base-300 border-t p-3">
 				<button class="btn btn-ghost btn-sm w-full text-xs" onclick={closeNotifications}>
 					Fermer

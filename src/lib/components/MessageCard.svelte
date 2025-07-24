@@ -3,38 +3,40 @@
 	import { pb } from "$lib/pocketbase.svelte";
 	import { deleteMessage, updateMessage } from "$lib/pocketbase.svelte";
 	import type { MessagesResponse } from "$lib/types/pocketbase";
-	import { userDb } from "$lib/shared";
+	import type { ExpandedMessage } from "$lib/types/types";
 
 	import { ArrowUpRight, PencilLine, Reply, Trash2 } from "lucide-svelte";
-
-	interface ExpandedMessage {
-		replyingTo?: {
-			content: string;
-			expand?: {
-				user?: {
-					username: string;
-				};
-			};
-		};
-	}
 
 	interface Props {
 		message: MessagesResponse<ExpandedMessage>;
 		onReply: (id: string) => void;
 		scrollToReply?: (id: string) => void;
+		getReplyMessage: (messageId: string) => MessagesResponse<ExpandedMessage> | undefined;
+		getReplyUsername: (userId: string, expandedUser?: { username: string }) => str;
 	}
 
-	let { message, onReply, scrollToReply }: Props = $props();
+	let { message, onReply, scrollToReply, getReplyMessage, getReplyUsername }: Props = $props();
 	let isEditing = $state(false);
 	let editContent = $state(message.content);
-	let isCurrentUser = $derived(message.user === pb.authStore.model?.id);
+	let isCurrentUser = $derived(message.user === pb.authStore.record?.id);
 	let hasReply = $derived(!!message.replyingTo);
-	let replyContent = $derived(message.expand?.replyingTo ? message.expand.replyingTo.content : "");
-	let replyUser = $derived(
-		message.expand?.replyingTo?.expand?.user
-			? message.expand.replyingTo.expand.user.username
-			: "Utilisateur"
-	);
+
+	// Utilise d'abord l'expand, puis fallback sur le message du thread
+	const replyContent = $derived.by(() => {
+		if (message.expand?.replyingTo?.content) {
+			return message.expand.replyingTo.content;
+		}
+
+		if (message.replyingTo) {
+			const replyMessage = getReplyMessage(message.replyingTo);
+			return replyMessage?.content;
+		}
+
+		return "Message indisponible";
+	});
+
+	// Username de l'auteur du message
+	const authorUsername = $derived(getReplyUsername(message.user, message.expand?.user));
 
 	const handleUpdateMessage = async () => {
 		await updateMessage(editContent, message);
@@ -72,7 +74,7 @@
 	</div>
 
 	<!-- Avatar (optionnel) -->
-	{#if message.expand?.user?.avatar}
+	<!-- {#if message.expand?.user?.avatar}
 		<div class="chat-image avatar">
 			<div class="w-10 rounded-full">
 				<img
@@ -82,11 +84,11 @@
 				/>
 			</div>
 		</div>
-	{/if}
+	{/if} -->
 
 	<!-- Contenu du message -->
 	<div class="chat-bubble {isCurrentUser ? 'chat-bubble-primary' : ''}">
-		<div class="text-sm font-semibold">{message.expand?.user?.username || "Utilisateur"}</div>
+		<div class="text-sm font-semibold">{!isCurrentUser ? authorUsername : ""}</div>
 
 		{#if hasReply}
 			<div
@@ -96,9 +98,9 @@
 				role="button"
 				tabindex="0"
 			>
-				<div class="text-base-content/70 flex items-center gap-1 text-sm">
+				<div class="text-base-content/60 flex items-center gap-1 text-xs">
 					<ArrowUpRight class="h-3 w-3" />
-					<span>Réponse à <span class="font-semibold">{replyUser}</span></span>
+					<span>Réponse à ...</span>
 				</div>
 				<p class="text-base-content/90 line-clamp-2 text-sm">
 					{replyContent || "Message indisponible"}
@@ -122,21 +124,19 @@
 	</div>
 
 	<!-- Footer avec les actions -->
-	<div class="chat-footer opacity-0 transition-opacity group-hover:opacity-100">
+	<div class="chat-footer pt-0.5 opacity-0 transition-opacity group-hover:opacity-100">
 		<div class="flex gap-2">
 			<button class="btn btn-ghost btn-xs" onclick={() => onReply(message.id)}>
 				<Reply class="mr-1 h-4 w-4" />
 				Répondre
 			</button>
 
-			{#if message.user === userDb.current.id}
+			{#if isCurrentUser}
 				<button class="btn btn-ghost btn-xs" onclick={() => (isEditing = true)}>
 					<PencilLine class="mr-1 h-4 w-4" />
-					Modifier
 				</button>
 				<button class="btn btn-ghost btn-xs" onclick={handleDeleteMessage}>
 					<Trash2 class="mr-1 h-4 w-4" />
-					Supprimer
 				</button>
 			{/if}
 		</div>

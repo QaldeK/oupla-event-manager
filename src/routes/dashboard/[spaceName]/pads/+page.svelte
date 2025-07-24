@@ -11,12 +11,17 @@
 	import { persistedState } from "$lib/utils/local-state.svelte.js";
 	import { isMobile } from "$lib/utils";
 	import { PagesList, ViewModeToggle } from "../site_pages/components/index.js";
-	import { Plus, FileText, AlertCircle, ArrowLeftSquare } from "lucide-svelte";
+	import { Plus, FileText, AlertCircle } from "lucide-svelte";
+	import { getContext } from "svelte";
+	import { type UserCurrentSpace } from "$lib/types/types";
 
 	let isLoading = $state(true);
 	let newPadTitle = $state("");
 	let isCreating = $state(false);
 	let error = $state<string | null>(null);
+
+	// Récupérer le contexte de l'espace courant
+	const currentSpace: UserCurrentSpace = getContext("currentSpace");
 
 	let pads = $derived.by(() => getPads());
 
@@ -81,24 +86,16 @@
 		// Nettoyage à la destruction du composant
 		return unsubscribe;
 	});
-
-	function navigateBack() {
-		goto("/dashboard"); // Assuming /dashboard is the parent, adjust if needed
-	}
 </script>
 
 <div>
 	<!-- Header avec navigation -->
-	<div class="mb-6 flex flex-wrap items-center gap-4">
-		<button class="btn btn-square" onclick={navigateBack}>
-			<ArrowLeftSquare />
-		</button>
-		<div class="flex items-center gap-3">
-			<div class="bg-primary/10 rounded-lg p-2">
-				<FileText class="text-primary h-5 w-5" />
-			</div>
-			<div class="text-2xl font-bold">Mes documents collaboratifs</div>
+
+	<div class="flex items-center gap-3">
+		<div class="bg-primary/10 rounded-lg p-2">
+			<FileText class="text-primary h-5 w-5" />
 		</div>
+		<div class="text-2xl font-bold">Mes documents collaboratifs</div>
 	</div>
 
 	<div class="mb-8">
@@ -174,8 +171,8 @@
 				{isLoading}
 				displayMode={viewMode}
 				onDelete={confirmDeletePad}
-				editBaseUrl="/dashboard/pads"
-				viewBaseUrl="/dashboard/pads"
+				editBaseUrl={`/dashboard/${currentSpace.name}/pads`}
+				viewBaseUrl={`/dashboard/${currentSpace.name}/pads`}
 				emptyStateTitle="Aucun document collaboratif trouvé"
 				emptyStateDescription="Créez votre premier document avec le formulaire ci-dessus."
 			/>

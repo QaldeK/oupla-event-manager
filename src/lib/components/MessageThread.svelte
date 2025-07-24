@@ -4,6 +4,8 @@
 	import { sendMessage } from "$lib/pocketbase.svelte";
 	import { messageStore } from "$lib/shared/messageStore.svelte";
 	import type { MessagesResponse } from "$lib/types/pocketbase";
+	import type { ExpandedMessage } from "$lib/types/types";
+	import { getSpace } from "$lib/shared";
 
 	import { MessageCircle, Reply, X } from "lucide-svelte";
 
@@ -16,11 +18,38 @@
 
 	let newMessage = $state("");
 	let replyingTo = $state<string | null>(null);
-	let replyingToMessage = $state<MessagesResponse | null>(null);
-	let messages = $derived<MessagesResponse[]>(messageStore.getMessageOfEvent(eventId));
+	let replyingToMessage = $state<MessagesResponse<ExpandedMessage> | null>(null);
+	let messages = $derived<MessagesResponse<ExpandedMessage>[]>(
+		messageStore.getMessageOfEvent(eventId)
+	);
 	let isLoading = $state(false);
 	let messageRefs = $state<Record<string, HTMLElement>>({});
 	let messageResponseOf = $state<string | null>(null);
+
+	// Fonction pour obtenir un message par son ID pour envoyé le content de replyTo
+	const getMessageFromThread = (
+		messageId: string
+	): MessagesResponse<ExpandedMessage> | undefined => {
+		return messages.find((m) => m.id === messageId);
+	};
+
+	const getReplyUsername = (userId: string, expandedUser?: { username: string }) => {
+		// D'abord vérifier l'expand
+		if (expandedUser?.username) {
+			return expandedUser.username;
+		}
+
+		// Fallback sur le spacesStore
+		const member = getSpace.members.find((m) => m.id === userId);
+		return member?.username || "Utilisateur";
+	};
+
+	// Pour la zone de réponse dans MessageThread
+	let replyingToUsername = $derived(
+		replyingToMessage
+			? getReplyUsername(replyingToMessage.user, replyingToMessage.expand?.user)
+			: null
+	);
 
 	const handleSend = async () => {
 		const result = await sendMessage(eventId, newMessage, replyingTo);
@@ -82,7 +111,13 @@
 						bind:this={messageRefs[message.id]}
 						class="rounded-lg {message.id === messageResponseOf ? ' highlight-message' : ''}"
 					>
-						<MessageCard {message} onReply={handleReply} scrollToReply={scrollToMessage} />
+						<MessageCard
+							{message}
+							onReply={handleReply}
+							scrollToReply={scrollToMessage}
+							getReplyMessage={getMessageFromThread}
+							{getReplyUsername}
+						/>
 					</div>
 				{/each}
 			</div>
@@ -97,7 +132,7 @@
 					<div class="flex items-center gap-2">
 						<Reply class="h-4 w-4" />
 						<span class="font-semibold">
-							Réponse à {replyingToMessage.expand?.user.username || "Utilisateur"}
+							Réponse à {replyingToUsername}
 						</span>
 					</div>
 					<button

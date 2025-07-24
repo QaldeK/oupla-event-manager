@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 import { PocketBaseSyncer } from "$lib/shared/pocketbaseSyncer.svelte";
-import type { Collection, StoreRecord, SyncOptions } from "$lib/types/syncState.types";
+import type { StoreRecord, SyncOptions } from "$lib/types/syncState.types";
+import type { RecordService } from "pocketbase";
 
 // Mock de l'objet collection de PocketBase
-const mockCollection: Collection = {
+const mockCollection: RecordService<TestRecord> = {
 	getFullList: vi.fn(),
 	getList: vi.fn(),
 	getOne: vi.fn(),
 	subscribe: vi.fn(),
 	unsubscribe: vi.fn(),
 	getFirstListItem: vi.fn()
-};
+} as unknown as RecordService<TestRecord>;
 
 interface TestRecord extends StoreRecord {
 	name: string;
@@ -135,5 +136,27 @@ describe("PocketBaseSyncer", () => {
 				filter: `status = 'active'`
 			})
 		);
+	});
+
+	it("devrait appeler onPruneNeeded avec la liste des IDs distants", async () => {
+		const syncOptions: SyncOptions = { mode: "manual" };
+		syncer = new PocketBaseSyncer<TestRecord>(syncOptions, "testCollection");
+
+		const onPruneNeeded = vi.fn();
+		syncer.onPruneNeeded = onPruneNeeded;
+		syncer.onSyncComplete = vi.fn();
+
+		// Mock getFullList pour ne retourner que des IDs
+		(mockCollection.getFullList as Mock).mockImplementation(({ fields }) => {
+			if (fields === "id") {
+				return Promise.resolve([{ id: "1" }, { id: "2" }]);
+			}
+			return Promise.resolve([]);
+		});
+
+		await syncer.start(mockCollection, null);
+
+		// Vérifie que le callback a été appelé avec la bonne liste
+		expect(onPruneNeeded).toHaveBeenCalledWith(["1", "2"]);
 	});
 });

@@ -3,17 +3,14 @@
 	import { page } from "$app/state";
 	import { modalState } from "$lib/shared/states.svelte.js";
 	import { screenDetector } from "$lib/utils/screen.svelte";
-	// Importation de TOUT depuis notre nouveau fichier de configuration
+	// Importation depuis le nouveau store de navigation
 	import {
-		confMenuItems,
-		eventsMenuItems,
-		generateUrl,
-		inviteUserButton,
+		navigationStore,
 		newEventButton,
-		otherMenuItems,
+		inviteUserButton,
 		type ActionItem,
 		type MenuItem
-	} from "$lib/shared/navigation";
+	} from "$lib/shared/navigation.svelte";
 
 	// Type d\'union pour représenter un item de navigation ou d\'action
 	type NavigationItem = MenuItem | ActionItem;
@@ -30,10 +27,15 @@
 	let currentFullUrl = $derived(page.url.pathname + page.url.search);
 	let currentPathname = $derived(page.url.pathname);
 
+	// Récupération des éléments de menu depuis le store
+	let eventsMenuItems = $derived(navigationStore.eventsMenuItems);
+	let otherMenuItems = $derived(navigationStore.otherMenuItems);
+	let confMenuItems = $derived(navigationStore.confMenuItems);
+
 	// Vérifie si un item de navigation correspond EXACTEMENT à l'URL actuelle
 	function isItemActive(item: NavigationItem): boolean {
 		if (!("path" in item)) return false; // Les ActionItem n'ont pas de chemin et ne peuvent pas être "actifs"
-		return generateUrl(item) === currentFullUrl;
+		return navigationStore.generateUrl(item) === currentFullUrl;
 	}
 
 	// Vérifie si un groupe de sous-menus doit être déplié
@@ -41,13 +43,16 @@
 		// Seuls les MenuItem peuvent avoir des sous-éléments et un chemin
 		if (!("subItems" in item) || !item.subItems || !("path" in item)) return false;
 
+		// Générer l'URL transformée pour la comparaison
+		const transformedUrl = navigationStore.generateUrl(item);
+		const transformedPath = transformedUrl.split("?")[0]; // Retirer les paramètres
+
 		// Déplie si on est sur la page parente ou une de ses sous-pages
-		if (currentPathname.startsWith(item.path)) {
+		if (currentPathname.startsWith(transformedPath)) {
 			return true;
 		}
 
 		// Déplie si un des enfants est la page active
-		// Nous savons que item.subItems contient des MenuItem, et isItemActive peut désormais gérer NavigationItem
 		return item.subItems.some((subItem: MenuItem) => isItemActive(subItem));
 	}
 
@@ -66,7 +71,7 @@
 		}
 		// Sinon, c'est un item de navigation (a la prop 'path')
 		else if ("path" in item) {
-			goto(generateUrl(item));
+			goto(navigationStore.generateUrl(item));
 		}
 
 		onItemClick?.(); // Ferme le menu sur mobile, par exemple
@@ -75,7 +80,7 @@
 
 <!-- SNIPPET RÉCURSIF POUR AFFICHER LES ITEMS DE MENU -->
 {#snippet renderMenuItem(item: NavigationItem, level = 0)}
-	{@const url = "path" in item ? generateUrl(item) : "#"}
+	{@const url = "path" in item ? navigationStore.generateUrl(item) : "#"}
 	{@const Icon = item.icon}
 	<li>
 		<a href={url} class={[isItemActive(item) && "bg-base-300"]} onclick={() => handleClick(item)}>

@@ -127,4 +127,21 @@ describe("IndexedDbManager", () => {
 		count = await dbManager.count();
 		expect(count).toBe(0);
 	});
+
+	it("devrait supprimer plusieurs enregistrements avec deleteMany", async () => {
+		const records: TestRecord[] = [
+			{ id: "1", name: "A", created: "", updated: "", collectionId: "", collectionName: "" },
+			{ id: "2", name: "B", created: "", updated: "", collectionId: "", collectionName: "" },
+			{ id: "3", name: "C", created: "", updated: "", collectionId: "", collectionName: "" }
+		];
+		await dbManager.save(records);
+
+		// Suppression multiple
+		await dbManager.deleteMany(["1", "3"]);
+		const all = await dbManager.loadAll();
+
+		// On doit retrouver uniquement l'enregistrement "2"
+		expect(all).toHaveLength(1);
+		expect(all[0].id).toBe("2");
+	});
 });

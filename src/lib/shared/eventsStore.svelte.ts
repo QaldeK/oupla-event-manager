@@ -52,12 +52,12 @@ class EventsStore {
 		if (this.#store.initPromise) return this.#store.initPromise;
 
 		this.#store.initPromise = (async () => {
-			const dbName = "eventsStore"; //= mode === 'external' ? 'events-public' : 'events-dashboard';
+			const dbName = `events_${spaceId}`;
 
 			const filter = `space = '${spaceId}' && (date_event = "" || date_event >= '${new Date().toISOString().split("T")[0]}')`;
 
 			const syncStore = new SyncStore<EventStoreRecord>({
-				name: "eventsStore",
+				name: `events_${spaceId}`,
 				version: 1,
 				dbName,
 				sync: {

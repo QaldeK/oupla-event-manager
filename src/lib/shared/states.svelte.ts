@@ -6,8 +6,6 @@ import { getNewEvent } from "$lib/services/eventActions";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
 import { type TaskType } from "$lib/types/event.types";
 
-import type { LogsResponse, UsersResponse } from "$lib/types/pocketbase";
-
 export interface ConfirmModalData {
 	title: string;
 	message: string;
@@ -180,16 +178,6 @@ export const messageSheet = $state({
 // ::: État de loading global pour les transitions et lazy loading
 export const loadingState = $state({
 	is: false
-});
-
-// ::: Store de notifications
-export type NotificationLogRecord = LogsResponse<unknown, { user_actor_id?: UsersResponse }>;
-
-export const notificationState = $state({
-	logs: [] as NotificationLogRecord[],
-	unreadCount: 0,
-	isInitialized: false,
-	subscription: null as (() => void) | null
 });
 
 // ::: Validation d'événements // Crée pour les test... USELESS?

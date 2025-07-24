@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
+	import { getContext } from "svelte";
 	import { userDb } from "$lib/shared/userDb.svelte.js";
-	import { CircleUserRound, LogOut, RefreshCw, Settings, Users, X } from "lucide-svelte";
+	import { CircleUserRound, LogOut, RefreshCw, Settings, Users } from "lucide-svelte";
 	import { fade } from "svelte/transition";
 	import * as Drawer from "$lib/components/ui/drawer";
 
@@ -34,7 +35,7 @@
 	}
 
 	function handleSettings() {
-		goto("/dashboard/config");
+		goto(`/dashboard/${currentSpace.name}/config`);
 		closeUserMenu();
 	}
 </script>

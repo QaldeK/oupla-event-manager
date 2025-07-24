@@ -1,6 +1,7 @@
 import { SyncStore } from "$lib/shared/syncState.svelte";
 import type { MessagesResponse, UsersResponse } from "$lib/types/pocketbase";
 import { Collections } from "$lib/types/pocketbase";
+import type { ExpandedMessage } from "$lib/types/types";
 
 /*
  *   **`MessageExpand` Interface:**  Cette interface décrit la structure de la propriété `expand` *que nous utilisons réellement*.  Cela rend le code beaucoup plus sûr en termes de types.  Nous savons que `user` est une relation vers la collection `users`, donc nous utilisons `UsersResponse`.  `replyingTo` peut aussi avoir un `expand`, donc c'est récursif.  `[key: string]: any` permet d'autres champs d'extension possibles.
@@ -72,7 +73,7 @@ class MessageStoreClass {
 	 * @param {string} eventId - L'identifiant de l'événement.
 	 * @returns {MessagesResponse[]} - Tableau des messages pour cet événement.
 	 */
-	getMessageOfEvent = $derived.by(() => (id: string): MessagesResponse[] => {
+	getMessageOfEvent = $derived.by(() => (id: string): MessagesResponse<ExpandedMessage>[] => {
 		if (!this.#store.syncStore) {
 			console.warn("messageStore is not initialized yet.");
 			return [];
@@ -88,7 +89,7 @@ class MessageStoreClass {
 			.sort((a, b) => {
 				return new Date(a.created).getTime() - new Date(b.created).getTime();
 			})
-			.exec() as MessagesResponse[];
+			.exec() as MessagesResponse<ExpandedMessage>[];
 	});
 
 	get isInitialized(): boolean {

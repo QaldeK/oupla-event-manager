@@ -32,8 +32,9 @@ onRecordCreateRequest((e) => {
 		user_actor_id: actorId,
 		space_id: e.record.get("space"),
 		details: {
-			event_title: record.get("event_title"),
-			date_event: record.get("date_event")
+			event_title: record.get("event_title") || "Événement",
+			date_event: record.get("date_event") || null,
+			message: `Nouvel événement "${record.get("event_title") || "Événement"}" créé`
 		}
 	});
 	console.log("[DEBUG] Event creation log created successfully");
@@ -135,7 +136,12 @@ onRecordUpdateRequest(
 			createLogEntry({
 				...baseInfoLog,
 				action: "sondage_proposed",
-				users_concerned: [...organizersId, created_by].filter(Boolean)
+				users_concerned: [...organizersId, created_by].filter(Boolean),
+				details: {
+					event_title: record.get("event_title") || "Événement",
+					date_event: record.get("date_event") || null,
+					message: `Nouvelles dates proposées pour "${record.get("event_title") || "Événement"}"`
+				}
 			});
 		}
 
@@ -143,7 +149,12 @@ onRecordUpdateRequest(
 			createLogEntry({
 				...baseInfoLog,
 				action: "event_confirmed",
-				users_concerned: [...organizersId, created_by].filter(Boolean)
+				users_concerned: [...organizersId, created_by].filter(Boolean),
+				details: {
+					event_title: record.get("event_title") || "Événement",
+					date_event: record.get("date_event") || null,
+					message: `L'événement "${record.get("event_title") || "Événement"}" a été confirmé`
+				}
 			});
 		}
 
@@ -152,7 +163,12 @@ onRecordUpdateRequest(
 			createLogEntry({
 				...baseInfoLog,
 				action: "event_canceled",
-				users_concerned: [...organizersId, created_by].filter(Boolean)
+				users_concerned: [...organizersId, created_by].filter(Boolean),
+				details: {
+					event_title: record.get("event_title") || "Événement",
+					date_event: record.get("date_event") || null,
+					message: `L'événement "${record.get("event_title") || "Événement"}" a été annulé`
+				}
 			});
 		}
 
@@ -160,14 +176,24 @@ onRecordUpdateRequest(
 			createLogEntry({
 				...baseInfoLog,
 				action: "event_date_changed",
-				users_concerned: [...organizersId, created_by].filter(Boolean)
+				users_concerned: [...organizersId, created_by].filter(Boolean),
+				details: {
+					event_title: record.get("event_title") || "Événement",
+					date_event: record.get("date_event") || null,
+					message: `La date de "${record.get("event_title") || "Événement"}" a été modifiée`
+				}
 			});
 
 			if (isSondageOpen()) {
 				createLogEntry({
 					...baseInfoLog,
 					action: "sondage_opened",
-					users_concerned: ["all"].filter(Boolean)
+					users_concerned: ["all"].filter(Boolean),
+					details: {
+						event_title: record.get("event_title") || "Événement",
+						date_event: record.get("date_event") || null,
+						message: `Sondage ouvert pour "${record.get("event_title") || "Événement"}"`
+					}
 				});
 			}
 
@@ -175,7 +201,12 @@ onRecordUpdateRequest(
 				createLogEntry({
 					...baseInfoLog,
 					action: "sondage_closed",
-					users_concerned: [...organizersId, created_by].filter(Boolean)
+					users_concerned: [...organizersId, created_by].filter(Boolean),
+					details: {
+						event_title: record.get("event_title") || "Événement",
+						date_event: record.get("date_event") || null,
+						message: `Sondage fermé pour "${record.get("event_title") || "Événement"}"`
+					}
 				});
 			}
 
@@ -214,6 +245,8 @@ onRecordUpdateRequest(
 					action: "organizers_changed",
 					users_concerned: concernedUsers,
 					details: {
+						event_title: record.get("event_title") || "Événement",
+						date_event: record.get("date_event") || null,
 						fields: ["organizers"],
 						message: message
 					}
@@ -282,6 +315,8 @@ onRecordDeleteRequest((e) => {
 		space_id: e.record.get("space"),
 		users_concerned: concernedUsers,
 		details: {
+			event_title: eventTitle,
+			date_event: e.record.getString("date_event") || null,
 			message: message
 		}
 	});
