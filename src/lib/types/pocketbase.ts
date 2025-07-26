@@ -11,6 +11,7 @@ export enum Collections {
 	Mfas = "_mfas",
 	Otps = "_otps",
 	Superusers = "_superusers",
+	ConversationSummaries = "conversation_summaries",
 	Events = "events",
 	EventsPast = "events_past",
 	Logs = "logs",
@@ -97,6 +98,25 @@ export type SuperusersRecord = {
 	tokenKey: string
 	updated?: IsoDateString
 	verified?: boolean
+}
+
+export enum ConversationSummariesTopicTypeOptions {
+	"event" = "event",
+	"group" = "group",
+	"dm" = "dm",
+}
+export type ConversationSummariesRecord = {
+	created?: IsoDateString
+	id: string
+	last_message_snippet?: string
+	last_message_timestamp?: IsoDateString
+	last_message_user?: RecordIdString
+	message_count?: number
+	space?: RecordIdString
+	topic_id?: string
+	topic_title?: string
+	topic_type?: ConversationSummariesTopicTypeOptions
+	updated?: IsoDateString
 }
 
 export type EventsRecord<Tcategories = unknown, Tdates_proposed = unknown, Texternal_proposal = unknown, Torganizers = unknown, Tother_date_query = unknown, Trecurrence = unknown, Trooms = unknown, Ttasks = unknown> = {
@@ -321,6 +341,7 @@ export type ExternalauthsResponse<Texpand = unknown> = Required<ExternalauthsRec
 export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemFields<Texpand>
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
+export type ConversationSummariesResponse<Texpand = unknown> = Required<ConversationSummariesRecord> & BaseSystemFields<Texpand>
 export type EventsResponse<Tcategories = unknown, Tdates_proposed = unknown, Texternal_proposal = unknown, Torganizers = unknown, Tother_date_query = unknown, Trecurrence = unknown, Trooms = unknown, Ttasks = unknown, Texpand = unknown> = Required<EventsRecord<Tcategories, Tdates_proposed, Texternal_proposal, Torganizers, Tother_date_query, Trecurrence, Trooms, Ttasks>> & BaseSystemFields<Texpand>
 export type EventsPastResponse<Tcategories = unknown, Torganizers = unknown, Texpand = unknown> = Required<EventsPastRecord<Tcategories, Torganizers>> & BaseSystemFields<Texpand>
 export type LogsResponse<Tdetails = unknown, Texpand = unknown> = Required<LogsRecord<Tdetails>> & BaseSystemFields<Texpand>
@@ -340,6 +361,7 @@ export type CollectionRecords = {
 	_mfas: MfasRecord
 	_otps: OtpsRecord
 	_superusers: SuperusersRecord
+	conversation_summaries: ConversationSummariesRecord
 	events: EventsRecord
 	events_past: EventsPastRecord
 	logs: LogsRecord
@@ -358,6 +380,7 @@ export type CollectionResponses = {
 	_mfas: MfasResponse
 	_otps: OtpsResponse
 	_superusers: SuperusersResponse
+	conversation_summaries: ConversationSummariesResponse
 	events: EventsResponse
 	events_past: EventsPastResponse
 	logs: LogsResponse
@@ -379,6 +402,7 @@ export type TypedPocketBase = PocketBase & {
 	collection(idOrName: '_mfas'): RecordService<MfasResponse>
 	collection(idOrName: '_otps'): RecordService<OtpsResponse>
 	collection(idOrName: '_superusers'): RecordService<SuperusersResponse>
+	collection(idOrName: 'conversation_summaries'): RecordService<ConversationSummariesResponse>
 	collection(idOrName: 'events'): RecordService<EventsResponse>
 	collection(idOrName: 'events_past'): RecordService<EventsPastResponse>
 	collection(idOrName: 'logs'): RecordService<LogsResponse>

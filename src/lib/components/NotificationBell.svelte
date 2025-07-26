@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { notificationSystem } from "$lib/shared/notificationSystem.svelte";
+	import { NotificationUtils } from "$lib/utils/notificationUtils";
 	import PortalDropdown from "$lib/components/ui/PortalDropdown.svelte";
-	import { Bell } from "lucide-svelte";
+	import { Bell, FileText, MessageSquare } from "lucide-svelte";
 	import { fade } from "svelte/transition";
 
 	interface Props {
@@ -12,23 +12,26 @@
 
 	let isOpen = $state(false);
 
+	// Utiliser l'utilitaire pour récupérer les notifications groupées
+	let groupedNotifications = $derived(NotificationUtils.getGroupedActivity(20));
+
 	function handleOpen() {
-		if (notificationSystem.unreadCount > 0) {
-			notificationSystem.markAsRead();
-		}
+		NotificationUtils.handleNotificationOpen();
 	}
 
 	function formatRelativeTime(dateString: string): string {
-		return notificationSystem.formatRelativeTime(dateString);
+		return NotificationUtils.formatRelativeTime(dateString);
 	}
 
 	function generateMessage(notification: any): string {
-		// Déterminer si c'est un log ou un message
-		if (notification.collectionName === "logs") {
-			return notificationSystem.generateLogMessage(notification);
-		} else {
-			return notificationSystem.generateMessageNotification(notification);
-		}
+		return NotificationUtils.generateMessage(notification);
+	}
+
+	function getNotificationIcon(notification: any) {
+		const type = NotificationUtils.getNotificationType(notification);
+		if (type === "grouped") return MessageSquare;
+		if (type === "log") return FileText;
+		return MessageSquare;
 	}
 </script>
 
@@ -44,34 +47,38 @@
 >
 	{#snippet trigger()}
 		<Bell size={20} />
-		{#if notificationSystem.unreadCount > 0}
+		{#if NotificationUtils.getUnreadCount() > 0}
 			<div
 				class="bg-error absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs text-white"
 				transition:fade
 			>
-				{notificationSystem.unreadCount > 9 ? "9+" : notificationSystem.unreadCount}
+				{NotificationUtils.getUnreadCount() > 9 ? "9+" : NotificationUtils.getUnreadCount()}
 			</div>
 		{/if}
 	{/snippet}
 
 	{#snippet content()}
-		{#if !notificationSystem.isInitialized}
+		{#if !NotificationUtils.isInitialized()}
 			<div class="p-4 text-center">
 				<div class="loading loading-spinner loading-sm"></div>
 				<p class="text-base-content/70 mt-2 text-sm">Chargement...</p>
 			</div>
-		{:else if notificationSystem.recentActivity.length === 0}
+		{:else if groupedNotifications.length === 0}
 			<div class="p-8 text-center">
 				<Bell size={32} class="text-base-content/50 mx-auto mb-2" />
 				<p class="text-base-content/70 text-sm">Aucune notification</p>
 			</div>
 		{:else}
-			{#each notificationSystem.recentActivity as notification (notification.id)}
+			{#each groupedNotifications as notification (notification.id)}
+				{@const IconComponent = getNotificationIcon(notification)}
 				<div
 					class="border-base-300 hover:bg-base-200 cursor-pointer border-b p-4 transition-colors"
 					transition:fade
 				>
 					<div class="flex items-start gap-3">
+						<div class="flex-shrink-0">
+							<IconComponent size={16} />
+						</div>
 						<div class="flex-1">
 							<p class="text-base-content text-sm">
 								{generateMessage(notification)}
@@ -87,7 +94,7 @@
 	{/snippet}
 
 	{#snippet footer()}
-		{#if notificationSystem.recentActivity.length > 0}
+		{#if groupedNotifications.length > 0}
 			<div class="p-3">
 				<button class="btn btn-ghost btn-sm w-full text-xs" onclick={() => (isOpen = false)}>
 					Fermer

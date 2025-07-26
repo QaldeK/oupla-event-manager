@@ -5,7 +5,7 @@ import { userDb } from "$lib/shared/userDb.svelte";
 import { getSpace } from "$lib/shared/spaceOptions.svelte";
 import { eventsStore } from "$lib/shared/eventsStore.svelte";
 import type { LogsResponse, MessagesResponse } from "$lib/types/pocketbase";
-import { SvelteDate } from "svelte/reactivity";
+import { SvelteDate, SvelteMap } from "svelte/reactivity";
 
 /**
  * Système de notification unifié basé sur les nouveaux stores
@@ -31,13 +31,107 @@ class NotificationSystem {
 	 * Cette propriété est dérivée de `_allNotifications` et est donc réactive.
 	 */
 	get recentActivity(): (LogsResponse | MessagesResponse)[] {
-		// Le tri est effectué ici plutôt que dans un `$derived` de haut niveau
-		// car la fonction de tri crée un nouveau tableau, ce qui est une bonne pratique pour les dérivés.
-		// On encapsule dans un getter pour que le tri soit ré-évalué à chaque accès.
 		return this._allNotifications
-			.slice() // Crée une copie pour ne pas muter la source
+			.slice()
 			.sort((a, b) => new SvelteDate(b.created).getTime() - new SvelteDate(a.created).getTime())
 			.slice(0, 20);
+	}
+
+	/**
+	 * Logs récents triés par date
+	 */
+	getLogs(limit: number = 10): LogsResponse[] {
+		return globalLogsStore.myLogs
+			.slice()
+			.sort((a, b) => new SvelteDate(b.created).getTime() - new SvelteDate(a.created).getTime())
+			.slice(0, limit);
+	}
+
+	/**
+	 * Messages récents triés par date
+	 */
+	getMessages(limit: number = 10): MessagesResponse[] {
+		return globalMessagesStore.messages
+			.slice()
+			.sort((a, b) => new SvelteDate(b.created).getTime() - new SvelteDate(a.created).getTime())
+			.slice(0, limit);
+	}
+
+	/**
+	 * Messages regroupés par événement
+	 */
+	getGroupedMessages(): Array<{
+		id: string;
+		type: "grouped_messages";
+		eventId: string;
+		eventTitle: string;
+		count: number;
+		created: string;
+		latestMessage: MessagesResponse;
+		isUnread: boolean;
+	}> {
+		const messages = globalMessagesStore.messages;
+		const messagesByEvent = new SvelteMap<string, MessagesResponse[]>();
+
+		// Regrouper par événement
+		messages.forEach((msg) => {
+			const eventId = msg.event;
+			if (!eventId) return;
+
+			if (!messagesByEvent.has(eventId)) {
+				messagesByEvent.set(eventId, []);
+			}
+			messagesByEvent.get(eventId)!.push(msg);
+		});
+
+		// Créer les groupes
+		return Array.from(messagesByEvent.entries())
+			.map(([eventId, msgs]) => {
+				const sortedMsgs = msgs.sort(
+					(a, b) => new SvelteDate(b.created).getTime() - new SvelteDate(a.created).getTime()
+				);
+				const latestMessage = sortedMsgs[0];
+				const eventTitle =
+					(latestMessage.expand as any)?.event?.event_title ||
+					eventsStore.getEventById(eventId)?.event_title ||
+					"un événement";
+
+				return {
+					id: `grouped_${eventId}_${latestMessage.created}`,
+					type: "grouped_messages" as const,
+					eventId,
+					eventTitle,
+					count: msgs.length,
+					created: latestMessage.created,
+					latestMessage,
+					isUnread: msgs.some((m) => this.isUnread(m))
+				};
+			})
+			.sort((a, b) => new SvelteDate(b.created).getTime() - new SvelteDate(a.created).getTime());
+	}
+
+	/**
+	 * Activité combinée avec messages regroupés
+	 */
+	getGroupedActivity(limit: number = 20): Array<
+		| LogsResponse
+		| {
+				id: string;
+				type: "grouped_messages";
+				eventId: string;
+				eventTitle: string;
+				count: number;
+				created: string;
+				latestMessage: MessagesResponse;
+				isUnread: boolean;
+		  }
+	> {
+		const logs = this.getLogs(50);
+		const groupedMessages = this.getGroupedMessages();
+
+		return [...logs, ...groupedMessages]
+			.sort((a, b) => new SvelteDate(b.created).getTime() - new SvelteDate(a.created).getTime())
+			.slice(0, limit);
 	}
 
 	/**
