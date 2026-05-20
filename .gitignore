@@ -30,6 +30,7 @@ pb/*.tmp
 pb/.env*
 
 _pb_bak
+**/pb_data
 .directory
 *_bak
 
@@ -43,5 +44,5 @@ aider.conf.yml
 .zed/*
 .augment-guidelines
 aider*
-CLAUDE.md
+#CLAUDE.md
 .prompts

@@ -7,6 +7,14 @@ const config = {
 	// for more information about preprocessors
 	preprocess: vitePreprocess({ script: true }),
 
+	vitePlugin: {
+		inspector: {
+			toggleKeyCombo: "alt-x",
+			showToggleButton: "always",
+			toggleButtonPos: "bottom-right"
+		}
+	},
+
 	kit: {
 		adapter: adapter()
 	}

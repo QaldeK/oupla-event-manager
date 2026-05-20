@@ -106,6 +106,78 @@ onRecordCreateRequest((e) => {
 	}
 
 	/**
+	 * Met à jour ou crée un résumé de conversation pour un événement
+	 * @param {Object} record - L'enregistrement du message
+	 */
+	function updateConversationSummary(record) {
+		try {
+			const eventId = record.getString("event");
+			if (!eventId) {
+				console.log("[DEBUG] Message not linked to an event, skipping conversation summary");
+				return;
+			}
+
+			// Récupérer l'événement pour obtenir les infos nécessaires
+			const event = $app.findRecordById("events", eventId);
+			if (!event) {
+				console.error("[ERROR] Event not found for conversation summary:", eventId);
+				return;
+			}
+
+			const spaceId = event.getString("space");
+			const eventTitle = event.getString("event_title");
+			const messageContent = record.getString("content");
+			const messageUser = record.getString("user");
+
+			// Créer un snippet du message (100 caractères max)
+			const snippet =
+				messageContent.length > 100 ? messageContent.substring(0, 97) + "..." : messageContent;
+
+			// Vérifier si un résumé existe déjà pour cet événement
+			let conversationSummary;
+			try {
+				conversationSummary = $app.findFirstRecordByFilter(
+					"conversation_summaries",
+					`topic_id="${eventId}" && topic_type="event"`
+				);
+			} catch (e) {
+				// Pas de résumé existant, on va en créer un
+				conversationSummary = null;
+			}
+
+			if (conversationSummary) {
+				// Mettre à jour le résumé existant
+				const currentCount = conversationSummary.getInt("message_count") || 0;
+
+				conversationSummary.set("last_message_user", messageUser);
+				conversationSummary.set("last_message_snippet", snippet);
+				conversationSummary.set("message_count", currentCount + 1);
+
+				$app.save(conversationSummary);
+				console.log("[DEBUG] Updated conversation summary for event:", eventId);
+			} else {
+				// Créer un nouveau résumé
+				const collection = $app.findCollectionByNameOrId("conversation_summaries");
+				const newSummary = new Record(collection);
+
+				newSummary.set("topic_id", eventId);
+				newSummary.set("topic_type", "event");
+				newSummary.set("topic_title", eventTitle);
+				newSummary.set("space", spaceId);
+				newSummary.set("last_message_user", messageUser);
+				newSummary.set("last_message_snippet", snippet);
+				newSummary.set("message_count", 1);
+
+				$app.save(newSummary);
+				console.log("[DEBUG] Created new conversation summary for event:", eventId);
+			}
+		} catch (error) {
+			console.error("[ERROR] Failed to update conversation summary:", error);
+			// Ne pas bloquer la création du message en cas d'erreur
+		}
+	}
+
+	/**
 	 * Calcule la liste des utilisateurs concernés par un message
 	 * @param {Object} record - L'enregistrement du message
 	 * @returns {string[]} - Tableau des IDs utilisateurs concernés
@@ -146,6 +218,10 @@ onRecordCreateRequest((e) => {
 		e.record.set("users_concerned", usersConcerned);
 
 		console.log("[DEBUG] Messages hook: users_concerned field set successfully");
+
+		// Mettre à jour le résumé de conversation
+		updateConversationSummary(e.record);
+
 	} catch (error) {
 		console.error("[ERROR] Messages hook: Failed to calculate users_concerned:", error);
 		// En cas d'erreur, on laisse le champ vide plutôt que de bloquer la création

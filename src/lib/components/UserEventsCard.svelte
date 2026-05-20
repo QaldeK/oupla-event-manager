@@ -15,7 +15,7 @@
 
 	let currentUser: UserType | null = userDb.current;
 
-	const isCurrentUserSubscribed = $derived(() => {
+	const isCurrentUserSubscribed = $derived.by(() => {
 		return event.organizers?.some(
 			(org: { id: string; username: string }) => org.id === currentUser?.id
 		);
@@ -41,13 +41,6 @@
 		if (!currentUser) return;
 		requestTaskUpdate({ event: event, user: currentUser });
 	};
-
-	// 👉 Helper pour lister les tâches de l'utilisateur actuel
-	const currentUserTasks = $derived(
-		event.organizers?.find(
-			(org: { id: string; username: string; tasks?: string[] }) => org.id === currentUser?.id
-		)?.tasks ?? []
-	);
 </script>
 
 <div class="@container flex flex-col rounded-lg border shadow-lg">

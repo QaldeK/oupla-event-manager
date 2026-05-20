@@ -1,8 +1,6 @@
 // <reference path="../pb_data/types.d.ts" />
 // pb_hooks/events.pb.js
 
-const { createLogEntry } = require(`${__hooks}/logs.shared.js`);
-const { getActorId } = require(`${__hooks}/utils.js`);
 
 /* --- LOGS DE CRÉATION D'ÉVÉNEMENT ---
 Crée un log avec pour concerned users les organisateurs et les participants du sondage

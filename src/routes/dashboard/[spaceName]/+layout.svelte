@@ -15,7 +15,8 @@
 	// stores et utilitaires
 	import { pb } from "$lib/pocketbase.svelte";
 	import { eventsStore } from "$lib/shared/eventsStore.svelte";
-	import { messageStore } from "$lib/shared/messageStore.svelte";
+	import { messageManager } from "$lib/shared/messageStore.svelte";
+	import { conversationDirectoryStore } from "$lib/shared/conversationDirectoryStore.svelte";
 	import { getSpace, loadSpaceOptions } from "$lib/shared/spaceOptions.svelte";
 	import { loadingState, messageSheet, modalState } from "$lib/shared/states.svelte";
 	import { userDb } from "$lib/shared/userDb.svelte";
@@ -76,8 +77,14 @@
 			// Initialiser les stores principaux avec l'ID de l'espace courant
 			await Promise.all([
 				loadSpaceOptions(currentSpace.id),
-				eventsStore.init({ spaceId: currentSpace.id, mode: "internal" })
+				eventsStore.init({ spaceId: currentSpace.id, mode: "internal" }),
+				messageManager.init(currentSpace.id)
 			]);
+
+			// Initialiser le store global des conversations s'il ne l'est pas déjà
+			if (!conversationDirectoryStore.isInitialized) {
+				await conversationDirectoryStore.init();
+			}
 
 			// Initialiser le contexte utilisateur
 			currentUser = {
@@ -96,18 +103,6 @@
 			throw new Error(err instanceof Error ? err.message : "Une erreur inconnue est survenue.");
 		}
 	}
-
-	// Chargement différé des stores secondaires après l'initialisation principale
-	$effect(() => {
-		if (isInitialized && currentSpace?.id) {
-			// Délai de 1 seconde pour ne pas impacter l'expérience utilisateur
-			setTimeout(() => {
-				if (currentSpace?.id) {
-					messageStore.init(currentSpace.id);
-				}
-			}, 1000);
-		}
-	});
 
 	// Ré-initialiser quand l'espace change (navigation entre espaces)
 	$effect(() => {
@@ -172,7 +167,7 @@
 	async function handleLogout() {
 		try {
 			// 1. Détruire tous les stores
-			await Promise.all([eventsStore.destroy(), messageStore.destroy()]);
+			await Promise.all([eventsStore.destroy(), messageManager.destroy()]);
 
 			// Nettoyer les notifications
 			notificationSystem.reset();

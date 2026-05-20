@@ -2,7 +2,7 @@
 	import MessageCard from "$lib/components/MessageCard.svelte";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import { sendMessage } from "$lib/pocketbase.svelte";
-	import { messageStore } from "$lib/shared/messageStore.svelte";
+	import { messageManager } from "$lib/shared/messageStore.svelte";
 	import type { MessagesResponse } from "$lib/types/pocketbase";
 	import type { ExpandedMessage } from "$lib/types/types";
 	import { getSpace } from "$lib/shared";
@@ -20,7 +20,7 @@
 	let replyingTo = $state<string | null>(null);
 	let replyingToMessage = $state<MessagesResponse<ExpandedMessage> | null>(null);
 	let messages = $derived<MessagesResponse<ExpandedMessage>[]>(
-		messageStore.getMessageOfEvent(eventId)
+		messageManager.getMessageOfEvent(eventId)
 	);
 	let isLoading = $state(false);
 	let messageRefs = $state<Record<string, HTMLElement>>({});
@@ -82,6 +82,15 @@
 			behavior: "smooth"
 		});
 
+	// Précharger la conversation au montage du composant pour de meilleures performances
+	$effect(() => {
+		if (eventId && messageManager.isInitialized) {
+			messageManager.preloadConversation(eventId).catch((error) => {
+				console.warn("Échec du préchargement de la conversation:", error);
+			});
+		}
+	});
+
 	$effect(() => {
 		if (list) {
 			if (!replyingTo) {
@@ -100,9 +109,15 @@
 
 	<!-- Zone de messages avec défilement -->
 	<div bind:this={scrollRef} class="flex-1 overflow-auto p-2">
-		{#if isLoading}
+		{#if isLoading || !messageManager.isInitialized}
 			<div class="flex justify-center p-4">
 				<span class="loading loading-spinner loading-md"></span>
+			</div>
+		{:else if messageManager.error}
+			<div class="flex justify-center p-4">
+				<div class="alert alert-error">
+					<span>Erreur lors du chargement des messages</span>
+				</div>
 			</div>
 		{:else}
 			<div class="space-y-4">

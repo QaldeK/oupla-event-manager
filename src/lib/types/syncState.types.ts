@@ -40,6 +40,7 @@ export interface StoreConfig<T extends StoreRecord> {
 	sync?: SyncOptions;
 	trackUpdates?: boolean;
 	cache?: CacheOptions;
+	storage?: "indexedDB" | "memory"; // Mode de stockage: IndexedDB ou mémoire uniquement
 }
 
 // Interface pour les erreurs de synchronisation

@@ -1,10 +1,11 @@
 import type { StoreRecord } from "$lib/types/syncState.types";
+import type { DbManagerInterface } from "./dbManager.interface";
 
 /**
  * Gestionnaire pour les opérations IndexedDB
  * Classe TypeScript pure sans dépendances Svelte
  */
-export class IndexedDbManager<T extends StoreRecord> {
+export class IndexedDbManager<T extends StoreRecord> implements DbManagerInterface<T> {
 	private db: IDBDatabase | null = null;
 	private initPromise: Promise<void> | null = null;
 
@@ -101,6 +102,54 @@ export class IndexedDbManager<T extends StoreRecord> {
 	}
 
 	/**
+	 * Obtient un enregistrement par son ID
+	 */
+	async get(id: string): Promise<T | undefined> {
+		if (!this.db) {
+			return undefined;
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction([this.storeName], "readonly");
+			const objectStore = transaction.objectStore(this.storeName);
+			const request = objectStore.get(id);
+
+			request.onerror = () => {
+				console.error(`⚠️ IndexedDbManager: Erreur de récupération:`, request.error);
+				reject(request.error);
+			};
+
+			request.onsuccess = () => {
+				resolve(request.result as T | undefined);
+			};
+		});
+	}
+
+	/**
+	 * Vérifie si un enregistrement existe
+	 */
+	async exists(id: string): Promise<boolean> {
+		if (!this.db) {
+			return false;
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = this.db!.transaction([this.storeName], "readonly");
+			const objectStore = transaction.objectStore(this.storeName);
+			const request = objectStore.count(id);
+
+			request.onerror = () => {
+				console.error(`⚠️ IndexedDbManager: Erreur de vérification:`, request.error);
+				reject(request.error);
+			};
+
+			request.onsuccess = () => {
+				resolve(request.result > 0);
+			};
+		});
+	}
+
+	/**
 	 * Supprime un enregistrement par son ID
 	 */
 	async delete(recordId: string): Promise<void> {
@@ -177,11 +226,11 @@ export class IndexedDbManager<T extends StoreRecord> {
 	}
 
 	/**
-	 * Obtient le nombre total d'enregistrements
+	 * Retourne le nombre d'enregistrements
 	 */
 	async count(): Promise<number> {
 		if (!this.db) {
-			throw new Error("IndexedDB not initialized");
+			return 0;
 		}
 
 		return new Promise((resolve, reject) => {
@@ -218,17 +267,19 @@ export class IndexedDbManager<T extends StoreRecord> {
 	}
 
 	/**
-	 * Ferme la connexion à la base de données
+	 * Ferme la base de données et libère les ressources
 	 */
-	close(): void {
+	async close(): Promise<void> {
 		if (this.db) {
 			this.db.close();
 			this.db = null;
 		}
+		this.initPromise = null;
+		console.log(`🧹 IndexedDbManager: DB '${this.dbName}' fermée`);
 	}
 
 	/**
-	 * Vérifie si la base est initialisée
+	 * Indique si le gestionnaire est initialisé
 	 */
 	get isInitialized(): boolean {
 		return this.db !== null;

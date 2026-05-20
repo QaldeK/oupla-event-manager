@@ -1,5 +1,6 @@
 import { pb } from "$lib/pocketbase.svelte";
-import { IndexedDbManager } from "$lib/shared/indexedDbManager.svelte";
+import { DbManagerFactory } from "$lib/shared/dbManager.interface";
+import type { DbManagerInterface } from "$lib/shared/dbManager.interface";
 import { IndexManager, QueryBuilder } from "$lib/shared/indexManager.svelte";
 import { PocketBaseSyncer } from "$lib/shared/pocketbaseSyncer.svelte";
 import type { Collections } from "$lib/types/pocketbase";
@@ -26,7 +27,7 @@ export class SyncStore<T extends StoreRecord> {
 
 	// Modules de gestion internes
 	private readonly config: StoreConfig<T>;
-	private readonly dbManager: IndexedDbManager<T>;
+	private readonly dbManager: DbManagerInterface<T>;
 	private readonly indexManager: IndexManager<T>;
 	private syncer: PocketBaseSyncer<T> | null = null;
 	private collection: Collection | null = null;
@@ -40,13 +41,21 @@ export class SyncStore<T extends StoreRecord> {
 
 	constructor(config: StoreConfig<T>) {
 		this.config = this.normalizeConfig(config);
-		this.dbManager = new IndexedDbManager<T>(
+
+		// Utiliser la factory pour créer le bon type de gestionnaire
+		const storageMode = this.config.storage || "indexedDB";
+		this.dbManager = DbManagerFactory.create<T>(
+			storageMode,
 			this.config.dbName || this.config.name,
 			this.config.name,
 			this.config.version,
 			this.config.primaryKey ?? "id"
 		);
+
 		this.indexManager = new IndexManager<T>(this.config.indexes);
+
+		// Log du mode de stockage utilisé
+		console.log(`📦 SyncStore "${this.config.name}" configuré en mode ${storageMode}`);
 	}
 
 	// --- Initialisation et Cycle de vie ---
@@ -132,15 +141,6 @@ export class SyncStore<T extends StoreRecord> {
 		} finally {
 			this.store.isSyncing = false;
 		}
-	}
-
-	public async destroy(): Promise<void> {
-		this.syncer?.stop();
-		await this.clearLocalData();
-		this.dbManager.close();
-		this.initPromise = null;
-		this.store.isInitialized = false;
-		console.log(`💥 Store "${this.config.name}" détruit.`);
 	}
 
 	// --- Accès et Manipulation des données ---
@@ -410,5 +410,46 @@ export class SyncStore<T extends StoreRecord> {
 			loadMore,
 			reset
 		};
+	}
+
+	// --- Nettoyage et Destruction ---
+
+	/**
+	 * Détruit complètement l'instance SyncStore et libère toutes les ressources
+	 * Utile pour les stores temporaires en mode mémoire
+	 */
+	async destroy(): Promise<void> {
+		try {
+			// 1. Arrêter la synchronisation
+			if (this.syncer) {
+				await this.syncer.stop();
+				this.syncer = null;
+			}
+
+			// 2. Nettoyer les données en mémoire
+			this.store.byId.clear();
+			this.store.updatedRecords.clear();
+			this.indexManager.clear();
+
+			// 3. Fermer et nettoyer le gestionnaire de base de données
+			await this.dbManager.close();
+
+			// 4. Nettoyer le localStorage si nécessaire
+			localStorage.removeItem(this.LAST_SYNC_KEY);
+
+			// 5. Réinitialiser l'état
+			this.store.isInitialized = false;
+			this.store.isSyncing = false;
+			this.store.error = null;
+			this.store.lastSync = null;
+			this.collection = null;
+			this.collectionName = null;
+			this.initPromise = null;
+
+			console.log(`🗑️ SyncStore "${this.config.name}" détruit et nettoyé`);
+		} catch (error) {
+			console.error(`❌ Erreur lors de la destruction de SyncStore "${this.config.name}":`, error);
+			throw error;
+		}
 	}
 }

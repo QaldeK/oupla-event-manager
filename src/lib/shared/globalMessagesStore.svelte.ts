@@ -37,6 +37,12 @@ class GlobalMessagesStore {
 			name: "globalMessages",
 			version: 1,
 			dbName: "globalMessages", // DB dédiée pour ne pas interférer avec d'autres stores
+			indexes: {
+				byEvent: {
+					path: "event",
+					type: "single"
+				}
+			},
 			sync: {
 				mode: "realtime",
 				filter,
@@ -116,6 +122,14 @@ class GlobalMessagesStore {
 	 */
 	getMessagesForSpace(spaceId: string): MessagesResponse[] {
 		return this.messages.filter((message) => message.space === spaceId);
+	}
+
+	/**
+	 * Messages pour un événement spécifique, en utilisant l'index pour la performance.
+	 */
+	getMessagesByEvent(eventId: string): MessagesResponse[] {
+		if (!this.syncStore) return [];
+		return this.syncStore.getByIndex("byEvent", eventId) as MessagesResponse[];
 	}
 
 	/**

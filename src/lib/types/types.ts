@@ -48,6 +48,15 @@ export type {
 	ModalStateType // État global des modals
 } from "$lib/shared/states.svelte";
 
+// Types pour les statistiques de conversations
+export interface ConversationStats {
+	totalConversations: number;
+	eventConversations: number;
+	groupConversations: number;
+	dmConversations: number;
+	recentConversations: number;
+}
+
 export type {
 	PublicSpaceInfo, // Infos publiques de l'espace
 	PublicEventInfo // Infos des événements publics

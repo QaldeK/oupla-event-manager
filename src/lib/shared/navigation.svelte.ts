@@ -16,7 +16,8 @@ import {
 	Palette,
 	PanelsTopLeft,
 	ExternalLink,
-	Archive
+	Archive,
+	MessageCircle
 } from "lucide-svelte";
 
 // --- INTERFACES ---
@@ -155,6 +156,11 @@ class NavigationStore {
 				label: "Newsletter",
 				icon: Mail,
 				path: "/dashboard/newsletter"
+			},
+			{
+				label: "Discussions",
+				icon: MessageCircle,
+				path: "/dashboard/discussions"
 			},
 			{
 				label: "Site public",

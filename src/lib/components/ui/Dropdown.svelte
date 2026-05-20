@@ -106,7 +106,7 @@
 	});
 
 	// Classes de position
-	const positionClasses = $derived(() => {
+	const positionClasses = $derived.by(() => {
 		const baseClasses = "absolute z-50";
 		const positionClass = position === "top" ? "bottom-full mb-2" : "top-full mt-2";
 
