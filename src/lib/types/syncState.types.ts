@@ -96,8 +96,10 @@ export type PathsToStringProps<T> = T extends string | number | boolean | Date
 		}[Extract<keyof T, string>];
 
 // Type pour les EventData de PocketBase
-export interface PocketBaseEventData<T extends StoreRecord = StoreRecord>
-	extends Omit<RecordSubscription<T>, "action"> {
+export interface PocketBaseEventData<T extends StoreRecord = StoreRecord> extends Omit<
+	RecordSubscription<T>,
+	"action"
+> {
 	action: "create" | "update" | "delete";
 	record: T;
 }

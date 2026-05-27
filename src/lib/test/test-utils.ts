@@ -83,7 +83,12 @@ export const MOFO_SPACE_CONFIG = {
 		{ name: "newtask", description: "testest", type: "onEvent", isDefault: false }
 	],
 	members: [
-		{ id: "o48pvotsdr2o7gt", username: "aldek", email: "***REMOVED***", role: "admin" },
+		{
+			id: "o48pvotsdr2o7gt",
+			username: "aldek",
+			email: import.meta.env.VITE_TEST_EMAIL_ALDEK as string,
+			role: "admin"
+		},
 		{ id: "ix78im6wl916zxr", username: "ghald", email: "ghald@riseup.net", role: "helpers" },
 		{ id: "vzq3336334p5ewa", username: "pito", email: "pito@pito.com", role: "helpers" },
 		{ id: "5tc53czs08l2z4b", username: "pati", email: "pati@pati.com", role: "invited" },
@@ -92,7 +97,12 @@ export const MOFO_SPACE_CONFIG = {
 		{ id: "7961w4ae24gi4xn", username: "touti", role: "invited" },
 		{ id: "7nd048fgvfe8329", username: "lila", role: "helpers" },
 		{ id: "3sdpmr92whfd7oa", username: "qko", email: "qk-oupla@gmx.com", role: "admin" },
-		{ id: "pt8013z6bhan87u", username: "users211593", email: "***REMOVED***", role: "external" },
+		{
+			id: "pt8013z6bhan87u",
+			username: "users211593",
+			email: import.meta.env.VITE_TEST_EMAIL_QKMAIL as string,
+			role: "external"
+		},
 		{ id: "a4le7vb3m03p5w3", username: "pouet", email: "pouet@pouet.com", role: "external" },
 		{ id: "22k3hmf98go8xsw", username: "newone", role: "helpers" }
 	]

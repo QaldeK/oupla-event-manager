@@ -22,7 +22,7 @@
  *
  * # ⚠️ ATTENTION: Ces tests créent de vrais événements dans PocketBase
  * # Assurez-vous d'être connecté avec les bons identifiants de test
- * # Authentification requise: ***REMOVED*** / ***REMOVED***
+ * # Configurer les variables VITE_TEST_EMAIL_ALDEK et VITE_TEST_PASSWORD dans .env
  */
 
 import { describe, test, expect, beforeAll, afterEach } from "vitest";
@@ -49,7 +49,12 @@ describe("Tests d'intégration PocketBase - Création d'événements réels", ()
 		// Authentification pour les tests
 		console.log("🔐 Authentification pour les tests...");
 		try {
-			await pb.collection("users").authWithPassword("***REMOVED***", "***REMOVED***");
+			await pb
+				.collection("users")
+				.authWithPassword(
+					import.meta.env.VITE_TEST_EMAIL_ALDEK as string,
+					import.meta.env.VITE_TEST_PASSWORD as string
+				);
 			console.log("✅ Authentifié:", pb.authStore.record?.username);
 		} catch (error) {
 			console.error("❌ Erreur d'authentification:", error);

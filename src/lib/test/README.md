@@ -27,6 +27,7 @@ bun run lint && bun run format
 ## 📁 Structure des tests
 
 ### Tests unitaires (avec mocks)
+
 - **`conflict-deduplication.test.ts`** - Tests de déduplication des conflits d'événements
 - **`eventActions-conflicts.test.ts`** - Tests de gestion des conflits après sauvegarde
 - **`recurrent-conflicts.test.ts`** - Tests des conflits pour événements récurrents (moqués)
@@ -35,11 +36,13 @@ bun run lint && bun run format
 - **`utils.test.ts`** - Tests des utilitaires et de la logique métier
 
 ### Tests d'intégration (vraie base de données)
+
 - **`integration.test.ts`** - Tests d'intégration PocketBase généraux
 - **`integration-with-validation.test.ts`** - Tests d'intégration avec validation préalable
 - **`real-recurrent.test.ts`** - Tests réels pour événements récurrents
 
 ### Utilitaires
+
 - **`test-utils.ts`** - Fonctions utilitaires pour créer des données de test cohérentes
 
 ## ⚠️ Tests avec vraie base de données
@@ -47,11 +50,13 @@ bun run lint && bun run format
 **ATTENTION** : Certains tests créent de vrais événements dans PocketBase !
 
 ### Authentification requise
+
 Les tests d'intégration nécessitent une authentification :
-- **Email** : `***REMOVED***`
-- **Mot de passe** : `***REMOVED***`
+
+- Configurer les variables dans `.env` (voir `.env.example`)
 
 ### Tests concernés
+
 - `integration.test.ts`
 - `integration-with-validation.test.ts`
 - `real-recurrent.test.ts`
@@ -61,6 +66,7 @@ Ces tests sont marqués avec l'avertissement ⚠️ dans leurs en-têtes.
 ## 🧪 Types de tests
 
 ### 1. Tests de logique métier
+
 ```bash
 # Déduplication des conflits
 bun run test conflict-deduplication.test.ts
@@ -70,6 +76,7 @@ bun run test utils.test.ts
 ```
 
 ### 2. Tests d'intégration avec mocks
+
 ```bash
 # Gestion des conflits (moqué)
 bun run test eventActions-conflicts.test.ts
@@ -80,6 +87,7 @@ bun run test validation-integration.test.ts
 ```
 
 ### 3. Tests d'intégration réels
+
 ```bash
 # Création d'événements réels
 bun run test integration.test.ts
@@ -96,6 +104,7 @@ bun run test real-recurrent.test.ts
 ### Fonctions testées principales
 
 #### eventActions.ts
+
 - `deduplicateConflictIds()` - Déduplication des IDs de conflit
 - `cleanupBidirectionalConflicts()` - Nettoyage des conflits bidirectionnels
 - `validateAndCleanExistingConflicts()` - Validation et nettoyage des conflits existants
@@ -105,12 +114,14 @@ bun run test real-recurrent.test.ts
 - `getDefaultRecurrence()` - Configuration par défaut de récurrence
 
 #### pocketbase.svelte.ts
+
 - `createEvent()` - Création d'événement
 - `updateEvent()` - Mise à jour d'événement
 - `createRecurrentEvent()` - Création d'événements récurrents
 - `updateReciprocalConflicts()` - Mise à jour des conflits réciproques
 
 #### validation/event-validator.svelte.ts
+
 - `validateEventStatic()` - Validation statique d'événement
 - Profils de validation : `DRAFT`, `STANDARD_EVENT`, `RECURRENT_MASTER`
 
@@ -119,20 +130,25 @@ bun run test real-recurrent.test.ts
 Les tests utilisent la vraie configuration de l'espace Mofo :
 
 #### Salles disponibles
+
 - `bibli`, `salle-2`, `salle 3`
 
 #### Catégories
+
 - `autre`, `apéro`, `concert`, `discussion`, `atelier`, `réunion`, `spectacle`, `jeu`
 
 #### Tâches
+
 - `présence`, `com`, `ménage`, `contact`, `course`, `animation`, `ouverture`, `newtask`
 
 #### Membres de test
+
 - `aldek` (admin), `ghald` (helpers), `pito` (helpers), `zeo` (helpers), etc.
 
 ## 🎯 Exemples d'utilisation
 
 ### Exécuter un test spécifique
+
 ```bash
 # Test de déduplication des conflits
 bun run test:unit -- -t "deduplicateConflictIds"
@@ -145,32 +161,29 @@ bun run test:unit -- -t "should create recurrent events and return event IDs"
 ```
 
 ### Créer de nouvelles données de test
+
 ```typescript
-import { createCompleteEvent, createMofoOrganizer, createMofoTask } from './test-utils';
+import { createCompleteEvent, createMofoOrganizer, createMofoTask } from "./test-utils";
 
 // Événement complet et valide
 const event = createCompleteEvent(
-    "Mon Atelier", 
-    "atelier", 
-    "2025-08-15", 
-    "14:00", 
-    "17:00", 
-    true,  // isPublic
-    true   // isConfirmed
+	"Mon Atelier",
+	"atelier",
+	"2025-08-15",
+	"14:00",
+	"17:00",
+	true, // isPublic
+	true // isConfirmed
 );
 
 // Ajouter des organisateurs
 event.organizers = [
-    createMofoOrganizer("aldek", ["présence", "animation"]),
-    createMofoOrganizer("ghald", ["com"])
+	createMofoOrganizer("aldek", ["présence", "animation"]),
+	createMofoOrganizer("ghald", ["com"])
 ];
 
 // Ajouter des tâches
-event.tasks = [
-    createMofoTask("présence"),
-    createMofoTask("animation"),
-    createMofoTask("com")
-];
+event.tasks = [createMofoTask("présence"), createMofoTask("animation"), createMofoTask("com")];
 ```
 
 ## 🔧 Dépannage
@@ -190,6 +203,7 @@ event.tasks = [
    - Utiliser `vi.clearAllMocks()` dans `beforeEach()`
 
 ### Debugger les tests
+
 ```bash
 # Voir les logs détaillés
 bun run test --reporter=verbose
@@ -201,6 +215,7 @@ bun run test --inspect-brk
 ## 📊 Couverture des tests
 
 Les tests couvrent :
+
 - ✅ Gestion des conflits d'événements
 - ✅ Validation des données d'événements
 - ✅ Création et modification d'événements

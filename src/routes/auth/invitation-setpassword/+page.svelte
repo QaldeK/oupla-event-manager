@@ -5,8 +5,8 @@
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 
-	let password = $state("***REMOVED***");
-	let passwordConfirm = $state("***REMOVED***");
+	let password = $state("");
+	let passwordConfirm = $state("");
 	let isLoading = $state(false);
 	let errors = $state({
 		password: "",

@@ -1,22 +1,22 @@
 /**
  * COMMANDES POUR EXÉCUTER CES TESTS :
- * 
+ *
  * # Exécuter tous les tests de ce fichier
  * bun run test integration-with-validation.test.ts
- * 
+ *
  * # Exécuter tous les tests
  * bun run test
- * 
+ *
  * # Exécuter un test spécifique par nom
  * bun run test:unit -- -t "should validate and create a complete atelier event"
  * bun run test:unit -- -t "should validate and create a paid concert event"
  * bun run test:unit -- -t "should reject invalid event missing required fields"
  * bun run test:unit -- -t "should validate draft event with minimal requirements"
  * bun run test:unit -- -t "should validate and create sondage event"
- * 
+ *
  * # Exécuter avec watch mode
  * bun run test --watch integration-with-validation.test.ts
- * 
+ *
  * # ⚠️ ATTENTION: Ces tests créent de vrais événements dans PocketBase
  * # Assurez-vous d'être connecté avec les bons identifiants de test
  */
@@ -59,7 +59,12 @@ describe("Tests d'intégration PocketBase avec validation préalable", () => {
 		// Authentification pour les tests
 		console.log("🔐 Authentification pour les tests...");
 		try {
-			await pb.collection("users").authWithPassword("***REMOVED***", "***REMOVED***");
+			await pb
+				.collection("users")
+				.authWithPassword(
+					import.meta.env.VITE_TEST_EMAIL_ZEO as string,
+					import.meta.env.VITE_TEST_PASSWORD as string
+				);
 			console.log("✅ Authentifié:", pb.authStore.record?.username);
 		} catch (error) {
 			console.error("❌ Erreur d'authentification:", error);

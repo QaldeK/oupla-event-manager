@@ -487,9 +487,8 @@ describe("NotificationSystem", () => {
 
 	describe("Compatibilité", () => {
 		it("devrait exporter les fonctions de compatibilité", async () => {
-			const { markNotificationsAsRead, generateNotificationMessage } = await import(
-				"$lib/shared/notificationSystem.svelte"
-			);
+			const { markNotificationsAsRead, generateNotificationMessage } =
+				await import("$lib/shared/notificationSystem.svelte");
 
 			expect(typeof markNotificationsAsRead).toBe("function");
 			expect(typeof generateNotificationMessage).toBe("function");

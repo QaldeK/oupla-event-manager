@@ -69,9 +69,9 @@
 	// État d'authentification
 	let isAuthenticated = $state(pb.authStore.isValid);
 	let username = $state("");
-	let email = $state("***REMOVED***"); // FIXIT !! : hardvalue for dev !!
-	let password = $state("***REMOVED***");
-	let passwordConfirm = $state("***REMOVED***");
+	let email = $state("");
+	let password = $state("");
+	let passwordConfirm = $state("");
 	let authError = $state("");
 
 	// Validation du mot de passe uniquement pour la correspondance

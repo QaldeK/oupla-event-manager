@@ -3,8 +3,8 @@
 	import { pb } from "$lib/pocketbase.svelte";
 	import { goto } from "$app/navigation";
 
-	let email = $state("***REMOVED***");
-	let password = $state("***REMOVED***");
+	let email = $state("");
+	let password = $state("");
 	let message = $state("");
 	let isCheckingAuth = $state(true); // Nouvel état pour la vérification
 

@@ -17,7 +17,6 @@
 - **CSR**: We work on client side rendering sveltekit project
 - **Types**: Use strict TypeScript typing, always define interfaces for props
 - **Naming**: Clear, explicit; use camelCase for variables, PascalCase for components
-- **Reactivity**: Use classes with `$state` for shared reactive state
 - **Style**: Use Tailwind CSS and DaisyUI
 - **DRY**: Avoid code duplication, extract reusable components and utilities
 - **KISS**: Keep code simple and readable
