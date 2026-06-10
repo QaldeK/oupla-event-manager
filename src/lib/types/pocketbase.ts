@@ -5,28 +5,30 @@
 import type PocketBase from "pocketbase";
 import type { RecordService } from "pocketbase";
 
-export enum Collections {
-	Authorigins = "_authOrigins",
-	Externalauths = "_externalAuths",
-	Mfas = "_mfas",
-	Otps = "_otps",
-	Superusers = "_superusers",
-	ConversationSummaries = "conversation_summaries",
-	Events = "events",
-	EventsPast = "events_past",
-	Logs = "logs",
-	Messages = "messages",
-	Pads = "pads",
-	SitePages = "site_pages",
-	SpaceMembers = "spaceMembers",
-	Spaces = "spaces",
-	SpacesOptions = "spaces_options",
-	Users = "users"
-}
+export const Collections = {
+	Authorigins: "_authOrigins",
+	Externalauths: "_externalAuths",
+	Mfas: "_mfas",
+	Otps: "_otps",
+	Superusers: "_superusers",
+	Events: "events",
+	EventsPast: "events_past",
+	Logs: "logs",
+	Messages: "messages",
+	Pads: "pads",
+	SitePages: "site_pages",
+	SpaceMembers: "spaceMembers",
+	Spaces: "spaces",
+	SpacesOptions: "spaces_options",
+	Users: "users"
+} as const;
+export type Collections = (typeof Collections)[keyof typeof Collections];
 
 // Alias types for improved usability
 export type IsoDateString = string;
+export type IsoAutoDateString = string & { readonly autodate: unique symbol };
 export type RecordIdString = string;
+export type FileNameString = string & { readonly filename: unique symbol };
 export type HTMLString = string;
 
 type ExpandType<T> = unknown extends T
@@ -53,70 +55,51 @@ export type AuthSystemFields<T = unknown> = {
 
 export type AuthoriginsRecord = {
 	collectionRef: string;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	fingerprint: string;
 	id: string;
 	recordRef: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type ExternalauthsRecord = {
 	collectionRef: string;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	id: string;
 	provider: string;
 	providerId: string;
 	recordRef: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type MfasRecord = {
 	collectionRef: string;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	id: string;
 	method: string;
 	recordRef: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type OtpsRecord = {
 	collectionRef: string;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	id: string;
 	password: string;
 	recordRef: string;
 	sentTo?: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type SuperusersRecord = {
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	email: string;
 	emailVisibility?: boolean;
 	id: string;
 	password: string;
 	tokenKey: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 	verified?: boolean;
-};
-
-export enum ConversationSummariesTopicTypeOptions {
-	"event" = "event",
-	"group" = "group",
-	"dm" = "dm"
-}
-export type ConversationSummariesRecord = {
-	created?: IsoDateString;
-	id: string;
-	last_message_snippet?: string;
-	last_message_timestamp?: IsoDateString;
-	last_message_user?: RecordIdString;
-	message_count?: number;
-	space?: RecordIdString;
-	topic_id?: string;
-	topic_title?: string;
-	topic_type?: ConversationSummariesTopicTypeOptions;
-	updated?: IsoDateString;
 };
 
 export type EventsRecord<
@@ -132,7 +115,7 @@ export type EventsRecord<
 	age_advice?: number;
 	canceled?: boolean;
 	categories?: null | Tcategories;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	created_by: RecordIdString;
 	dateEnd?: IsoDateString;
 	dateStart?: IsoDateString;
@@ -144,7 +127,7 @@ export type EventsRecord<
 	event_title: string;
 	external_proposal?: null | Texternal_proposal;
 	id: string;
-	image?: string[];
+	image?: FileNameString[];
 	inConflictWith?: RecordIdString[];
 	isConfirmed?: boolean;
 	isMasterRecurrent?: boolean;
@@ -174,14 +157,14 @@ export type EventsRecord<
 	tasks?: null | Ttasks;
 	time_end?: string;
 	time_start?: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type EventsPastRecord<Tcategories = unknown, Torganizers = unknown> = {
 	age_advice?: string;
 	canceled?: boolean;
 	categories?: null | Tcategories;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	created_by?: RecordIdString;
 	date_event?: string;
 	desc_public?: HTMLString;
@@ -205,38 +188,38 @@ export type EventsPastRecord<Tcategories = unknown, Torganizers = unknown> = {
 	space?: RecordIdString;
 	start_event?: string;
 	start_public?: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type LogsRecord<Tdetails = unknown> = {
 	action: string;
 	collection_target: string;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	details?: null | Tdetails;
 	id: string;
 	record_target_id?: string;
 	space: RecordIdString;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 	user_actor_id: RecordIdString;
 	users_concerned?: RecordIdString[];
 };
 
 export type MessagesRecord = {
 	content: string;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	event?: RecordIdString;
 	id: string;
 	isEdited?: boolean;
 	replyingTo?: RecordIdString;
 	space: RecordIdString;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 	user: RecordIdString;
 	users_concerned?: RecordIdString[];
 };
 
 export type PadsRecord = {
 	content?: HTMLString;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	created_by: RecordIdString;
 	editingUser?: RecordIdString;
 	id: string;
@@ -246,22 +229,24 @@ export type PadsRecord = {
 	space: RecordIdString;
 	tags?: string;
 	title: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
-export enum SitePagesSectionOptions {
-	"page" = "page",
-	"leftSide" = "leftSide",
-	"header" = "header",
-	"top" = "top",
-	"rightSide" = "rightSide",
-	"footer" = "footer"
-}
+export const SitePagesSectionOptions = {
+	page: "page",
+	leftSide: "leftSide",
+	header: "header",
+	top: "top",
+	rightSide: "rightSide",
+	footer: "footer"
+} as const;
+export type SitePagesSectionOptions =
+	(typeof SitePagesSectionOptions)[keyof typeof SitePagesSectionOptions];
 export type SitePagesRecord<TcomponentConfig = unknown> = {
 	componentConfig?: null | TcomponentConfig;
 	componentType?: string;
 	content?: HTMLString;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	created_by?: RecordIdString;
 	editingUser?: RecordIdString;
 	enabled?: boolean;
@@ -274,33 +259,37 @@ export type SitePagesRecord<TcomponentConfig = unknown> = {
 	space: RecordIdString;
 	tags?: string;
 	title: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
-export enum SpaceMembersRoleOptions {
-	"admin" = "admin",
-	"helpers" = "helpers",
-	"invited" = "invited",
-	"external" = "external"
-}
+export const SpaceMembersRoleOptions = {
+	admin: "admin",
+	helpers: "helpers",
+	invited: "invited",
+	external: "external"
+} as const;
+export type SpaceMembersRoleOptions =
+	(typeof SpaceMembersRoleOptions)[keyof typeof SpaceMembersRoleOptions];
 export type SpaceMembersRecord = {
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	id: string;
 	isMemberOfRecurrent?: RecordIdString[];
 	isOrganizerOf?: RecordIdString[];
 	role: SpaceMembersRoleOptions;
 	space: RecordIdString;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 	user: RecordIdString;
 };
 
-export enum SpacesInscriptionOptions {
-	"open" = "open",
-	"invitation" = "invitation",
-	"close" = "close"
-}
+export const SpacesInscriptionOptions = {
+	open: "open",
+	invitation: "invitation",
+	close: "close"
+} as const;
+export type SpacesInscriptionOptions =
+	(typeof SpacesInscriptionOptions)[keyof typeof SpacesInscriptionOptions];
 export type SpacesRecord<Tdeleted_records = unknown> = {
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	created_by: RecordIdString;
 	deleted_records?: null | Tdeleted_records;
 	description?: string;
@@ -308,7 +297,7 @@ export type SpacesRecord<Tdeleted_records = unknown> = {
 	inscription?: SpacesInscriptionOptions;
 	name: string;
 	public_name: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type SpacesOptionsRecord<
@@ -319,7 +308,7 @@ export type SpacesOptionsRecord<
 	Ttasks = unknown
 > = {
 	categories?: null | Tcategories;
-	created?: IsoDateString;
+	created: IsoAutoDateString;
 	id: string;
 	mailContactSpace?: string;
 	mailSend?: HTMLString;
@@ -331,12 +320,12 @@ export type SpacesOptionsRecord<
 	rooms?: null | Trooms;
 	space?: RecordIdString;
 	tasks?: null | Ttasks;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 };
 
 export type UsersRecord = {
-	avatar?: string;
-	created?: IsoDateString;
+	avatar?: FileNameString;
+	created: IsoAutoDateString;
 	email: string;
 	emailVisibility?: boolean;
 	id: string;
@@ -345,7 +334,7 @@ export type UsersRecord = {
 	isInvited?: boolean;
 	password: string;
 	tokenKey: string;
-	updated?: IsoDateString;
+	updated: IsoAutoDateString;
 	username?: string;
 	verified?: boolean;
 };
@@ -359,8 +348,6 @@ export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemF
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>;
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> &
 	AuthSystemFields<Texpand>;
-export type ConversationSummariesResponse<Texpand = unknown> =
-	Required<ConversationSummariesRecord> & BaseSystemFields<Texpand>;
 export type EventsResponse<
 	Tcategories = unknown,
 	Tdates_proposed = unknown,
@@ -423,7 +410,6 @@ export type CollectionRecords = {
 	_mfas: MfasRecord;
 	_otps: OtpsRecord;
 	_superusers: SuperusersRecord;
-	conversation_summaries: ConversationSummariesRecord;
 	events: EventsRecord;
 	events_past: EventsPastRecord;
 	logs: LogsRecord;
@@ -442,7 +428,6 @@ export type CollectionResponses = {
 	_mfas: MfasResponse;
 	_otps: OtpsResponse;
 	_superusers: SuperusersResponse;
-	conversation_summaries: ConversationSummariesResponse;
 	events: EventsResponse;
 	events_past: EventsPastResponse;
 	logs: LogsResponse;
@@ -455,24 +440,72 @@ export type CollectionResponses = {
 	users: UsersResponse;
 };
 
+// Utility types for create/update operations
+
+type ProcessCreateAndUpdateFields<T> = Omit<
+	{
+		// Omit AutoDate fields
+		[K in keyof T as Extract<T[K], IsoAutoDateString> extends never
+			? K
+			: never]: // Convert FileNameString to File
+		T[K] extends infer U
+			? U extends FileNameString | FileNameString[]
+				? U extends any[]
+					? File[]
+					: File
+				: U
+			: never;
+	},
+	"id"
+>;
+
+// Create type for Auth collections
+export type CreateAuth<T> = {
+	id?: RecordIdString;
+	email: string;
+	emailVisibility?: boolean;
+	password: string;
+	passwordConfirm: string;
+	verified?: boolean;
+} & ProcessCreateAndUpdateFields<T>;
+
+// Create type for Base collections
+export type CreateBase<T> = {
+	id?: RecordIdString;
+} & ProcessCreateAndUpdateFields<T>;
+
+// Update type for Auth collections
+export type UpdateAuth<T> = Partial<
+	Omit<ProcessCreateAndUpdateFields<T>, keyof AuthSystemFields>
+> & {
+	email?: string;
+	emailVisibility?: boolean;
+	oldPassword?: string;
+	password?: string;
+	passwordConfirm?: string;
+	verified?: boolean;
+};
+
+// Update type for Base collections
+export type UpdateBase<T> = Partial<Omit<ProcessCreateAndUpdateFields<T>, keyof BaseSystemFields>>;
+
+// Get the correct create type for any collection
+export type Create<T extends keyof CollectionResponses> =
+	CollectionResponses[T] extends AuthSystemFields
+		? CreateAuth<CollectionRecords[T]>
+		: CreateBase<CollectionRecords[T]>;
+
+// Get the correct update type for any collection
+export type Update<T extends keyof CollectionResponses> =
+	CollectionResponses[T] extends AuthSystemFields
+		? UpdateAuth<CollectionRecords[T]>
+		: UpdateBase<CollectionRecords[T]>;
+
 // Type for usage with type asserted PocketBase instance
 // https://github.com/pocketbase/js-sdk#specify-typescript-definitions
 
-export type TypedPocketBase = PocketBase & {
-	collection(idOrName: "_authOrigins"): RecordService<AuthoriginsResponse>;
-	collection(idOrName: "_externalAuths"): RecordService<ExternalauthsResponse>;
-	collection(idOrName: "_mfas"): RecordService<MfasResponse>;
-	collection(idOrName: "_otps"): RecordService<OtpsResponse>;
-	collection(idOrName: "_superusers"): RecordService<SuperusersResponse>;
-	collection(idOrName: "conversation_summaries"): RecordService<ConversationSummariesResponse>;
-	collection(idOrName: "events"): RecordService<EventsResponse>;
-	collection(idOrName: "events_past"): RecordService<EventsPastResponse>;
-	collection(idOrName: "logs"): RecordService<LogsResponse>;
-	collection(idOrName: "messages"): RecordService<MessagesResponse>;
-	collection(idOrName: "pads"): RecordService<PadsResponse>;
-	collection(idOrName: "site_pages"): RecordService<SitePagesResponse>;
-	collection(idOrName: "spaceMembers"): RecordService<SpaceMembersResponse>;
-	collection(idOrName: "spaces"): RecordService<SpacesResponse>;
-	collection(idOrName: "spaces_options"): RecordService<SpacesOptionsResponse>;
-	collection(idOrName: "users"): RecordService<UsersResponse>;
-};
+export type TypedPocketBase = {
+	collection<T extends keyof CollectionResponses>(
+		idOrName: T
+	): RecordService<CollectionResponses[T]>;
+} & PocketBase;

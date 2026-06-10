@@ -31,7 +31,19 @@ import type {
 	DateProposedType,
 	ExternalProposalType
 } from "$lib/types/event.types";
-import { Collections } from "$lib/types/pocketbase";
+import { Collections, type IsoAutoDateString } from "$lib/types/pocketbase";
+
+export function asAutoDate(date: string): IsoAutoDateString {
+	return date as IsoAutoDateString;
+}
+
+export function asAutoDates<T extends Record<string, any>>(obj: T): T {
+	return {
+		...obj,
+		created: obj.created as IsoAutoDateString,
+		updated: obj.updated as IsoAutoDateString
+	};
+}
 
 export const MOFO_SPACE_CONFIG = {
 	id: "xl69b9bu7yjbaj7",
@@ -139,8 +151,8 @@ export function createBaseEvent(): EventType {
 		isMasterRecurrent: false,
 		masterRecurrentId: "",
 		space: MOFO_SPACE_CONFIG.id,
-		created: "",
-		updated: "",
+		created: "" as IsoAutoDateString,
+		updated: "" as IsoAutoDateString,
 		collectionId: "events",
 		collectionName: Collections.Events,
 		expand: undefined,

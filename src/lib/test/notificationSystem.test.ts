@@ -1,7 +1,7 @@
 // src/lib/test/notificationSystem.test.ts
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { notificationSystem } from "$lib/shared/notificationSystem.svelte";
-import type { LogsResponse, MessagesResponse } from "$lib/types/pocketbase";
+import type { LogsResponse, MessagesResponse, IsoAutoDateString } from "$lib/types/pocketbase";
 
 // Mock des dépendances
 vi.mock("$lib/shared/globalLogsStore.svelte", () => ({
@@ -56,6 +56,8 @@ Object.defineProperty(window, "localStorage", {
 	value: localStorageMock
 });
 
+const autoDate = (d: string) => d as IsoAutoDateString;
+
 // Données de test
 const mockLogs: LogsResponse[] = [
 	{
@@ -70,8 +72,8 @@ const mockLogs: LogsResponse[] = [
 			event_title: "Événement Test",
 			message: 'Nouvelles dates proposées pour "Événement Test"'
 		},
-		created: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 30).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		collectionId: "logs_id",
 		collectionName: "logs" as any,
 		expand: {
@@ -79,8 +81,8 @@ const mockLogs: LogsResponse[] = [
 				id: "user456",
 				username: "testuser",
 				email: "test@example.com",
-				created: "",
-				updated: "",
+				created: "" as IsoAutoDateString,
+				updated: "" as IsoAutoDateString,
 				emailVisibility: false,
 				verified: false,
 				collectionId: "",
@@ -101,8 +103,8 @@ const mockLogs: LogsResponse[] = [
 			event_title: "Événement Confirmé",
 			message: 'L\'événement "Événement Confirmé" a été confirmé'
 		},
-		created: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		collectionId: "logs_id",
 		collectionName: "logs" as any,
 		expand: {}
@@ -113,11 +115,11 @@ const mockMessages: MessagesResponse[] = [
 	{
 		id: "msg1",
 		content: "Message de test",
-		created: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 minutes ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 45).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		user: "user456",
 		event: "event1",
-		replyingTo: null,
+		replyingTo: "",
 		space: "space1",
 		isEdited: false,
 		users_concerned: ["user123", "user456"],
@@ -128,8 +130,8 @@ const mockMessages: MessagesResponse[] = [
 				id: "user456",
 				username: "testuser",
 				email: "test@example.com",
-				created: "",
-				updated: "",
+				created: "" as IsoAutoDateString,
+				updated: "" as IsoAutoDateString,
 				emailVisibility: false,
 				verified: false,
 				collectionId: "",
@@ -139,8 +141,8 @@ const mockMessages: MessagesResponse[] = [
 			event: {
 				id: "event1",
 				event_title: "Événement Test",
-				created: "",
-				updated: "",
+				created: "" as IsoAutoDateString,
+				updated: "" as IsoAutoDateString,
 				collectionId: "",
 				collectionName: "events" as any,
 				expand: {}
@@ -471,13 +473,13 @@ describe("NotificationSystem", () => {
 			// Un élément ancien devrait être considéré comme lu
 			const oldItem = {
 				...mockLogs[0],
-				created: new Date(Date.now() - 1000 * 60 * 60).toISOString() // 1 heure avant
+				created: autoDate(new Date(Date.now() - 1000 * 60 * 60).toISOString())
 			};
 
 			// Un élément récent devrait être considéré comme non lu
 			const newItem = {
 				...mockLogs[0],
-				created: new Date(Date.now() + 1000 * 60).toISOString() // 1 minute après
+				created: autoDate(new Date(Date.now() + 1000 * 60).toISOString())
 			};
 
 			expect(notificationSystem.isUnread(oldItem)).toBe(false);

@@ -1,7 +1,7 @@
 // src/lib/test/globalMessagesStore.test.ts
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { globalMessagesStore } from "$lib/shared/globalMessagesStore.svelte";
-import type { MessagesResponse } from "$lib/types/pocketbase";
+import type { MessagesResponse, IsoAutoDateString } from "$lib/types/pocketbase";
 
 // Mock des dépendances
 const mockGetFullList = vi.fn();
@@ -17,16 +17,18 @@ vi.mock("$lib/shared/userDb.svelte", () => ({
 	}
 }));
 
+const autoDate = (d: string) => d as IsoAutoDateString;
+
 // Mock des messages de test
 const mockMessages: MessagesResponse[] = [
 	{
 		id: "msg1",
 		content: "Premier message de test",
-		created: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 30).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		user: "user456",
 		event: "event1",
-		replyingTo: null,
+		replyingTo: "",
 		space: "space1",
 		isEdited: false,
 		users_concerned: ["user123", "user456"],
@@ -37,8 +39,8 @@ const mockMessages: MessagesResponse[] = [
 				id: "user456",
 				username: "testuser",
 				email: "test@example.com",
-				created: "",
-				updated: "",
+				created: "" as IsoAutoDateString,
+				updated: "" as IsoAutoDateString,
 				emailVisibility: false,
 				verified: false,
 				collectionId: "",
@@ -48,8 +50,8 @@ const mockMessages: MessagesResponse[] = [
 			event: {
 				id: "event1",
 				event_title: "Événement Test",
-				created: "",
-				updated: "",
+				created: "" as IsoAutoDateString,
+				updated: "" as IsoAutoDateString,
 				collectionId: "",
 				collectionName: "events" as any,
 				expand: {}
@@ -59,8 +61,8 @@ const mockMessages: MessagesResponse[] = [
 	{
 		id: "msg2",
 		content: "Deuxième message de test",
-		created: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		user: "user789",
 		event: "event2",
 		replyingTo: "msg1",
@@ -74,11 +76,11 @@ const mockMessages: MessagesResponse[] = [
 	{
 		id: "msg3",
 		content: "Message récent",
-		created: new Date(Date.now() - 1000 * 60 * 60 * 1.5).toISOString(), // 1.5 hours ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 60 * 1.5).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		user: "user456",
-		event: null,
-		replyingTo: null,
+		event: "" as any,
+		replyingTo: "" as any,
 		space: "space1",
 		isEdited: false,
 		users_concerned: ["user123", "user456"],
@@ -89,11 +91,11 @@ const mockMessages: MessagesResponse[] = [
 	{
 		id: "msg4",
 		content: "Message ancien",
-		created: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(), // 25 hours ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		user: "user456",
 		event: "event3",
-		replyingTo: null,
+		replyingTo: "",
 		space: "space1",
 		isEdited: false,
 		users_concerned: ["user123", "user456"],
@@ -316,11 +318,11 @@ describe("globalMessagesStore", () => {
 			const newMessage: MessagesResponse = {
 				id: "msg_new",
 				content: "Nouveau message",
-				created: new Date().toISOString(),
-				updated: new Date().toISOString(),
+				created: autoDate(new Date().toISOString()),
+				updated: autoDate(new Date().toISOString()),
 				user: "user456",
 				event: "event1",
-				replyingTo: null,
+				replyingTo: "",
 				space: "space1",
 				isEdited: false,
 				users_concerned: ["user123", "user456"], // Utilisateur concerné
@@ -340,11 +342,11 @@ describe("globalMessagesStore", () => {
 			const newMessage: MessagesResponse = {
 				id: "msg_new",
 				content: "Nouveau message",
-				created: new Date().toISOString(),
-				updated: new Date().toISOString(),
+				created: autoDate(new Date().toISOString()),
+				updated: autoDate(new Date().toISOString()),
 				user: "user456",
 				event: "event1",
-				replyingTo: null,
+				replyingTo: "",
 				space: "space1",
 				isEdited: false,
 				users_concerned: ["user456", "user789"], // Utilisateur non concerné

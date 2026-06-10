@@ -107,6 +107,7 @@
 	{/if}
 
 	{#if !currentEvent.canceled}
+	<!-- TODO ? autoriser que hasauth  -->
 		{#if !currentEvent.isConfirmed && !currentEvent.isSondage}
 			<button class="btn" onclick={handleConfirmEvent}>
 				<CalendarCheck />

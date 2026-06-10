@@ -10,6 +10,9 @@ import {
 	isPageComponent,
 	getTypedComponentConfig
 } from "$lib/types/publicSiteType";
+import type { IsoAutoDateString } from "$lib/types/pocketbase";
+
+const autoDate = (d: string) => d as IsoAutoDateString;
 
 describe("Types discriminés pour les composants de site", () => {
 	// Mock data pour les tests
@@ -32,14 +35,14 @@ describe("Types discriminés pour les composants de site", () => {
 		space: "space1",
 		collectionId: "site_pages",
 		collectionName: "site_pages" as any,
-		created: "2024-01-01T00:00:00Z",
-		updated: "2024-01-01T00:00:00Z",
+		created: autoDate("2024-01-01T00:00:00Z"),
+		updated: autoDate("2024-01-01T00:00:00Z"),
 		isEditing: false,
-		editingUser: null,
-		lastEditHeartbeat: null,
+		editingUser: "",
+		lastEditHeartbeat: "",
 		created_by: "user1",
 		lastMod: "2024-01-01T00:00:00Z",
-		tags: null
+		tags: ""
 	};
 
 	const mockBlocComponent: BlocResponse = {
@@ -48,9 +51,8 @@ describe("Types discriminés pour les composants de site", () => {
 		componentConfig: {
 			bgColor: "bg-gray-100",
 			textColor: "text-gray-900",
-			showTitle: true,
-			padding: "p-4"
-		},
+			showTitle: true
+		} as any,
 		title: "Bloc d'information",
 		content: "<p>Contenu du bloc</p>",
 		section: "rightSide" as any,
@@ -59,14 +61,14 @@ describe("Types discriminés pour les composants de site", () => {
 		space: "space1",
 		collectionId: "site_pages",
 		collectionName: "site_pages" as any,
-		created: "2024-01-01T00:00:00Z",
-		updated: "2024-01-01T00:00:00Z",
+		created: autoDate("2024-01-01T00:00:00Z"),
+		updated: autoDate("2024-01-01T00:00:00Z"),
 		isEditing: false,
-		editingUser: null,
-		lastEditHeartbeat: null,
+		editingUser: "",
+		lastEditHeartbeat: "",
 		created_by: "user1",
 		lastMod: "2024-01-01T00:00:00Z",
-		tags: null
+		tags: ""
 	};
 
 	const mockPageComponent: PageResponse = {
@@ -86,14 +88,14 @@ describe("Types discriminés pour les composants de site", () => {
 		space: "space1",
 		collectionId: "site_pages",
 		collectionName: "site_pages" as any,
-		created: "2024-01-01T00:00:00Z",
-		updated: "2024-01-01T00:00:00Z",
+		created: autoDate("2024-01-01T00:00:00Z"),
+		updated: autoDate("2024-01-01T00:00:00Z"),
 		isEditing: false,
-		editingUser: null,
-		lastEditHeartbeat: null,
+		editingUser: "",
+		lastEditHeartbeat: "",
 		created_by: "user1",
 		lastMod: "2024-01-01T00:00:00Z",
-		tags: null
+		tags: ""
 	};
 
 	describe("Type Guards", () => {
@@ -134,8 +136,7 @@ describe("Types discriminés pour les composants de site", () => {
 			expect(config).toEqual({
 				bgColor: "bg-gray-100",
 				textColor: "text-gray-900",
-				showTitle: true,
-				padding: "p-4"
+				showTitle: true
 			});
 		});
 

@@ -6,7 +6,7 @@
 	import { fade } from "svelte/transition";
 
 	// États réactifs avec $state
-	let email = $state("qk-oupla@gmx.com");
+	let email = $state("");
 	let username = $state("qko");
 	let isLoading = $state(false);
 	let invitationLink = $state("");

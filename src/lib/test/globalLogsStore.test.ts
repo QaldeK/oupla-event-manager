@@ -1,7 +1,7 @@
 // src/lib/test/globalLogsStore.test.ts
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { globalLogsStore } from "$lib/shared/globalLogsStore.svelte";
-import type { LogsResponse } from "$lib/types/pocketbase";
+import type { LogsResponse, IsoAutoDateString } from "$lib/types/pocketbase";
 
 // Mock des dépendances
 vi.mock("$lib/shared/syncState.svelte", () => ({
@@ -24,6 +24,8 @@ vi.mock("$lib/shared/userDb.svelte", () => ({
 	}
 }));
 
+const autoDate = (d: string) => d as IsoAutoDateString;
+
 // Mock des logs de test
 const mockLogs: LogsResponse[] = [
 	{
@@ -38,8 +40,8 @@ const mockLogs: LogsResponse[] = [
 			event_title: "Événement Test",
 			message: "Nouvel événement créé"
 		},
-		created: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 30).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		collectionId: "logs_id",
 		collectionName: "logs" as any,
 		expand: {}
@@ -56,8 +58,8 @@ const mockLogs: LogsResponse[] = [
 			event_title: "Sondage Test",
 			message: "Nouvelles dates proposées"
 		},
-		created: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		collectionId: "logs_id",
 		collectionName: "logs" as any,
 		expand: {}
@@ -74,8 +76,8 @@ const mockLogs: LogsResponse[] = [
 			pad_title: "Pad Test",
 			message: "Nouveau pad créé"
 		},
-		created: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(), // 25 hours ago (not recent)
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		collectionId: "logs_id",
 		collectionName: "logs" as any,
 		expand: {}
@@ -92,8 +94,8 @@ const mockLogs: LogsResponse[] = [
 			event_title: "Événement Modifié",
 			message: "Organisateurs modifiés"
 		},
-		created: new Date(Date.now() - 1000 * 60 * 10).toISOString(), // 10 minutes ago
-		updated: new Date().toISOString(),
+		created: autoDate(new Date(Date.now() - 1000 * 60 * 10).toISOString()),
+		updated: autoDate(new Date().toISOString()),
 		collectionId: "logs_id",
 		collectionName: "logs" as any,
 		expand: {}
