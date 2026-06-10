@@ -32,6 +32,7 @@ pb/.env*
 _pb_bak
 .directory
 *_bak
+bak_*
 
 llm
 docs
