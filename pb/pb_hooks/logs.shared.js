@@ -12,36 +12,36 @@
  * @param {string[]} [param0.users_concerned] - Tableau des ID des utilisateurs concernés par ce log.
  * @param {Object} [param0.details] - Données JSON supplémentaires.
  */
-function createLogEntry({
-	action,
-	collection_target,
-	record_target_id,
-	user_actor_id,
-	space_id,
-	users_concerned = [],
-	details
-}) {
-	try {
-		const logsCollection = $app.findCollectionByNameOrId("logs");
-		const logRecord = new Record(logsCollection); // Crée une instance vide pour cette collection
+module.exports = {
+	createLogEntry: function ({
+		action,
+		collection_target,
+		record_target_id,
+		user_actor_id,
+		space_id,
+		users_concerned = [],
+		details
+	}) {
+		try {
+			const logsCollection = $app.findCollectionByNameOrId("logs");
+			const logRecord = new Record(logsCollection);
 
-		logRecord.set("action", action);
-		if (collection_target) logRecord.set("collection_target", collection_target);
-		if (record_target_id) logRecord.set("record_target_id", record_target_id);
-		logRecord.set("user_actor_id", user_actor_id);
-		if (space_id) logRecord.set("space", space_id);
+			logRecord.set("action", action);
+			if (collection_target) logRecord.set("collection_target", collection_target);
+			if (record_target_id) logRecord.set("record_target_id", record_target_id);
+			logRecord.set("user_actor_id", user_actor_id);
+			if (space_id) logRecord.set("space", space_id);
 
-		const finalUsersConcerned = [...new Set(users_concerned.filter(Boolean))];
-		if (finalUsersConcerned.length > 0) {
-			logRecord.set("users_concerned", finalUsersConcerned);
+			const finalUsersConcerned = [...new Set(users_concerned.filter(Boolean))];
+			if (finalUsersConcerned.length > 0) {
+				logRecord.set("users_concerned", finalUsersConcerned);
+			}
+
+			if (details) logRecord.set("details", details);
+
+			$app.save(logRecord);
+		} catch (err) {
+			console.error(`Failed to create log entry (action: ${action}): ${JSON.stringify(err)}`);
 		}
-
-		if (details) logRecord.set("details", details);
-
-		$app.save(logRecord);
-	} catch (err) {
-		console.error(`Failed to create log entry (action: ${action}): ${JSON.stringify(err)}`);
 	}
-}
-
-module.exports = { createLogEntry };
+};

@@ -1,14 +1,14 @@
 // pb_hooks/pads.pb.js
 /// <reference path="../pb_data/types.d.ts" />
 
-const { createLogEntry } = require(`${__hooks}/logs.shared.js`);
-const { getActorId } = require(`${__hooks}/utils.js`);
-
 /**
  * Hook de création de pad - génère un log create_pad
  */
 onRecordCreateRequest((e) => {
 	console.log("[DEBUG] Pads hook: Starting pad creation log");
+
+	const { createLogEntry } = require(`${__hooks}/logs.shared.js`);
+	const { getActorId } = require(`${__hooks}/utils.js`);
 
 	try {
 		const actorId = getActorId(e, "system");
@@ -40,6 +40,9 @@ onRecordCreateRequest((e) => {
  */
 onRecordUpdateRequest((e) => {
 	console.log("[DEBUG] Pads hook: Starting pad update log");
+
+	const { createLogEntry } = require(`${__hooks}/logs.shared.js`);
+	const { getActorId } = require(`${__hooks}/utils.js`);
 
 	try {
 		const actorId = getActorId(e, "system");
